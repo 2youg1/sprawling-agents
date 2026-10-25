@@ -6,7 +6,7 @@
 /-!
 # runtime::catalog
 
-规定 `catalog`、`catalog::dormant`、`catalog::fit`、`catalog::guide`、`catalog::namespace`（`crates/runtime/src/` 下同名的文件）与 `tools::tool` 那一扇门。渐进披露与截断锁：一个 run 被告知哪些工具与 skill，各付多少字节。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `catalog`、`catalog::dormant`、`catalog::exposure`、`catalog::fit`、`catalog::guide`、`catalog::namespace`（`crates/runtime/src/` 下同名的文件）与 `tools::tool` 那一扇门。渐进披露与截断锁：一个 run 被告知哪些工具与 skill，各付多少字节。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -21,7 +21,9 @@ pub struct SkillPin { pub name: String, pub hash: B3Hash }
 pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode: Option<Mode> —— 私有 */ }
 impl Catalog {
     pub fn new() -> Catalog;
-    pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<(), AxError>; // disclosure 非空；重名＝E_INVALID_ARGS；命名空间由准入它的装配层说（§8-60）
+    pub fn set_exposure(&mut self, stated: kernel::config::CatalogExposure); // 本 run 冻下的两张 `[catalog]` 表；先于第一件 admit_tool（§8-60、D111）
+    pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<Exposure, AxError>; // disclosure 非空；重名＝E_INVALID_ARGS；命名空间由准入它的装配层说（§8-60）；答它得到的档位，Off 的不进工具表、索引与 run
+    pub fn tool_table(&self) -> Result<ToolTable, AxError>;   // 本 run 的工具表：常驻数组的字节与每件一行（含 Off），`prompt_assembled.tools` 记它（D111）
     pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）；expansion 是城内地址
     pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 城外书架上的一件：expansion 是扫描读到的那份文档正文（§8-29-6）
     pub fn set_mode(&mut self, mode: Mode);                                    // Resident 段的 mode 行：run 开始时的 mode；会话中换 mode 不改它（§8-62）
@@ -66,6 +68,11 @@ impl Catalog {
 pub enum Namespace { Own(kernel::ReservedNamespace), Server(kernel::ServerLabel) }
 // kernel
 pub enum ReservedNamespace { Computer, Media, Record, Skill, Sprawling, Web } // ALL、as_str、named；city 的配置层拒绝用它们作 label 的 MCP 服务器
+// runtime::catalog::exposure
+pub const FIXED: [&str; 2] = ["tool", "read"];                       // 哪张表都挪不动的两件，恒为 Core
+pub fn exposure_of(stated: &CatalogExposure, name: &str, namespace: &str) -> (Exposure, ExposureFrom); // 固定 > 表 > 缺省
+pub fn fallback(name: &str) -> (Exposure, ExposureFrom);              // 两张表都不说时：固定件 Core/Fixed，某个 mode 核心里的 Core/Default，其余 Dormant/Default
+pub struct ToolTable { pub array: Vec<u8>, pub record: kernel::event::record::PromptTools }
 // runtime::mode
 pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 允许执行的常驻工具名，含 `tool`
 pub fn in_some_core(name: &str) -> bool;                               // 在某个 mode 的核心里：ChatRequest.tools 取的就是它（D25）
@@ -78,6 +85,8 @@ impl ToolTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<ToolTool, AxE
 
 - **一件工具的命名空间由准入它的装配层说**（`accounting::worker::workbench` 把每件工具连同一个 `Namespace` 交给 `admit_tool`）：只有那里知道一件工具是城自己的还是某台服务器的。城自己的工具归预留命名空间（`sprawling`：城与居民之间的协作与自身状态；`computer`：浏览器；`media`：识图与转写；`record`：回看与提案；`web`：联网搜索；`skill`：阅览室的 skill），外部服务器的工具归它的 label——它的每件工具拼作 `{label}_{tool}`，`ServerLabel` 不含 `_`，所以 `tool find` 去掉前缀得到的成员名唯一。预留名由 `kernel::ReservedNamespace` 一处列出，city 的配置层拒绝以它们为 label 的服务器（`crates/city/spec/ConfigLayers.lean` §8-4）：一台 MCP 服务器若叫 `sprawling`，`tool list sprawling` 会把外部工具当作城自己的能力列出。被否：按名字切第一个 `_` 推出命名空间——城自己的工具名（`web_search`）也含 `_`，推出的命名空间会是错的。
 - **索引的写法**：一行段头；然后先工具的命名空间、后 skill，各按名字的字节序，一件一行。命名空间写作 `- <名> (<件数>): <提示>`：预留命名空间的提示是表里那一句，其余是成员去掉 `<label>_` 前缀后的名字，以 `, ` 相连；skill 写作 `- skill <名>: <提示>`，提示是披露的第一句（到第一个 `. ` 或行尾）。提示在 `HINT_MAX_BYTES` 处按字符边界截断。逐件贪心：带提示的那行放得下就放，放不下退到只有名字的那行，再放不下就停，剩下的件数写成末行 `+N more`。预算先扣掉 `+N more` 在 N 取全部件数时的长度，所以那一行恒放得下。没有休眠的件时整块不出现。
+- **一件工具的档位由 `catalog::exposure` 一处定**（D111）：`exposure_of` 先看它是不是 `FIXED` 里的两件（`tool` 是休眠索引唯一的门，`read` 是打开目录条目与 skill 的唯一的门，任何一件降档，索引列出的东西就没有调用够得到），是就恒为 `Core`；否则读这个 run 冻下的两张 `[catalog]` 表，次序是 `kernel::config::CatalogExposure::stated` 的（楼的工具键、楼的命名空间键、城的工具键、城的命名空间键，`crates/kernel/Spec.lean` §8-22）；两张表都不说时取 `fallback`：在某个 mode 的核心里（`mode::in_some_core`）的是 `Core`，其余 `Dormant`，也就是这张表出现之前的行为。`admit_tool` 把档位记在这一件上并答它：`Core` 进 `ChatRequest.tools`，`Dormant` 进休眠索引，`Off` 只留一行给 `tool_table`，不进工具表、索引、`tool` 的 `list`／`find`／`detail`／`run`。装配层拿到 `Off` 就不给它在 bench 上登记路由，所以模型按名字直调它也够不到（`accounting::worker::workbench`）。档位不改 `mode_admits`：`edit` 与 `exec` 被表降到 `Dormant` 后经 `tool` 的 `run` 到达，`chat` 下仍在它们自己的第一道门被拒（D25）。
+- **每个 run 记下它的工具表**：`tool_table` 把 `tool_defs` 的数组按 JSON 序列化一次，`array` 由装配层放进对象库，`record` 是 `PromptTools { hash, len, index, rows }`：数组的 BLAKE3 与字节、休眠索引的字节、每件一行（名字、命名空间、档位、来源、定义的字节、按 `dormant::hint` 截出的第一句），`Off` 的也有一行，按名字排。`FrozenPrefix::with_tools` 把它挂在冻结的前缀上，每一回合的 `prompt_assembled.tools` 都写同一份（`crates/kernel/Spec.lean` §8-22 的记录、`crates/wire/Spec.lean` §8-99 的读者）。字节是本城序列化的字节，不是哪一家 provider 线上的字节：各家兼容格式拼法不同，账要一把对所有兼容格式都一样的尺。
 - **每个 mode 允许执行哪些常驻工具，由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`tool`；`work` 再加 `edit` 与 `exec`。`ChatRequest.tools` 的常驻核心是 `Mode::ALL` 各自 `core_tools` 的并集，在 session 开始时定下（D25），所以会话中换 mode 不改工具表，只改门（§8-62）。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。`status` 在派发时冻结的那几行进 Run 段之前留在常驻核心里，因为 `City.md` 让每个居民去调它。
 
 下面的模型是索引装填的长度账、命名空间的折叠与三档的可见性；Rust 的 `catalog::dormant` 按同一贪心拼出字节，`catalog::tests` 对拍上限、折叠与三档（§16）。
@@ -355,6 +364,17 @@ end Runtime.Catalog
 **被否**：①改 mode 时换工具表：违反 D21，每次改都整段缓存失效；②`chat` 里 `edit`／`exec` 只经 `tool` 的 `run` 走第三档：模型在 `work` 与 `chat` 之间看到同一件工具时有时直调、有时经 `run`，指南要说两套用法。
 
 **重开参数**：某个 mode 的核心多出一件定义很大的工具、使并集的字节在小模型的窗口里显著时，重议是否只对能改策略的 session 用并集。
+-/
+
+/-! D111 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结
+
+**决定**：每件已建好的工具在 `admit_tool` 时取一个档位 `Exposure { Core, Dormant, Off }`（`kernel::config`）：`tool` 与 `read` 恒为 `Core`；其余读这个 run 冻下的楼与城两张 `[catalog]` 表，楼的工具键、楼的命名空间键、城的工具键、城的命名空间键依次，先说的算；都不说时，某个 mode 核心里的是 `Core`，其余 `Dormant`。`Off` 的工具只留一行给本 run 的工具表记录，装配层不给它登记路由。表只许写在城与楼两级（`crates/city/spec/ConfigLayers.lean` §8-4g）。
+
+**理由**：截断锁的三档原本由代码里的静态表定，一栋楼想把一台两百件工具的服务器整组关掉、或把常用的 `plan` 提成常驻，只能改代码。档位按工具与命名空间两种键写，是因为人想的单位有两种：一件常用工具，与一整台服务器。工具键压过命名空间键，近层压过远层，所以「这台服务器关掉，只留一件」写成两行。`tool` 与 `read` 固定，因为它们是休眠索引与 skill 的唯一出入口。表在 run 起点随配置冻结，D21 的「工具表在 session 里不变」照旧成立。
+
+**被否**：①给每件工具一个布尔「常驻」：关不掉，`Off` 的意思是不准入，是截断锁的第一档；②档位写在房间层：工具数组在 provider 的缓存里排在 system 之前，同一栋楼的房间各不相同就把这栋楼的缓存打碎；③页面按名字推命名空间：命名空间由准入它的装配层说（§8-60），推出来的会错。
+
+**重开参数**：某家 provider 让工具在会话中途加载而不失效缓存时（D110 的重开参数），`Dormant` 与 `Core` 的差可能缩小到不值得一张表。
 -/
 
 /-! D110 一个 `tool` 工具、四个 op，取代 `describe` 与 `call` 两扇门；休眠索引一个命名空间一行

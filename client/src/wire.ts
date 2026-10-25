@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 69 as const;
+export const WIRE_V = 70 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "423d9007f42ac99f7ef7bbf3e26966f802d77b211df0e114903829c85e6172ab" as const;
+export const WIRE_HASH = "8bc47ef8ba6c205a854f7796b5c85e210b548763f9035a51636aae079c613c03" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -727,6 +727,77 @@ export const BytesAnswer = Schema.Struct({
 export type BytesAnswer = typeof BytesAnswer.Type;
 
 /**
+ * How one admitted tool reaches a building's sessions.
+ * 
+ * Three values, the truncation lock's three tiers: `Core` travels in
+ * every request's tool list, `Dormant` is one line of the dormant index
+ * under its namespace and runs through `tool`, and `Off` is not admitted
+ * at all, so it costs no byte anywhere and no call reaches it.
+ */
+export const Exposure = Schema.Literals(["core", "dormant", "off"]).annotate({ identifier: "Exposure" });
+export type Exposure = typeof Exposure.Type;
+
+/**
+ * Where the exposure a tool was given came from. Closed, because a page
+ * that shows the source must be able to name every one of them.
+ */
+export const ExposureFrom = Schema.Union([
+  Schema.Literal("fixed"),
+  Schema.Literal("default"),
+  Schema.Literal("city"),
+  Schema.Literal("building"),
+]).annotate({ identifier: "ExposureFrom" });
+export type ExposureFrom = typeof ExposureFrom.Type;
+
+/**
+ * One tool of a building.
+ */
+export const CatalogTool = Schema.Struct({
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  exposure: Exposure,
+  fallback: Exposure,
+  from: ExposureFrom,
+  hint: Schema.String,
+  last_used: Schema.optional(Schema.NullOr(TimeMs)),
+  name: Schema.String,
+  namespace: Schema.String,
+  runs_used: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}).annotate({ identifier: "CatalogTool" });
+export type CatalogTool = typeof CatalogTool.Type;
+
+/**
+ * One layer's `[catalog]` table, as written: tool name to exposure,
+ * and namespace to exposure. Both maps empty is a layer that says
+ * nothing, which is how most layers stay.
+ */
+export const ExposureTable = Schema.Struct({
+  namespaces: Schema.optional(Schema.Record(Schema.String, Exposure)),
+  tools: Schema.optional(Schema.Record(Schema.String, Exposure)),
+}).annotate({ identifier: "ExposureTable" });
+export type ExposureTable = typeof ExposureTable.Type;
+
+/**
+ * A run's identity in the one spelling the city writes it: a hyphenated uuid in lower case, as `kernel::RunId::parse` accepts it. Bare hex, braces, the `urn:uuid:` prefix and upper case are refused.
+ */
+export const RunId = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "u"))).pipe(Schema.brand("RunId"));
+export type RunId = typeof RunId.Type;
+
+/**
+ * The tools of one building, and the two tables a page edits.
+ */
+export const CatalogAnswer = Schema.Struct({
+  building: Address,
+  city: ExposureTable,
+  core_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  index_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  run: Schema.optional(Schema.NullOr(RunId)),
+  runs_seen: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  stated: ExposureTable,
+  tools: Schema.Array(CatalogTool),
+}).annotate({ identifier: "CatalogAnswer" });
+export type CatalogAnswer = typeof CatalogAnswer.Type;
+
+/**
  * What happened to the file.
  * 
  * `Renamed` is its own arm because a rename and a delete-plus-add are
@@ -921,12 +992,6 @@ export const EventKind = Schema.Union([
   Schema.Literal("prefix_held"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
-
-/**
- * A run's identity in the one spelling the city writes it: a hyphenated uuid in lower case, as `kernel::RunId::parse` accepts it. Bare hex, braces, the `urn:uuid:` prefix and upper case are refused.
- */
-export const RunId = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "u"))).pipe(Schema.brand("RunId"));
-export type RunId = typeof RunId.Type;
 
 /**
  * Event sequence number; contiguous from [`Seq::FIRST`], checked arithmetic.
@@ -3423,11 +3488,42 @@ export const PrefixSegment = Schema.Struct({
 export type PrefixSegment = typeof PrefixSegment.Type;
 
 /**
+ * One tool of a frozen table.
+ */
+export const PromptTool = Schema.Struct({
+  exposure: Exposure,
+  from: ExposureFrom,
+  hint: Schema.String,
+  len: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  name: Schema.String,
+  namespace: Schema.String,
+}).annotate({ identifier: "PromptTool" });
+export type PromptTool = typeof PromptTool.Type;
+
+/**
+ * The tools a run was frozen with: the array every request carries,
+ * kept whole in the content store, and one row per tool the assembler
+ * built, whatever its exposure.
+ * 
+ * A row is written for an `Off` tool as well, because the page that
+ * turns a tool back on reads its rows here: a tool that was not admitted
+ * is still one the building could admit.
+ */
+export const PromptTools = Schema.Struct({
+  hash: Schema.String,
+  index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  len: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  rows: Schema.Array(PromptTool),
+}).annotate({ identifier: "PromptTools" });
+export type PromptTools = typeof PromptTools.Type;
+
+/**
  * What one run was told before it said anything.
  */
 export const PrefixAnswer = Schema.Struct({
   run: RunId,
   segments: Schema.Array(PrefixSegment),
+  tools: Schema.optional(Schema.NullOr(PromptTools)),
 }).annotate({ identifier: "PrefixAnswer" });
 export type PrefixAnswer = typeof PrefixAnswer.Type;
 
@@ -4972,6 +5068,9 @@ export const Answer = Schema.Union([
     layers: LayersAnswer,
   }),
   Schema.Struct({
+    catalog: CatalogAnswer,
+  }),
+  Schema.Struct({
     git_status: GitStatusAnswer,
   }),
   Schema.Struct({
@@ -5333,6 +5432,11 @@ export const Query = Schema.Union([
       addr: Address,
     }),
   }),
+  Schema.Struct({
+    catalog: Schema.Struct({
+      building: Address,
+    }),
+  }),
 ]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
@@ -5352,6 +5456,32 @@ export type Ask = typeof Ask.Type;
  */
 export const BeatMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("BeatMs"));
 export type BeatMs = typeof BeatMs.Type;
+
+/**
+ * What a building's runs may reach: the sandbox's limits, the external
+ * servers its tools come from, the windows on this person's own machine
+ * its desktop connector may touch, the context reminder's second rung,
+ * and how each tool reaches a run.
+ * 
+ * Each face is optional and an absent one leaves that section alone; an
+ * empty `mcp` list is a building that reaches no server, which is a
+ * different statement from not saying.
+ * 
+ * `desktop` is the allowlist's text and not a parsed value: the connector
+ * that reads that file at start-up is the authority on its syntax and
+ * fails closed, and a second parser here would be a second authority
+ * (`crates/city/Spec.lean` §8-26).
+ */
+export const BuildingSettings = Schema.Struct({
+  addr: Address,
+  catalog: Schema.optional(Schema.NullOr(ExposureTable)),
+  context_second_threshold: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  desktop: Schema.optional(Schema.NullOr(Schema.String)),
+  idem: IdemKey,
+  mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),
+  sandbox: Schema.optional(Schema.NullOr(SandboxLimits)),
+}).annotate({ identifier: "BuildingSettings" });
+export type BuildingSettings = typeof BuildingSettings.Type;
 
 /**
  * How a closing city treats the runs it still has.
@@ -5386,6 +5516,7 @@ export type KeepWarm = typeof KeepWarm.Type;
  * it is (`crates/wire/spec/Command/Step.lean` §8-61).
  */
 export const CitySettings = Schema.Struct({
+  catalog: Schema.optional(Schema.NullOr(ExposureTable)),
   effort: Schema.optional(Schema.NullOr(Effort)),
   idem: IdemKey,
   keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
@@ -5756,14 +5887,7 @@ export const Command = Schema.Union([
     }),
   }),
   Schema.Struct({
-    configure_building: Schema.Struct({
-      addr: Address,
-      context_second_threshold: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-      desktop: Schema.optional(Schema.NullOr(Schema.String)),
-      idem: IdemKey,
-      mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),
-      sandbox: Schema.optional(Schema.NullOr(SandboxLimits)),
-    }),
+    configure_building: BuildingSettings,
   }),
   Schema.Struct({
     attach_endpoint: Schema.Struct({

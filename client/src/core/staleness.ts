@@ -119,6 +119,12 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // `building_configured`.
     case "config":
       return reached(kind === "rules_changed" || kind === "building_configured");
+    // A building's tools move with either `[catalog]` table, which land as
+    // the two records above, and with a run that ends: it may carry a
+    // newer table and new evidence of use. Not every turn, because the
+    // answer folds the whole ledger.
+    case "catalog":
+      return reached(kind === "rules_changed" || kind === "building_configured" || kind === "run_frozen");
     // A room's stretches move when one opens and when a run in one starts
     // or ends, which is also when its last line and run count move.
     case "sessions":

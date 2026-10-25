@@ -215,6 +215,126 @@
     "en": "prompts",
     "zh": "提示"
   },
+  "bld_catalog": {
+    "en": "capabilities",
+    "zh": "能力"
+  },
+  "catalog_scope": {
+    "en": "save to",
+    "zh": "保存到"
+  },
+  "catalog_scope_building": {
+    "en": "this building",
+    "zh": "本楼"
+  },
+  "catalog_scope_city": {
+    "en": "the city default",
+    "zh": "全城默认"
+  },
+  "catalog_meter": {
+    "en": "the newest run carried {core} bytes of core tools and a {index}-byte dormant index",
+    "zh": "最新的 run 带了 {core} 字节常驻工具与 {index} 字节休眠索引"
+  },
+  "catalog_more": {
+    "en": "{n} bytes more in every request",
+    "zh": "每次请求多 {n} 字节"
+  },
+  "catalog_less": {
+    "en": "{n} bytes less in every request",
+    "zh": "每次请求少 {n} 字节"
+  },
+  "catalog_no_run": {
+    "en": "No run yet: the tools appear here once this building's first run has started.",
+    "zh": "还没有 run：这栋楼的第一个 run 开始之后，这里列出它的工具。"
+  },
+  "catalog_group": {
+    "en": "{n} tools · {core} core · {dormant} on demand · {off} off",
+    "zh": "{n} 件 · 常驻 {core} · 按需 {dormant} · 关 {off}"
+  },
+  "catalog_core": {
+    "en": "core",
+    "zh": "常驻"
+  },
+  "catalog_dormant": {
+    "en": "on demand",
+    "zh": "按需"
+  },
+  "catalog_off": {
+    "en": "off",
+    "zh": "关"
+  },
+  "catalog_fixed": {
+    "en": "Always core: a run reaches every other capability through it.",
+    "zh": "固定常驻：run 经它够到其余的能力。"
+  },
+  "catalog_from_fixed": {
+    "en": "fixed",
+    "zh": "固定"
+  },
+  "catalog_from_default": {
+    "en": "default",
+    "zh": "缺省"
+  },
+  "catalog_from_city": {
+    "en": "set for the city",
+    "zh": "全城设定"
+  },
+  "catalog_from_building": {
+    "en": "set for this building",
+    "zh": "本楼设定"
+  },
+  "catalog_used": {
+    "en": "used in {n} of the last {of} runs, last {when}",
+    "zh": "近 {of} 个 run 里 {n} 个用过，最后一次 {when}"
+  },
+  "catalog_unused": {
+    "en": "not used in the last {of} runs",
+    "zh": "近 {of} 个 run 里没用过"
+  },
+  "catalog_row": {
+    "en": "how {name} reaches a run",
+    "zh": "{name} 怎样到达 run"
+  },
+  "catalog_save_building": {
+    "en": "save for this building",
+    "zh": "保存到本楼"
+  },
+  "catalog_save_city": {
+    "en": "save as the city default",
+    "zh": "保存为全城默认"
+  },
+  "catalog_unchanged": {
+    "en": "Nothing has changed yet.",
+    "zh": "还没有改动。"
+  },
+  "catalog_next_run": {
+    "en": "A change applies from the next run in this building; a run already going keeps the tools it started with.",
+    "zh": "改动从这栋楼的下一个 run 起生效；已经在跑的 run 仍用它开始时的工具。"
+  },
+  "catalog_saved": {
+    "en": "Saved: the next run starts with this table.",
+    "zh": "已保存：下一个 run 按这张表开始。"
+  },
+  "catalog_skills_rules": {
+    "en": "Which skills reach a run is decided by the building's rules (reading_room).",
+    "zh": "哪些 skill 到达 run 由楼的规则（reading_room）决定。"
+  },
+  "catalog_skills_rules_link": {
+    "en": "edit the rules",
+    "zh": "改规则"
+  },
+  "skills_changed": {
+    "en": "another version than the newest run read",
+    "zh": "与最新 run 读到的版本不同"
+  },
+  "run_prompt_tools": {
+    "en": "tools",
+    "zh": "工具"
+  },
+  "run_prompt_tools_size": {
+    "en": "{n} bytes · {core} of {all} core",
+    "zh": "{n} 字节 · {all} 件中 {core} 件常驻"
+  },
   "prompts_rooms": {
     "en": "rooms",
     "zh": "房间"

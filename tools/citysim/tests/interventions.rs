@@ -111,6 +111,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
             effort: None,
             second_threshold: None,
             search: kernel::config::SearchConfiguration::Default,
+            catalog: kernel::config::CatalogExposure::default(),
         },
         checkpoint: None,
         cancel,

@@ -315,6 +315,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | D52 | `crates/accounting/spec/Connectors.lean` |
 | D53 | `crates/accounting/spec/Worker.lean` |
 | D54 | `crates/accounting/spec/Worker.lean` |
+| D55 | `crates/accounting/spec/Views/Usage.lean` |
 -/
 
 /-! ## 13 依赖选型

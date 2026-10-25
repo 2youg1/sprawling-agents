@@ -33,6 +33,11 @@ pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64,
                           #[serde(default, skip_serializing_if = "Option::is_none")] pub hash: Option<B3Hash> }   // hash：这一行所留字节的 BLAKE3（runtime D105）；旧行没有它，读作 None；缺席即省略
     // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime D1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
+pub struct PromptTools { pub hash: B3Hash, pub len: u64, pub index: u64, pub rows: Vec<PromptTool> }
+    // prompt_assembled.tools（`#[serde(default, skip_serializing_if = "Option::is_none")]`）：常驻工具数组的哈希与字节（数组本身在对象库）、休眠索引的字节、每件一行；旧行与没有目录的前缀没有它（runtime D111）
+pub struct PromptTool { pub name: String, pub namespace: String, pub exposure: Exposure,
+                        pub from: ExposureFrom, pub len: u64, pub hint: String }
+    // 一件工具：档位与来源（kernel::config），定义的字节（不论档位，Off 的也写一行），dormant::hint 截出的第一句
 pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
                     pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
                     pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
@@ -219,7 +224,8 @@ pub struct CityInitialized {}           // 城名在信封的 addr
 pub struct BuildingCreated { pub addr: Address, pub template: String,
                              pub adopted: bool }   // false 时不写出
 pub struct BuildingConfigured { pub addr: Address, pub sandbox: bool, pub mcp: bool,
-                                pub desktop: bool, pub context: bool }
+                                pub desktop: bool, pub context: bool,
+                                pub catalog: bool }   // [catalog]；false 时不写出，旧行读作 false
 pub struct CancelReceived {}
 pub struct HandoffWritten { pub must_read: Vec<Locator>, pub overview: String,
     pub progress: String, pub context: String, pub next_step: String }

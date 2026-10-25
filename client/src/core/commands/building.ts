@@ -3,15 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The four faces of one building `ConfigureBuilding` carries - its MCP
-// servers, its desktop allowlist, its context rung and its sandbox -
-// one builder each, apart from `commands.ts` for the length budget that
-// file sits at. Each builder fills its own face and writes `null` into
-// the other three, because the city reads `null` as "leave this face as
-// it is" (`assembly/commanding/configure.rs`).
+// The five faces of one building `ConfigureBuilding` carries - its MCP
+// servers, its desktop allowlist, its context rung, its sandbox and its
+// `[catalog]` table - one builder each, apart from `commands.ts` for the
+// length budget that file sits at. Each builder fills its own face and
+// writes `null` into the others, because the city reads `null` as "leave
+// this face as it is" (`accounting/src/worker/commanding/configure.rs`).
 
 import { mintIdem } from "../idem";
-import type { Address, Command, McpServer, SandboxLimits } from "../../wire";
+import type { Address, Command, ExposureTable, McpServer, SandboxLimits } from "../../wire";
 
 export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command {
   return {
@@ -21,6 +21,7 @@ export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command 
       sandbox: null,
       desktop: null,
       context_second_threshold: null,
+      catalog: null,
       idem: mintIdem(),
     },
   };
@@ -37,6 +38,7 @@ export function configureDesktop(addr: Address, allowlist: string): Command {
       sandbox: null,
       desktop: allowlist,
       context_second_threshold: null,
+      catalog: null,
       idem: mintIdem(),
     },
   };
@@ -55,6 +57,7 @@ export function configureContext(addr: Address, percent: number): Command {
       sandbox: null,
       desktop: null,
       context_second_threshold: percent,
+      catalog: null,
       idem: mintIdem(),
     },
   };
@@ -71,6 +74,24 @@ export function configureSandbox(addr: Address, limits: SandboxLimits): Command 
       sandbox: limits,
       desktop: null,
       context_second_threshold: null,
+      catalog: null,
+      idem: mintIdem(),
+    },
+  };
+}
+
+// A building's whole `[catalog]` table: how each tool reaches its runs.
+// It replaces what the building stated, and an empty table hands every
+// tool back to the city's table (`crates/wire/Spec.lean` §8-99).
+export function configureCatalog(addr: Address, catalog: ExposureTable): Command {
+  return {
+    configure_building: {
+      addr,
+      mcp: null,
+      sandbox: null,
+      desktop: null,
+      context_second_threshold: null,
+      catalog,
       idem: mintIdem(),
     },
   };

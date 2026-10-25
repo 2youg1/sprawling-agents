@@ -20,7 +20,7 @@ import crates.city.spec.Building
 * 设置页答的值就是 run 被治理的值（`the_setting_page_and_the_run_read_one_value`）：`settled_effort` 与 `load` 爬的是同一条梯子，`resolve` 只是 `tagged` 丢掉那一级。
 * 最近的那一级说了算，且说出它是哪一级（`the_nearest_rung_that_speaks_wins`）；一级都没说就是 `none`，城有意把这件事交给缺省或供应方。
 * 地址就是楼时只有两级、同一份文件只读一次（`an_address_that_is_its_building_reads_two_rungs`）；房间的地址读三级（`a_room_reads_three_rungs`）。文件的位置是 kernel 布局的模型（`crates/kernel/spec/Layout.lean` 的 `config`），楼取地址首段是 `crates/city/spec/Building.lean` 的 `head`。
-* 有的表只许写在较远的几级：`[skills] shelves` 与 `[remote]` 只在城那一级，`[search]` 在城与楼两级（`crates/city/spec/ConfigLayers.lean` §8-4c）。一级写了一张比它够得到的那一级更近的表，读文件时即拒（`a_table_written_too_near_is_refused`）；一级写的表它全都够得到就照读（`a_rung_reads_the_tables_it_reaches`），城那一级够得到每一张（`the_city_states_its_own_tables`）。
+* 有的表只许写在较远的几级：`[skills] shelves` 与 `[remote]` 只在城那一级，`[search]` 与 `[catalog]` 在城与楼两级（`crates/city/spec/ConfigLayers.lean` §8-4c、§8-4g）。一级写了一张比它够得到的那一级更近的表，读文件时即拒（`a_table_written_too_near_is_refused`）；一级写的表它全都够得到就照读（`a_rung_reads_the_tables_it_reaches`），城那一级够得到每一张（`the_city_states_its_own_tables`）。
 * 梯子给一个解析拒词只加上文件，码与恢复语照解析器给的（`the_ladder_keeps_the_parsers_recovery`，D8 (a)）。
 * 一层只点名一种居民，地址自己那一层有会话记录时梯子上的 harness 不生效（`a_session_that_opened_on_a_model_keeps_it`），没有记录时最近的那一级点名的 harness 生效（`without_a_record_the_nearest_harness_runs`，D6）。
 -/
@@ -143,6 +143,7 @@ inductive Confined where
   | Remote
   | Search
   | Agents
+  | Catalog
   deriving DecidableEq, Repr
 
 /-- 一级离城多远：城 0、楼 1、房间 2。 -/
@@ -157,6 +158,7 @@ def Confined.nearest : Confined → Layer
   | .Remote => .City
   | .Search => .Building
   | .Agents => .City
+  | .Catalog => .Building
 
 /-- 这一级够不够得到这张表：不比它最近的那一级更近。 -/
 def reaches (rung : Layer) (table : Confined) : Bool :=

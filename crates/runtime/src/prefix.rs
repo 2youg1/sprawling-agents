@@ -11,7 +11,7 @@
 use std::collections::BTreeSet;
 
 use kernel::consts_policy::{BYTES_PER_TOKEN, PREFIX_SLOTS, STARTUP_BUDGET_TOKENS};
-use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, SkipReason};
+use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, PromptTools, SkipReason};
 use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
 use crate::elision::{self, Elided};
@@ -226,6 +226,10 @@ pub struct FrozenPrefix {
     /// held, which skipped nothing because it was never offered a list
     /// of documents.
     skipped: Option<Vec<Vec<PromptSkip>>>,
+    /// The tool table the requests carry beside these four segments, as
+    /// the catalog recorded it. `None` for a prefix assembled without a
+    /// catalog, whose record then names no table.
+    tools: Option<PromptTools>,
 }
 
 impl FrozenPrefix {
@@ -259,7 +263,19 @@ impl FrozenPrefix {
             resident,
             run,
             skipped: None,
+            tools: None,
         })
+    }
+
+    /// This prefix, recording `tools` as the table its requests carry
+    /// (`crates/runtime/spec/Catalog.lean` §8-60). Frozen with the prefix,
+    /// so every turn's `prompt_assembled` names the same table.
+    #[must_use]
+    pub fn with_tools(self, tools: PromptTools) -> FrozenPrefix {
+        FrozenPrefix {
+            tools: Some(tools),
+            ..self
+        }
     }
 
     /// The wire form of the frozen prefix: four system blocks, each
@@ -390,6 +406,7 @@ impl FrozenPrefix {
                 .into_iter()
                 .map(|breakpoint| breakpoint.as_str().to_owned())
                 .collect(),
+            tools: self.tools.clone(),
         })
     }
 }

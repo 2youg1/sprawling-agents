@@ -56,7 +56,7 @@ pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
-pub use config_layers::{CitySetting, write_city_setting};
+pub use config_layers::{CitySetting, check_catalog, write_catalog, write_city_setting};
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
 pub use config_layers::{HostPermanence, RemoteRoute, remote_route};
 pub use config_layers::{city_search, default_search_supplier};

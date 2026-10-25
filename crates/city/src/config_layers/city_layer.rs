@@ -13,6 +13,7 @@
 
 use std::path::Path;
 
+use kernel::config::ExposureTable;
 use kernel::layout::CityLayout;
 use kernel::{AxError, Effort, KeepWarm};
 
@@ -20,20 +21,29 @@ use super::write::{Change, change_at};
 
 /// One fact of the city's own layer a page may write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CitySetting {
+pub enum CitySetting<'a> {
     KeepWarm(KeepWarm),
     Effort(Effort),
+    /// The city's whole `[catalog]` table, the default every building
+    /// that states nothing reads (`crates/city/spec/ConfigLayers.lean`
+    /// §8-4g); an empty table takes the key out.
+    Catalog(&'a ExposureTable),
 }
 
 /// Writes one fact into the city's own `CONFIG.toml`.
 ///
 /// # Errors
-/// Propagates a city layer that exists and cannot be read or parsed, and
-/// a directory that cannot be written.
-pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), AxError> {
+/// `E_CONFIG_INVALID`, before any byte is written, for a `[catalog]` key
+/// the reader would refuse; propagates a city layer that exists and
+/// cannot be read or parsed, and a directory that cannot be written.
+pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<(), AxError> {
     let change = match setting {
         CitySetting::KeepWarm(setting) => Change::KeepWarm(setting),
         CitySetting::Effort(effort) => Change::Effort(effort),
+        CitySetting::Catalog(table) => {
+            super::catalog::check(table)?;
+            Change::Catalog(table)
+        }
     };
     change_at(&CityLayout::new(city_root).city_config(), change)
 }

@@ -19,8 +19,9 @@
 
   import { buildingOf } from "../../core/route";
   import { ui } from "../../ui";
-  import type { PrefixSegment, RunId } from "../../wire";
+  import type { RunId } from "../../wire";
   import { lookOf } from "./prompt";
+  import type { Sent } from "./prompt";
   import Look from "./prompt.look.svelte";
 
   interface Props {
@@ -39,10 +40,10 @@
   let receipt = $state<string | null>(null);
 
   const asked = $derived(u.conn.asking.ask({ prefix: { run } }));
-  const segments = $derived.by((): readonly PrefixSegment[] | undefined => {
+  const sent = $derived.by((): Sent | undefined => {
     const held = $asked;
     if (held === undefined) return undefined;
-    return "prefix" in held ? held.prefix.segments : [];
+    return "prefix" in held ? held.prefix : { segments: [], tools: null };
   });
 
   // A copy receipt lasts long enough to be seen and no longer.
@@ -58,7 +59,7 @@
   });
 
   const look = $derived(
-    lookOf(segments, { open, receipt }, $lang, {
+    lookOf(sent, { open, receipt }, $lang, {
       toggle: (hash) => {
         if (!open.delete(hash)) open.add(hash);
       },

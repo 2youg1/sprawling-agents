@@ -34,8 +34,10 @@
   import Prompts from "../building/prompts.look.svelte";
   import { actionName, actionWord, cardsOf } from "../building/prompts";
   import type { PromptsLook } from "../building/prompts";
-  import { Address, B3Hash } from "../../wire";
-  import type { LayerDocument } from "../../wire";
+  import { Address, B3Hash, RunId } from "../../wire";
+  import type { CatalogAnswer, LayerDocument } from "../../wire";
+  import Catalog from "../building/catalog.look.svelte";
+  import { catalogLook, draftOf, pressGroup, rowsOf } from "../building/catalog";
   import Case from "./case.svelte";
 
   const { lang } = ui();
@@ -74,6 +76,36 @@
     actionName: (card, action) => actionName(card, action, $lang),
     onAction: still,
   }));
+  // One building's tools after its newest run: the city's own namespace
+  // with a fixed row and an edited one, and a server the building turned
+  // off; the draft moves `plan` into the core and the server back on, so
+  // the meter shows what the save would add.
+  const ANSWER: CatalogAnswer = {
+    building: SHOP,
+    run: null,
+    core_bytes: 2840,
+    index_bytes: 412,
+    runs_seen: 12,
+    tools: [
+      { name: "edit", namespace: "sprawling", hint: "Replace text in a file you have read", bytes: 980, exposure: "core", from: "default", fallback: "core", runs_used: 11, last_used: null },
+      { name: "plan", namespace: "sprawling", hint: "Claim a node of the roadmap", bytes: 640, exposure: "dormant", from: "default", fallback: "dormant", runs_used: 0, last_used: null },
+      { name: "read", namespace: "sprawling", hint: "Open one file by its path", bytes: 860, exposure: "core", from: "fixed", fallback: "core", runs_used: 12, last_used: null },
+      { name: "github_create_issue", namespace: "github", hint: "create a issue on the forge", bytes: 310, exposure: "off", from: "building", fallback: "dormant", runs_used: 0, last_used: null },
+      { name: "github_list_issue", namespace: "github", hint: "list a issue on the forge", bytes: 290, exposure: "off", from: "building", fallback: "dormant", runs_used: 0, last_used: null },
+    ],
+    city: {},
+    stated: { namespaces: { github: "off" } },
+  };
+  const ROWS = rowsOf(ANSWER, "building");
+  const DRAFT = pressGroup(ROWS, { tools: { plan: "core" }, namespaces: draftOf(ANSWER, "building").namespaces }, "github", "dormant");
+  const CATALOG = $derived(
+    catalogLook({ answer: { ...ANSWER, run: RunId.make("00000000-0000-4000-8000-000000000001") }, scope: "building", draft: DRAFT, edited: true, now: 0 }, $lang, {
+      scope: still,
+      edit: still,
+      save: still,
+    }),
+  );
+  const EMPTY = $derived(catalogLook({ answer: ANSWER, scope: "city", draft: draftOf(ANSWER, "city"), edited: false, now: 0 }, $lang, { scope: still, edit: still, save: still }));
   const TASK = "fix the checkout total";
 
   const MARKS: readonly { readonly name: string; readonly mark: TreeMark; readonly size: string | undefined }[] = [
@@ -127,6 +159,7 @@
       at="#/skills/release-notes"
       admitted="admitted"
       used="3 uses"
+      changed={say($lang, "skills_changed")}
       wire={{ type: "button", disabled: false, onclick: still }}
     />
   </div>
@@ -138,7 +171,7 @@
       [
         { key: "plan", label: say($lang, "bld_plan") },
         { key: "commits", label: say($lang, "bld_commits") },
-        { key: "skills", label: say($lang, "bld_skills") },
+        { key: "catalog", label: say($lang, "bld_catalog") },
       ],
       "commits",
       still,
@@ -186,4 +219,12 @@
 
 <Case label="building prompts · the newest run's slots and one room's documents, each with its steps">
   <Prompts {...PROMPTS} />
+</Case>
+
+<Case label="building capabilities · a fixed row, a draft that moves one tool in and a server back on, and the meter">
+  <Catalog {...CATALOG} />
+</Case>
+
+<Case label="building capabilities · the city's layer before the building's first run">
+  <Catalog {...EMPTY} />
 </Case>

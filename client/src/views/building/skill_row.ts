@@ -23,5 +23,8 @@ export interface SkillRowLook {
   readonly at: string;
   readonly admitted: string;
   readonly used: string;
+  // Said when the next run reads another version than the newest run
+  // was frozen with; absent otherwise.
+  readonly changed: string | undefined;
   readonly wire: SkillRowWire;
 }

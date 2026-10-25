@@ -198,6 +198,7 @@ impl Views {
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
             wire::Query::Versions { at } => return self.versions_ask(at),
             wire::Query::Layers { addr } => return self.layers_ask(addr),
+            wire::Query::Catalog { building } => return self.catalog_ask(building),
             wire::Query::Bytes { version, range } => return self.bytes_ask(*version, *range),
             wire::Query::Export { at, version } => return self.export_ask(at, *version),
             wire::Query::Preview { version, viewport } => {

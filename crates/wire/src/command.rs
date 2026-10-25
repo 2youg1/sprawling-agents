@@ -34,11 +34,11 @@ pub use shelf::Shelf;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
 pub use step::{AgentAdding, AgentLoginStart, CityClosing, CloseMode, DeviceForgetting};
+pub use step::{BuildingSettings, PromptStep, PromptWrite};
 pub use step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,
     SecretForgetting, SessionNaming,
 };
-pub use step::{PromptStep, PromptWrite};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

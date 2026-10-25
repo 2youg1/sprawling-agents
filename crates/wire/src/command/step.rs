@@ -118,6 +118,39 @@ pub struct RulesWrite {
     pub idem: IdemKey,
 }
 
+/// What a building's runs may reach: the sandbox's limits, the external
+/// servers its tools come from, the windows on this person's own machine
+/// its desktop connector may touch, the context reminder's second rung,
+/// and how each tool reaches a run.
+///
+/// Each face is optional and an absent one leaves that section alone; an
+/// empty `mcp` list is a building that reaches no server, which is a
+/// different statement from not saying.
+///
+/// `desktop` is the allowlist's text and not a parsed value: the connector
+/// that reads that file at start-up is the authority on its syntax and
+/// fails closed, and a second parser here would be a second authority
+/// (`crates/city/Spec.lean` §8-26).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct BuildingSettings {
+    pub addr: Address,
+    pub sandbox: Option<kernel::SandboxLimits>,
+    pub mcp: Option<Vec<kernel::McpServer>>,
+    pub desktop: Option<String>,
+    /// Where the context reminder's second rung sits, as one layer states
+    /// it: a raw percent on the wire. The domain is
+    /// `kernel::config::SecondThreshold`'s one construction point, and a
+    /// deserializer that enforced it here would be the second place that
+    /// rule lives.
+    pub context_second_threshold: Option<u64>,
+    /// The building's whole `[catalog]` table, which replaces what the
+    /// building stated before; an empty table takes the key out, so the
+    /// building follows the city's again (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    pub catalog: Option<kernel::config::ExposureTable>,
+    pub idem: IdemKey,
+}
+
 /// The city's own layer from the settings page: `None` leaves a key as
 /// it is (`crates/wire/spec/Command/Step.lean` §8-61).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +161,9 @@ pub struct CitySettings {
     /// The city's whole `[search]` table, written before the other two
     /// so a value the city refuses lands nothing.
     pub search: Option<kernel::config::SearchConfiguration>,
+    /// The city's whole `[catalog]` table, the default every building
+    /// that states nothing follows (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    pub catalog: Option<kernel::config::ExposureTable>,
     pub idem: IdemKey,
 }
 

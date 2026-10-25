@@ -219,13 +219,8 @@ impl Laying {
             }
         }
         admitted.extend(self.filed_beyond_sprawling(site, addr, &bound)?);
-        for (namespace, tool) in admitted {
-            held(&catalog, "lay out the catalog")?.admit_tool(tool.meta(), namespace)?;
-            bench.register(Box::new(kept::Kept::new(
-                tool,
-                std::sync::Arc::clone(&keeper),
-            )))?;
-        }
+        held(&catalog, "lay out the catalog")?.set_exposure(site.config.catalog.clone());
+        register(&catalog, &mut bench, admitted, &keeper)?;
         self.admit_reading_room(&catalog, &site.rules, &site.building, addr)?;
         Ok(Workbench {
             catalog,
@@ -289,6 +284,30 @@ impl Laying {
 
 /// One admitted tool and the namespace the catalog lists it under.
 type Filed = (Namespace, Box<dyn kernel::Tool>);
+
+/// Files every built tool in the catalog, at the exposure the run's
+/// `[catalog]` tables give it, and routes on the bench every one the
+/// catalog admitted. A tool a table turned off gets no route: the catalog
+/// keeps its row for the record, and a call by its name reaches nothing
+/// (`crates/runtime/Spec.lean` §8-60).
+///
+/// # Errors
+/// Propagates a catalog left locked by a thread that died, and a
+/// duplicate registration on either list.
+fn register(
+    catalog: &Mutex<runtime::Catalog>,
+    bench: &mut ToolBench,
+    built: Vec<Filed>,
+    keeper: &Arc<kept::Keeper>,
+) -> Result<(), AxError> {
+    for (namespace, tool) in built {
+        let exposure = held(catalog, "lay out the catalog")?.admit_tool(tool.meta(), namespace)?;
+        if exposure != kernel::config::Exposure::Off {
+            bench.register(Box::new(kept::Kept::new(tool, Arc::clone(keeper))))?;
+        }
+    }
+    Ok(())
+}
 
 impl Laying {
     /// The admitted tools the city files under a namespace other than

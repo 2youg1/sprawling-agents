@@ -3,38 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one reconfiguration of a building's own layer writes.
+//! What one reconfiguration of a building's own layer writes, and what
+//! the settings page writes into the city's own.
 //!
-//! The faces travel together: one command speaks for all of them, and a
-//! call site spelling four bare booleans says nothing about which face is
-//! which. They arrive as one value and are recorded as one event.
+//! A building's faces travel together: one command speaks for all of
+//! them, as one `wire::BuildingSettings`, and they are recorded as one
+//! event.
 
+use kernel::AxError;
 use kernel::event::EventKind;
 use kernel::event::Scope;
 use kernel::event::record::GoverningDocument;
-use kernel::{Address, AxError};
 
 use super::super::RunWorker;
 
-/// The faces of a building's own layer one reconfiguration speaks for.
-///
-/// `None` is "this caller said nothing about that face", which is not the
-/// same as an empty statement: `mcp: Some(&[])` writes "this building
-/// reaches no server", while `None` leaves that face as it was.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Reconfiguration<'a> {
-    pub(super) sandbox: Option<&'a kernel::SandboxLimits>,
-    pub(super) mcp: Option<&'a [kernel::McpServer]>,
-    pub(super) desktop: Option<&'a str>,
-    /// A whole percent of the window. The domain is
-    /// `kernel::config::SecondThreshold`'s one construction point, so an
-    /// out-of-domain value is refused there rather than here.
-    pub(super) context_second_threshold: Option<u64>,
-}
-
 impl RunWorker {
     /// Writes what a building's runs may reach into that building's own
-    /// configuration layer.
+    /// configuration layer. `None` is "the page said nothing about that
+    /// face", which is not the same as an empty statement: `mcp: Some(vec![])`
+    /// writes "this building reaches no server", while `None` leaves that
+    /// face as it was.
     ///
     /// **The contents are not recorded; the change is.** `CONFIG.toml`
     /// is the authority for what a run is governed by, and an event
@@ -52,16 +40,30 @@ impl RunWorker {
     /// the refusal of a second rung outside its domain.
     pub(super) fn configure_building(
         &mut self,
-        addr: &Address,
-        reconfigured: Reconfiguration<'_>,
+        settings: &wire::BuildingSettings,
     ) -> Result<(), AxError> {
-        let Reconfiguration {
+        let wire::BuildingSettings {
+            addr,
             sandbox,
             mcp,
             desktop,
             context_second_threshold,
-        } = reconfigured;
+            catalog,
+            idem: _,
+        } = settings;
         let building = city::Building::of(addr)?;
+        // Taken before anything is written: the domain is
+        // `SecondThreshold`'s one construction point, so an out-of-domain
+        // percent refuses the frame here rather than after the faces
+        // beside it landed, or at the next read.
+        let threshold = context_second_threshold
+            .map(kernel::config::SecondThreshold::parse)
+            .transpose()?;
+        // Judged before any other face is written, so a table the city
+        // refuses leaves the building as it was.
+        if let Some(table) = catalog {
+            city::write_catalog(&self.city_root, building.addr(), table)?;
+        }
         if let Some(limits) = sandbox {
             city::write_sandbox(
                 &self.city_root,
@@ -78,19 +80,13 @@ impl RunWorker {
                 servers,
             )?;
         }
-        // Taken before written: the domain is `SecondThreshold`'s one
-        // construction point, so an out-of-domain percent is refused
-        // here rather than written and refused at the next read.
-        let mut context = false;
-        if let Some(percent) = context_second_threshold {
-            let threshold = kernel::config::SecondThreshold::parse(percent)?;
+        if let Some(threshold) = threshold {
             city::write_second_threshold(
                 &self.city_root,
                 building.addr(),
                 city::Layer::Building,
                 threshold,
             )?;
-            context = true;
         }
         // Written whole and never parsed here: the connector that reads
         // it at start-up is the authority on its syntax and fails closed,
@@ -110,7 +106,8 @@ impl RunWorker {
                 sandbox: sandbox.is_some(),
                 mcp: mcp.is_some(),
                 desktop: desktop.is_some(),
-                context,
+                context: threshold.is_some(),
+                catalog: catalog.is_some(),
             },
         )?;
         self.record(EventKind::BuildingConfigured, payload)
@@ -141,24 +138,33 @@ impl RunWorker {
     /// §8-61). A frame that states nothing writes nothing and books
     /// nothing.
     ///
-    /// `[search]` goes first: it is the one fact the city refuses for
-    /// what it says, so a refused frame leaves the file as it was.
+    /// `[search]` and `[catalog]` are the facts the city refuses for what
+    /// they say, so both are judged before the first byte lands: the
+    /// catalog by `city::check_catalog`, the search by its own writer,
+    /// which judges before it writes. A refused frame leaves the file as
+    /// it was.
     ///
     /// # Errors
-    /// `E_CONFIG_INVALID` for a `[search]` value the reader would refuse;
+    /// `E_CONFIG_INVALID` for a `[search]` value or a `[catalog]` key the
+    /// reader would refuse;
     /// propagates a city layer this build cannot read or write, and a
     /// history that will not take the line.
     pub(in crate::worker) fn configure_city(
         &mut self,
         settings: wire::CitySettings,
     ) -> Result<(), AxError> {
+        if let Some(table) = &settings.catalog {
+            city::check_catalog(table)?;
+        }
         let search = settings
             .search
             .map(|search| city::write_search(&self.city_root, &search));
         let others = settings
-            .keep_warm
-            .map(city::CitySetting::KeepWarm)
+            .catalog
+            .as_ref()
+            .map(city::CitySetting::Catalog)
             .into_iter()
+            .chain(settings.keep_warm.map(city::CitySetting::KeepWarm))
             .chain(settings.effort.map(city::CitySetting::Effort));
         let mut written = search.transpose()?.is_some();
         for setting in others {

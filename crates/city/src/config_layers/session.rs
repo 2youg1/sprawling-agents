@@ -39,11 +39,21 @@ use super::{ConfigLayer, Layer, path};
 /// What the configuration at `addr` itself states, with the ladder
 /// above it left out.
 ///
+/// The file is judged at the rung the ladder reads it at: an address
+/// that is its own building has no room rung, and its file is the
+/// building's, where a table confined to the city and the buildings is
+/// stated legitimately (§8-4).
+///
 /// # Errors
 /// Refuses an unreadable file and a file that does not parse, exactly
 /// as [`super::load`] does. A missing file states nothing.
 pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError> {
-    super::ladder::stated(&path(city_root, addr, Layer::Resident)?, Layer::Resident)
+    let rung = if crate::building::Building::of(addr)?.addr() == addr {
+        Layer::Building
+    } else {
+        Layer::Resident
+    };
+    super::ladder::stated(&path(city_root, addr, Layer::Resident)?, rung)
 }
 
 /// Records what a session froze at its own address.

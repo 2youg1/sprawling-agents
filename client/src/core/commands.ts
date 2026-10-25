@@ -27,6 +27,7 @@ import type {
   Window,
   DialectKind,
   Effort,
+  ExposureTable,
   GitOid,
   GovernedDocument,
   HaltScope,
@@ -339,7 +340,7 @@ export function connectToolkit(toolkit: ToolkitSlug): Command {
   return { connect_toolkit: { toolkit, idem: mintIdem() } };
 }
 
-export { configureContext, configureDesktop, configureMcp, configureSandbox } from "./commands/building";
+export { configureCatalog, configureContext, configureDesktop, configureMcp, configureSandbox } from "./commands/building";
 
 // One of the three governed documents, whole. `base` is the text the
 // box started from: the raw editor and the identity cards both write
@@ -391,6 +392,12 @@ export function configureCity(keepWarm: KeepWarm | null, effort: Effort | null):
 // city writes what the page drew (client D94).
 export function configureSearch(search: SearchConfiguration): Command {
   return { configure_city: { search, idem: mintIdem() } };
+}
+
+// The city's whole `[catalog]`: the table every building that states
+// nothing follows (`crates/wire/Spec.lean` §8-99).
+export function configureCityCatalog(catalog: ExposureTable): Command {
+  return { configure_city: { catalog, idem: mintIdem() } };
 }
 
 // One of a building's own spine documents. `base` is the text the

@@ -397,6 +397,10 @@ pub enum Query {
     /// send order, each with its layer and whether it is sent
     /// (`crates/wire/spec/Answer/Prefix.lean` §8-98).
     Layers { addr: Address },
+    /// How each tool this building admits reaches its runs: the newest
+    /// run's frozen table, read against the `[catalog]` tables on disk,
+    /// with the evidence of use (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    Catalog { building: Address },
 }
 
 /// The Query surface, in declaration order — the order the handshake

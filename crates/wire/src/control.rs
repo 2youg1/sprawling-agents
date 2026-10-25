@@ -86,7 +86,7 @@ pub fn classify(command: &Command) -> ControlVerdict {
         Command::Dispatch { .. }
         | Command::Wake { .. }
         | Command::ProbeEndpoint { .. }
-        | Command::ConfigureBuilding { .. }
+        | Command::ConfigureBuilding(_)
         | Command::AttachEndpoint { .. }
         | Command::SelectModel { .. }
         // Starting a session reaches no run in flight: the assembly

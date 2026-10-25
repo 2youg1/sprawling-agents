@@ -12,7 +12,7 @@
   // lens over forty turns, and the evidence lens with and without
   // anything to check.
 
-  import type { Answer, EvidenceItem, PrefixSegment, PrefixSlot, Query } from "../../wire";
+  import type { Answer, EvidenceItem, PrefixSegment, PrefixSlot, PromptTools, Query } from "../../wire";
   import { Address, B3Hash, Locator, RunId, Seq } from "../../wire";
 
   const RUN = RunId.make("5b1e7d2a-9c3f-4e8b-a1d2-3c4b5a6f7e80");
@@ -38,6 +38,20 @@
     segmentOf("run", 4, true, "Tidy the release notes for 0.0.10."),
   ];
 
+  // The table the requests carried ahead of the segments: two core
+  // tools, a dormant one and one a building turned off.
+  const TOOLS: PromptTools = {
+    hash: "b3-tools",
+    len: 1840,
+    index: 412,
+    rows: [
+      { name: "edit", namespace: "sprawling", exposure: "core", from: "default", len: 980, hint: "Replace text in a file you have read" },
+      { name: "github_create_issue", namespace: "github", exposure: "off", from: "building", len: 310, hint: "create a issue on the forge" },
+      { name: "plan", namespace: "sprawling", exposure: "dormant", from: "default", len: 640, hint: "Claim a node of the roadmap" },
+      { name: "read", namespace: "sprawling", exposure: "core", from: "fixed", len: 860, hint: "Open one file by its path" },
+    ],
+  };
+
   const ITEMS: readonly EvidenceItem[] = [
     { at: Seq.make(412), kind: "screenshot", locator: Locator.make("shop/notes/.evidence/412.png"), picture: { width: 1440, height: 900, media_type: "image/png" } },
     { at: Seq.make(418), kind: "finished", locator: Locator.make("shop/notes/CHANGELOG.md"), picture: null },
@@ -46,7 +60,7 @@
   function answering(items: readonly EvidenceItem[]): (query: Query) => Answer | undefined {
     return (query) => {
       if (typeof query !== "object") return undefined;
-      if ("prefix" in query) return { prefix: { run: query.prefix.run, segments: SEGMENTS } };
+      if ("prefix" in query) return { prefix: { run: query.prefix.run, segments: SEGMENTS, tools: TOOLS } };
       if ("evidence" in query) return { evidence: { run: query.evidence.run, items } };
       return undefined;
     };
@@ -79,11 +93,11 @@
 </Case>
 
 <Case label="run · the prompt lens, one segment open with its copy receipt, one the store no longer holds">
-  <PromptLook {...lookOf(SEGMENTS, { open: new Set([OPENED]), receipt: OPENED }, $lang, NOBODY)} />
+  <PromptLook {...lookOf({ segments: SEGMENTS, tools: TOOLS }, { open: new Set([OPENED, "tools"]), receipt: OPENED }, $lang, NOBODY)} />
 </Case>
 
 <Case label="run · the prompt lens of a run sent no prompt">
-  <PromptLook {...lookOf([], { open: new Set(), receipt: null }, $lang, NOBODY)} />
+  <PromptLook {...lookOf({ segments: [], tools: null }, { open: new Set(), receipt: null }, $lang, NOBODY)} />
 </Case>
 
 <Case label="run · the context lens over forty turns">

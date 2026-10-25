@@ -214,6 +214,32 @@ fn dispatch_one_run(
     models: Box<dyn accounting::ModelFactory + Send>,
     connectors: Box<dyn accounting::Connectors + Send + Sync>,
 ) -> String {
+    let (_dir, mut worker) = lab_city(models, connectors);
+    dispatch(&mut worker, "s1")
+}
+
+/// Dispatches one run into `lab` under the session `session`, and answers
+/// how the dispatch ended, for a failure message.
+fn dispatch(worker: &mut accounting::worker::RunWorker, session: &str) -> String {
+    let dispatched = worker.handle(wire::Command::Dispatch {
+        addr: Address::parse(LAB).unwrap(),
+        task: "Answer.".to_owned(),
+        goal: "one turn with the tools this worker was handed".to_owned(),
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        idem: idem(session.as_bytes()),
+        session: Some(kernel::SessionName::parse(session).unwrap()),
+        effort: None,
+        model: None,
+    });
+    format!("{dispatched:?}")
+}
+
+/// A city with one building that names the server `apps`, and a worker
+/// that builds `models` and reaches servers through `connectors`.
+fn lab_city(
+    models: Box<dyn accounting::ModelFactory + Send>,
+    connectors: Box<dyn accounting::Connectors + Send + Sync>,
+) -> (tempfile::TempDir, accounting::worker::RunWorker) {
     let dir = tempfile::tempdir().unwrap();
     form(
         dir.path(),
@@ -263,17 +289,7 @@ fn dispatch_one_run(
         })
         .unwrap();
     name_an_absent_server(dir.path());
-    let dispatched = worker.handle(wire::Command::Dispatch {
-        addr: Address::parse(LAB).unwrap(),
-        task: "Answer.".to_owned(),
-        goal: "one turn with the tools this worker was handed".to_owned(),
-        policy: kernel::RunPolicy::of(kernel::Mode::Work),
-        idem: idem(b"dispatch"),
-        session: Some(kernel::SessionName::parse("s1").unwrap()),
-        effort: None,
-        model: None,
-    });
-    format!("{dispatched:?}")
+    (dir, worker)
 }
 
 #[test]
@@ -334,6 +350,86 @@ fn two_hundred_tools_of_one_server_take_one_index_line_and_are_found() {
                 .iter()
                 .any(|hit| hit.starts_with("- apps_create_issue:")),
         "find answered {found:?}; the dispatch answered {dispatched}"
+    );
+}
+
+/// The `apps` rows of the building's capabilities answer.
+fn apps_rows(city_root: &std::path::Path) -> Vec<wire::CatalogTool> {
+    let answer = accounting::views::ask(
+        city_root,
+        &wire::Query::Catalog {
+            building: Address::parse(LAB).unwrap(),
+        },
+    )
+    .unwrap();
+    let wire::Answer::Catalog(catalog) = answer else {
+        panic!("the capabilities question answered {answer:?}");
+    };
+    catalog
+        .tools
+        .into_iter()
+        .filter(|tool| tool.namespace == NAMESPACE)
+        .collect()
+}
+
+/// The capabilities answer lists every tool of a two-hundred-tool server
+/// the newest run was frozen with, and a namespace the building turns off
+/// is gone from the next run's index and tool list while the answer
+/// still lists it, off, so a person can turn it back on
+/// (`crates/wire/spec/Answer/Catalog.lean` §8-99, runtime D111).
+#[test]
+fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
+    use kernel::config::{Exposure, ExposureFrom, ExposureTable};
+    let offered = Arc::new(Mutex::new(Vec::new()));
+    let (dir, mut worker) = lab_city(
+        Box::new(Listeners(Arc::clone(&offered))),
+        Box::new(Scripted(two_hundred_tools())),
+    );
+    let first = dispatch(&mut worker, "s1");
+    let rows = apps_rows(dir.path());
+    assert_eq!(rows.len(), 200, "the first dispatch answered {first}");
+    assert!(
+        rows.iter()
+            .all(|row| row.exposure == Exposure::Dormant && row.from == ExposureFrom::Default),
+        "{rows:?}"
+    );
+    assert!(
+        offered
+            .lock()
+            .unwrap()
+            .contains(&format!("{NAMESPACE} (200)")),
+        "{:?}",
+        offered.lock().unwrap()
+    );
+
+    offered.lock().unwrap().clear();
+    worker
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+            addr: Address::parse(LAB).unwrap(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: Some(ExposureTable {
+                tools: std::collections::BTreeMap::new(),
+                namespaces: [(NAMESPACE.to_owned(), Exposure::Off)].into(),
+            }),
+            idem: idem(b"catalog"),
+        }))
+        .unwrap();
+    let second = dispatch(&mut worker, "s2");
+
+    let named: Vec<String> = offered.lock().unwrap().clone();
+    assert!(
+        !named.is_empty() && !named.iter().any(|name| name.starts_with(NAMESPACE)),
+        "the next run was offered {named:?}; the second dispatch answered {second}"
+    );
+    let rows = apps_rows(dir.path());
+    assert_eq!(rows.len(), 200);
+    assert!(
+        rows.iter()
+            .all(|row| row.exposure == Exposure::Off && row.from == ExposureFrom::Building),
+        "{rows:?}"
     );
 }
 

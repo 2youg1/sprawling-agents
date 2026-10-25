@@ -177,6 +177,7 @@ fn frozen_and_live_share_no_field() {
         mcp: Vec::new(),
         second_threshold: None,
         search: SearchConfiguration::Default,
+        catalog: crate::config::CatalogExposure::default(),
     })
     .unwrap();
     let live = serde_json::to_value(LiveConfig {}).unwrap();

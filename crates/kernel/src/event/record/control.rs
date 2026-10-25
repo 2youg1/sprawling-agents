@@ -52,6 +52,11 @@ pub struct BuildingConfigured {
     pub mcp: bool,
     pub desktop: bool,
     pub context: bool,
+    /// The building's `[catalog]` table. Written only when true, so a
+    /// line about the other four faces keeps the bytes it always had,
+    /// and a line written before the table existed reads as false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub catalog: bool,
 }
 
 /// `cancel_received`: the turn saw the stop. The run it belongs to is

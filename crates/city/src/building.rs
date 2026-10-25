@@ -401,6 +401,9 @@ pub struct Written {
     /// Where the context reminder's second rung sits, `[context]` of
     /// the building's own layer.
     pub context: bool,
+    /// The building's `[catalog]` table: how each admitted tool reaches
+    /// its runs.
+    pub catalog: bool,
 }
 
 /// The ledger record for a reconfiguration: which faces of a building's
@@ -422,6 +425,7 @@ pub fn configured_payload(building: &Building, wrote: Written) -> Result<Payload
         mcp: wrote.mcp,
         desktop: wrote.desktop,
         context: wrote.context,
+        catalog: wrote.catalog,
     })
 }
 

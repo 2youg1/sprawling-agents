@@ -8,9 +8,12 @@
 //! actually reach is listed — admission is the caller's evidence: the
 //! assembler registers the tools a building's vocation, rules and book
 //! allow, and reads each building's reading room off its `city::policy`
-//! rules. Of what is admitted, the mode's core travels as tools; the rest
-//! waits in the dormant index, one line per namespace and one per skill,
-//! and a run lists, finds, details and runs it through `tool`.
+//! rules. Each tool it registers takes an exposure here, from the
+//! building's and the city's `[catalog]` tables or the default
+//! ([`exposure`]): the core travels as tools, a dormant tool waits in the
+//! dormant index, one line per namespace and one per skill, and a run
+//! lists, finds, details and runs it through `tool`; an `Off` tool is
+//! kept only as a row of the table this run records.
 //!
 //! `tool_defs` is the single source of `ChatRequest.tools`: a tool absent
 //! here and absent from the dormant index does not exist for the model.
@@ -19,12 +22,15 @@ use std::collections::BTreeMap;
 
 pub use kernel::event::record::SkillPin;
 
+use kernel::config::{CatalogExposure, Exposure, ExposureFrom};
+use kernel::event::record::{PromptTool, PromptTools};
 use kernel::{AxCode, AxError, B3Hash, ToolCall, ToolDef, ToolMeta};
 
 use crate::mode::catalog_entry;
 use kernel::Mode;
 
 mod dormant;
+pub mod exposure;
 mod fit;
 mod guide;
 mod namespace;
@@ -74,17 +80,33 @@ pub enum Expansion {
 
 #[derive(Debug, Default)]
 pub struct Catalog {
+    /// The admitted tools a run can reach, core or dormant.
     tools: BTreeMap<String, Filed>,
+    /// The tools a table turned off: no request, index or call reaches
+    /// them, and they are kept only for the table this run records.
+    withheld: BTreeMap<String, Filed>,
     skills: BTreeMap<String, Admitted>,
     mode: Option<Mode>,
+    exposure: CatalogExposure,
 }
 
-/// One admitted tool: what the model is told it is, and the namespace it
-/// is filed under.
+/// One admitted tool: what the model is told it is, the namespace it is
+/// filed under, and how it reaches the run.
 #[derive(Debug)]
 struct Filed {
     def: ToolDef,
     namespace: Namespace,
+    exposure: Exposure,
+    from: ExposureFrom,
+}
+
+/// The tool table one run was frozen with: the core array as the catalog
+/// serialises it, which the assembler keeps in the content store, and the
+/// record `prompt_assembled` carries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolTable {
+    pub array: Vec<u8>,
+    pub record: PromptTools,
 }
 
 /// One admitted skill, and which door it came in by: the door decides
@@ -111,14 +133,21 @@ impl Catalog {
         Catalog::default()
     }
 
-    /// Registers an admitted tool under the namespace it is filed in.
+    /// Registers a built tool under the namespace it is filed in, at the
+    /// exposure [`exposure::exposure_of`] gives it, and answers that
+    /// exposure: an `Off` tool is withheld, and the caller registers no
+    /// route for it, so a call by its name reaches nothing.
     /// Eight-field completeness is the type's business; what is checked
     /// here is catalog hygiene: non-empty disclosure, no duplicate name.
     ///
     /// # Errors
-    /// An empty disclosure and a name already admitted are
+    /// An empty disclosure and a name already registered are
     /// `E_INVALID_ARGS`.
-    pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<(), AxError> {
+    pub fn admit_tool(
+        &mut self,
+        meta: &ToolMeta,
+        namespace: Namespace,
+    ) -> Result<Exposure, AxError> {
         if meta.disclosure.trim().is_empty() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -132,7 +161,7 @@ impl Catalog {
             )));
         }
         let key = meta.name.as_str().to_owned();
-        if self.tools.contains_key(&key) {
+        if self.tools.contains_key(&key) || self.withheld.contains_key(&key) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "admit tool to catalog",
@@ -143,18 +172,22 @@ impl Catalog {
                  catalog name points at one tool"
             )));
         }
-        self.tools.insert(
-            key,
-            Filed {
-                def: ToolDef {
-                    name: meta.name.clone(),
-                    description: meta.disclosure.clone(),
-                    input_schema: meta.params.clone(),
-                },
-                namespace,
+        let (exposure, from) = exposure::exposure_of(&self.exposure, &key, namespace.as_str());
+        let filed = Filed {
+            def: ToolDef {
+                name: meta.name.clone(),
+                description: meta.disclosure.clone(),
+                input_schema: meta.params.clone(),
             },
-        );
-        Ok(())
+            namespace,
+            exposure,
+            from,
+        };
+        match exposure {
+            Exposure::Core | Exposure::Dormant => self.tools.insert(key, filed),
+            Exposure::Off => self.withheld.insert(key, filed),
+        };
+        Ok(exposure)
     }
 
     /// Registers one reading-room-admitted SKILL entry kept inside the
@@ -210,6 +243,13 @@ impl Catalog {
     /// The run sits in exactly one mode; the catalog shows only it.
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = Some(mode);
+    }
+
+    /// The `[catalog]` tables this run is frozen with. Set before the
+    /// first tool is admitted: a tool takes its exposure as it is
+    /// admitted.
+    pub fn set_exposure(&mut self, stated: CatalogExposure) {
+        self.exposure = stated;
     }
 
     /// The Resident-segment text: the header line, the mode this run sits
@@ -278,12 +318,16 @@ impl Catalog {
         by_namespace
     }
 
-    /// Whether `name` travels as a tool in this run's requests: it is in
-    /// the core of some mode (`mode::in_some_core`, runtime D25), whatever
-    /// mode the run sits in. A catalog told no mode carries no tool, so
-    /// nothing reaches a model before a mode was decided.
+    /// Whether `name` travels as a tool in this run's requests: it was
+    /// admitted at `Core`, whatever mode the run sits in (runtime D25,
+    /// D111). A catalog told no mode carries no tool, so nothing reaches
+    /// a model before a mode was decided.
     fn is_core(&self, name: &str) -> bool {
-        self.mode.is_some() && crate::mode::in_some_core(name)
+        self.mode.is_some()
+            && self
+                .tools
+                .get(name)
+                .is_some_and(|filed| filed.exposure == Exposure::Core)
     }
 
     /// The call a `tool` `run` stands for, with the id the model gave it,
@@ -308,6 +352,38 @@ impl Catalog {
             .filter(|(name, _)| self.is_core(name))
             .map(|(_, filed)| filed.def.clone())
             .collect()
+    }
+
+    /// The tool table this run is frozen with: the core array as
+    /// [`Catalog::tool_defs`] lists it, serialised once, and one row per
+    /// registered tool in name order, withheld ones included.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` for a definition that will not serialise, which a
+    /// schema held as a `Payload` cannot be, and a length past `u64`.
+    pub fn tool_table(&self) -> Result<ToolTable, AxError> {
+        let array = serialised(&self.tool_defs())?;
+        let mut rows = Vec::with_capacity(self.tools.len().saturating_add(self.withheld.len()));
+        for (name, filed) in self.tools.iter().chain(self.withheld.iter()) {
+            rows.push(PromptTool {
+                name: name.clone(),
+                namespace: filed.namespace.as_str().to_owned(),
+                exposure: filed.exposure,
+                from: filed.from,
+                len: counted(serialised(&filed.def)?.len())?,
+                hint: dormant::hint(&filed.def.description).to_owned(),
+            });
+        }
+        rows.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(ToolTable {
+            record: PromptTools {
+                hash: B3Hash::digest(&array),
+                len: counted(array.len())?,
+                index: counted(dormant::index(&self.dormant_entries()).len())?,
+                rows,
+            },
+            array,
+        })
     }
 
     /// What this run was given, and what each one hashed to.
@@ -363,6 +439,30 @@ impl Catalog {
         }
         None
     }
+}
+
+/// One value as the tool table spells it.
+fn serialised(value: &impl serde::Serialize) -> Result<Vec<u8>, AxError> {
+    serde_json::to_vec(value).map_err(|err| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "record the tool table",
+            err.to_string(),
+        )
+        .with_recovery("give the tool a schema that serialises as JSON")
+    })
+}
+
+/// A byte count as the record holds it.
+fn counted(len: usize) -> Result<u64, AxError> {
+    u64::try_from(len).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "record the tool table",
+            "a length past u64",
+        )
+        .with_recovery("admit fewer or smaller tools: a table this long cannot be recorded")
+    })
 }
 
 #[cfg(test)]

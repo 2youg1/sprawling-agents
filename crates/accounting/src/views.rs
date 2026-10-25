@@ -28,6 +28,7 @@ pub mod answering;
 pub mod archives;
 mod asking;
 pub mod building_page;
+mod catalog;
 pub mod city;
 pub mod commits;
 pub mod cost_of;

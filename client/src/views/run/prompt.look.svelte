@@ -14,7 +14,7 @@ is a control, so it lifts from raised to raised-hover. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
   import Path from "../parts/path.svelte";
-  import type { PromptLook, SegmentLook } from "./prompt";
+  import type { PromptLook, SegmentLook, ToolsLook } from "./prompt";
 
   const look: PromptLook = $props();
 </script>
@@ -78,10 +78,49 @@ is a control, so it lifts from raised to raised-hover. -->
   </li>
 {/snippet}
 
+{#snippet table(tools: ToolsLook)}
+  <li class="border-b border-edge">
+    <div class="flex items-center gap-base py-tight text-note">
+      <button
+        {...tools.fold}
+        class={[
+          "flex min-h-control-sm min-w-0 flex-1 items-center gap-base rounded-control px-snug text-left transition-colors still:transition-none",
+          "ease-leave hover:wash hover:ease-arrive",
+        ]}
+      >
+        <Glyph
+          name="chevron"
+          size="sm"
+          class={[
+            "shrink-0 text-text-faint transition-transform still:transition-none",
+            tools.open ? "rotate-90 ease-arrive" : "ease-leave",
+          ]}
+        />
+        <span class="shrink-0 text-text-quiet">{tools.slot}</span>
+        <span class="figure shrink-0 text-text-faint">{tools.size}</span>
+      </button>
+    </div>
+    {#if tools.open}
+      <ul class="flex flex-col pb-base pl-wide text-note">
+        {#each tools.rows as row (row.key)}
+          <li class="flex min-w-0 items-baseline gap-base">
+            <span class="shrink-0 font-mono text-text-quiet">{row.name}</span>
+            <span class="min-w-0 truncate text-text-faint">{row.facts}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </li>
+{/snippet}
+
 {#if look.segments === undefined}
   <p class="text-text-faint">…</p>
 {:else if look.segments.length > 0}
   <ul>
+    {#if look.tools !== undefined}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+      {@render table(look.tools)}
+    {/if}
     {#each look.segments as each (each.key)}
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render segment(each)}

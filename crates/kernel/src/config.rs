@@ -14,10 +14,12 @@ use crate::model::Effort;
 use crate::tool::ServerLabel;
 
 mod container;
+mod exposure;
 mod interpreter;
 mod sandbox;
 mod search;
 pub use container::{ContainerImage, ContainerLimits};
+pub use exposure::{CatalogExposure, Exposure, ExposureFrom, ExposureTable};
 pub use interpreter::Interpreter;
 pub use sandbox::{SandboxArm, SandboxLimits};
 pub use search::{SearchConfiguration, SearchSupplier};
@@ -310,6 +312,13 @@ pub struct FrozenConfig {
     /// written before search existed, which reads as `Default`.
     #[serde(default)]
     pub search: SearchConfiguration,
+    /// The `[catalog]` tables of the city and the building, frozen for
+    /// the reason `mcp` is: they decide which tools travel in the tool
+    /// array, which a provider caches ahead of the system prompt.
+    /// Absent in a snapshot written before `[catalog]` existed, which
+    /// reads as two tables that state nothing.
+    #[serde(default)]
+    pub catalog: CatalogExposure,
 }
 
 /// Every concern's ladder, handed to [`freeze`] together: the values
@@ -325,6 +334,7 @@ pub struct StatedConfig {
     pub mcp: LayeredValue<Vec<McpServer>>,
     pub second_threshold: LayeredValue<SecondThreshold>,
     pub search: LayeredValue<SearchConfiguration>,
+    pub catalog: LayeredValue<ExposureTable>,
 }
 
 /// Hot-reloadable surface. Empty: the type exists so the no-field-overlap
@@ -349,6 +359,14 @@ pub fn freeze(stated: &StatedConfig) -> FrozenConfig {
         // Silence on every rung is the default supplier, which is what
         // a city written before `[search]` existed meant.
         search: stated.search.resolve().cloned().unwrap_or_default(),
+        // Not one value up the ladder: a tool key the building does not
+        // write still falls to the city's, so both tables are kept and
+        // `CatalogExposure::stated` reads them in order. A room's rung
+        // is refused where the file is read.
+        catalog: CatalogExposure {
+            city: stated.catalog.city.clone().unwrap_or_default(),
+            building: stated.catalog.building.clone().unwrap_or_default(),
+        },
     }
 }
 

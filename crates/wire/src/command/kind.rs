@@ -8,16 +8,15 @@
 use kernel::model::{RunPolicy, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, InputKinds,
-    McpServer, ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed,
-    SessionName,
+    ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
-    Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
-    IdentityCard, PolicyChange, PromptWrite, ProposalDecisions, PursuitStep, RangeWrite,
+    BuildingSettings, Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument,
+    HaltScope, IdentityCard, PolicyChange, PromptWrite, ProposalDecisions, PursuitStep, RangeWrite,
     RulesWrite, SecretForgetting, SessionNaming, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
@@ -83,27 +82,8 @@ pub enum Command<Secret = Sealed<String>> {
         tuning: EndpointTuning,
         idem: IdemKey,
     },
-    /// What a building's runs may reach: the sandbox's limits, the external servers its tools come
-    /// from, and the windows on this person's own machine its desktop connector may touch.
-    ///
-    /// Each field is optional and an absent one leaves that section alone; an empty `mcp` list is a
-    /// building that reaches no server, which is a different statement from not saying.
-    ///
-    /// `desktop` is the allowlist's text and not a parsed value: the connector that reads that file
-    /// at start-up is the authority on its syntax and fails closed, and a second parser here would
-    /// be a second authority (`crates/city/Spec.lean` §8-26).
-    ConfigureBuilding {
-        addr: Address,
-        sandbox: Option<SandboxLimits>,
-        mcp: Option<Vec<McpServer>>,
-        desktop: Option<String>,
-        /// Where the context reminder's second rung sits, as one layer states it: a raw
-        /// percent on the wire. The domain is `kernel::config::SecondThreshold`'s one
-        /// construction point, and a deserializer that enforced it here would be the
-        /// second place that rule lives.
-        context_second_threshold: Option<u64>,
-        idem: IdemKey,
-    },
+    /// What a building's runs may reach, as `ConfigureCity` carries the city's own layer.
+    ConfigureBuilding(BuildingSettings),
     AttachEndpoint {
         name: ProviderName,
         /// The base URL as a provider's documentation prints it; the

@@ -24,7 +24,7 @@ trait File {
 
 impl File for Catalog {
     fn file(&mut self, meta: &ToolMeta) -> Result<(), AxError> {
-        self.admit_tool(meta, filed(meta.name.as_str()))
+        self.admit_tool(meta, filed(meta.name.as_str())).map(|_| ())
     }
 }
 
@@ -454,4 +454,81 @@ fn resolve_run_hands_back_the_target_or_one_refusal() {
             refused.recovery()
         );
     }
+}
+
+/// A table moves a tool between the three exposures, nearer statements
+/// first and a tool's own key before its namespace's; `tool` and `read`
+/// stay core whatever is written; an `Off` tool reaches no request, index
+/// or call, and the recorded table still lists it (§8-60, D111).
+#[test]
+fn a_catalog_table_moves_tools_between_core_dormant_and_off() {
+    use kernel::config::{CatalogExposure, Exposure, ExposureFrom, ExposureTable};
+    let mut catalog = Catalog::new();
+    catalog.set_mode(Mode::Work);
+    catalog.set_exposure(CatalogExposure {
+        city: ExposureTable {
+            tools: [("plan".to_owned(), Exposure::Core)].into(),
+            namespaces: [("apps".to_owned(), Exposure::Off)].into(),
+        },
+        building: ExposureTable {
+            tools: [
+                ("exec".to_owned(), Exposure::Dormant),
+                ("apps_mail".to_owned(), Exposure::Dormant),
+                ("read".to_owned(), Exposure::Off),
+            ]
+            .into(),
+            namespaces: std::collections::BTreeMap::new(),
+        },
+    });
+    for name in ["read", "tool", "exec", "plan", "apps_mail", "apps_ping"] {
+        catalog.file(&meta(name)).unwrap();
+    }
+
+    let carried: Vec<String> = catalog
+        .tool_defs()
+        .iter()
+        .map(|def| def.name.as_str().to_owned())
+        .collect();
+    assert_eq!(carried, ["plan", "read", "tool"]);
+    assert!(
+        catalog.render().contains("- apps (1)"),
+        "{}",
+        catalog.render()
+    );
+    assert!(
+        catalog
+            .resolve_run(&ToolCall {
+                id: "toolu_1".to_owned(),
+                name: ToolName::parse("tool").unwrap(),
+                args: Payload::of(
+                    &serde_json::json!({ "op": "run", "name": "apps_ping", "args": {} })
+                )
+                .unwrap(),
+            })
+            .is_err()
+    );
+
+    let rows: Vec<(String, Exposure, ExposureFrom)> = catalog
+        .tool_table()
+        .unwrap()
+        .record
+        .rows
+        .into_iter()
+        .map(|row| (row.name, row.exposure, row.from))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            (
+                "apps_mail".to_owned(),
+                Exposure::Dormant,
+                ExposureFrom::Building
+            ),
+            ("apps_ping".to_owned(), Exposure::Off, ExposureFrom::City),
+            ("exec".to_owned(), Exposure::Dormant, ExposureFrom::Building),
+            ("plan".to_owned(), Exposure::Core, ExposureFrom::City),
+            ("read".to_owned(), Exposure::Core, ExposureFrom::Fixed),
+            ("tool".to_owned(), Exposure::Core, ExposureFrom::Fixed),
+        ]
+    );
 }

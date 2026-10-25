@@ -180,22 +180,7 @@ impl RunWorker {
                 ..
             } => self.wake(&source, &subject, &body),
             wire::Command::ConnectToolkit { toolkit, .. } => self.connect_toolkit(&toolkit),
-            wire::Command::ConfigureBuilding {
-                addr,
-                sandbox,
-                mcp,
-                desktop,
-                context_second_threshold,
-                ..
-            } => self.configure_building(
-                &addr,
-                super::configure::Reconfiguration {
-                    sandbox: sandbox.as_ref(),
-                    mcp: mcp.as_deref(),
-                    desktop: desktop.as_deref(),
-                    context_second_threshold,
-                },
-            ),
+            wire::Command::ConfigureBuilding(ref settings) => self.configure_building(settings),
             wire::Command::ProbeEndpoint {
                 name,
                 base_url,

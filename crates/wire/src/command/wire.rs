@@ -28,9 +28,9 @@ use kernel::IdemKey;
 use super::kind::Command;
 use super::no_secret::NoSecret;
 use super::step::{
-    AgentAdding, AgentLoginStart, CityClosing, CitySettings, DeviceForgetting, DoorAnswer,
-    DoorOpening, DoorStep, PolicyChange, PromptWrite, ProposalDecisions, RangeWrite, RulesWrite,
-    SecretForgetting, SessionNaming,
+    AgentAdding, AgentLoginStart, BuildingSettings, CityClosing, CitySettings, DeviceForgetting,
+    DoorAnswer, DoorOpening, DoorStep, PolicyChange, PromptWrite, ProposalDecisions, RangeWrite,
+    RulesWrite, SecretForgetting, SessionNaming,
 };
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
@@ -47,7 +47,7 @@ impl<Secret> Command<Secret> {
             | Self::Wake { ref idem, .. }
             | Self::OpenSession { ref idem, .. }
             | Self::ProbeEndpoint { ref idem, .. }
-            | Self::ConfigureBuilding { ref idem, .. }
+            | Self::ConfigureBuilding(BuildingSettings { ref idem, .. })
             | Self::CreateBuilding { ref idem, .. }
             | Self::RemoveBuilding { ref idem, .. }
             | Self::Steer { ref idem, .. }
@@ -122,21 +122,7 @@ impl From<WireCommand> for Command {
                 effort,
                 model,
             },
-            Command::ConfigureBuilding {
-                addr,
-                sandbox,
-                mcp,
-                desktop,
-                context_second_threshold,
-                idem,
-            } => Self::ConfigureBuilding {
-                addr,
-                sandbox,
-                mcp,
-                desktop,
-                context_second_threshold,
-                idem,
-            },
+            Command::ConfigureBuilding(settings) => Self::ConfigureBuilding(settings),
             Command::ProbeEndpoint {
                 name,
                 base_url,

@@ -139,8 +139,8 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 ```rust
 pub fn write_rules_against(city_root: &Path, addr: &Address, base: &str, text: &str) -> Result<BuildingRules, AxError>;
-pub enum CitySetting { KeepWarm(KeepWarm), Effort(Effort) }
-pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), AxError>;
+pub enum CitySetting<'a> { KeepWarm(KeepWarm), Effort(Effort), Catalog(&'a ExposureTable) }   // [catalog] 见 ConfigLayers §8-4g
+pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<(), AxError>;
 ```
 
 - **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。它是楼规唯一的写门（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）；`rules` 工具只读，没有写面（§8-2b，D23），所以「盘上的楼规永远读得懂」只有一条规则。

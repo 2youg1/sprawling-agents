@@ -9,13 +9,13 @@ import { Address, EnvVarName, ServerLabel } from "../wire";
 import type { SandboxLimits } from "../wire";
 import { configureSandbox } from "./commands";
 
-// `ConfigureBuilding` carries four faces of a building in one verb, and
+// `ConfigureBuilding` carries five faces of a building in one verb, and
 // the city reads `null` as "leave this face as it is". The sandbox card
 // must therefore speak about the sandbox and nothing else, or saving it
-// would wipe the building's MCP servers, desktop allowlist or context
-// rung (client/Spec.lean §4-50).
+// would wipe the building's MCP servers, desktop allowlist, context rung
+// or `[catalog]` table (client/Spec.lean §4-50).
 describe("configureSandbox", () => {
-  test("states the sandbox whole and leaves the other three faces alone", () => {
+  test("states the sandbox whole and leaves the other four faces alone", () => {
     const limits: SandboxLimits = {
       shell: true,
       fuel: 2_000_000,
@@ -31,6 +31,7 @@ describe("configureSandbox", () => {
       mcp: null,
       desktop: null,
       context_second_threshold: null,
+      catalog: null,
       idem: "-",
     });
   });

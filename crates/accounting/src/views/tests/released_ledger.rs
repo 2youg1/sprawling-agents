@@ -67,6 +67,7 @@ fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
                 stored: true,
                 sources: Vec::new(),
             }],
+            tools: None,
         }))
     );
 }
