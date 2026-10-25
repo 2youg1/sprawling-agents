@@ -314,7 +314,8 @@ fn a_decision_number_heads_one_decision_in_its_specification() {
     assert_eq!(
         judged(&root),
         Ok(vec![
-            "crates/j/spec/Part.lean:4: D3 also heads a decision at crates/j/Spec.lean:1".to_owned(),
+            "crates/j/spec/Part.lean:4: D3 also heads a decision at crates/j/Spec.lean:1"
+                .to_owned(),
         ])
     );
 }

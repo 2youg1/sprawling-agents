@@ -21,6 +21,7 @@ use crate::header::{Leader, notice};
 use crate::members;
 use crate::report::{Violation, XtaskError};
 
+mod decisions;
 mod effective;
 mod ratchet;
 mod rustpath;
@@ -56,14 +57,16 @@ const SECTIONS: [&str; 17] = [
 
 /// The `spec` gate: one effective specification per package, no prose
 /// naming a SPEC the tree lacks, the import discipline, no `sorry`,
-/// `admit` or `axiom`, every path a specification cites on disk, and
-/// the two counts that may only fall.
+/// `admit` or `axiom`, every path a specification cites on disk, the
+/// two counts that may only fall, and each decision number heading one
+/// decision in its specification.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     effective::one_per_package(root, &mut violations)?;
     effective::no_dangling_names(root, &mut violations)?;
     source::check(root, &mut violations)?;
     ratchet::check(root, &mut violations)?;
+    decisions::check(root, &mut violations)?;
     Ok(violations)
 }
 
