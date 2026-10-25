@@ -37,21 +37,36 @@ City Hall is the building `hall`; its vocation is to plan, so it gets `city` and
 
 The resident core differs by mode in what it may run, not in what it carries: the tool list of every request is the union of both modes' cores, so changing a run's mode mid-session leaves the list's bytes alone, and a call to `edit` or `exec` in chat mode is refused with `E_GATE_DENIED` before it does anything (`mode_admits` in [`crates/runtime/src/mode.rs`](../crates/runtime/src/mode.rs)).
 
+## Choosing how much of the catalog a run carries
+
+The city's `CONFIG.toml` and a building's may give a tool or a whole namespace one of three exposures under `[catalog.tools]` or `[catalog.namespaces]`: `core` sends the tool in every request, `dormant` lists it in the dormant index for `tool` to fetch on demand, and `off` does not admit it. For example:
+
+```toml
+[catalog.tools]
+exec = "dormant"
+web_search = "off"
+
+[catalog.namespaces]
+record = "core"
+```
+
+A tool's setting is read in this order: the building's tool key, the building's namespace key, the city's tool key, the city's namespace key, then the built-in default. `tool` and `read` are always `core`, because they are the doors to the index and the documents it names. Only the city and building layers state these tables, so every room of a building keeps the same cacheable tool array; each table is frozen independently, which means a building that states one tool still follows the city for every other. Every run records the table it actually received, `off` rows included, in `prompt_assembled.tools` ([`crates/runtime/src/catalog/exposure.rs`](../crates/runtime/src/catalog/exposure.rs), runtime D111). The building page's capabilities section edits these two layers and shows the newest run's byte counts and recent use beside the choice.
+
 ## The resident tools
 
 These travel in the tool list of every request, as far as the building admitted them. They are filed under `sprawling`, so `tool list sprawling` names them beside the dormant members.
 
 ### `read`
 
-**Read a file by its path, or a skill by the name the catalog lists it under.**
+**Reads a file by its path, or a skill by the name the catalog lists it under, with line numbers counted from 1.**
 
-[`crates/runtime/src/tools/read.rs`](../crates/runtime/src/tools/read.rs). It answers by numbered lines and says where to continue, and it is also how a run opens a catalog entry — a skill, the mode row or the `dev` row — by name. A path the model chose is held to the **read bound**: all of the run's own building, every building that is not confidential, and never a reserved subtree. A file it returns counts as read for `edit`. Resident in both modes, in every building.
+[`crates/runtime/src/tools/read.rs`](../crates/runtime/src/tools/read.rs). Its arguments are `file_path`, an optional `offset` whose line number counts from 1, and an optional `limit` of at most 512 lines. It answers by numbered lines and says where to continue, and it is also how a run opens a catalog entry — a skill, the mode row or the `dev` row — by name. A path the model chose is held to the **read bound**: all of the run's own building, every building that is not confidential, and never a reserved subtree. A file it returns counts as read for `edit`. Resident in both modes, in every building.
 
 ### `search`
 
-**Find a substring in the files under one path.**
+**Searches the lines of files under one path for a regular expression in ripgrep's syntax, or with `glob` alone finds files by name.**
 
-[`crates/runtime/src/tools/search.rs`](../crates/runtime/src/tools/search.rs). Literal text, never a regular expression, and each hit carries the line number `read` continues from. It asks the same read bound as `read`, so what one may open the other may find. Resident in both modes, in every building.
+[`crates/runtime/src/tools/search.rs`](../crates/runtime/src/tools/search.rs). `pattern` is a regular expression matched one line at a time by the `regex` crate, whose engine does not backtrack; `output_mode` is `files_with_matches` by default, or `content` and `count`, and `-i`, `-A`, `-B`, `-C` and `context` adjust the match and its context. With `glob` and no `pattern`, the call finds files by name instead of searching their lines. A reported line number counts from 1 and is the `offset` `read` continues from. The call refuses `multiline`, `type`, a nonzero `offset` and a pattern that spells a line break, because matching line by line would otherwise answer wrongly; `-n`, `-o` and `head_limit` go unread. Search asks the same read bound as `read`, so what one may open the other may find. Resident in both modes, in every building.
 
 ### `status`
 
@@ -67,29 +82,21 @@ These travel in the tool list of every request, as far as the building admitted 
 
 ### `edit`
 
-**Replace an exact string in a file you have read in this run: `old` must match exactly once or the call fails.**
+**Performs exact string replacements in a file you have read in this run: `old_string` must match exactly once, or set `replace_all` to change every occurrence.**
 
-[`crates/runtime/src/tools/edit.rs`](../crates/runtime/src/tools/edit.rs). A file changed since this run read it is refused, and the refusal shows the passage as it reads now; an empty `old` creates a file that does not exist. Every write is checked against the building's write domain (`write` and `prefixes` in `RULES.toml`) and against the run's write limit, which under `Create` lets it create a file and change none. Resident in every building, run only in work mode.
+[`crates/runtime/src/tools/edit.rs`](../crates/runtime/src/tools/edit.rs). Its arguments are `file_path`, `old_string`, `new_string` and the optional `replace_all`. A file changed since this run read it is refused, and the refusal shows the passage as it reads now; an empty `old_string` creates a file that does not exist. Every write is checked against the building's write domain (`write` and `prefixes` in `RULES.toml`) and against the run's write limit, which under `Create` lets it create a file and change none. Resident in every building, run only in work mode.
 
 ### `exec`
 
-[`crates/runtime/src/tools/exec/disclosure.rs`](../crates/runtime/src/tools/exec/disclosure.rs) and [`crates/runtime/src/tools/exec/dispatch.rs`](../crates/runtime/src/tools/exec/dispatch.rs). The description names the sandbox arm the run got, so its first sentence depends on `[sandbox] arm` in `CONFIG.toml`. With no arm named, or with `native` or `copied_tree`:
+[`crates/runtime/src/tools/exec/disclosure.rs`](../crates/runtime/src/tools/exec/disclosure.rs) and [`crates/runtime/src/tools/exec/dispatch.rs`](../crates/runtime/src/tools/exec/dispatch.rs). The description names the sandbox arm the run got. With no arm named, or with `native`, `copied_tree`, `container` or `none`:
 
-**Run a program, a Python snippet, or a shell line.**
-
-With `container`:
-
-**Run a program, Python snippet, or shell line.**
-
-With `none`:
-
-**Program and shell calls run on the host with no confinement.**
+**Executes a command, or a Python script.**
 
 With `python`:
 
-**Sandbox execution offers only the Python WASI arm; program and shell sandbox calls refuse.**
+**Executes a Python script.**
 
-The call names one of three arms — a program, a Python snippet, a shell line — and may ask for `where: host` to run outside the confinement. The shell arm stays off until `[sandbox] shell = true`. Under the `Create` write limit a command runs only in a copy. A file a command prints or writes does not count as read for `edit`. Which mechanism fills each arm on each platform, and what each one does not guarantee, is in [How `exec` is confined](operating.md#how-exec-is-confined). Resident in every building except City Hall, run only in work mode.
+The call gives exactly one of `command` and `python`, and may ask for `where: host` to run outside the confinement; `where` defaults to `sandbox`, and the Python arm has no host form. With `[sandbox] shell = true`, a command is interpreted by the configured shell. Without it, the default, a command is one program and its arguments: quotes group arguments, and unquoted shell syntax such as pipes, redirection and wildcards is refused rather than passed to a program as arguments. Under the `Create` write limit host execution is refused and a confined command writes only in a copy. A file a command prints or writes does not count as read for `edit`. Which mechanism fills each arm on each platform, and what each one does not guarantee, is in [How `exec` is confined](operating.md#how-exec-is-confined). Resident in every building except City Hall, run only in work mode.
 
 ## `sprawling` — working with other residents, and the run itself
 
@@ -98,23 +105,23 @@ The call names one of three arms — a program, a Python snippet, a shell line �
 The namespace's sentence is in `own_about` in [`crates/runtime/src/catalog/namespace.rs`](../crates/runtime/src/catalog/namespace.rs), with the other namespaces' sentences below. The rest of `sprawling` is dormant. In the dormant index, and in what `tool list` prints with no namespace, the whole namespace is one line; for a building that builds it reads:
 
 ```text
-- sprawling (10): talk to other residents, split and hand off work, see your run
+- sprawling (16): talk to other residents, split and hand off work, see your run
 ```
 
-The sentence is 62 bytes long, so it fits under the 64-byte cut whole. In City Hall the count is 9: `city` is added, and `delegate` and `workshop` are absent. `tool list sprawling` lists every member, the resident ones included, in byte order of their names. For a building that builds, with no sandbox arm named, it prints this; the lines for `archive` and `signal` end in a space where the cut fell, which is left out here:
+The sentence is 62 bytes long, so it fits under the 64-byte cut whole. In City Hall the count is 14: `city` is added, and `exec`, `delegate` and `workshop` are absent. `tool list sprawling` lists every member, the resident ones included, in byte order of their names. For a building that builds, with no sandbox arm named, it prints this; the lines for `archive` and `signal` end in a space where the cut fell, which is left out here:
 
 ```text
 - archive: Write down what this building should not have to be told twice,
 - delegate: Hand one piece of work to another agent in this building, one le
-- edit: Replace an exact string in a file you have read in this run: `ol
-- exec: Run a program, a Python snippet, or a shell line
+- edit: Performs exact string replacements in a file you have read in th
+- exec: Executes a command, or a Python script
 - goal: Claim the ground you are about to work on, so two residents do n
 - neighbours: Who else this building has, and what each of them is for; call i
 - plan: Take a node of this building's plan before unassigned work
 - pr: Offer your work for review, or check someone else's; nothing you
-- read: Read a file by its path, or a skill by the name the catalog list
+- read: Reads a file by its path, or a skill by the name the catalog lis
 - rules: What this building's runs are judged by
-- search: Find a substring in the files under one path
+- search: Searches the lines of files under one path for a regular express
 - signal: Speak to another resident, or to every one of them, or take the
 - status: Report your current situation in thirteen lines: who you are, wh
 - succeed: Replace yourself with a successor at this address when the windo

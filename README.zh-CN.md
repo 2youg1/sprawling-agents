@@ -22,11 +22,36 @@
 
 sprawling尽量少打断你。Agent在自己的楼里默认拥有全部权限，用`minimal`模板盖的楼里每个文件它都能写，干完的活不经审查直接落地（想打开审查或者限制写入，见[一栋你自己的楼](docs/getting-started.zh-CN.md#一栋你自己的楼)），送到你面前等你拍板的，是居民凭楼的规则定不下来的设计问题。计划、决定和交接都写成能直接读的文件，Agent换了会话就从这些记录接着干，记忆就在你的文件、代码和文档库里。目前也不内置workflow，工作流由你用角色、skills和工具接入来定义。
 
+这种少打断不等于少给你信息：对话页默认从work开始，空输入框里的地址打开命令面板，你可以在那里换房间或会话、把当前对话分叉到另一个房间；建楼页既能按模板新建，也能接管城里已有的目录，楼页则把下次run会读到的提示层、每份文档从哪里来，以及每件工具是常驻、按需还是关闭都摆出来，让你先看清模型会拿到什么，再决定要不要改，而不是在反复切换页面和追问里猜它为什么这样做。
+
 <p align="center">
-  <img alt="会话开始前的Main对话页：输入框，左边是工作区，右边是模型、思考强度和权限三个控件" src="docs/images/main-before-a-session.png" width="49%">
-  <img alt="一个跑完的会话和它的仪表：首个token用时、输出速度、缓存命中和token数，下面是每次工具调用和它的耗时，右边打开着它读过的文件" src="docs/images/a-session-at-work.png" width="49%">
-  <img alt="这次run写出的报告，带表格和编号列表，旁边是它读的CSV文件" src="docs/images/a-report-beside-its-file.png" width="98%">
+  <a href="docs/images/a-report-beside-its-file.png"><img alt="对话中是一份带表格和编号列表的报告，右侧打开报告所依据的observations.csv" src="docs/images/a-report-beside-its-file.png" width="100%"></a>
+  <br>
+  <sub>一次run的报告与它读取的CSV并排；点击查看完整窗口。</sub>
 </p>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/images/building-prompts.png"><img alt="atlas楼页的提示节，列出City.md和AGENTS.md的层级、是否发送与字节数" src="docs/images/building-prompts-detail.png" width="100%"></a>
+      <br><sub>提示层：每份文档的来源、状态和发送顺序都可以检查。</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/images/building-capabilities.png"><img alt="atlas楼页的能力节，工具按core、on demand、off三档设置" src="docs/images/building-capabilities-detail.png" width="100%"></a>
+      <br><sub>能力：本楼或全城默认的工具档位，改动前的依据就在同页。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/images/raise-adopt.png"><img alt="建楼页接管lab-notes目录，显示地址、模板和RULES.toml预览" src="docs/images/raise-adopt-detail.png" width="100%"></a>
+      <br><sub>接管目录：已有文件原样保留，规则在落地前先检查。</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/images/talk-palette-carry.png"><img alt="命令面板的带着这段对话去列表，列出garden/sensors、atlas/notes和atlas/review" src="docs/images/talk-palette-carry-detail.png" width="100%"></a>
+      <br><sub>分叉对话：把已有上下文带到另一个房间，不必复制粘贴。</sub>
+    </td>
+  </tr>
+</table>
 
 **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->。** 版本之间数据格式、wire和界面都还可能变。
 
