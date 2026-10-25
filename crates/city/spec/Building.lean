@@ -41,6 +41,8 @@ pub fn create(city_root: &Path, addr: &Address, template: BuildingTemplate)
 pub fn created_payload(building: &Building, template: BuildingTemplate)
     -> Result<Payload, AxError>;
 pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;
+pub fn withdraw_adoption(city_root: &Path, building: &Building)
+    -> Result<(), AxError>;                                   // 收编的 base checkpoint 被拒时撤回规则
 pub fn adopted_payload(building: &Building, template: BuildingTemplate)
     -> Result<Payload, AxError>;                              // adopted: true
 pub fn configured_payload(building: &Building, wrote: Written)
@@ -71,6 +73,7 @@ pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         /
 - **哪个目录名是一栋楼，只有一条规则**：`names_a_building` 拒点开头的目录（保留子树在其中）、地址文法拼不出的名字与保留名；`all` 按它列楼，`wizard::survey` 按它向新城提供可收编的文件夹，所以新城提供的与旧城列出的不会不一致。`all` 不要求 `RULES.toml`：一个还没有规则的顶层文件夹也被列出，`has_rules` 答它有没有规则，页面据此把它标为可收编（`wire::BuildingProgress.adoptable`）。
 - **`raise` 是人从页面立楼的门**（`Command::CreateBuilding`）：目录在就收编、不在就新建，由 `Founding` 说是哪一种（D32）。`rules` 为 `Written` 时先经 `policy::evaluate`（每次派活读规则的同一个读者）求值，被拒就什么都不落：没有目录、没有文件、没有账本行。`Template` 照模板的字节。`template_rules` 答一个模板在一个地址会写下的 `RULES.toml`，页面在立楼之前给人看；它与 `create` 拒同样的地址（房间、保留子树）。
 - **adopt（兑现「导入一个已有目录」这件事）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录先由人搬入城内再收编，本体不做拷贝。`adopted_payload` 记规则来自哪个模板：命令行与开城时的收编是 `minimal`，页面上的收编是人选的那个。
+- **收编没做完就撤回规则**：规则落下之后，sprawling 先做 base checkpoint 再记 `building_created`。checkpoint 被拒时（例如暂存扫描在目录里找到一个像凭据的文件），sprawling 调 `withdraw_adoption` 删掉这一次写下的 `RULES.toml`，目录回到可收编，人移走那个文件后再按一次就完成收编。不撤回的话，目录有了规则，却没有 `building_created` 行、也没有 base checkpoint，再按一次又被「已有规则」拒。只删规则文件：它是 `lay_out` 以 `create_new` 新写的，此前不在，删掉不丢人的字节；补上的 spine 文件与 `.gitignore` 规则留下，因为两者都是缺才写，第二次收编不会再写一遍。删不掉时，checkpoint 的拒绝照样返回，恢复里写明要人先删哪个文件。
 -/
 
 /-! D32 人从页面立楼时，目录在不在由城看：在就收编，不在就新建

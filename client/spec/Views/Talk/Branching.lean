@@ -8,7 +8,7 @@
 
 规定 `client/src/views/talk/branching.ts` 的 `pressed` 与 `settled`，以及同一文件里 `keepBranches` 据它们发 `OpenSession`、移动主区的方式（`client/Spec.lean` §4-49、D44）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`branching.test.ts` 逐条回放本文件末尾 `#eval` 打印的轨迹向量。
 
-分支有三个入口：信箱「最近」段一行的分支键、过去一段会话里每一回合的分支键、当前一段对话里的分支键与选行器。三者都经同一个 `keepBranches` 发出 `OpenSession { from }`，主区只在页面的 belief 显示这个房间开了新的一段之后才移到那个房间。
+开一段新会话有六个入口：信箱「最近」段一行的分支键、过去一段会话里每一回合的分支键、当前一段对话里的分支键与选行器、命令面板的「带着这段对话去…」，以及 `/new` 与 `/compact`。前四个从一行分出（`OpenSession { from }`），后两个从头开、只带不带交接（`OpenSession { carry }`）；六个都经同一个 `keepBranches` 发出，主区只在页面的 belief 显示这个房间开了新的一段之后才移到那个房间。状态机不看新的一段从哪里开始，所以下面的模型对六个入口是同一个。
 
 城不说一条拒绝答的是哪条命令（线上没有 idem），所以答复从 belief 读，与 `talk/handing.ts` 读一次派活的答复是同一条规则：按下那一刻记下两样——这个房间当前一段从哪个 seq 开始（`belief.sessions[room]`），以及最新的那条拒绝；之后 belief 里这个房间的一段比记下的新，就是城开了分支；出现一条比记下的新的拒绝，就是城拒了它。两样在同一拍到达时开成的一方算数，因为一段已经存在，按它不在处理就是对人说谎。
 
@@ -60,9 +60,9 @@ def refusedSince (mark seen : Seen) : Bool := seen.refusal ≠ 0 && seen.refusal
 
 /-! D100 分支先等城开出新的一段再移动主区；三个入口共用一个状态机
 
-- **决策**：信箱「最近」段的分支键、过去一段会话里的分支键与当前对话里的分支键都调用 `views/talk/branching.ts` 的 `keepBranches` 交出的 `open(room, origin, went)`，它是全页唯一的一份（`ui().branches`）。按下时记下 `belief.sessions[room]` 与 `belief.refusal`，发出 `OpenSession { carry: nothing, from: origin }`；之后 belief 里这个房间的一段比记下的新，才把主区移到 `#/talk/<room>` 并调用 `went`（信箱借它收起，当前对话借它把选行器挑中的话放回框里、画分支的边界线）；出现一条更新的拒绝时进 `refused`，主区不动，发起它的那一行写出原因，`E_BUSY` 时旁边是停下这个房间正在跑的 run 的 `/stop`（`belief/live.ts` 的 `newestWorking`，与框里 `/stop` 停的是同一个 run）。这条拒绝由那一行说，角落不再弹同一条（`branchClaims`）。在途时再按任何分支键什么也不发，键说明有一个分支正在打开。
+- **决策**：每个开新会话的入口都调用 `views/talk/branching.ts` 的 `keepBranches` 交出的 `open(room, opening, went)`，它是全页唯一的一份（`ui().branches`）。`opening` 是 `Opening`：从一行分出（`branch`，带 `origin`），或从头开（`fresh`，带 `carry`）。按下时记下 `belief.sessions[room]` 与 `belief.refusal`，发出 `OpenSession`（分支是 `{ carry: nothing, from: origin }`，从头开是 `{ carry, from: null }`）；之后 belief 里这个房间的一段比记下的新，才把主区移到 `#/talk/<room>` 并调用 `went`（信箱借它收起，当前对话借它把选行器挑中的话放回框里、画分支的边界线，命令面板借它关上）；出现一条更新的拒绝时进 `refused`，主区不动，发起它的那一行写出原因，`E_BUSY` 时旁边是停下这个房间正在跑的 run 的 `/stop`（`belief/live.ts` 的 `newestWorking`，与框里 `/stop` 停的是同一个 run）。这条拒绝由那一行说，角落不再弹同一条（`branchClaims`）；`/new` 与 `/compact` 的拒绝由主区那一段说，措辞说的是新会话而不是分支。在途时再按任何分支键什么也不发，键说明有一个分支正在打开。
 - **理由**：`u.send` 只说帧离开了页面，不说城接受了它；房间里有 run 在跑时城以 `E_BUSY` 拒绝开新的一段（`crates/accounting/src/worker/commanding/sessions.rs` 的 `open_session`）。先移动主区，页面就停在那个房间正在跑的会话上，框开着，人接下来打的字成了对正在跑的 run 的转向。belief 已经经 `session_opened` 知道新的一段，所以「开成了」是一个读得到的事实，不必猜一个时长。状态放在全页一份里而不是各入口一份，是因为角落要在拒绝到达的那一刻知道它归谁，第四个入口也只能经过这一份。
-- **被击败的备选**：①发出后等一个固定时长再移动——城慢时照样早移，城快时白等；②每个入口各写一份等待——今天两个入口各写一份「发了就走」，同一个缺陷正是这样出现两次；③只在页面认为房间有 run 在跑时不发——城才是这件事的权威，页面的读数可能落后，拒绝照样要有地方说。
+- **被击败的备选**：①发出后等一个固定时长再移动——城慢时照样早移，城快时白等；②每个入口各写一份等待——两个分支入口曾各写一份「发了就走」，`/new` 与 `/compact` 又写了第三份（#120），同一个缺陷正是这样一次次出现；③只在页面认为房间有 run 在跑时不发——城才是这件事的权威，页面的读数可能落后，拒绝照样要有地方说。
 - **重开参数**：线上的拒绝带上它答的命令的 idem，那时答复按 idem 认，不再按「比记下的新」认。
 -/
 
