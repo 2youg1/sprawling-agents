@@ -18,7 +18,7 @@ use kernel::{
     AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
 };
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
-use runtime::{Admitted, CallTool, Catalog, ConcurrentInvoke};
+use runtime::{Admitted, Catalog, ConcurrentInvoke, ToolTool};
 
 use super::Sieving;
 
@@ -90,7 +90,7 @@ pub(super) struct Placing<'f> {
     ran: (u32, u32),
     checkpointing: &'f Checkpointing,
     /// What the run was told it can reach: the one authority on what a
-    /// call through `call` stands for (`crates/runtime/Spec.lean` §8-61).
+    /// `tool` `run` stands for (`crates/runtime/Spec.lean` §8-61).
     catalog: Arc<Mutex<Catalog>>,
 }
 
@@ -112,9 +112,9 @@ impl<'f> Placing<'f> {
         }
     }
 
-    /// Resolves calls through `call` against the run's own catalog. A
-    /// face built without it resolves nothing, and a call through `call`
-    /// then reaches no tool.
+    /// Resolves each `tool` `run` against the run's own catalog. A face
+    /// built without it resolves nothing, and a `run` then reaches no
+    /// tool.
     #[must_use]
     pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
         self.catalog = catalog;
@@ -210,14 +210,15 @@ impl ConcurrentInvoke for Placing<'_> {
     }
 
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
-        if call.name.as_str() != CallTool::NAME {
+        if call.name.as_str() != ToolTool::NAME {
             return call;
         }
         // A call the catalog will not resolve goes on as it came and
-        // reaches `call` itself, which asks the catalog the same question
-        // and answers its refusal: the refusal has one author.
+        // reaches `tool` itself, which answers a `list`, `find` or
+        // `detail`, and for a `run` asks the catalog the same question and
+        // answers its refusal: the refusal has one author.
         match self.catalog.lock() {
-            Ok(catalog) => catalog.resolve_call(&call).unwrap_or(call),
+            Ok(catalog) => catalog.resolve_run(&call).unwrap_or(call),
             Err(_) => call,
         }
     }

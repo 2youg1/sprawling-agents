@@ -33,15 +33,14 @@ pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
 pub use backlog::{Ceiling, Unapplied, Unseen, platform_shares};
 pub use backlog::{Chunk, Exit, PlatformShares, PollBudget, RunProcesses, Shares, Sink, Stream};
 pub use tools::BoundReader;
-pub use tools::CallTool;
 pub use tools::ChildStatus;
-pub use tools::DescribeTool;
 pub use tools::ProviderMode;
 pub use tools::ReadBound;
 pub use tools::ReadTool;
 pub use tools::SearchTool;
 pub use tools::StatusSnapshot;
 pub use tools::StatusTool;
+pub use tools::ToolTool;
 pub use tools::parse_arm;
 pub use tools::{EditDesk, EditTool, PathLocks, ReadStamps};
 pub use tools::{ExecSetup, ExecTool};
@@ -73,7 +72,7 @@ pub use sandbox::assert_sandbox_conformance;
 
 mod watchdog;
 
-pub use catalog::{Catalog, CatalogEntry, Expansion, SkillPin};
+pub use catalog::{Catalog, CatalogEntry, Expansion, Namespace, SkillPin};
 pub use clock::{ClockReading, ClockStamp, StampGate, ZoneEntry, stamp};
 pub use conversation::Opening;
 pub use digest::{Breaker, BreakerVerdict, Digest, DigestOutcome, StructureNode};

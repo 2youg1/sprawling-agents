@@ -85,7 +85,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 | 测试 | 它钉住的事 |
 |---|---|
-| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表加上休眠索引里的工具行（`crates/runtime/Spec.lean` §8-60），`describe` 与 `call` 本身各由脚本调一次：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
+| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表，再把休眠索引的每个命名空间行换成脚本以 `tool` 的 `list` 列出的成员，列出的件数要等于行上的计数（`crates/runtime/Spec.lean` §8-60）；`tool` 本身也在表里，由脚本以 `detail`、`list`、`run` 调用：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
 | `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`crates/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
 | `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `crates/city/skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
 
@@ -103,9 +103,9 @@ import crates.accounting.spec.Worker.Workbench.Tools
 每个模型都带一个可实现的正常路径（两行落下再交出变化、一条命令配方问得到端口、不给主机时问 `github.com`、一份非空的选择），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
 
-/-! D23 验收覆盖从模型收到的工具表与休眠索引的工具行算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入
+/-! D23 验收覆盖从模型收到的工具表与休眠索引各命名空间行经 `tool list` 列出的成员算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入
 
-理由：哪些工具存在，唯一的权威是工作台的那一次登记（`crates/sprawling/Spec.lean` §8-27），模型第一次请求里的工具表加上休眠索引的工具行就是它的输出（不常驻的工具只在索引里留一行，`crates/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+理由：哪些工具存在，唯一的权威是工作台的那一次登记（`crates/sprawling/Spec.lean` §8-27），模型第一次请求里的工具表，加上休眠索引每个命名空间行经 `tool list` 列出的成员，就是它的输出（不常驻的工具按命名空间在索引里合成一行，`crates/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
 -/
 
 /-! ## 3 假设与歧义

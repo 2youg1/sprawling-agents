@@ -113,6 +113,19 @@ fn a_payload_with_no_reading_is_drawn_as_its_json() {
     );
 }
 
+/// A `tool` answer is already the text a model reads: a guide, a list
+/// or the hits of a `find`. Drawn as JSON, every newline in it would
+/// reach the model as `\n` and every quote as `\"`.
+#[test]
+fn a_tool_answer_is_its_text() {
+    let tool = ToolName::parse("tool").unwrap();
+    let guide = "github (2 tools)\n- github_create_issue: Open an issue\n";
+    assert_eq!(
+        shown(Rendering::V2, &tool, &answered(json!({"text": guide}))).unwrap(),
+        guide
+    );
+}
+
 /// Only a mark that numbers the line it sits on, for one reading of
 /// where the passage starts, comes off; a numbered line the file holds
 /// stays, and so does a replacement line with a number nobody copied.

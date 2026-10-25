@@ -9,8 +9,8 @@
 //! assembler registers the tools a building's vocation, rules and book
 //! allow, and reads each building's reading room off its `city::policy`
 //! rules. Of what is admitted, the mode's core travels as tools; the rest
-//! is one line each in the dormant index, and a run fetches a guide with
-//! `describe` and runs a dormant tool through `call`.
+//! waits in the dormant index, one line per namespace and one per skill,
+//! and a run lists, finds, details and runs it through `tool`.
 //!
 //! `tool_defs` is the single source of `ChatRequest.tools`: a tool absent
 //! here and absent from the dormant index does not exist for the model.
@@ -27,6 +27,10 @@ use kernel::Mode;
 mod dormant;
 mod fit;
 mod guide;
+mod namespace;
+
+pub use guide::{FIND_HITS, LIST_CEILING};
+pub use namespace::Namespace;
 
 /// The most bytes the dormant index may take, header and `+N more` line
 /// included, whatever the building admits (runtime D19).
@@ -70,9 +74,17 @@ pub enum Expansion {
 
 #[derive(Debug, Default)]
 pub struct Catalog {
-    tools: BTreeMap<String, ToolDef>,
+    tools: BTreeMap<String, Filed>,
     skills: BTreeMap<String, Admitted>,
     mode: Option<Mode>,
+}
+
+/// One admitted tool: what the model is told it is, and the namespace it
+/// is filed under.
+#[derive(Debug)]
+struct Filed {
+    def: ToolDef,
+    namespace: Namespace,
 }
 
 /// One admitted skill, and which door it came in by: the door decides
@@ -99,10 +111,14 @@ impl Catalog {
         Catalog::default()
     }
 
-    /// Registers an L2 tool (or an L0 tool for wire schema purposes).
+    /// Registers an admitted tool under the namespace it is filed in.
     /// Eight-field completeness is the type's business; what is checked
     /// here is catalog hygiene: non-empty disclosure, no duplicate name.
-    pub fn admit_tool(&mut self, meta: &ToolMeta) -> Result<(), AxError> {
+    ///
+    /// # Errors
+    /// An empty disclosure and a name already admitted are
+    /// `E_INVALID_ARGS`.
+    pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<(), AxError> {
         if meta.disclosure.trim().is_empty() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -129,10 +145,13 @@ impl Catalog {
         }
         self.tools.insert(
             key,
-            ToolDef {
-                name: meta.name.clone(),
-                description: meta.disclosure.clone(),
-                input_schema: meta.params.clone(),
+            Filed {
+                def: ToolDef {
+                    name: meta.name.clone(),
+                    description: meta.disclosure.clone(),
+                    input_schema: meta.params.clone(),
+                },
+                namespace,
             },
         );
         Ok(())
@@ -229,20 +248,34 @@ impl Catalog {
     }
 
     /// Every admitted capability a session does not carry as a tool, in
-    /// the index's order: the tools outside the core, then the skills.
-    fn dormant_entries(&self) -> Vec<dormant::Entry<'_>> {
-        self.tools
-            .iter()
-            .filter(|(name, _)| !self.is_core(name))
-            .map(|(name, def)| dormant::Entry {
-                label: name.clone(),
-                about: &def.description,
+    /// the index's order: one entry per namespace of the tools outside
+    /// the core, then one per skill.
+    fn dormant_entries(&self) -> Vec<dormant::Entry> {
+        self.dormant_namespaces()
+            .into_iter()
+            .map(|((_, namespace), members)| dormant::Entry {
+                label: format!("{} ({})", namespace.as_str(), members.len()),
+                about: namespace.about(members.iter().copied()),
             })
             .chain(self.skills.iter().map(|(name, admitted)| dormant::Entry {
                 label: format!("skill {name}"),
-                about: &admitted.entry.disclosure,
+                about: admitted.entry.disclosure.clone(),
             }))
             .collect()
+    }
+
+    /// The tools outside the core, by namespace in the byte order of its
+    /// name, each namespace's members in name order. The name leads the
+    /// key because `Namespace` orders the city's own before any server's.
+    fn dormant_namespaces(&self) -> BTreeMap<(&str, &Namespace), Vec<&str>> {
+        let mut by_namespace: BTreeMap<(&str, &Namespace), Vec<&str>> = BTreeMap::new();
+        for (name, filed) in self.tools.iter().filter(|(name, _)| !self.is_core(name)) {
+            by_namespace
+                .entry((filed.namespace.as_str(), &filed.namespace))
+                .or_default()
+                .push(name.as_str());
+        }
+        by_namespace
     }
 
     /// Whether `name` travels as a tool in this run's requests: it is in
@@ -253,16 +286,17 @@ impl Catalog {
         self.mode.is_some() && crate::mode::in_some_core(name)
     }
 
-    /// The call a `call` stands for, with the id the model gave it, so its
-    /// result pairs with the `call` in the conversation and its tool
-    /// passes its own doors (`crates/runtime/Spec.lean` §8-61).
+    /// The call a `tool` `run` stands for, with the id the model gave it,
+    /// so its result pairs with the `tool` call in the conversation and
+    /// its tool passes its own doors (`crates/runtime/Spec.lean` §8-61).
     ///
     /// # Errors
-    /// `E_INVALID_ARGS` when the arguments name no tool or carry no
-    /// object, when they name `call` itself, when the name is not a tool
-    /// this run was admitted, and when the arguments do not fit the
-    /// tool's input schema; the last carries the schema.
-    pub fn resolve_call(&self, call: &ToolCall) -> Result<ToolCall, AxError> {
+    /// `E_INVALID_ARGS` when the call is not a `run`, when the arguments
+    /// name no tool or carry no object, when they name `tool` itself,
+    /// when the name is not a tool this run was admitted, and when the
+    /// arguments do not fit the tool's input schema; the last carries the
+    /// schema.
+    pub fn resolve_run(&self, call: &ToolCall) -> Result<ToolCall, AxError> {
         fit::resolve(&self.tools, call)
     }
 
@@ -272,7 +306,7 @@ impl Catalog {
         self.tools
             .iter()
             .filter(|(name, _)| self.is_core(name))
-            .map(|(_, def)| def.clone())
+            .map(|(_, filed)| filed.def.clone())
             .collect()
     }
 
@@ -294,9 +328,8 @@ impl Catalog {
             .collect()
     }
 
-    /// Second-level disclosure. Tools expand to their schema via
-    /// `tool_defs` (the wire always carries it); skills and the mode
-    /// expand through here.
+    /// Second-level disclosure. Tools expand to their schema through
+    /// `tool`'s `detail`; skills and the mode expand through here.
     ///
     /// The two answers are different kinds of thing — a place to open
     /// and a text already in the prompt — so they are different

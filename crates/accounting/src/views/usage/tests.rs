@@ -118,16 +118,17 @@ pub(super) fn library(name: &str, text: &str) -> Shelved {
 
 /// The fixture: run 1 pins `kiln` and reads it three ways on two days,
 /// plus a file that is no skill; run 2 pinned nothing and reads `kiln`,
-/// which is not a use; three server calls, one through `call`, one to a
-/// server nothing knows.
+/// which is not a use; three server calls, one through the `call` an
+/// earlier build wrote, one through `tool` to a server nothing knows. The
+/// guide is fetched through `tool`.
 pub(super) fn fixture() -> Vec<EventRecord> {
     vec![
         started(1, 1, &[("kiln", "kiln v1")]),
         called(
             later(2, 1, 2),
             "c1",
-            "describe",
-            json!({ "name": "skill kiln" }),
+            "tool",
+            json!({ "op": "detail", "name": "skill kiln" }),
         ),
         answered(3, 1, "c1"),
         called(
@@ -157,8 +158,8 @@ pub(super) fn fixture() -> Vec<EventRecord> {
         called(
             later(13, 1, 13),
             "c8",
-            "call",
-            json!({ "name": "plan_finish", "args": {} }),
+            "tool",
+            json!({ "op": "run", "name": "plan_finish", "args": {} }),
         ),
     ]
 }

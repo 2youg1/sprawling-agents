@@ -1816,7 +1816,7 @@ book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
 - **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（§8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
 - **录音从读界之内的一个文件或一个 `cas:` 块进来，只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。参数与 `read` 同一种写法：相对城根的路径（审查楼里是这个 run 的树）、城内的绝对路径，或 Locator。连接器把 desktop 的录音存进 CAS，窗口里那一行 `[recording attached: …, cas:…]` 的 locator 原样交给它（runtime D15）。判定是 `read` 的那一份：文法、reserved subtree、读界，链接解开后再判一次，打开后核对没换过；拒绝与 `read` 同码。读界之内的别楼也收：模型能 `read` 的东西本来就进了它对主模型的对话，录音出门去的是按本楼的 policy 选出的端点，与那段对话同一种出门；机密楼的文件楼外读不到，机密楼里的 run 只拿得到回环上的转写端点。**容器**：文件（`file:` 在内）看扩展名（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（`crates/gateway/Spec.lean` §8-33）；块没有名字，看开头的字节，经 `Recording::read_unlabelled`（`crates/gateway/Spec.lean` §8-34）。
 - **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
-- **在目录里的位置**：它不在任何 mode 的常驻核心（`runtime::mode::core_tools`），所以不进工具表，只在休眠索引里按名字的字节序占一行，经 `describe` 与 `call` 用（`crates/runtime/Spec.lean` §8-60）；登记次序不再决定它在请求里的位置。
+- **在目录里的位置**：它不在任何 mode 的常驻核心（`runtime::mode::core_tools`），所以不进工具表，只在休眠索引里随它的命名空间那一行出现，经 `tool` 找、看、调（`crates/runtime/Spec.lean` §8-60）；登记次序不再决定它在请求里的位置。
 - **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。连接器存下的录音：一个为这座楼存进 CAS 的 wav 块，run 以它的 `cas:` 调 `transcribe`，拿回脚本端点转出的字。工具自己的拒绝（机密楼的路径、reserved subtree、认不得的容器、不存在的文件与块）由 `transcribe` 模块的测试守着。
 -/
 
@@ -1839,7 +1839,7 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 - **图只经 `runtime::BoundReader` 读进来**，与 `transcribe` 同一扇门、同一份判定（§8-131）：楼里的一个 PNG、读界之内别楼的一个 PNG、连接器存进 CAS 的截图（窗口里那一行 `[picture attached: image/png WxH, cas:…]` 的 locator）都收。读进来的字节交 `runtime::pipeline::connector::png_picture`，与连接器存图同一种认法：只认 PNG，超过 `IMAGE_MAX_BYTES` 或头读不出，`E_INVALID_ARGS`。
 - **发出去的是所选 face 的图片内容**（`crates/gateway/Spec.lean` §8-34）：一条 system、一条带图的 user 消息，没有工具；`policy` 是这座楼的。选中的模型登记为只读字时，端点在发出前拒绝，拒词让人把 `ocr` 指向一个 `text_image` 的模型。
 - **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
-- **在目录里的位置**：它不在任何 mode 的常驻核心，所以不进工具表，只在休眠索引里按名字的字节序占一行，经 `describe` 与 `call` 用（`crates/runtime/Spec.lean` §8-60）。
+- **在目录里的位置**：它不在任何 mode 的常驻核心，所以不进工具表，只在休眠索引里随它的命名空间那一行出现，经 `tool` 找、看、调（`crates/runtime/Spec.lean` §8-60）。
 - **验收**：`crates/sprawling/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
 - **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（`crates/gateway/Spec.lean` §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——的线上字段已经落地：`SelectModel.input: Option<InputKinds>`，出现时排在目录之前，一个目录写着 `text` 的模型带 `input: TextImage` 选为 `Ocr` 之后，`ocr` 在它上面读得出字（gateway D16）。只差设置页的控件（client/Spec.lean 的模型表仍是三行，`crates/kernel/Spec.lean` §8-80），控件归前端；页面今天不带这一格（线上缺席即 `None`），梯子照旧。
 -/
@@ -1853,8 +1853,8 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 
 | 层 | 字段 | 落点 | 只写 | 执法者 |
 |---|---|---|---|---|
-| 目录行 | `disclosure` | 常驻核心的工具随 `tool_defs()`；其余工具的第一句截成休眠索引的提示进 Resident 段，全文只经 `describe`（`crates/runtime/Spec.lean` §8-60） | 它是什么、什么时候该用 | `claim_tool/tests.rs` 的 548 B 预算 |
-| 说明书 | `params` 各字段的 `description` | 常驻核心的随 `tool_defs()`；其余只经 `describe` | 怎么用：字段、取值、默认、拒绝条件 | 同上（量的是两者之和） |
+| 目录行 | `disclosure` | 常驻核心的工具随 `tool_defs()`；其余工具按命名空间各占休眠索引的一行，自己的第一句由 `tool` 的 `list` 与 `find` 给出，全文只经 `tool` 的 `detail`（`crates/runtime/Spec.lean` §8-60） | 它是什么、什么时候该用 | `claim_tool/tests.rs` 的 548 B 预算 |
+| 说明书 | `params` 各字段的 `description` | 常驻核心的随 `tool_defs()`；其余只经 `tool` 的 `detail` | 怎么用：字段、取值、默认、拒绝条件 | 同上（量的是两者之和） |
 | 二级展开 | `CatalogEntry::expansion` | 按需 `read` | 整套纪律 | — |
 
 `plan` 的六个动作就住在说明书里（`action` 那句），目录行只剩 84 B 余量而原文已占 83 B——**把动作抄进目录行既付两遍钱也放不下**，那条预算就是这个决定的执法者。`signal` 的四类 kind 同理。

@@ -114,8 +114,11 @@ fn shared(setup: &Setup) -> Vec<Episode> {
         signal(setup),
         crate::playback::episode(),
         proposal(setup),
-        describe(),
-        call(),
+        detail(),
+        run_itself(),
+        list("sprawling"),
+        list("record"),
+        list("web"),
     ]
 }
 
@@ -505,17 +508,17 @@ fn succeed() -> Episode {
 }
 
 /// The guide of a dormant tool: its whole disclosure, its schema, and
-/// the door it is run through (`crates/runtime/Spec.lean` §8-60).
-fn describe() -> Episode {
+/// how it is run (`crates/runtime/Spec.lean` §8-60).
+fn detail() -> Episode {
     Episode {
         step: Step {
-            tool: "describe",
-            args: json!({ "name": "archive" }),
+            tool: "tool",
+            args: json!({ "op": "detail", "name": "archive" }),
         },
         holds: |seen| {
             let text = answered_text(seen.answer)?;
             ensure(
-                text.starts_with("tool archive: run it with `call`")
+                text.starts_with("tool archive (sprawling): run it with `tool`")
                     && text.contains("input schema:"),
                 format!("the guide of a dormant tool read {text:?}"),
             )
@@ -523,20 +526,38 @@ fn describe() -> Episode {
     }
 }
 
-/// A call through `call` that stands for nothing reaches `call` itself
-/// and is refused by the catalog's own sentence (§8-61); every builder
-/// call above that named a dormant tool directly passed that tool's doors.
-fn call() -> Episode {
+/// The members of one namespace the dormant index folded into a line;
+/// the coverage counts them as offered (`catalogue::covered`).
+fn list(namespace: &'static str) -> Episode {
     Episode {
         step: Step {
-            tool: "call",
-            args: json!({ "name": "call", "args": {} }),
+            tool: "tool",
+            args: json!({ "op": "list", "namespace": namespace }),
+        },
+        holds: |seen| {
+            let text = answered_text(seen.answer)?;
+            ensure(
+                text.lines().all(|line| line.starts_with("- ")),
+                format!("a namespace listed {text:?}"),
+            )
+        },
+    }
+}
+
+/// A `tool` `run` that stands for nothing reaches `tool` itself and is
+/// refused by the catalog's own sentence (§8-61); every builder call
+/// above that named a dormant tool directly passed that tool's doors.
+fn run_itself() -> Episode {
+    Episode {
+        step: Step {
+            tool: "tool",
+            args: json!({ "op": "run", "name": "tool", "args": {} }),
         },
         holds: |seen| {
             let error = failed(seen.answer)?;
             ensure(
-                error.get("subject") == Some(&json!("`call` cannot run itself")),
-                format!("a call through `call` naming itself answered {error:?}"),
+                error.get("subject") == Some(&json!("`tool` cannot run itself")),
+                format!("a `tool` `run` naming itself answered {error:?}"),
             )
         },
     }

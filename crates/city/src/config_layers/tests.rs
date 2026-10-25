@@ -181,6 +181,24 @@ fn a_broken_file_names_itself_in_the_refusal() {
     );
 }
 
+/// A server's label is the namespace of its tools in the catalog, so a
+/// label the city keeps for its own tools is refused where it is read.
+#[test]
+fn a_server_may_not_take_a_namespace_the_city_keeps() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
+    write(
+        &path(dir.path(), &room, Layer::City).unwrap(),
+        "[[mcp]]
+label = \"sprawling\"
+command = \"mcp-own\"
+",
+    );
+    let err = load(dir.path(), &room).unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.subject().contains("sprawling"), "{}", err.subject());
+}
+
 #[test]
 fn a_building_states_which_servers_it_reaches_and_replaces_the_citys_table() {
     let dir = tempfile::tempdir().unwrap();

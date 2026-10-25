@@ -358,8 +358,9 @@ fn web_search_refuses_a_mapping_the_remote_tool_does_not_take_before_the_call() 
 }
 
 /// The tool joins the bench a run is laid out with: an ordinary
-/// building's model is told about `web_search` under the default
-/// supplier, without anything being sent to it.
+/// building's model is told about the `web` namespace `web_search` is
+/// filed under, with the default supplier, without anything being sent
+/// to it.
 #[test]
 fn an_ordinary_building_offers_web_search_to_its_model() {
     let dir = tempfile::tempdir().unwrap();
@@ -382,8 +383,8 @@ fn an_ordinary_building_offers_web_search_to_its_model() {
         provider
             .bodies()
             .iter()
-            .any(|body| body.contains("web_search")),
-        "the tool table the model is given carries web_search: {:?}",
+            .any(|body| body.contains("- web (1): ")),
+        "the dormant index the model is given files web_search: {:?}",
         provider.bodies()
     );
 }

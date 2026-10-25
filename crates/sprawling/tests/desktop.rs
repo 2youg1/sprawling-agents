@@ -115,14 +115,13 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         model: None,
     });
 
+    // The six are filed under the connector's label, one line of the
+    // dormant index that counts them (`crates/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
-    let missing: Vec<&str> = OFFERED
-        .into_iter()
-        .filter(|tool| !names.iter().any(|name| name == tool))
-        .collect();
+    let line = format!("desktop ({})", OFFERED.len());
     assert!(
-        missing.is_empty(),
-        "the model was never offered {missing:?}: offered {names:?}, and the dispatch answered {dispatched:?}"
+        names.contains(&line),
+        "the model was never offered {OFFERED:?} as {line:?}: offered {names:?}, and the dispatch answered {dispatched:?}"
     );
 }
 

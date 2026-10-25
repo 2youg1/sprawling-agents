@@ -9,9 +9,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use kernel::{Address, AxError, Locator};
+use kernel::{Address, AxError, Effect, Locator, ReservedNamespace};
 use runtime::bench::ToolBench;
-use runtime::{EditTool, SearchTool, StatusTool};
+use runtime::{EditTool, Namespace, SearchTool, StatusTool};
 
 use super::super::Assignment;
 use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
@@ -174,23 +174,27 @@ impl Laying {
         // makes, so a name on one list and not the other is either a
         // tool nobody can call or a call nobody was told about; one list
         // leaves nothing to agree by hand.
-        // Both key by name, so this order reaches no model.
-        let mut admitted: Vec<Box<dyn kernel::Tool>> = vec![
-            Box::new(archive_tool),
-            Box::new(claim_tool),
-            Box::new(edit),
-            Box::new(status),
-            Box::new(signal_tool),
-            Box::new(goal_tool),
-            Box::new(pr_tool),
-            Box::new(rules_tool),
-            Box::new(neighbours_tool),
-            Box::new(read),
-            Box::new(search),
-            Box::new(succeed),
-            // The doors to the dormant index (`crates/runtime/Spec.lean` §8-60).
-            Box::new(runtime::DescribeTool::new(Arc::clone(&catalog))?),
-            Box::new(runtime::CallTool::new(Arc::clone(&catalog))?),
+        // Both key by name, so this order reaches no model. Each tool is
+        // filed here under the namespace the catalog lists it in
+        // (`crates/runtime/Spec.lean` §8-60): this is the one place that
+        // knows which tools are the city's own.
+        let own =
+            |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
+        let mut admitted: Vec<Filed> = vec![
+            own(Box::new(archive_tool)),
+            own(Box::new(claim_tool)),
+            own(Box::new(edit)),
+            own(Box::new(status)),
+            own(Box::new(signal_tool)),
+            own(Box::new(goal_tool)),
+            own(Box::new(pr_tool)),
+            own(Box::new(rules_tool)),
+            own(Box::new(neighbours_tool)),
+            own(Box::new(read)),
+            own(Box::new(search)),
+            own(Box::new(succeed)),
+            // The door to the dormant index (`crates/runtime/Spec.lean` §8-60).
+            own(Box::new(runtime::ToolTool::new(Arc::clone(&catalog))?)),
         ];
         // What this building's residents are for decides the rest of
         // the bench. City Hall writes Markdown and plans: it gets no
@@ -201,33 +205,22 @@ impl Laying {
         // an invariant (`crates/city/Spec.lean` §8-22).
         match city::vocation_of(site.building.addr()) {
             city::Vocation::Builds => {
-                admitted.push(Box::new(self.exec_tool(site, at, policy.reader())?));
-                admitted.push(Box::new(collab::DelegateTool::new(Arc::clone(&delegates))?));
-                admitted.push(Box::new(collab::WorkshopTool::new(
+                admitted.push(own(Box::new(self.exec_tool(site, at, policy.reader())?)));
+                admitted.push(own(Box::new(collab::DelegateTool::new(Arc::clone(
+                    &delegates,
+                ))?)));
+                admitted.push(own(Box::new(collab::WorkshopTool::new(
                     Arc::clone(&desks.workshop),
                     Arc::clone(&delegates),
-                )?));
+                )?)));
             }
             city::Vocation::Plans => {
-                admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
+                admitted.push(own(Box::new(city::CityTool::new(&self.city_root)?)));
             }
         }
-        // Present only where the book names an endpoint this building
-        // may send a recording or a picture to (`crates/sprawling/Spec.lean` §8-131,
-        // §8-142).
-        admitted.extend(self.endpoint_tools(site, &bound)?);
-        // A look back at the history this building may read, written
-        // into the city's playback exports (`crates/sprawling/Spec.lean` §8-132).
-        admitted.push(Box::new(self.playback_tool(site, addr)?));
-        admitted.push(Box::new(self.proposal_tool(site, addr, &bound)?));
-        // The city's own way onto the web, to the supplier `[search]`
-        // names (`crates/accounting/spec/Connectors.lean` §8-35).
-        if let Some(search) = self.search_tool(site)? {
-            admitted.push(Box::new(search));
-        }
-        admitted.extend(self.outside_tools(site)?);
-        for tool in admitted {
-            held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
+        admitted.extend(self.filed_beyond_sprawling(site, addr, &bound)?);
+        for (namespace, tool) in admitted {
+            held(&catalog, "lay out the catalog")?.admit_tool(tool.meta(), namespace)?;
             bench.register(Box::new(kept::Kept::new(
                 tool,
                 std::sync::Arc::clone(&keeper),
@@ -291,6 +284,64 @@ impl Laying {
                 move |asked| pins.pin(asked, "finish a plan node"),
             )),
         )
+    }
+}
+
+/// One admitted tool and the namespace the catalog lists it under.
+type Filed = (Namespace, Box<dyn kernel::Tool>);
+
+impl Laying {
+    /// The admitted tools the city files under a namespace other than
+    /// `sprawling` (`crates/runtime/Spec.lean` §8-60): reading pictures
+    /// and recordings, the look back and the proposal, the web, and what
+    /// reaches outside the city.
+    ///
+    /// # Errors
+    /// Propagates any of those tools that refuses to be built.
+    fn filed_beyond_sprawling(
+        &self,
+        site: &Site,
+        addr: &Address,
+        bound: &runtime::ReadBound,
+    ) -> Result<Vec<Filed>, AxError> {
+        let mut filed: Vec<Filed> = Vec::new();
+        // Present only where the book names an endpoint this building
+        // may send a recording or a picture to (`crates/sprawling/Spec.lean` §8-131,
+        // §8-142).
+        let media = Namespace::Own(ReservedNamespace::Media);
+        filed.extend(
+            self.endpoint_tools(site, bound)?
+                .into_iter()
+                .map(|tool| (media.clone(), tool)),
+        );
+        // A look back at the history this building may read, written
+        // into the city's playback exports (`crates/sprawling/Spec.lean` §8-132).
+        let record = Namespace::Own(ReservedNamespace::Record);
+        filed.push((record.clone(), Box::new(self.playback_tool(site, addr)?)));
+        filed.push((record, Box::new(self.proposal_tool(site, addr, bound)?)));
+        // The city's own way onto the web, to the supplier `[search]`
+        // names (`crates/accounting/spec/Connectors.lean` §8-35).
+        if let Some(search) = self.search_tool(site)? {
+            filed.push((Namespace::Own(ReservedNamespace::Web), Box::new(search)));
+        }
+        filed.extend(
+            self.outside_tools(site)?
+                .into_iter()
+                .map(|tool| (outside_namespace(tool.meta()), tool)),
+        );
+        Ok(filed)
+    }
+}
+
+/// The namespace a tool from outside the city is filed under: an external
+/// server's tools under its label, which the configuration layer keeps
+/// clear of the namespaces the city reserves, and a browser under
+/// `computer`.
+fn outside_namespace(meta: &kernel::ToolMeta) -> Namespace {
+    if let Effect::Connector { label } = &meta.effect {
+        Namespace::Server(label.clone())
+    } else {
+        Namespace::Own(ReservedNamespace::Computer)
     }
 }
 

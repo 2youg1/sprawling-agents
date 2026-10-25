@@ -56,13 +56,19 @@ mod tests;
 
 pub(super) use shelves::Shelved;
 
-/// The part of a skill a `describe` reads.
+/// The part of a skill a `tool` `detail` reads.
 const GUIDE_PART: &str = "guide";
 /// The part of a skill a `read` of its bare name reads.
 const DOCUMENT_PART: &str = "SKILL.md";
-/// The prefix the dormant index spells a skill with, which `describe`
-/// also accepts.
+/// The prefix the dormant index spells a skill with, which `tool`
+/// `detail` also accepts.
 const SKILL_PREFIX: &str = "skill ";
+/// The tool a ledger written before `tool` existed fetched a guide with;
+/// its lines are history and still count as reads of the guide.
+const EARLIER_DESCRIBE: &str = "describe";
+/// The tool a ledger written before `tool` existed ran a dormant tool
+/// through; an unresolved line of it still counts as a server call.
+const EARLIER_CALL: &str = "call";
 
 /// Which of the three usage questions a page asked.
 pub enum UsageQuestion {
@@ -88,6 +94,13 @@ struct Use {
     call: String,
 }
 
+/// Whether a call of `tool` is a `tool` call of `op`, or a call of the
+/// tool an earlier build spelled that op as.
+fn is_op(tool: &str, argument: &impl Fn(&str) -> Option<String>, op: &str, earlier: &str) -> bool {
+    tool == earlier
+        || (tool == runtime::tools::ToolTool::NAME && argument("op").as_deref() == Some(op))
+}
+
 /// One read of a skill.
 #[derive(Debug, Clone)]
 struct SkillRead {
@@ -98,8 +111,8 @@ struct SkillRead {
 }
 
 /// One call of a tool server's tool. `label` is the server the record's
-/// effect names; a `call` line names none, and `tool` is then the whole
-/// name it asked for.
+/// effect names; an unresolved `tool` `run` line names none, and `tool`
+/// is then the whole name it asked for.
 #[derive(Debug, Clone)]
 struct McpCall {
     label: Option<String>,
@@ -342,7 +355,7 @@ impl Usage {
                 tool,
                 used,
             });
-        } else if name == runtime::tools::CallTool::NAME {
+        } else if is_op(name, &argument, runtime::tools::ToolTool::RUN, EARLIER_CALL) {
             if let Some(tool) = argument("name") {
                 self.calls.push(McpCall {
                     label: None,
@@ -371,7 +384,7 @@ impl Usage {
     ) -> Option<((String, B3Hash), String)> {
         let pins = self.pins.get(&run)?;
         let pinned = |name: &str| pins.get(name).map(|hash| (name.to_owned(), *hash));
-        if tool == runtime::tools::DescribeTool::NAME {
+        if is_op(tool, &argument, "detail", EARLIER_DESCRIBE) {
             let asked = argument("name")?;
             let asked = asked.trim();
             let skill = pinned(asked.strip_prefix(SKILL_PREFIX).unwrap_or(asked))?;

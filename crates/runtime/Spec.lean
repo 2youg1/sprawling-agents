@@ -65,7 +65,7 @@ import crates.runtime.spec.Watchdog
 | `handoff` | 五段构造点＋resume 消费 Handoff 产新 Run 种子；形状 2 |
 | 完备化 | prefix 四段全量（封顶＋截断标注＋跨段去重＋跳过入账）＋断点 ≤4＋Steer 边界消费＋窗口组装入 Assembling 相 |
 | `pipeline`＋`offload` | 结果信封三附件＋offload 四不变量（独占有损可还原）＋截断定序 |
-| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋截断锁的三档：常驻核心、至多 1 KiB 的休眠索引、`describe` 与 `call` 两扇门（§8-60、§8-61）＋两个 mode 的目录行与合并时的准入（§8-54）＋会话中换运行策略的策略格（§8-62） |
+| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋截断锁的三档：常驻核心、至多 1 KiB 且一个命名空间一行的休眠索引、`tool` 那一扇门（§8-60、§8-61）＋两个 mode 的目录行与合并时的准入（§8-54）＋会话中换运行策略的策略格（§8-62） |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
 | `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`，以及经它按字节读的 `bound_reader`（§8-14、§8-29–§8-33、§8-59） |
@@ -327,8 +327,8 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D16 | 按字节读的门在 runtime，交出一个 `Read` 与字节的来处 | `crates/runtime/spec/Tools/BoundReader.lean` |
 | D19 | 休眠索引整份封顶 1 KiB，按字节、不按件 | `crates/runtime/spec/Catalog.lean` |
 | D20 | 索引按稳定序贪心装填，先带提示、再只有名字、最后 `+N more` | `crates/runtime/spec/Catalog.lean` |
-| D21 | 工具表在 session 里恒不变，第三档经 `describe` 与 `call` 走会话 | `crates/runtime/spec/Catalog.lean` |
-| D22 | 搜索是确定的关键词排序，skill 正文仍只经 `read` | `crates/runtime/spec/Catalog.lean` |
+| D21 | 工具表在 session 里恒不变，第三档经 `tool` 走会话 | `crates/runtime/spec/Catalog.lean` |
+| D22 | 找是确定的等级匹配，skill 正文仍只经 `read` | `crates/runtime/spec/Catalog.lean` |
 | D23 | 命令行程序不另立目录 | `crates/runtime/spec/Catalog.lean` |
 | D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `crates/runtime/spec/Turn.lean`（§8-3），性质在 `crates/runtime/spec/Turn/Durability.lean` |
 | D25 | 会话中可改运行策略之后，常驻核心是各 mode 核心的并集 | `crates/runtime/spec/Catalog.lean` |
@@ -350,6 +350,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `crates/runtime/spec/Reserve.lean` |
 | D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
 | D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `crates/runtime/spec/Tools/Edit.lean` |
+| D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -365,7 +366,7 @@ kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：pr
 无（行号计法与 recovery 文句不构成行为常量）。
 
 两处 pub(crate) 数据面（改须本 SPEC 同集）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
-截断锁的三个常量住 `catalog`（改值＝改入窗字节＝过本 SPEC）：`DORMANT_INDEX_CEILING=1024`（整份休眠索引的上限，D19）、`HINT_MAX_BYTES=64`（索引里一件的提示截到多长，§8-60）、`DESCRIBE_HITS=8`（`describe` 一次列出几件候选，D22）；常驻核心的名单住 `mode::core_tools`（§8-60）。
+截断锁的三个常量住 `catalog`（改值＝改入窗字节＝过本 SPEC）：`DORMANT_INDEX_CEILING=1024`（整份休眠索引的上限，D19）、`HINT_MAX_BYTES=64`（索引里一件的提示截到多长，§8-60）、`FIND_HITS=8`（`tool` 的 `find` 一次列出几件候选，D22）；常驻核心的名单住 `mode::core_tools`（§8-60）。
 一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
 -/
 
@@ -388,7 +389,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 - 分叉：`fork::tests`（`a_cut_inside_a_wave_moves_back_to_the_safe_point`、`a_cut_the_history_does_not_hold_is_refused`）、`fork::request_tests` 与 `crates/runtime/tests/replay_fork.rs`。
 - 打戳与时间段：`clock` 的测试（`off_emits_never_even_for_timestamped_tools`、`first_result_emits_once_then_timeless_deduplicates_within_a_bucket`、`timestamped_emits_every_result_with_its_own_reading`、`a_span_keeps_its_start_and_leaves_out_its_end`、`a_span_with_no_moment_in_it_is_refused`）。
 - 准入：`mode` 的测试，每种要求、每种落地各自的拒与放。
-- 截断锁：`catalog::tests`（休眠索引不超过上限、截断只在放不下时发生、没准入的件零字节、常驻核心以外的工具不进工具表、`resolve_call` 的三种拒绝与换出的调用沿用原 `id`）、`tools::describe` 与 `tools::call` 的测试，以及工具面换调用的 `turn::tests::concurrent`。
+- 截断锁：`catalog::tests`（休眠索引不超过上限、一个命名空间一行、两百件工具的 MCP 服务器只占一行且典型问话在 `FIND_HITS` 件内找到、截断只在放不下时发生、没准入的件零字节、常驻核心以外的工具不进工具表、`resolve_run` 的三种拒绝与换出的调用沿用原 `id`），以及工具面换调用的 `turn::tests::resolving`。
 - 路径与按字节读：`tools::chosen_path` 的测试、`tools::read::tests::doors` 与 `tools::bound_reader` 的测试（`the_door_refuses_what_read_refuses_with_the_same_code`）。
 
 只有节注释的分部，其要求由类型、trybuild 反例（`crates/runtime/tests/trybuild.rs`）与 `cargo nextest run -p sprawling-runtime` 的各模块测试守住。

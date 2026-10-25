@@ -97,8 +97,8 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
 /// dormant index. A name here travels only where the building admitted
 /// it: the hall registers no `exec`, so `exec` is in no tier there.
 ///
-/// The two doors of the truncation lock are in every mode, because a
-/// dormant capability is reachable only through them. Chat answers the
+/// `tool` is in every mode, because a dormant capability is reachable
+/// only through it. Chat answers the
 /// person and reads what it is asked about; work also edits and runs
 /// commands, which is what carrying out a task is made of. `status` is in
 /// both because the city prompt sends every resident to it for its
@@ -107,20 +107,18 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
 pub fn core_tools(mode: Mode) -> &'static [&'static str] {
     match mode {
         Mode::Chat => &[
-            crate::tools::CallTool::NAME,
-            crate::tools::DescribeTool::NAME,
             crate::tools::ReadTool::NAME,
             crate::tools::SearchTool::NAME,
             crate::tools::StatusTool::NAME,
+            crate::tools::ToolTool::NAME,
         ],
         Mode::Work => &[
-            crate::tools::CallTool::NAME,
-            crate::tools::DescribeTool::NAME,
             crate::tools::EditTool::NAME,
             kernel::ToolName::EXEC,
             crate::tools::ReadTool::NAME,
             crate::tools::SearchTool::NAME,
             crate::tools::StatusTool::NAME,
+            crate::tools::ToolTool::NAME,
         ],
     }
 }
@@ -139,7 +137,7 @@ pub fn in_some_core(name: &str) -> bool {
 /// The gate a resident tool asks at its call: a tool that some mode
 /// carries and the mode in force does not is refused, before it does
 /// anything (runtime D25). A tool outside every core is the catalog's
-/// to reach through `call`, and this gate does not judge it.
+/// to reach through `tool`'s `run`, and this gate does not judge it.
 ///
 /// # Errors
 /// `E_GATE_DENIED`, naming the tool and the mode, when the mode in
