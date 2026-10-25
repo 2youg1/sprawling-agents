@@ -376,9 +376,12 @@
       return commands;
     }
     const all = carrying ? carried : entries;
-    return needle === ""
-      ? all
-      : all.filter((entry) => `${entry.label} ${entry.hint}`.toLowerCase().includes(needle));
+    // A carry row's hint says how its opening goes, so the carry list is
+    // searched by place alone: a row that matched on its hint would leave
+    // the list the moment the hint changed, and take the city's refusal
+    // with it (4-64b).
+    const searched = (entry: Entry): string => (carrying ? entry.label : `${entry.label} ${entry.hint}`);
+    return needle === "" ? all : all.filter((entry) => searched(entry).toLowerCase().includes(needle));
   });
 
   function pick(entry: Entry | undefined): void {

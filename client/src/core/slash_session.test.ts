@@ -84,6 +84,7 @@ describe("the session in main", () => {
         },
         whenFrozen: (run, then) => waiting.push([run, then]),
         openSession: (room, carry) => branches.open(room, { kind: "fresh", carry }, () => undefined),
+        opening: () => get(branches.held).kind === "opening",
       },
     };
   }
@@ -131,6 +132,13 @@ describe("the session in main", () => {
     expect(kinds(at.sent)).toEqual(["cancel", "open_session"]);
     const opened = at.sent[1];
     expect(opened !== undefined && "open_session" in opened ? opened.open_session.carry : null).toBe("handoff");
+  });
+
+  test("/compact while another session is opening stops nothing and keeps the line", () => {
+    const at = held(true);
+    at.hands.openSession(Address.make("lab/room2"), "nothing");
+    run(at.hands, "/compact");
+    expect([kinds(at.sent), at.waiting, at.written]).toEqual([["open_session"], [], []]);
   });
 
   test("/tag and /untag change the session in main by one word, folded to lower case", () => {

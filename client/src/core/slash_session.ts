@@ -35,10 +35,12 @@ function opened(hands: SlashHands, room: Address, carry: Carry): void {
 
 // `/compact` is `/new --carry`. A run still going is stopped first and
 // the session opens once the belief holds it frozen: a frozen run has
-// written the handoff, and no session opens under a working run.
+// written the handoff, and no session opens under a working run. While
+// another session is opening the door would take no second one, so
+// nothing is stopped and the line stays to send again (client D100).
 export function compact(hands: SlashHands): void {
   const room = hands.here;
-  if (room === null) return;
+  if (room === null || hands.opening()) return;
   const going = hands.live;
   if (going === null) {
     opened(hands, room, "handoff");

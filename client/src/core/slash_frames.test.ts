@@ -83,6 +83,7 @@ function ran(line: string): Done {
     // The page's branch door sends the frame and moves main only once
     // the city opens the session (`slash_session.test.ts`).
     openSession: (room, carry) => command(openSession(room, carry, null)),
+    opening: () => false,
   };
   const call = parse(line);
   const verb = find(call?.verb ?? "");
