@@ -79,7 +79,7 @@ pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、bloc
 impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound: ReadBound, block_store: &Path)
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
-// args：{path}。先问 catalog，再当作地址。
+// args：{file_path, offset?, limit?}（§8-29-1，offset 是从 1 数的行号）。先问 catalog，再当作地址。
 // 创建臂：old_string=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new_string＝全文；父目录自动建（域内已证）。
 // 路径不存在而 old_string 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
