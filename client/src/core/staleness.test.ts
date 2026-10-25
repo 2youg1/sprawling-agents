@@ -22,6 +22,11 @@ describe("a write reaches the answer that reads it back", () => {
     expect(reachOf("config", "building_configured")).toBe("every");
   });
 
+  test("a prompt step or a page's save makes the room's layers answer stale", () => {
+    const kinds: EventKind[] = ["governed_document_written", "document_written", "checkpoint_committed", "model_returned"];
+    expect(kinds.map((kind) => reachOf("layers", kind))).toEqual(["every", "every", "every", "none"]);
+  });
+
   test("a record that writes none of them leaves them held", () => {
     expect(reachOf("identity", "model_returned")).toBe("none");
     expect(reachOf("config", "model_returned")).toBe("none");

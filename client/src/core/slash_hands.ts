@@ -49,6 +49,9 @@ export interface SessionHands {
   // city has opened it, and stays put when the city refuses (client
   // D100).
   readonly openSession: (room: Address, carry: Carry) => boolean;
+  // Whether a session is opening through that door now, which takes no
+  // second one until the city has answered the first.
+  readonly opening: () => boolean;
 }
 
 // Everything a verb may reach for, and nothing a view could not hand

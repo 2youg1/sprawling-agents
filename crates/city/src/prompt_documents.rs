@@ -75,8 +75,8 @@ impl PromptDocument {
             [building, RESERVED_PREFIX, CITY_FILE] => Some(PromptDocument::BuildingCity {
                 building: a_building(building)?,
             }),
-            [RESERVED_PREFIX, MODELS_DIR, provider, note] => note_of(None, provider, note),
-            [building, RESERVED_PREFIX, MODELS_DIR, provider, note] => {
+            [RESERVED_PREFIX, MODELS_DIR, provider, note @ ..] => note_of(None, provider, note),
+            [building, RESERVED_PREFIX, MODELS_DIR, provider, note @ ..] => {
                 note_of(Some(a_building(building)?), provider, note)
             }
             _ => None,
@@ -188,10 +188,11 @@ pub fn model_notes(
     root.push(MODELS_DIR);
     let mut notes = Vec::new();
     for provider in names_in(&root)? {
-        for file in names_in(&root.join(&provider))? {
+        for file in files_under(&root.join(&provider), &mut Vec::new())? {
+            let parts: Vec<&str> = file.iter().map(String::as_str).collect();
             if let Some(PromptDocument::ModelNote {
                 provider, model, ..
-            }) = note_of(None, &provider, &file)
+            }) = note_of(None, &provider, &parts)
             {
                 notes.push((provider, model));
             }
@@ -199,6 +200,51 @@ pub fn model_notes(
     }
     notes.sort();
     Ok(notes)
+}
+
+/// Every file under `dir`, each as the names of the directories on the
+/// way to it and its own: a model id with a slash keeps its note in a
+/// directory of its own (`crates/city/spec/SpineFiles.lean`).
+///
+/// Links are followed, because the freeze follows them when it reads a
+/// note, and a list that stopped at a link would leave out a note every
+/// run on that model is sent. `above` holds the resolved directories on
+/// the way down, so a link back to one of them is not walked again; a
+/// link to nothing is not listed, as the freeze reads it as no note.
+fn files_under(dir: &Path, above: &mut Vec<PathBuf>) -> Result<Vec<Vec<String>>, AxError> {
+    let resolved = match std::fs::canonicalize(dir) {
+        Ok(resolved) => resolved,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => return Err(storage(dir, &err)),
+    };
+    if above.contains(&resolved) {
+        return Ok(Vec::new());
+    }
+    let entries = std::fs::read_dir(dir).map_err(|err| storage(dir, &err))?;
+    above.push(resolved);
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|err| storage(dir, &err))?;
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        let path = entry.path();
+        let kind = match std::fs::metadata(&path) {
+            Ok(meta) => meta.file_type(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(storage(&path, &err)),
+        };
+        if kind.is_dir() {
+            for mut below in files_under(&path, above)? {
+                below.insert(0, name.clone());
+                files.push(below);
+            }
+        } else if kind.is_file() {
+            files.push(vec![name]);
+        }
+    }
+    above.pop();
+    Ok(files)
 }
 
 /// Takes `step` on `doc`, only while the file still holds the version
@@ -312,10 +358,12 @@ fn a_building(segment: &str) -> Option<Address> {
         .filter(|addr| !addr.is_reserved())
 }
 
-/// The note `file` names under `provider`, when `file` carries the
-/// note extension and both parts read back to the same address.
-fn note_of(building: Option<Address>, provider: &str, file: &str) -> Option<PromptDocument> {
-    let model = file.strip_suffix(NOTE_EXT)?.strip_suffix('.')?;
+/// The note the segments after `provider` name, when the last carries
+/// the note extension and the whole reads back to the same address: a
+/// model id with a slash spans more than one segment.
+fn note_of(building: Option<Address>, provider: &str, note: &[&str]) -> Option<PromptDocument> {
+    let model = note.join("/");
+    let model = model.strip_suffix(NOTE_EXT)?.strip_suffix('.')?;
     let doc = PromptDocument::ModelNote {
         building,
         provider: provider.to_owned(),

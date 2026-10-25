@@ -18,10 +18,14 @@ import type { Address } from "../../wire";
 import type { BranchHere, Opening } from "./branching";
 
 // The words for each kind of opening: while it opens, refused because a
-// run is working, and refused for any other reason.
-const WORDS: Record<Opening["kind"], { readonly opening: Key; readonly busy: Key; readonly refused: Key }> = {
-  branch: { opening: "branch_opening", busy: "branch_busy", refused: "branch_refused" },
-  fresh: { opening: "session_opening", busy: "session_busy", refused: "session_refused" },
+// run is working, and refused for any other reason, with the city's way
+// forward when it gave one.
+const WORDS: Record<
+  Opening["kind"],
+  { readonly opening: Key; readonly busy: Key; readonly refused: Key; readonly refusedThen: Key }
+> = {
+  branch: { opening: "branch_opening", busy: "branch_busy", refused: "branch_refused", refusedThen: "branch_refused_then" },
+  fresh: { opening: "session_opening", busy: "session_busy", refused: "session_refused", refusedThen: "session_refused_then" },
 };
 
 export interface BranchNote {
@@ -50,7 +54,14 @@ export function noteOf(here: BranchHere, room: Address, lang: Lang, stop: (() =>
       const error = here.error;
       const words = WORDS[here.of];
       if (error.code !== "E_BUSY") {
-        return { said: fill(say(lang, words.refused), { why: noticeTitle(lang, error.code, error.subject) }), stop: null };
+        // The place that asked claims the refusal, so the corner says
+        // nothing; the city's way forward is said here or nowhere.
+        const why = noticeTitle(lang, error.code, error.subject);
+        const said =
+          error.recovery === ""
+            ? fill(say(lang, words.refused), { why })
+            : fill(say(lang, words.refusedThen), { why, recovery: error.recovery });
+        return { said, stop: null };
       }
       return {
         said: say(lang, words.busy),

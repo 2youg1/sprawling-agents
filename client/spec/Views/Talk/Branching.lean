@@ -60,9 +60,9 @@ def refusedSince (mark seen : Seen) : Bool := seen.refusal ≠ 0 && seen.refusal
 
 /-! D100 分支先等城开出新的一段再移动主区；三个入口共用一个状态机
 
-- **决策**：每个开新会话的入口都调用 `views/talk/branching.ts` 的 `keepBranches` 交出的 `open(room, opening, went)`，它是全页唯一的一份（`ui().branches`）。`opening` 是 `Opening`：从一行分出（`branch`，带 `origin`），或从头开（`fresh`，带 `carry`）。按下时记下 `belief.sessions[room]` 与 `belief.refusal`，发出 `OpenSession`（分支是 `{ carry: nothing, from: origin }`，从头开是 `{ carry, from: null }`）；之后 belief 里这个房间的一段比记下的新，才把主区移到 `#/talk/<room>` 并调用 `went`（信箱借它收起，当前对话借它把选行器挑中的话放回框里、画分支的边界线，命令面板借它关上）；出现一条更新的拒绝时进 `refused`，主区不动，发起它的那一行写出原因，`E_BUSY` 时旁边是停下这个房间正在跑的 run 的 `/stop`（`belief/live.ts` 的 `newestWorking`，与框里 `/stop` 停的是同一个 run）。这条拒绝由那一行说，角落不再弹同一条（`branchClaims`）；`/new` 与 `/compact` 的拒绝由主区那一段说，措辞说的是新会话而不是分支。在途时再按任何分支键什么也不发，键说明有一个分支正在打开。
+- **决策**：每个开新会话的入口都调用 `views/talk/branching.ts` 的 `keepBranches` 交出的 `open(room, opening, went)`，它是全页唯一的一份（`ui().branches`）。`opening` 是 `Opening`：从一行分出（`branch`，带 `origin`），或从头开（`fresh`，带 `carry`）。按下时记下 `belief.sessions[room]` 与 `belief.refusal`，发出 `OpenSession`（分支是 `{ carry: nothing, from: origin }`，从头开是 `{ carry, from: null }`）；之后 belief 里这个房间的一段比记下的新，才把主区移到 `#/talk/<room>` 并调用 `went`（信箱借它收起，当前对话借它把选行器挑中的话放回框里、画分支的边界线，命令面板借它关上）；出现一条更新的拒绝时进 `refused`，主区不动，发起它的那一行写出原因，`E_BUSY` 时旁边是停下这个房间正在跑的 run 的 `/stop`（`belief/live.ts` 的 `newestWorking`，与框里 `/stop` 停的是同一个 run）。这条拒绝由那一行说，角落不再弹同一条（`branchClaims`）；`/new` 与 `/compact` 的拒绝由主区那一段说，措辞说的是新会话而不是分支。在途时再按任何分支键什么也不发，键说明有一个分支正在打开。`/compact` 同样如此：有一段正在打开时它不停正在跑的 run，也不发任何帧，命令行留着，等那一段有了结果再发。
 - **理由**：`u.send` 只说帧离开了页面，不说城接受了它；房间里有 run 在跑时城以 `E_BUSY` 拒绝开新的一段（`crates/accounting/src/worker/commanding/sessions.rs` 的 `open_session`）。先移动主区，页面就停在那个房间正在跑的会话上，框开着，人接下来打的字成了对正在跑的 run 的转向。belief 已经经 `session_opened` 知道新的一段，所以「开成了」是一个读得到的事实，不必猜一个时长。状态放在全页一份里而不是各入口一份，是因为角落要在拒绝到达的那一刻知道它归谁，第四个入口也只能经过这一份。
-- **被击败的备选**：①发出后等一个固定时长再移动——城慢时照样早移，城快时白等；②每个入口各写一份等待——两个分支入口曾各写一份「发了就走」，`/new` 与 `/compact` 又写了第三份（#120），同一个缺陷正是这样一次次出现；③只在页面认为房间有 run 在跑时不发——城才是这件事的权威，页面的读数可能落后，拒绝照样要有地方说。
+- **被击败的备选**：①发出后等一个固定时长再移动——城慢时照样早移，城快时白等；②每个入口各写一份等待——几份等待就是几处各自判断「开成了没有」的地方，一处改了、别处照旧，同一个缺陷会在还没改的入口上再出现一次；③只在页面认为房间有 run 在跑时不发——城才是这件事的权威，页面的读数可能落后，拒绝照样要有地方说。
 - **重开参数**：线上的拒绝带上它答的命令的 idem，那时答复按 idem 认，不再按「比记下的新」认。
 -/
 

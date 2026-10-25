@@ -4579,6 +4579,10 @@
     "en": "not branched: {why}",
     "zh": "没有开出分支：{why}"
   },
+  "branch_refused_then": {
+    "en": "not branched: {why}; {recovery}",
+    "zh": "没有开出分支：{why}；{recovery}"
+  },
   "session_opening": {
     "en": "opening a new session…",
     "zh": "正在打开新的会话…"
@@ -4590,6 +4594,10 @@
   "session_refused": {
     "en": "no new session: {why}",
     "zh": "没有开出新的会话：{why}"
+  },
+  "session_refused_then": {
+    "en": "no new session: {why}; {recovery}",
+    "zh": "没有开出新的会话：{why}；{recovery}"
   },
   "branch_stop": {
     "en": "stop the run working in {room}",

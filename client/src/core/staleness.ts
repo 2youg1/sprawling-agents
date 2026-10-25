@@ -61,6 +61,13 @@ const PROPOSALS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "proposal_offered", "proposal_decided", "proposal_withdrawn", "document_written",
 ]);
 
+// A room's prompt documents move when a page steps one (own, inherit,
+// restore) or saves one word by word, and when a run writes a convention
+// file in the room's chain, which every wave's checkpoint carries.
+const LAYERS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
+  "governed_document_written", "document_written", "checkpoint_committed", "file_restored",
+]);
+
 // How far one record of this kind reaches into the answers held under
 // one question name.
 export function reachOf(name: string, kind: EventKind): Reach {
@@ -106,6 +113,8 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));
+    case "layers":
+      return reached(LAYERS_MOVED.has(kind));
     // The city's list names cards and offer times, which a save does not
     // move: a stale card is still open.
     case "open_proposals":
