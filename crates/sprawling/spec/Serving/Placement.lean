@@ -331,7 +331,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
   - macOS：没有理想处理器的接口（`THREAD_AFFINITY_POLICY` 在 Apple 芯片上不受支持），座位表不建；性能核由 D40 与 `crates/runtime/spec/Tools/Exec.lean` D29 的 QoS 分工争取，拓扑只读给 doctor（D45）。
   - Linux：没有软的理想处理器调用，`sched_setaffinity` 是硬亲和（下面的对照臂）；座位表不建。内核调度器在 Intel 混合架构（ITMT）与 ARM（EAS）上本来就把忙线程放到大核上；拓扑只读给 doctor（D45）。
 - **(c) 一步计算从头到尾在一条线程上。** 一步就是 §8-93 的一轮：热线程从一次醒来到下一次阻塞做完的一件事（折叠一条记录、执行一次工具调用、落一次 relay）。一步之内不把工作交给另一条线程：不经 channel 转手、不 spawn 后再 join、async 任务不在一步中途转去阻塞池。lane 本来各是一条 OS 线程；tokio worker 的一步是一次任务轮询，tokio 的偷任务只发生在两次轮询之间。这是代码的写法，不要平台接口，三个平台同一条。它守住了没有，由下面四臂对照的「中途换核次数」读出。
-- **硬亲和只作对照臂。** Windows：harness 进程经 `win32job` 2.0.3 的安全接口装进一只 job，以 `ExtendedLimitInfo::limit_affinity` 设成计划里处理器的掩码，并置 `limit_silent_breakaway_ok`，让子进程不继承这只 job，run 自己的 job 才有余下的处理器可拿；每个 run 的 job 经 `Backlog::with_affinity` 取余下处理器掩码（D49）。Linux：硬亲和是外部的 `taskset -c`，整个二进制由做测量的人起动在它下面，进程内不设，本臂给出要用的列表。macOS：没有硬亲和，这一臂不跑，照实说。三个平台都只读一次拓扑、算一次计划，座位表与掩码出自同一份计划。
+- **硬亲和只作对照臂。** Windows：harness 进程经 `win32job` 2.0.3 的安全接口装进一只 job，以 `ExtendedLimitInfo::limit_affinity` 设成计划里处理器的掩码，并置 `limit_silent_breakaway_ok`，让子进程不继承这只 job，run 自己的 job 才有余下的处理器可拿；每个 run 的 job 经 `Backlog::with_affinity` 取余下处理器掩码（D103）。Linux：硬亲和是外部的 `taskset -c`，整个二进制由做测量的人起动在它下面，进程内不设，本臂给出要用的列表。macOS：没有硬亲和，这一臂不跑，照实说。三个平台都只读一次拓扑、算一次计划，座位表与掩码出自同一份计划。
 
 **被否**：①硬亲和作默认（每个 session 一个核）——核忙时宁可排队也不换核，正与 D88 第 3 条「算不过来就立即下一个核」相反；②座位不够时两条热线程共用最空的座位——两条都首选同一个核，那个核一忙两条一起被挪，等于没有偏好，还把座位数抬到最快一档的物理核数之上；③按负载随时改理想处理器——活着的线程偏好一变，就是「计算中途跳来跳去」，模型的「坐下不换」排除了它；④一张表先到先得、tokio worker 也要座位——worker 在第一次醒来时就坐下且永不退出，四个座位的机器上账本、折叠与最先醒的两条 worker 坐满，lane 永远拿不到座位，谁得到偏好由起动次序定而不是由谁要紧定；⑤每次醒来要座位、停放时交还——每次停放与醒来都要取锁，锁就进了热路径。
 
@@ -422,7 +422,7 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写�
   | `"soft_shares"` | 关 | 要 | 设 | User 填写的非零字节上限；缺席即不设 |
   | `"pinned"` | 关 | 要（硬亲和，D41、D103） | 设 | 不设 |
 
-  `"pinned"` 是第四臂：除了 `"soft"` 那几项，它把 harness 进程按在计划里的处理器上（Windows 的 job 亲和限额、Linux 的 `taskset -c` 列表、macOS 说没有这一臂，D41 与 D49）；`"soft_shares"` 与 `"pinned"` 今天都读得懂，四个拼写以外的值按读不懂拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。子进程比核心低一档（Windows 的 below-normal 优先级类、Unix 的 `nice 10`、Linux 的 `ionice`）属于 §8-13-3，不归这个设置；macOS 的 `taskpolicy -c utility` 是 D29 的 CPU 份额一项，随这一臂开关。
+  `"pinned"` 是第四臂：除了 `"soft"` 那几项，它把 harness 进程按在计划里的处理器上（Windows 的 job 亲和限额、Linux 的 `taskset -c` 列表、macOS 说没有这一臂，D41 与 D103）；`"soft_shares"` 与 `"pinned"` 今天都读得懂，四个拼写以外的值按读不懂拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。子进程比核心低一档（Windows 的 below-normal 优先级类、Unix 的 `nice 10`、Linux 的 `ionice`）属于 §8-13-3，不归这个设置；macOS 的 `taskpolicy -c utility` 是 D29 的 CPU 份额一项，随这一臂开关。
 - 份额要的那一半能不能落地按平台与运行中的机器分：Windows 的 job 两半都设；macOS 只有 CPU 一半（`taskpolicy` 是命令外面的一层包装，`RunProcesses.share` 在 macOS 上读作 `Unset`）；Linux 上两半都要 harness 自己的 cgroup 可写（D33），不可写时只剩 `nice 10` 一档。哪一状态由 `runtime::platform_shares` 一处读（`crates/runtime/spec/Tools/Exec.lean` D33）：`backlog` 的接线用这个答案决定建不建 cgroup，doctor 那一行用同一个答案说人话。
 - 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，因此只有 User 选择 `"soft_shares"` 且填写 `[core] memory_bytes` 时才请求。产品约束是不设缺省 run 内存上限，不能从物理内存推导。
 - 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。`memory_bytes` 缺席时 `"soft_shares"` 只给 CPU 份额；零、负数与非整数在配置读取处拒绝。
@@ -439,7 +439,7 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写�
 测量归之后的读数，这里只写计划，实现照它留出开关与采样点。
 
 - **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/spec/Person.lean`），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂（D47 的表），四个拼写今天都读得懂。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
-- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 不设份额；②(a)+(b)+(c)，加上 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 份额；③再加 D29 的作业级内存上限；④硬亲和（D41、D49）。不做那一臂就是 `[core] placement = "none"`。CPU 份额与 (a)+(b)+(c) 同在 ②，所以对照读不出份额单独的贡献；要读它时，在 ① 上只打开份额加一格。④ 的 run job 经 D49 的值接口申请余下处理器掩码，读数须检查实际亲和与 `unfollowed`；拒绝或空补集不能计作完整约束。
+- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 不设份额；②(a)+(b)+(c)，加上 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 份额；③再加 D29 的作业级内存上限；④硬亲和（D41、D103）。不做那一臂就是 `[core] placement = "none"`。CPU 份额与 (a)+(b)+(c) 同在 ②，所以对照读不出份额单独的贡献；要读它时，在 ① 上只打开份额加一格。④ 的 run job 经 D103 的值接口申请余下处理器掩码，读数须检查实际亲和与 `unfollowed`；拒绝或空补集不能计作完整约束。
 - **负载**：TP1 吞吐台的同一个 citysim 场景，并发 run 数 4 与 16，另在后台跑 N ∈ {0, 4, 16} 个 `cargo build`，每个都经一个 run 的 exec 起动（于是它们落在各自 run 的 job 里，与真实城一样）。每臂每格重复 5 次，报中位数，写明机器类别（核数与 P/E 之分）。
 - **读数**：工具调用的 harness 开销（`tool_called` 到 `tool_result`）与 relay 往返，各自的 p50、p99、p999；每步计算中途换核的次数——在每步的阶段边界（醒来、工具执行前、工具执行后、再次阻塞）各采一次当前处理器号，一步里前后不同就计一次，按热线程的种类分开计。
 - **处理器号怎么采**：Windows 是 `GetCurrentProcessorNumberEx`，没有安全接口，放进 D41 的同一个 Zig 叶子；Linux 读 `/proc/thread-self/stat` 的第 39 个字段（标准库读文件，第一档；`sched_getcpu` 要 `unsafe`），只在测量构建里读，因为每次一个系统调用；macOS 没有读当前处理器的接口，只报延迟，换核次数写「不可测」。
