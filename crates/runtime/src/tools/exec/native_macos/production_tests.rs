@@ -8,7 +8,7 @@ use std::process::Command;
 
 fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Backlog) -> ExecTool {
     ExecTool::new(
-        setup(source, None, Some(PathBuf::from("/bin/sh"))),
+        setup(source, None, None),
         Box::new(EchoSandbox::new()),
         backlog,
     )
@@ -37,11 +37,7 @@ fn invoke_python(tool: &ExecTool, script: &str, args: &[String]) -> Value {
     );
     let mut arguments = vec!["-c".to_owned(), script.to_owned()];
     arguments.extend_from_slice(args);
-    let result = tool
-        .invoke(&call(serde_json::json!({
-            "program": {"path": python, "args": arguments}
-        })))
-        .unwrap();
+    let result = tool.invoke(&call(line_of(python, &arguments))).unwrap();
     serde_json::to_value(result.result).unwrap()
 }
 
@@ -50,9 +46,9 @@ fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
     let tool = native_tool(source.path(), scratch.path(), patient());
-    let outcome = tool.invoke(&call(serde_json::json!({
-        "program": {"path": "/bin/sh", "args": ["-c", "printf copy > written; printf 'target-output\n'; printf 'target-error\n' >&2; exit 23"]}
-    }))).unwrap();
+    let outcome = tool
+        .invoke(&call(line_of("/bin/sh", ["-c", "printf copy > written; printf 'target-output\n'; printf 'target-error\n' >&2; exit 23"])))
+        .unwrap();
     let result = serde_json::to_value(outcome.result).unwrap();
     assert_eq!(
         (
@@ -193,7 +189,7 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     let scratch = tempfile::tempdir().unwrap();
     let missing = source.path().join("missing-wrapper");
     let tool = ExecTool::new(
-        setup(source.path(), None, Some(PathBuf::from("/bin/sh"))),
+        setup(source.path(), None, None),
         Box::new(EchoSandbox::new()),
         patient(),
     )
@@ -202,7 +198,12 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
         Confinement::MacosSeatbelt { wrapper: missing },
         Some(scratch.path().to_path_buf()),
     ));
-    let error = tool.invoke(&call(serde_json::json!({"program":{"path":"/usr/bin/touch","args":[source.path().join("side-effect")]}}))).unwrap_err();
+    let error = tool
+        .invoke(&call(line_of(
+            "/usr/bin/touch",
+            [source.path().join("side-effect").display().to_string()],
+        )))
+        .unwrap_err();
     assert_eq!(*error.code(), AxCode::SandboxDenied);
     assert!(!source.path().join("side-effect").exists());
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
