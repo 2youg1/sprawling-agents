@@ -8,7 +8,7 @@ piece of the swimlane graph, the short oid, the message and the room
 that made it. The chosen session's lane and its nodes take the accent
 (docs/frontend-method.md §7B), a node the colour of its run's phase, and
 a commit another room made is quieter. The picked row is washed and its
-identity opens under it, each value whole on one line and cut by the
+identity and moment open under it, each value whole on one line and cut by the
 pane's edge, so a copy takes the whole value. Every role and `aria-*`
 value comes in the bags. -->
 <script lang="ts">
@@ -61,6 +61,8 @@ value comes in the bags. -->
             {/if}
             <dt class="text-text-faint">{look.labels.parents}</dt>
             <dd class="figure truncate">{row.facts.parents}</dd>
+            <dt class="text-text-faint">{look.labels.at}</dt>
+            <dd class="figure truncate"><time datetime={row.facts.at.iso}>{row.facts.at.text}</time></dd>
           </dl>
         </div>
       {/if}

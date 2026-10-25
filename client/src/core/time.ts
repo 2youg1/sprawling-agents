@@ -58,20 +58,32 @@ export function hhmmss(at: number): string {
   return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-// A moment the ledger wrote, in UTC, as two halves: the day, written
-// once at the head of a timeline, and the time of day to the
-// millisecond, written on every row (docs/frontend-method.md §7D). Joined, they are
-// the ISO 8601 instant a `<time datetime>` carries.
-export function isoDay(at: number): string {
-  return new Date(at).toISOString().slice(0, 10);
+// The time of day to the millisecond, for a column where two moments
+// can fall inside one second and the order between them is read.
+export function hhmmssms(at: number): string {
+  return `${hhmmss(at)}.${String(new Date(at).getMilliseconds()).padStart(3, "0")}`;
 }
 
-export function isoTime(at: number): string {
-  return new Date(at).toISOString().slice(11);
+// The local calendar day as `2026-10-02`, for the date said once above
+// a column of times of day, and before the time in a whole moment.
+export function ymd(at: number): string {
+  const day = new Date(at);
+  const two = (n: number): string => String(n).padStart(2, "0");
+  return `${String(day.getFullYear())}-${two(day.getMonth() + 1)}-${two(day.getDate())}`;
 }
 
+// A whole moment on one line, the local day and the time to the second,
+// where no column above says the day: `2026-10-02 03:04:05`.
+export function moment(at: number): string {
+  return `${ymd(at)} ${hhmmss(at)}`;
+}
+
+// The ISO 8601 instant in UTC that a `<time datetime>` carries. Every
+// moment the screen writes is in the reader's own time zone
+// (client/Spec.lean 4-59), so this is the one place UTC is spelled, and
+// no view calls `toISOString` itself.
 export function isoInstant(at: number): string {
-  return `${isoDay(at)}T${isoTime(at)}`;
+  return new Date(at).toISOString();
 }
 
 // Whole numbers with a thin separator, and money from micro-dollars.

@@ -6,27 +6,27 @@
 <script lang="ts">
   // The chosen session, the panorama workbench's middle pane (client/Spec.lean
   // §7K): one line saying where it works and which commit it started
-  // from, with the way to its run page, then the instrument sheet and the
-  // timeline. Its name and its state are not written here: the sessions
-  // column's chosen row names it and draws its state, and the box under
-  // the pane carries its address (§7K, "one place on a screen").
+  // from, with the way to its run page, then the instrument sheet. Its
+  // name and its state are not written here: the sessions column's
+  // chosen row names it and draws its state, and the box under the pane
+  // carries its address (§7K, "one place on a screen"). The moments of
+  // its turns and calls are the thread's, under the pane, and the run
+  // page's to the millisecond, so the pane draws no timeline.
   //
   // The session is `chosen.svelte.ts`'s answer - a picked commit's run, or
-  // the room's newest - and this pane asks that run's rounds once for the
-  // sheet and the timeline both, so the two cannot be reading different
-  // turns. The same question is the one the conversation asks, and
-  // `asking` merges them by content.
+  // the room's newest - and this pane asks that run's rounds for the
+  // sheet. The same question is the one the conversation asks, and
+  // `asking` merges them by content, so the sheet and the thread cannot
+  // be reading different turns.
   import type { Snippet } from "svelte";
 
-  import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer, RunId } from "../../wire";
   import Empty from "../parts/empty.svelte";
-  import { commitsIn, pickedCommit, sessionRun } from "./chosen.svelte";
+  import { sessionRun } from "./chosen.svelte";
   import Sheet from "./sheet.svelte";
-  import Timeline from "./timeline.svelte";
 
   interface Props {
     readonly here: Address;
@@ -48,7 +48,6 @@
   const belief = u.conn.belief;
 
   const run = $derived(shown === undefined ? sessionRun($belief, here) : shown);
-  const picked = $derived(pickedCommit(here));
 
   let rounds = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
@@ -59,9 +58,6 @@
       rounds = held !== undefined && "rounds" in held ? held.rounds : undefined;
     });
   });
-
-  const commits = $derived(u.conn.asking.ask(commitsIn(here)));
-  const held = $derived(readAnswer($commits, (answer) => ("commits" in answer ? answer.commits.commits : undefined)));
 
   // Where the session works: the worktree it opened, and the commit its
   // changes are measured from.
@@ -102,7 +98,6 @@
   {:else}
     <div class="mt-snug flex min-h-0 flex-1 flex-col">
       <Sheet {here} {run} {rounds} />
-      <Timeline {run} turns={rounds?.turns ?? []} commits={held.kind === "held" ? held.value : []} {picked} />
     </div>
   {/if}
 </section>

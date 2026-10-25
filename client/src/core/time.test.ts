@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { isoDay, isoInstant, isoTime, kilo } from "./time";
+import { hhmmssms, isoInstant, kilo, ymd } from "./time";
 
 describe("a token count read at a glance", () => {
   test("three significant figures under a mark, and no trailing zero", () => {
@@ -21,13 +21,12 @@ describe("a token count read at a glance", () => {
   });
 });
 
-describe("a ledger instant in UTC", () => {
-  test("the day once, then the time of day to the millisecond", () => {
-    const at = Date.UTC(2026, 9, 2, 3, 4, 5, 678);
-    expect([isoDay(at), isoTime(at)]).toEqual(["2026-10-02", "03:04:05.678Z"]);
+describe("a ledger instant", () => {
+  test("the screen writes the reader's own day and time of day, padded", () => {
+    const at = new Date(2026, 9, 2, 3, 4, 5, 7).getTime();
+    expect([ymd(at), hhmmssms(at)]).toEqual(["2026-10-02", "03:04:05.007"]);
   });
-  test("the whole instant a datetime attribute carries is the two halves joined", () => {
-    const at = Date.UTC(2026, 9, 2, 3, 4, 5, 678);
-    expect(isoInstant(at)).toBe("2026-10-02T03:04:05.678Z");
+  test("the datetime attribute carries the instant in UTC", () => {
+    expect(isoInstant(Date.UTC(2026, 9, 2, 3, 4, 5, 678))).toBe("2026-10-02T03:04:05.678Z");
   });
 });

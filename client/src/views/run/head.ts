@@ -17,7 +17,7 @@ import { POSTURE_WORD } from "../../core/doing";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { buildingOf, roomOf, toFragment } from "../../core/route";
-import { count, isoDay, isoInstant, isoTime, lasted, usd } from "../../core/time";
+import { count, isoInstant, lasted, moment, usd } from "../../core/time";
 import type { Address, Closing, Turn } from "../../wire";
 import { figuresOf, modelsOf } from "./lanes";
 
@@ -115,7 +115,7 @@ function took(props: HeadProps, lang: Lang): CellLook | null {
       {
         kind: "time",
         key: "started",
-        text: fill(say(lang, "run_head_started"), { clock: `${isoDay(from)} ${isoTime(from)}` }),
+        text: fill(say(lang, "run_head_started"), { clock: moment(from) }),
         at: isoInstant(from),
       },
     ],

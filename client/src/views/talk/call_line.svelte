@@ -34,7 +34,7 @@ third layer). -->
   import { fill, say } from "../../core/lang";
   import type { Doing } from "../../core/doing";
   import type { Call, RunId } from "../../wire";
-  import { isoInstant } from "../../core/time";
+  import { hhmmss } from "../../core/time";
   import { lineWalker } from "../../core/lines";
   import { pressedOf } from "../../core/press";
   import { ui } from "../../ui";
@@ -92,8 +92,8 @@ third layer). -->
   });
   const when = $derived(
     call.answered === null || call.answered === undefined
-      ? fill(say($lang, "talk_call_started"), { at: isoInstant(call.called) })
-      : fill(say($lang, "talk_call_finished"), { at: isoInstant(call.answered) }),
+      ? fill(say($lang, "talk_call_started"), { at: hhmmss(call.called) })
+      : fill(say($lang, "talk_call_finished"), { at: hhmmss(call.answered) }),
   );
   const hint = $derived(call.outcome === "failed" ? `${failedWords} · ${when}` : when);
 

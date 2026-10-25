@@ -103,7 +103,7 @@ const HISTORY: readonly (readonly [string, readonly string[], string, number, st
   ["a", ["5"], "the document contract, first draft", 0, "lab/room1", -1_800],
 ];
 
-export const COMMITS: readonly CommitAnswer[] = HISTORY.map(([digit, parents, message, n, actor, after], row) => ({
+const COMMITS: readonly CommitAnswer[] = HISTORY.map(([digit, parents, message, n, actor, after], row) => ({
   actor: Address.make(actor),
   at: TimeMs.make(START + after * 1_000),
   lineage: [],

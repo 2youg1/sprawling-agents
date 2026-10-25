@@ -20,7 +20,7 @@ const RECORD: EventRecord = {
   run: RUN,
   seq: Seq.make(7),
   kind: "run_started",
-  t: TimeMs.make(Date.UTC(2026, 9, 2, 0, 0, 1, 250)),
+  t: TimeMs.make(new Date(2026, 9, 2, 0, 0, 1, 250).getTime()),
   who: "hall/mayor",
   prev: B3Hash.make("0".repeat(64)),
   v: 1,
@@ -37,7 +37,7 @@ describe("a row of the record's timeline", () => {
     const opened = lookOf({ entry, day: "2026-10-02", open: true, onToggle: () => undefined }, "en");
     expect(closed.row).toMatchObject({ kind: "record", open: false, wire: { type: "button", "aria-expanded": false }, raw: undefined });
     expect(opened.row).toMatchObject({ kind: "record", open: true, wire: { type: "button", "aria-expanded": true }, raw: JSON.stringify(RECORD, null, 2) });
-    expect([closed.day, opened.day]).toEqual([undefined, { day: "2026-10-02", zone: "UTC · ledger position" }]);
+    expect([closed.day, opened.day]).toEqual([undefined, { day: "2026-10-02", zone: "local time · ledger position" }]);
     const row = closed.row;
     if (row.kind === "record") row.wire.onclick();
     expect(toggled).toEqual([7]);
@@ -46,7 +46,7 @@ describe("a row of the record's timeline", () => {
   test("a record with no room says who wrote it, and a log line held without a time writes none", () => {
     const record = lookOf({ entry: { kind: "record", key: "r7", seq: RECORD.seq, t: RECORD.t, record: RECORD }, day: null, open: false, onToggle: () => undefined }, "en");
     const line = lookOf({ entry: { kind: "log", key: "l7", seq: LINE.seq, t: null, line: LINE }, day: null, open: false, onToggle: () => undefined }, "en");
-    expect(record.row).toMatchObject({ kind: "record", when: { text: "00:00:01.250Z", at: "2026-10-02T00:00:01.250Z" }, seq: "#7", where: "by hall/mayor" });
+    expect(record.row).toMatchObject({ kind: "record", when: { text: "00:00:01.250", at: new Date(RECORD.t).toISOString() }, seq: "#7", where: "by hall/mayor" });
     expect(line.row).toEqual({ kind: "log", when: undefined, seq: "#7", level: "decide", line: "no offload", module: "runtime" });
   });
 });

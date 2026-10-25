@@ -4,17 +4,16 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Which session the panorama workbench speaks for, and which commit in
-// it a person picked (client/Spec.lean §7K). The session pane, the commits
-// pane and the timeline all read the one answer here, so the lane the
-// commits pane marks and the session the middle pane draws cannot be two
+// it a person picked (client/Spec.lean §7K). The session pane and the
+// commits pane both read the one answer here, so the lane the commits
+// pane marks and the session the middle pane draws cannot be two
 // different runs.
 //
 // **A commit names its session.** Picking one picks the run that made it
-// in the room that run worked in, and the timeline finds the checkpoint
-// by the commit's oid; the conversation moves to that room the same way
-// a session row moves it, through the address bar. A pick belongs to the
-// room it was made in: once the conversation is somewhere else, the
-// session there is that room's newest again.
+// in the room that run worked in; the conversation moves to that room
+// the same way a session row moves it, through the address bar. A pick
+// belongs to the room it was made in: once the conversation is somewhere
+// else, the session there is that room's newest again.
 
 import { commitsQuery } from "../../core/asking";
 import type { Belief } from "../../core/belief";

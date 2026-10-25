@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // One row of the record's timeline, decided (client D95: a seat, a look
-// and this file): the time of day to the millisecond in UTC, the ledger
+// and this file): the local time of day to the millisecond, the ledger
 // position, what happened and where, every word in the person's
 // language. A ledger record opens to the record as it was written, the
 // chain's own fields included; a log line is one line and opens
@@ -12,7 +12,7 @@
 
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
-import { isoInstant, isoTime } from "../../core/time";
+import { hhmmssms, isoInstant } from "../../core/time";
 import type { EventRecord, Seq } from "../../wire";
 import { factsOf, whatHappened } from "./event";
 import { LEVEL_NAMES } from "./timeline";
@@ -76,7 +76,7 @@ export interface EntryProps {
 
 export function lookOf(props: EntryProps, lang: Lang): EntryLook {
   return {
-    day: props.day === null ? undefined : { day: props.day, zone: say(lang, "rec_utc") },
+    day: props.day === null ? undefined : { day: props.day, zone: say(lang, "rec_local") },
     row: rowOf(props, lang),
   };
 }
@@ -118,7 +118,7 @@ function rowOf(props: EntryProps, lang: Lang): RowLook {
 }
 
 function momentOf(t: number): MomentLook {
-  return { text: isoTime(t), at: isoInstant(t) };
+  return { text: hhmmssms(t), at: isoInstant(t) };
 }
 
 function factLine(record: EventRecord): string {

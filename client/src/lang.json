@@ -5603,9 +5603,9 @@
     "en": "ledger and log",
     "zh": "账本与日志"
   },
-  "rec_utc": {
-    "en": "UTC · ledger position",
-    "zh": "UTC · 账本位置"
+  "rec_local": {
+    "en": "local time · ledger position",
+    "zh": "本地时间 · 账本位置"
   },
   "rec_newest": {
     "en": "back to the newest",
@@ -9284,8 +9284,8 @@
     "zh": "还没有工具调用"
   },
   "run_calls_axis": {
-    "en": "UTC when it answered · how long",
-    "zh": "UTC 答复时刻 · 用时"
+    "en": "when it answered · how long",
+    "zh": "答复时刻 · 用时"
   },
   "run_call_running": {
     "en": "running",
@@ -9891,10 +9891,6 @@
     "en": "waiting for you",
     "zh": "等你"
   },
-  "world_running": {
-    "en": "running",
-    "zh": "运行中"
-  },
   "world_open_run": {
     "en": "open the run",
     "zh": "打开 run 页"
@@ -10031,18 +10027,6 @@
     "en": "No session has run in this room yet.",
     "zh": "这个房间还没有跑过会话。"
   },
-  "world_timeline": {
-    "en": "timeline",
-    "zh": "时间轴"
-  },
-  "world_timeline_day": {
-    "en": "{day} · UTC",
-    "zh": "{day} · UTC"
-  },
-  "world_checkpoint": {
-    "en": "checkpoint",
-    "zh": "检查点"
-  },
   "world_no_commits": {
     "en": "no commit yet",
     "zh": "还没有提交"
@@ -10062,6 +10046,10 @@
   "world_parents": {
     "en": "parents",
     "zh": "父提交"
+  },
+  "world_commit_at": {
+    "en": "made",
+    "zh": "提交于"
   },
   "ring_used": {
     "en": "{used} / {window}",

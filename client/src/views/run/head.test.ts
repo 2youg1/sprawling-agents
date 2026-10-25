@@ -9,6 +9,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { moment } from "../../core/time";
 import { Address, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 import type { Turn } from "../../wire";
 import { lookOf } from "./head";
@@ -67,11 +68,11 @@ describe("the run page's sheet", () => {
     ]);
   });
 
-  test("the start is a moment a machine can read, and a cache nobody reported says so", () => {
+  test("the start is written in local time and stated in UTC, and a cache nobody reported says so", () => {
     const look = lookOf(KNOWN, "en");
     const started = look.cells.find((cell) => cell.key === "took")?.lines[1];
     const cached = look.cells.find((cell) => cell.key === "tokens")?.lines[1];
-    expect(started).toEqual({ kind: "time", key: "started", text: "started 1970-01-01 00:00:01.000Z", at: "1970-01-01T00:00:01.000Z" });
+    expect(started).toEqual({ kind: "time", key: "started", text: `started ${moment(1000)}`, at: "1970-01-01T00:00:01.000Z" });
     expect(cached).toEqual({ kind: "text", key: "cached", rank: "more", face: "figure", text: "cache not reported" });
   });
 });

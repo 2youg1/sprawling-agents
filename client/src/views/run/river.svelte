@@ -16,7 +16,7 @@
   import { POSTURE_WORD } from "../../core/doing";
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { isoInstant, isoTime, lasted } from "../../core/time";
+  import { hhmmssms, isoInstant, lasted } from "../../core/time";
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import type { Share } from "./lanes";
@@ -163,7 +163,7 @@
             {#if landed === null}
               <span class="figure text-text-faint">{say($lang, "run_call_running")}</span>
             {:else}
-              <time class="figure text-text-faint" datetime={isoInstant(landed)}>{isoTime(landed)}</time>
+              <time class="figure text-text-faint" datetime={isoInstant(landed)}>{hhmmssms(landed)}</time>
             {/if}
             <span class="hidden truncate text-text-faint @min-[40rem]:block"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span
