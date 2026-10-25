@@ -499,7 +499,10 @@ mod phases {
         std::fs::create_dir_all(city.path().join("lab")).unwrap();
         std::fs::write(city.path().join("lab").join("history.txt"), history_text()).unwrap();
         let tool = SearchTool::new(city.path(), everywhere()).unwrap();
-        let search = call("search", json!({ "text": "HMAC_KEY" }));
+        let search = call(
+            "search",
+            json!({ "pattern": "HMAC_KEY", "output_mode": "content" }),
+        );
         report("search", (0..32).map(|_| timed(&tool, &search)));
     }
 
