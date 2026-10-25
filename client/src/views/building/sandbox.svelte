@@ -194,7 +194,7 @@
 </script>
 
 <section class="flex max-w-page min-w-0 flex-col gap-base" aria-label={say($lang, "bld_sandbox")}>
-  <h2 class="text-note text-text-faint">{say($lang, "bld_sandbox")}</h2>
+  <h2 class="sr-only">{say($lang, "bld_sandbox")}</h2>
   <p class="max-w-measure text-note text-text-quiet">
     {held === null && known ? say($lang, "sandbox_inherited") : say($lang, "sandbox_what")}
   </p>

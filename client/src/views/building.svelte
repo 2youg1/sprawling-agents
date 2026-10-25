@@ -169,7 +169,7 @@
   />
   {#if removal !== "hall"}
     <Button
-      label={fill(say($lang, "bld_remove"), { addr: address })}
+      label={say($lang, "bld_remove")}
       tone="quiet"
       {...removal === "busy" ? { why: say($lang, "bld_remove_busy") } : {}}
       onPress={() => {
@@ -247,7 +247,7 @@
   open={removing}
   title={fill(say($lang, "bld_remove_title"), { addr: address })}
   detail={say($lang, "bld_remove_detail")}
-  confirmLabel={fill(say($lang, "bld_remove"), { addr: address })}
+  confirmLabel={say($lang, "bld_remove")}
   cancelLabel={say($lang, "part_cancel")}
   destructive
   onConfirm={() => {

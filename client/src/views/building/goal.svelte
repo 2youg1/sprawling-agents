@@ -12,7 +12,7 @@
   // city's pursuit line is the one authority; this line draws it.
   import { QUERIES } from "../../core/asking";
   import { pursue } from "../../core/commands";
-  import { fill, say } from "../../core/lang";
+  import { say } from "../../core/lang";
   import { pursuitClause } from "../../core/pursuit";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
@@ -68,7 +68,7 @@
         <Field
           label={say($lang, "bld_goal")}
           labelling="hidden"
-          placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
+          placeholder={say($lang, "bld_goal_placeholder")}
           value={goal}
           onInput={(value) => {
             goal = value;

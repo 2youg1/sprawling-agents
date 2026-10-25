@@ -123,7 +123,10 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
   return {
     level: seat.level,
     title: say(lang, "runs_title"),
-    counts: fill(say(lang, "runs_counts"), { asking: String(waiting.length), runs: String(seat.runs.length) }),
+    // How many are waiting for the person is the city page's figure row's
+    // to say, and the runs themselves are the control under the heading;
+    // the heading counts only what nothing above it counts.
+    counts: fill(say(lang, "runs_counts"), { runs: String(seat.runs.length) }),
     asking:
       waiting.length === 0
         ? null

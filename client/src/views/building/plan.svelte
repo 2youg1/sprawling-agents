@@ -89,7 +89,7 @@
 </script>
 
 <div>
-  <h2 class="mb-base text-note text-text-faint">{say($lang, "bld_plan")}</h2>
+  <h2 class="sr-only">{say($lang, "bld_plan")}</h2>
   <!-- Two figures, because either alone misleads (kernel::completion).
        The bar is the leaves, which say how many pieces the plan turned
        out to have; the figure beside it is the weighted share, which

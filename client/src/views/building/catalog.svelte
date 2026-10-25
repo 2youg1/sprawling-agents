@@ -97,7 +97,7 @@
 </script>
 
 <section class="flex max-w-page min-w-0 flex-col gap-wide" aria-label={say($lang, "bld_catalog")}>
-  <h2 class="text-note text-text-faint">{say($lang, "bld_catalog")}</h2>
+  <h2 class="sr-only">{say($lang, "bld_catalog")}</h2>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {:else if look === undefined}
