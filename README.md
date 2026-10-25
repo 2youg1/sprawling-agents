@@ -22,11 +22,36 @@ The city is more than a metaphor. Buildings, floors and rooms are the directory 
 
 sprawling interrupts you as little as it can. Agents have full permission in their own building by default: in a building raised from the `minimal` template an agent may write every file, and finished work lands without review (to turn on review or limit writes, see [A building of your own](docs/getting-started.md#a-building-of-your-own)). What reaches you for a decision is a design question a resident cannot settle from the building's rules. Plans, decisions and handoffs are written down as files you can read directly, an agent in a new session picks the work up from these records, and the memory lives in your files, code and document libraries. There are no built-in workflows for now; you define the workflow through roles, skills and tool connections.
 
+Interrupting you less does not mean telling you less: the conversation starts in work by default, the address in an empty box opens the command palette, where you can change room or session and branch the current conversation into another room; the raise page builds from a template or adopts a folder already in the city, and the building page lays out the prompt layers the next run will read, where each document comes from, and whether each tool is core, on demand or off, so you can see what the model will receive before deciding what to change instead of guessing why it acted after switching pages and asking again.
+
 <p align="center">
-  <img alt="The Main conversation page before a session: the text box, the workspace on the left, the model, effort and permission controls on the right" src="docs/images/main-before-a-session.png" width="49%">
-  <img alt="A finished session with its sheet: time to first token, output rate, cache hits and tokens, then each tool call with how long it took, and the file it read open on the right" src="docs/images/a-session-at-work.png" width="49%">
-  <img alt="The report the run wrote, with its table and numbered list, beside the CSV file it read" src="docs/images/a-report-beside-its-file.png" width="98%">
+  <a href="docs/images/a-report-beside-its-file.png"><img alt="A report with a table and a numbered list in the conversation, with the observations.csv it is based on open on the right" src="docs/images/a-report-beside-its-file.png" width="100%"></a>
+  <br>
+  <sub>A run's report beside the CSV it read; select the image for the full window.</sub>
 </p>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/images/building-prompts.png"><img alt="The prompts section of the atlas building, listing the layers, sent state and byte counts of City.md and AGENTS.md" src="docs/images/building-prompts-detail.png" width="100%"></a>
+      <br><sub>Prompt layers: inspect each document's origin, state and place in the send order.</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/images/building-capabilities.png"><img alt="The capabilities section of the atlas building, with tools set to core, on demand or off" src="docs/images/building-capabilities-detail.png" width="100%"></a>
+      <br><sub>Capabilities: tool tiers for this building or the city default, with the evidence for a change on the same page.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/images/raise-adopt.png"><img alt="The raise page adopting the lab-notes folder, with its address, template and RULES.toml preview" src="docs/images/raise-adopt-detail.png" width="100%"></a>
+      <br><sub>Adopt a folder: keep every existing file, with the rules checked before anything lands.</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/images/talk-palette-carry.png"><img alt="The command palette's take this conversation to list, offering garden/sensors, atlas/notes and atlas/review" src="docs/images/talk-palette-carry-detail.png" width="100%"></a>
+      <br><sub>Branch a conversation: take its context to another room without copying and pasting.</sub>
+    </td>
+  </tr>
+</table>
 
 **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may all still change between versions.
 
