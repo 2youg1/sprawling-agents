@@ -149,6 +149,10 @@ with one round in it reads as a page that broke. -->
   <AddressLine {...addressLineOf($lang, "hall/mayor", null, () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
 {/snippet}
 
+{#snippet inBoxSession()}
+  <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
+{/snippet}
+
 <Case label="composer · an empty room lifts the box, the address line in its placeholder">
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
     <div class="w-full">
@@ -163,11 +167,12 @@ with one round in it reads as a page that broke. -->
   </div>
 </Case>
 
-<Case label="composer · docked once the room has a thread">
+<Case label="composer · docked once the room has a thread, the address and session in its placeholder">
   <div class="px-pane pb-pane">
     <Composer started
       placeholder={say($lang, "talk_placeholder_mayor")}
       sending="dispatch"
+      door={inBoxSession}
       hearing
       onSend={() => false}
       onStop={() => false}

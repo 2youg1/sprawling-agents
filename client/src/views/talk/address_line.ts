@@ -18,15 +18,15 @@ import type { Lang } from "../../core/lang";
 import type { Seq } from "../../wire";
 import type { Arrival } from "../palette_door.svelte";
 
-// Whether a conversation column draws the address line at its head: zen
-// and blend do, and the panorama workbench, which writes the address under
-// the chosen session's title (docs/frontend-method.md §7D), does not.
+// Whether a conversation column draws the address line: zen and blend do,
+// and the panorama workbench, which writes the address under the chosen
+// session's title (docs/frontend-method.md §7D), does not.
 export type Head = "address" | "none";
 
-// Where one address line stands (client/Spec.lean 4-10a): at the head of
-// the conversation, in a header of its own; or in an empty room's box, in
-// the place of the box's placeholder, as the words "to <address>…" whose
-// address is the button.
+// Where one address line stands (client/Spec.lean 4-10a): in the box, in
+// the place of its placeholder, as the words "to <address>…" whose address
+// is the button; or at the head of a past session, which has no box, in a
+// header of its own.
 export type At = "head" | "box";
 
 // The placeholder's words on either side of the address, for the line

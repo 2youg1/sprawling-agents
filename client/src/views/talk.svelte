@@ -34,7 +34,7 @@
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
   import AddressLine from "./talk/address_line.svelte";
-  import type { At, Head } from "./talk/address_line";
+  import type { Head } from "./talk/address_line";
   import Composer from "./talk/composer.svelte";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
@@ -65,9 +65,8 @@
     // steps aside and the last thing said stands above the box.
     readonly band: boolean;
     // Whether the column draws the address line (client/Spec.lean
-    // 4-10a): zen and blend do, at its head or over an empty room's box;
-    // the panorama workbench writes the address under the chosen session
-    // instead.
+    // 4-10a): zen and blend do, in the box's placeholder; the panorama
+    // workbench writes the address under the chosen session instead.
     readonly head: Head;
   }
 
@@ -223,13 +222,9 @@
   // stands in the middle. The first send lets it sink at once, before
   // the city has answered, because the words it shows are already there.
   const blank = $derived(runs.length === 0 && echo === null);
-  // Where the address line stands (client/Spec.lean 4-10a): in an empty
-  // room's box, as the address its placeholder names, so the room is
-  // named once; at the column's head once the room has something to read.
-  const addressAt = $derived.by((): At | "nowhere" => {
-    if (band || head !== "address") return "nowhere";
-    return blank ? "box" : "head";
-  });
+  // The address line stands in the box, as the address its placeholder
+  // names, so the page names the room once (client/Spec.lean 4-10a).
+  const addressed = $derived(!band && head === "address");
 
   function send(text: string): boolean {
     const going = live;
@@ -371,7 +366,7 @@
     hearing={u.hearing()}
     room={address}
     band={band ? lastSaid : undefined}
-    door={addressAt === "box" ? addressInBox : undefined}
+    door={addressed ? addressInBox : undefined}
     onSend={send}
     onStop={() => {
       const going = live;
@@ -381,14 +376,11 @@
 {/snippet}
 
 <!-- One column, one box. The box is the same element in an empty room and
-in a full one: in an empty room it is lifted to the middle of the column
-with the room's name above it, and the first send lets it sink to its seat
+in a full one: in an empty room it is lifted to the middle of the column,
+and the first send lets it sink to its seat
 (docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
-  {#if addressAt === "head"}
-    <AddressLine {address} />
-  {/if}
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
       {#if runs.length > 0}

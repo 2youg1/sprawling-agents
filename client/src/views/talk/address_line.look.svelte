@@ -4,9 +4,9 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the address line is drawn (`./address_line.ts`): one quiet line
-  // at the head of the conversation, or the address inside an empty
-  // room's placeholder (client/Spec.lean 4-10a), the building's part in
+  // How the address line is drawn (`./address_line.ts`): the address
+  // inside the box's placeholder, or one quiet line at the head of a past
+  // session (client/Spec.lean 4-10a), the building's part in
   // the faint ink and free to shrink, the room in the quiet ink and never
   // cut, the session's number after it on the figure face. The building
   // gives way a thousand times faster than the room, so the room is cut
