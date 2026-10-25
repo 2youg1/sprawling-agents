@@ -2,12 +2,12 @@
 preload = ["./scripts/runes.ts"]
 
 # A version published less than three days ago is not resolved by
-# `bun add` or `bun update`: the cooldown `.github/dependabot.yml` gives
-# every other ecosystem's version updates, and gives the reason for, held
-# here because Dependabot has no entry for `client/`. Written in seconds
-# so that any bun that reads the key reads it the same way. A security
-# fix needed today goes in `minimumReleaseAgeExcludes` as `name@version`,
-# which lifts the wait for that one release. A frozen install takes what
-# `bun.lock` pins whatever its age.
+# `bun add` or `bun update`. This is the cooldown `.github/dependabot.yml`
+# gives every other ecosystem, and that file gives the reason; it is set
+# here because Dependabot has no entry for `client/`. The value is in
+# seconds so that every bun that reads the key reads it the same way. A
+# security fix needed today goes in `minimumReleaseAgeExcludes` as
+# `name@version`, which lifts the wait for that one release. A frozen
+# install takes what `bun.lock` pins, whatever its age.
 [install]
 minimumReleaseAge = 259200
