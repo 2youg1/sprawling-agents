@@ -20,7 +20,7 @@
 |---|---|---|---|
 | `edit` | `file_path`、`old_string`、`new_string`、`replace_all`（可选，缺省 `false`） | `Edit`：同四个 | `old_string: ""` 新建一个不存在的文件，Claude Code 新建走 `Write`；读后被改即拒，Claude Code 在 `old_string` 仍唯一匹配时照改（D106）；`file_path` 收城相对路径，也收本平台落在城里的绝对路径（§8-30-1），Claude Code 要绝对路径 |
 | `exec` | `command` 或 `python` 恰给一个；`where`（可选，`sandbox`｜`host`） | `Bash`：`command`、`timeout`、`description`、`run_in_background` | 没有 `timeout` 与 `run_in_background`：前台窗口到了命令自己转进后台（§8-28）；没有 `description`；`python` 与 `where` 是本城的沙箱（§8-13-4，D118） |
-| `read` | `path`、`offset`（0 基）、`limit`（至多 512） | `Read`：`file_path`、`offset`（行号）、`limit`、`pages`、`allow_large` | 本 Step 余下的一项：改名 `file_path`，`offset` 改成 1 基行号（§8-29-1、§8-63） |
+| `read` | `file_path`、`offset`（1 基行号）、`limit`（至多 512） | `Read`：`file_path`、`offset`（行号）、`limit`、`pages`、`allow_large` | `file_path` 也收 catalog 里一件 skill 的名字；没有 `pages` 与 `allow_large`：read 只交文本，一次至多 512 行（§8-29-1，D119） |
 | `search` | `text`（子串）、`path`、`context`、`mode` | `Grep`：`pattern`（ripgrep 正则）、`path`、`glob`、`output_mode`、`-i`、`context` 等；`Glob`：`pattern`、`path` | 本 Step 余下的一项：`pattern` 改成正则，`mode` 改成 `output_mode` 与它的三个值，按文件名找住在 search 里（§8-30-2，D117） |
 | `status` | 无 | 无同类 | 本城的处境查询（§8-14） |
 | `tool` | `op`、`namespace`、`query`、`name`、`args` | `ToolSearch`：`query`、`max_results` | `find` 收 `query`，与 `ToolSearch` 同名；`list`、`detail`、`run` 是本城的目录门（§8-60） |
@@ -231,7 +231,7 @@ impl ToolBench {
 | 文件 | 管什么 |
 |---|---|
 | `crates/runtime/src/tools/edit.rs` | `EditTool` 与 `EditDesk`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→锁内准入（§8-64）→匹配数→落盘→记新戳），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old_string` 首行附近的几行，带 0 基行号 |
+| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old_string` 首行附近的几行，带 1 基行号（D119） |
 | `crates/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：读过之后的落盘与 diff、没读过、读后被改带片段、两个 run 争一个文件、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 -/
 

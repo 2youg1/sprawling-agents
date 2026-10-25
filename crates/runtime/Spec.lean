@@ -362,6 +362,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D116 | 参数改名不改变任何已派生的 `IdemKey`，不做迁移 | `crates/runtime/spec/Tools.lean` |
 | D117 | 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件 | `crates/runtime/spec/Tools/Search.lean` |
 | D118 | `command` 在没有 shell 的楼里读作一个程序与它的参数 | `crates/runtime/spec/Tools/Exec.lean` |
+| D119 | 模型读到的行号从 1 数起（渲染器 V3），账本里的下标仍从 0 数起 | `crates/runtime/spec/Rendering.lean` |
 -/
 
 /-! ## 13 依赖选型
