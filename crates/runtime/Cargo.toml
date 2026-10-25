@@ -26,6 +26,13 @@ storage = { workspace = true }
 # its own bytes; the same decoder the browser's screenshots are measured
 # with (8-27-10).
 png.workspace = true
+# search's `glob`: ripgrep's own glob matcher, so `*.{ts,tsx}` and
+# `src/**/*.rs` mean what they mean to Claude Code's Grep
+# (`crates/runtime/spec/Tools/Search.lean` D117).
+globset = { version = "0.4", default-features = false }
+# search's `pattern`: the engine ripgrep uses by default, which matches
+# with finite automata and never backtracks (`crates/runtime/spec/Tools/Search.lean` D120).
+regex = "1"
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.
