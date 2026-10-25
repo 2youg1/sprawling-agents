@@ -186,7 +186,7 @@ fn adopting_an_existing_directory_keeps_every_file_it_found() {
     let err = adopt(city.path(), &addr("ghost")).unwrap_err();
     assert!(err.recovery().contains("create"), "{err}");
     // The record says it was an adoption.
-    let payload = adopted_payload(&building).unwrap();
+    let payload = adopted_payload(&building, BuildingTemplate::Minimal).unwrap();
     assert_eq!(
         payload.as_map().get("adopted"),
         Some(&serde_json::Value::Bool(true))

@@ -257,9 +257,12 @@ impl RunWorker {
             wire::Command::AddAgent(_) => Err(OnTheListener::AddAgent.refusal()),
             wire::Command::AgentLogin(it) => Err(Unbuilt::AgentLogin(it.agent).not_built()),
             wire::Command::ForgetDevice(_) => Err(OnTheListener::ForgetDevice.refusal()),
-            wire::Command::CreateBuilding { addr, template, .. } => {
-                self.create_building(addr, template.as_str())
-            }
+            wire::Command::CreateBuilding {
+                addr,
+                template,
+                rules,
+                ..
+            } => self.raise_building(&addr, template.as_str(), rules.as_deref()),
             wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
             // The person's entrance, so the answerer is a human; a delegate has its own tool.
             wire::Command::Approve { item, verdict, .. } => {
@@ -288,9 +291,7 @@ impl RunWorker {
             wire::Command::PutIdentity {
                 ref card, ref base, ..
             } => self.put_identity(card, base),
-            wire::Command::PutRules(write) => {
-                self.put_rules(&write.building, &write.base, &write.body)
-            }
+            wire::Command::PutRules(ref write) => self.put_rules(write),
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
             wire::Command::PutGuide { progress, .. } => guide::put(&self.city_root, &progress),
             wire::Command::ConfigureCity(settings) => self.configure_city(settings),
@@ -305,9 +306,7 @@ impl RunWorker {
             wire::Command::DecideProposals(ref decisions) => self.decide_proposals(decisions),
             wire::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             wire::Command::Reveal { at, .. } => (self.reveal)(&self.city_root, &at),
-            wire::Command::RestoreDiscard {
-                ref restoration, ..
-            } => self.restore_discard(restoration),
+            wire::Command::RestoreDiscard { restoration, .. } => self.restore_discard(&restoration),
             wire::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
             wire::Command::DoctorRefresh { .. } => {
                 self.look_at_this_machine();

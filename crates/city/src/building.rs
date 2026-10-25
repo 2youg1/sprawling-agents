@@ -115,16 +115,112 @@ pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError> {
         if !entry.path().is_dir() {
             continue;
         }
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        if let Ok(addr) = Address::parse(&name) {
+        if let Some(addr) = names_a_building(&entry.file_name().to_string_lossy()) {
             out.push(addr);
         }
     }
     out.sort_by(|left: &Address, right: &Address| left.as_str().cmp(right.as_str()));
     Ok(out)
+}
+
+/// The address a top-level directory named `name` has as a building,
+/// or `None` when it can be none: a dot directory - the reserved subtree
+/// among them - or a name the address grammar cannot spell, which
+/// nothing could ever dispatch to.
+///
+/// The one rule [`all`] lists buildings by and `crate::wizard::survey`
+/// offers folders by, so the folders a new city offers and the buildings
+/// an old one lists cannot disagree.
+pub(crate) fn names_a_building(name: &str) -> Option<Address> {
+    if name.starts_with('.') {
+        return None;
+    }
+    Address::parse(name).ok().filter(|addr| !addr.is_reserved())
+}
+
+/// The `RULES.toml` a raised building starts with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RulesText<'a> {
+    /// The template's own bytes, with the building's name filled in.
+    Template,
+    /// What a person wrote, evaluated before anything lands.
+    Written(&'a str),
+}
+
+/// How a raised building came to be at its address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Founding {
+    /// Laid out where no directory stood.
+    Built,
+    /// Drawn over a directory that was already there, whose files are
+    /// left as they were.
+    Adopted,
+}
+
+/// Raises the building a person asked for at `addr`: laid out where no
+/// directory stands, or drawn over the one already there, and says which.
+///
+/// The directory decides, because whether it is there is a fact of the
+/// disk and this city is its reader: a request that said "adopt" or
+/// "create" itself would be a second answer, and the two could disagree.
+/// Written rules are evaluated by the reader every dispatch uses
+/// (`crate::policy::evaluate`) before anything is laid out, so a refused
+/// text leaves no directory and no file behind.
+///
+/// # Errors
+/// Refuses what [`create`] refuses, and written rules the evaluator
+/// refuses, with the evaluator's reason.
+pub fn raise(
+    city_root: &Path,
+    addr: &Address,
+    template: BuildingTemplate,
+    rules: RulesText<'_>,
+) -> Result<(Building, Founding), AxError> {
+    let building = own_address(addr, "raise a building")?;
+    let text = match rules {
+        RulesText::Template => template.rules(addr)?,
+        RulesText::Written(text) => {
+            crate::policy::evaluate(addr, text)?;
+            text.to_owned()
+        }
+    };
+    let founding = if building.root(city_root).is_dir() {
+        Founding::Adopted
+    } else {
+        Founding::Built
+    };
+    lay_out(city_root, &building, &text)?;
+    Ok((building, founding))
+}
+
+/// The `RULES.toml` `template` lays a building out with at `addr`: what
+/// a page shows a person before they raise it.
+///
+/// # Errors
+/// Refuses a room address and the reserved subtree, as [`create`] does.
+pub fn template_rules(addr: &Address, template: BuildingTemplate) -> Result<String, AxError> {
+    own_address(addr, "read a building template")?;
+    template.rules(addr)
+}
+
+/// Whether rules have been drawn over this building's directory. A
+/// top-level folder without them is one [`all`] lists and nobody has
+/// adopted yet; [`raise`] at its address adopts it.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` when the rules file is there and cannot be looked at.
+pub fn has_rules(city_root: &Path, building: &Building) -> Result<bool, AxError> {
+    let file = crate::policy::rules_path(city_root, building.addr());
+    match std::fs::metadata(&file) {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "look for a building's rules",
+            format!("{}: {err}", file.display()),
+        )
+        .with_recovery("fix the file's permissions; a rules file that exists is read")),
+    }
 }
 
 /// Lays out a new building and returns it.
@@ -139,11 +235,22 @@ pub fn create(
     addr: &Address,
     template: BuildingTemplate,
 ) -> Result<Building, AxError> {
+    let building = own_address(addr, "create a building")?;
+    lay_out(city_root, &building, &template.rules(addr)?)?;
+    Ok(building)
+}
+
+/// The building `addr` is the address of.
+///
+/// # Errors
+/// Refuses the reserved subtree, and a room: a room is an address inside
+/// a building, not one.
+fn own_address(addr: &Address, action: &str) -> Result<Building, AxError> {
     let building = Building::of(addr)?;
     if building.addr() != addr {
         return Err(AxError::failure(
             AxCode::InvalidArgs,
-            "create a building",
+            action.to_owned(),
             addr.as_str().to_owned(),
         )
         .with_recovery(format!(
@@ -152,6 +259,17 @@ pub fn create(
             addr.as_str()
         )));
     }
+    Ok(building)
+}
+
+/// Writes `rules` as the building's `RULES.toml` and lays its spine files
+/// where they are missing.
+///
+/// # Errors
+/// Refuses a building that already has rules, and a path that will not
+/// take the write.
+fn lay_out(city_root: &Path, building: &Building, rules: &str) -> Result<(), AxError> {
+    let addr = building.addr();
     let root = building.root(city_root);
     // The building's own reserved subtree, made before the file that
     // lives in it: what governs a building is not writable by what runs
@@ -159,7 +277,6 @@ pub fn create(
     let governed = root.join(kernel::RESERVED_PREFIX);
     std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
     let file = governed.join(RULES_FILE);
-    let rules = template.rules(addr)?;
     // `create_new` rather than exists-then-write: the refusal and the
     // write are one operation, so no second caller lands in between.
     match std::fs::OpenOptions::new()
@@ -177,7 +294,7 @@ pub fn create(
             // adopted usually has ignore rules of its own, and those are
             // the bytes adoption promises not to touch.
             crate::gitignore::place(&root)?;
-            Ok(building)
+            Ok(())
         }
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Err(AxError::failure(
             AxCode::InvalidArgs,
@@ -236,14 +353,18 @@ pub fn created_payload(
     })
 }
 
-/// The ledger record for an adoption.
+/// The ledger record for an adoption, under the template its rules came
+/// from.
 ///
 /// # Errors
 /// Propagates the payload's own refusal to hold what it was given.
-pub fn adopted_payload(building: &Building) -> Result<Payload, AxError> {
+pub fn adopted_payload(
+    building: &Building,
+    template: BuildingTemplate,
+) -> Result<Payload, AxError> {
     Payload::of(&BuildingCreated {
         addr: building.addr().clone(),
-        template: BuildingTemplate::Minimal.name().to_owned(),
+        template: template.name().to_owned(),
         adopted: true,
     })
 }

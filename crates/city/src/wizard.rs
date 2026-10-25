@@ -72,13 +72,12 @@ pub fn survey(entries: &[(String, bool)], has_history: bool) -> Standing {
     let mut adoptable = Vec::new();
     let mut loose: usize = 0;
     for (name, is_dir) in entries {
-        if !is_dir || name.starts_with('.') {
-            loose = loose.saturating_add(1);
-            continue;
-        }
-        match Address::parse(name) {
-            Ok(addr) if !addr.is_reserved() => adoptable.push(addr),
-            _ => loose = loose.saturating_add(1),
+        match is_dir
+            .then(|| crate::building::names_a_building(name))
+            .flatten()
+        {
+            Some(addr) => adoptable.push(addr),
+            None => loose = loose.saturating_add(1),
         }
     }
     adoptable.sort_by(|left, right| left.as_str().cmp(right.as_str()));

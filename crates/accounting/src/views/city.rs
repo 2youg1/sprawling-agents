@@ -115,9 +115,22 @@ impl CityAsk {
                 }
             })
             .collect();
+        let ruled = buildings
+            .iter()
+            .map(|addr| {
+                city::Building::of(addr).and_then(|held| city::has_rules(&self.city_root, &held))
+            })
+            .collect::<Result<Vec<bool>, kernel::AxError>>();
+        let ruled = match ruled {
+            Ok(ruled) => ruled,
+            Err(stopped) => {
+                return super::prepared::unavailable_because("CityView".to_owned(), &stopped);
+            }
+        };
         let buildings = buildings
             .into_iter()
-            .filter_map(|addr| {
+            .zip(ruled)
+            .filter_map(|(addr, ruled)| {
                 let plan = plans.remove(&addr)?;
                 Some(wire::BuildingProgress {
                     addr,
@@ -125,7 +138,7 @@ impl CityAsk {
                     problems: plan.problems,
                     blocked: plan.blocked,
                     ready: u32::try_from(plan.ready.len()).unwrap_or(u32::MAX),
-                    adoptable: false,
+                    adoptable: !ruled,
                 })
             })
             .collect();

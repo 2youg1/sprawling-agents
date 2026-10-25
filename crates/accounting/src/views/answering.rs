@@ -247,7 +247,7 @@ impl Views {
                     pins: self.skill_pins.clone(),
                 };
             }
-            wire::Query::Template { .. } => unavailable(query.name().to_owned()),
+            wire::Query::Template { template, addr } => template_answer(template, addr),
             wire::Query::GitStatus { building } => match self.git_status_ask(building) {
                 Ok(ask) => return Prepared::GitStatus(ask),
                 Err(stopped) => {
@@ -417,5 +417,22 @@ impl Views {
             .filter(|(_, hot)| hot.phase == storage::RunPhase::Active)
             .map(|(run, _)| run.to_string())
             .collect()
+    }
+}
+
+/// The rules `template` would lay a building out with at `addr`, read
+/// from the one place the template's bytes live (`city::template_rules`);
+/// a room, the reserved subtree and a template this build does not have
+/// are answered `Unavailable` with the city's reason.
+fn template_answer(template: &wire::TemplateName, addr: &kernel::Address) -> wire::Answer {
+    match city::BuildingTemplate::parse(template.as_str())
+        .and_then(|known| city::template_rules(addr, known))
+    {
+        Ok(rules) => wire::Answer::Template(Box::new(wire::TemplateAnswer {
+            template: template.clone(),
+            addr: addr.clone(),
+            rules,
+        })),
+        Err(stopped) => unavailable_because("Template".to_owned(), &stopped),
     }
 }
