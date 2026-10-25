@@ -150,7 +150,7 @@ def firstRun (skills : List String) : Run := fun run =>
         [ ("file_path", .str notesPath)
         , ("old_string", .str ""), ("new_string", .str notesText) ])
     :: skills.zipIdx.map (fun (skill, index) =>
-        calling run (index + 1) "read" (Json.mkObj [("path", .str skill)]))
+        calling run (index + 1) "read" (Json.mkObj [("file_path", .str skill)]))
     ++ [saying "the file is written and every skill was read"]
 
 /-- The run the walk kills. If the city that comes back sends its conversation

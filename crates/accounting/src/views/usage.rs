@@ -71,6 +71,10 @@ const EARLIER_DESCRIBE: &str = "describe";
 /// The tool a ledger written before `tool` existed ran a dormant tool
 /// through; an unresolved line of it still counts as a server call.
 const EARLIER_CALL: &str = "call";
+/// The argument a ledger written before `read` took Claude Code's names
+/// named the file with; its lines keep it, because recorded calls are
+/// never re-spelled (`crates/runtime/spec/Tools.lean` D115).
+const EARLIER_READ_PATH: &str = "path";
 
 /// Which of the three usage questions a page asked.
 pub enum UsageQuestion {
@@ -445,7 +449,8 @@ impl Usage {
             return Some((skill, GUIDE_PART.to_owned()));
         }
         if tool == runtime::tools::ReadTool::NAME {
-            let path = argument("path")?;
+            let path = argument(runtime::tools::ReadTool::FILE_PATH)
+                .or_else(|| argument(EARLIER_READ_PATH))?;
             if let Some(skill) = pinned(&path) {
                 return Some((skill, DOCUMENT_PART.to_owned()));
             }

@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { Address, GitOid, RunId, Seq, TimeMs } from "../../wire";
 import type { Call, RoundsAnswer } from "../../wire";
 import { bracketOf } from "../checkpoints";
-import { followingIn, readingOf } from "./reading";
+import { followingIn, readFrom, readingOf } from "./reading";
 
 const RUN = RunId.make("0199c0de-0000-4000-8000-000000000001");
 
@@ -47,6 +47,26 @@ const SHOT = call(5, {
   output: { head: JSON.stringify({ image: `cas:b3-${"0".repeat(64)}`, width: 1280, height: 720, media_type: "image/png" }), cut: 0 },
 });
 const UNPLACED = call(6, { tool: "mcp/github" });
+
+describe("where a read call opens the file", () => {
+  // A ledger keeps both spellings of a read (crates/runtime/spec/Tools.lean
+  // D115): `file_path` numbers its offset from 1 (D119), the older `path`
+  // from 0, and both open on the line an editor counts from 1.
+  test("from the line either spelling of the call names", () => {
+    const asked = (args: object) => readFrom(call(9, { tool: "read", effect: "read", render: "generic", arguments: { head: JSON.stringify(args), cut: 0 } }));
+    expect([
+      asked({ path: "shop/main.rs", offset: 9 }),
+      asked({ file_path: "shop/main.rs", offset: 10 }),
+      asked({ file_path: "shop/main.rs" }),
+      asked({ file_path: "shop/main.rs", offset: 0 }),
+    ]).toEqual([
+      { path: "shop/main.rs", line: 10 },
+      { path: "shop/main.rs", line: 10 },
+      { path: "shop/main.rs", line: 1 },
+      { path: "shop/main.rs", line: 1 },
+    ]);
+  });
+});
 
 describe("how the inspector reads a call", () => {
   // The registration names terminals and diffs; the two other readings

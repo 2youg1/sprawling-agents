@@ -42,7 +42,7 @@
                   "type": "function",
                   "function": {
                     "name": "read",
-                    "arguments": "{\"path\": \"atlas/notes/README.md\"}"
+                    "arguments": "{\"file_path\": \"atlas/notes/README.md\"}"
                   }
                 }
               ]

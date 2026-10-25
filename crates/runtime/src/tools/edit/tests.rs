@@ -107,7 +107,7 @@ fn a_file_changed_after_the_read_is_refused_with_the_passage_as_it_now_reads() {
     assert_eq!(*err.code(), AxCode::VersionConflict);
     assert!(
         err.subject()
-            .contains("lines 0-2 as the file now reads:\nalpha\nbeta, said another\ngamma\n"),
+            .contains("lines 1-3 as the file now reads:\nalpha\nbeta, said another\ngamma\n"),
         "{}",
         err.subject()
     );
@@ -516,15 +516,17 @@ fn a_passage_copied_with_its_line_marks_edits_the_lines_it_marks() {
     let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
     look(&tool, tmp.path(), "work/a.txt");
+    // Row n is line n + 1 (D119): a passage read from row 8 shows row 9
+    // under the mark 10.
     tool.invoke(&call(
         "work/a.txt",
-        "row 9\n10|row 10\n",
-        "row 9\n10|row ten\n",
+        "row 8\n10|row 9\n",
+        "row 8\n10|row nine\n",
     ))
     .unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
-        before.replace("row 10\n", "row ten\n")
+        before.replace("row 9\n", "row nine\n")
     );
 }
 
@@ -552,11 +554,11 @@ fn a_numbered_line_added_in_the_replacement_is_written_as_it_came() {
     let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
     look(&tool, tmp.path(), "work/a.txt");
-    tool.invoke(&call("work/a.txt", "10|row 10\n", "10|row ten\n12|keep\n"))
+    tool.invoke(&call("work/a.txt", "10|row 9\n", "10|row nine\n12|keep\n"))
         .unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
-        before.replace("row 10\n", "row ten\n12|keep\n")
+        before.replace("row 9\n", "row nine\n12|keep\n")
     );
 }
 
@@ -569,7 +571,7 @@ fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
     let tool = tool(tmp.path());
     let before: String = (0..13)
         .map(|n| match n {
-            11 => "7|literal\n".to_owned(),
+            10 => "7|literal\n".to_owned(),
             _ => format!("row {n}\n"),
         })
         .collect();
@@ -577,8 +579,8 @@ fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
     look(&tool, tmp.path(), "work/a.txt");
     tool.invoke(&call(
         "work/a.txt",
-        "10|row 10\n7|literal\n",
-        "10|row 10\n7|changed\n",
+        "10|row 9\n7|literal\n",
+        "10|row 9\n7|changed\n",
     ))
     .unwrap();
     assert_eq!(
@@ -616,7 +618,7 @@ fn a_passage_copied_from_a_search_hit_with_context_edits_the_lines_it_marks() {
         .take(3)
         .map(|l| format!("{l}\n"))
         .collect();
-    assert_eq!(old, "5|row 5\nrow 6\nrow 7\n");
+    assert_eq!(old, "6|row 5\nrow 6\nrow 7\n");
     let new = old.replace("row 7", "row seven");
     tool.invoke(&call("work/a.txt", &old, &new)).unwrap();
     assert_eq!(

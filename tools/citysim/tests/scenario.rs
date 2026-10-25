@@ -417,7 +417,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 "content": [
                     { "type": "tool_use", "id": "c1", "name": "status", "input": {} },
                     { "type": "tool_use", "id": "c0", "name": "read", "input": {
-                        "path": "sim/lobby/room1/notes.md",
+                        "file_path": "sim/lobby/room1/notes.md",
                     }},
                 ],
                 "stop_reason": "tool_use",

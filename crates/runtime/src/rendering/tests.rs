@@ -7,7 +7,7 @@ use kernel::event::record::{Rendering, ToolAnswer};
 use kernel::{AxCode, AxError, Payload, ToolName};
 use serde_json::json;
 
-use super::{Copied, shown};
+use super::{Copied, Numbering, shown};
 
 fn payload(value: serde_json::Value) -> Payload {
     Payload::of(&value).unwrap()
@@ -131,17 +131,22 @@ fn a_tool_answer_is_its_text() {
 /// stays, and so does a replacement line with a number nobody copied.
 #[test]
 fn only_marks_drawn_where_they_sit_come_off() {
-    let copied = Copied::of("row 9\n10|row 10\n7|kept\n");
+    let copied = Copied::of("row 9\n10|row 10\n7|kept\n", Numbering::FromZero);
     assert_eq!(copied.starts().into_iter().collect::<Vec<_>>(), vec![9]);
     let (bare, taken) = copied.drawn_from(9).unwrap();
     assert_eq!(
         (bare.as_str(), taken.into_iter().collect::<Vec<_>>()),
         ("row 9\nrow 10\n7|kept\n", vec![10])
     );
-    assert_eq!(Copied::of("fn a() {\n|x\n").starts().len(), 0);
+    assert_eq!(
+        Copied::of("fn a() {\n|x\n", Numbering::FromZero)
+            .starts()
+            .len(),
+        0
+    );
     let numbers = [10].into_iter().collect();
     assert_eq!(
-        Copied::of("10|row ten\n12|keep\n").without(&numbers),
+        Copied::of("10|row ten\n12|keep\n", Numbering::FromZero).without(&numbers),
         "row ten\n12|keep\n"
     );
 }
@@ -158,7 +163,73 @@ fn every_drawn_body_unmarks_to_its_text() {
         let answer = answered(json!({"path": "a.rs", "offset": offset, "bytes": 0, "text": body}));
         let drawn = shown(Rendering::V2, &read(), &answer).unwrap();
         let (_, marked) = drawn.split_once('\n').unwrap();
-        assert_eq!(Copied::of(marked).drawn_from(offset).unwrap().0, body);
+        assert_eq!(
+            Copied::of(marked, Numbering::FromZero)
+                .drawn_from(offset)
+                .unwrap()
+                .0,
+            body
+        );
+    }
+}
+
+/// V3 (D119) draws the same payload with line numbers counted from 1:
+/// the header, the line to continue from, the line past the end, and the
+/// marks, which fall on the first line and on every tenth line.
+#[test]
+fn version_three_numbers_a_read_from_one() {
+    let answer = answered(json!({
+        "path": "a.md", "offset": 18, "total_lines": 40, "next_offset": 22,
+        "bytes": 9, "text": "r\ns\nt\nu\n",
+    }));
+    let past = answered(json!({
+        "path": "a.md", "offset": 9, "total_lines": 4, "bytes": 0, "text": "",
+    }));
+    assert_eq!(
+        [
+            shown(Rendering::V3, &read(), &answer).unwrap(),
+            shown(Rendering::V3, &read(), &past).unwrap(),
+        ],
+        [
+            "a.md lines 19-22 of 40, next 23\n19|r\n20|s\nt\nu\n".to_owned(),
+            "a.md has 4 lines; offset 10 is past the end\n".to_owned(),
+        ]
+    );
+}
+
+/// A search hit block is numbered the way a V3 read from its first line
+/// is, so its line numbers are the offsets `read` takes.
+#[test]
+fn version_three_numbers_a_search_hit_from_one() {
+    let answer = answered(json!({
+        "count": 1, "truncated": false, "unreadable": 0, "unread": [],
+        "matches": [{"path": "a.rs", "line": 9, "from": 8, "text": "x\ny\nz"}],
+    }));
+    assert_eq!(
+        shown(Rendering::V3, &ToolName::parse("search").unwrap(), &answer).unwrap(),
+        "1 match in 1 file\na.rs\n9|x\n10|y\nz\n"
+    );
+}
+
+/// What V3 draws, the edit side takes back to the file's own bytes, for
+/// any interval of any text, with the first line's index as its start.
+#[test]
+fn every_body_version_three_draws_unmarks_to_its_text() {
+    let text: String = (0..57).map(|n| format!("  v{n} = {n};\r\n")).collect();
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    for offset in [0u64, 3, 9, 10, 49] {
+        let body: String = lines[usize::try_from(offset).unwrap()..].concat();
+        let answer = answered(json!({"path": "a.rs", "offset": offset, "bytes": 0, "text": body}));
+        let drawn = shown(Rendering::V3, &read(), &answer).unwrap();
+        let (_, marked) = drawn.split_once('\n').unwrap();
+        let copied = Copied::of(marked, Numbering::FromOne);
+        assert_eq!(
+            (
+                copied.starts().contains(&offset),
+                copied.drawn_from(offset).unwrap().0
+            ),
+            (true, body)
+        );
     }
 }
 

@@ -43,7 +43,7 @@ fn records(lines: &[Line]) -> Vec<EventRecord> {
                 now(seq, *run),
                 &format!("c{seq}"),
                 "read",
-                json!({ "path": format!("s{skill}") }),
+                json!({ "file_path": format!("s{skill}") }),
             ),
             Line::Other => record(now(seq, 0), EventKind::RunFrozen, json!({})),
         })

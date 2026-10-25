@@ -36,7 +36,7 @@ fn every_shipped_skill_on_a_shelf_outside_the_city_is_read_by_name_and_pinned() 
         .iter()
         .map(|skill| Step {
             tool: "read",
-            args: json!({ "path": skill.name }),
+            args: json!({ "file_path": skill.name }),
         })
         .collect();
     let (factory, _, heard) = script::scripted(steps);

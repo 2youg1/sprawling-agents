@@ -15,15 +15,16 @@
 use kernel::Payload;
 use serde_json::{Map, Value};
 
-use super::read::push_line;
+use super::read::{Numbering, push_line};
 
 /// The header and the grouped entries of one `search` payload, or `None`
-/// when the payload is not the shape `tools::search` writes.
-pub(super) fn text(result: &Payload) -> Option<String> {
+/// when the payload is not the shape `tools::search` writes. Hit lines
+/// are 0-based indexes in the payload and drawn by `numbering`.
+pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     let map = result.as_map();
     let mut body = String::new();
     let mut header = if let Some(matches) = map.get("matches") {
-        content(matches.as_array()?, &mut body)?
+        content(matches.as_array()?, numbering, &mut body)?
     } else if let Some(files) = map.get("files") {
         files_only(files.as_array()?, &mut body)?
     } else {
@@ -46,7 +47,7 @@ pub(super) fn text(result: &Payload) -> Option<String> {
 /// Every hit, a group per file: the path on a line of its own, then its
 /// hit blocks, each marked from its first line, which is the hit line
 /// unless context starts above it. Groups are parted by an empty line.
-fn content(matches: &[Value], body: &mut String) -> Option<String> {
+fn content(matches: &[Value], numbering: Numbering, body: &mut String) -> Option<String> {
     let mut files = 0_usize;
     let mut last: Option<&str> = None;
     for hit in matches {
@@ -63,7 +64,7 @@ fn content(matches: &[Value], body: &mut String) -> Option<String> {
             last = Some(path);
         }
         for (at, text) in (from..).zip(hit.get("text")?.as_str()?.split('\n')) {
-            push_line(body, from, at, text);
+            push_line(body, numbering, (from, at), text)?;
             body.push('\n');
         }
     }

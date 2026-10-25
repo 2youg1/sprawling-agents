@@ -47,12 +47,27 @@ export function regionOf(reading: Reading): Region {
 
 // The arguments of a call that read one file from one line, and nothing
 // else: a search also reads under a path, but it asks for a pattern, and
-// an excess key refuses the decode.
-const ReadOne = Schema.Struct({
-  path: Schema.String,
-  offset: Schema.optional(Schema.Int),
-  limit: Schema.optional(Schema.Int),
-});
+// an excess key refuses the decode. A ledger holds both spellings, because
+// recorded calls are never re-spelled (crates/runtime/spec/Tools.lean
+// D115): `file_path` with a line number counted from 1 (D119), and the
+// older `path` with a line counted from 0.
+const ReadOne = Schema.Union([
+  Schema.Struct({
+    file_path: Schema.String,
+    offset: Schema.optional(Schema.Int),
+    limit: Schema.optional(Schema.Int),
+  }),
+  Schema.Struct({
+    path: Schema.String,
+    offset: Schema.optional(Schema.Int),
+    limit: Schema.optional(Schema.Int),
+  }),
+]);
+
+function readFromAsked(read: typeof ReadOne.Type): ReadFrom {
+  if ("file_path" in read) return { path: read.file_path, line: Math.max(read.offset ?? 1, 1) };
+  return { path: read.path, line: (read.offset ?? 0) + 1 };
+}
 
 // A screenshot as the browser tool records it: the picture is in the
 // content store, and the record names it and its two sides.
@@ -75,7 +90,7 @@ export function readFrom(call: Call): ReadFrom | null {
   if (call.effect !== "read" || asked === null || asked === undefined || asked.cut > 0) return null;
   return Option.match(Schema.decodeUnknownOption(Schema.fromJsonString(ReadOne), { onExcessProperty: "error" })(asked.head), {
     onNone: () => null,
-    onSome: (read) => ({ path: read.path, line: (read.offset ?? 0) + 1 }),
+    onSome: readFromAsked,
   });
 }
 

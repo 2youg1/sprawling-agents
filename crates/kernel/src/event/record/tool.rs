@@ -131,6 +131,9 @@ pub enum Rendering {
     /// One header line and a body for the tools that have one, and a
     /// refusal as one line (`crates/runtime/spec/Rendering.lean` §8-63).
     V2,
+    /// V2 with its line numbers counted from 1, the way Claude Code and a
+    /// compiler count them (`crates/runtime/spec/Rendering.lean` D119).
+    V3,
 }
 
 impl Rendering {

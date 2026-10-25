@@ -97,7 +97,7 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
                 "reading",
                 "tu_1",
                 "read",
-                serde_json::json!({ "path": "lab/room1/keys.md" }),
+                serde_json::json!({ "file_path": "lab/room1/keys.md" }),
             ),
             completion("done", None),
         ],

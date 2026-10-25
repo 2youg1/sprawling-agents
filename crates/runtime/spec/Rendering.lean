@@ -15,13 +15,15 @@
 ### 8-63 runtime::rendering（形状 1 判定）
 
 ```rust
-pub const CURRENT: Rendering = Rendering::V2;
+pub const CURRENT: Rendering = Rendering::V3;
+pub enum Numbering { FromZero, FromOne }   // 一版渲染器怎样给行编号；V1、V2 从 0，V3 从 1
+impl Numbering { pub fn of(rendering: Rendering) -> Numbering; }
 pub fn shown(rendering: Rendering, name: &ToolName, answer: &ToolAnswer) -> Result<String, AxError>;
 pub struct Copied<'a>;   // 从 read 答里抄出的段落，每行带它可能有的标记
 impl Copied<'_> {
-    pub fn of(text: &str) -> Copied<'_>;
-    pub fn starts(&self) -> BTreeSet<u64>;                                // 段落首行可能落在的文件行号
-    pub fn drawn_from(&self, start: u64) -> Option<(String, BTreeSet<u64>)>; // 首行在 start 时 read 会画的标记剥掉后的文本，与剥掉的号
+    pub fn of(text: &str, numbering: Numbering) -> Copied<'_>;            // 按画出它的那一版编号读标记
+    pub fn starts(&self) -> BTreeSet<u64>;                                // 段落首行可能落在的文件下标（0 基）
+    pub fn drawn_from(&self, start: u64) -> Option<(String, BTreeSet<u64>)>; // 首行在下标 start 时 read 会画的标记剥掉后的文本，与剥掉的号
     pub fn without(&self, numbers: &BTreeSet<u64>) -> String;            // 剥掉号在 numbers 里的标记，其余行原样
 }
 ```
@@ -32,13 +34,16 @@ impl Copied<'_> {
 
 **V2**：
 - **拒绝是一行**：`E_CODE action: subject; recovery`，其余部分各以 `; ` 接在同一行：`nearby` 非空时接 `nearby: a, b`；`retry` 为 yes 时接 `retry` 或 `retry after N ms`，unknown 时接 `it may have taken effect`；门拒时接三段式拒绝的全部三段 `rule: <rule>; <violation>; instead: <alternative>`（kernel 的 `GateRefusal`）：只给规则，模型只知道被拦，不知道为什么、还能做什么。引文里的换行换成空格，码恒在行首。谁为失败付账、哪个 provider 失败留在账本里，模型据以行动的只有上面这些。
-- **read 是一行头加正文**：头是 `<path> lines <a>-<b> of <total>`，有续读点时接 `, next <k>`；载荷里的其他键不画，包括较早账本行里的 `version`：edit 凭读戳准入，没有谁收它（`crates/runtime/spec/Tools/Edit.lean` §8-64）；文本为空时是 `<path> is empty`（总行数为 0 或未知）或 `<path> has <total> lines; offset <o> is past the end`。行号 0 基、闭区间，与 `offset` 和 `search` 的 `line` 同一套编号（§8-29-1、§8-30-2），所以头与标记上的数字可以原样递回去。读到末尾的答没有 `total_lines`，总数就是末行号加一。正文逐字节保留，只在 0 基行号是 10 的倍数的行与首行的行首插 `<n>|`。载荷的 `offset` 缺席即 0（§8-29-1）。
+- **read 是一行头加正文**：头是 `<path> lines <a>-<b> of <total>`，有续读点时接 `, next <k>`；载荷里的其他键不画，包括较早账本行里的 `version`：edit 凭读戳准入，没有谁收它（`crates/runtime/spec/Tools/Edit.lean` §8-64）；文本为空时是 `<path> is empty`（总行数为 0 或未知）或 `<path> has <total> lines; offset <o> is past the end`。行号是载荷里的 0 基下标原样、闭区间：V2 写下的那些行里，调用的 `offset` 也从 0 数，所以头与标记上的数字可以原样递回去。读到末尾的答没有 `total_lines`，总数就是末行号加一。正文逐字节保留，只在 0 基行号是 10 的倍数的行与首行的行首插 `<n>|`。载荷的 `offset` 缺席即 0（§8-29-1）。
 - **search 按文件分组**：头一行说答了什么——content 是 `<n> matches in <f> files`，files 是 `<n> files`，count 是 `<n> files, <m> matches`（单数时写 `1 match`、`1 file`）；停走时接 `; <stopped>`，有没看过的地方时接 `; <k> not searched`。content 下每个文件一组：文件路径独占一行，接着是它的命中块，组与组之间空一行；每个命中块按 read 的语法标号，就像一个从块首行（`from`，缺席即命中行）开始的 read 答：块首行与行号为 10 的倍数的行的行首插 `<n>|`，所以从搜索答里抄进 `edit` 的段落照样能剥掉标记。上下文从命中行之上开始时命中行本身不标号，模型从块首行往下数，最多数 `CONTEXT_CAP` 行；标在命中行上会让 `edit` 认不出它（`Copied` 只剥 read 会画的标记），而让 `edit` 另认一套搜索的标号就是两套语法。files 下每行一个路径；count 下每行 `<path>:<count>`。最后，`unread` 每条一行 `<path> not searched: <why>`，与上文空一行。`truncated` 不画：`stopped` 已经说了停在哪。
 - **tool 的答就是它的正文**：`tool` 的 `list`、`find`、`detail` 答 `{"text": t}`，画成 `t` 原样（§8-60）；画成 JSON 时其中每个换行都会成为 `\n`、每个引号成为 `\"` 到达模型。
 - **其余工具**的答本版仍画成 JSON（与 V1 同字节）；某个工具有了自己的读法时在这里加一条。V2 一旦随一个发布版写进过账本，再加读法就要进位到 V3，旧行照旧按 V2 画。
+
 - **载荷不是渲染器认得的形状**（例如 read 的 `text` 不是串）时画成 JSON：模型仍读到每个字节，载荷形状的变动也不会让一条已记下的答重建失败。
 
-**剥标记**：标记是行首的一个或多个 ASCII 数字加 `|`，语法只写在 `rendering::read` 一处，画与剥不会分歧。行首长成这样的行可能是渲染器画的标记，也可能是文件本来的文本，单看段落分不出；分得出的是位置：read 只在标记所写的那个行号的行上画它，且只画在答（或搜索命中块）的首行或行号为 10 的倍数的行；这条位置规则只写在 `rendering::read::is_marked` 一处，画（read、search）与剥（`Copied`）都问它。`edit` 先按原样匹配 `old_string`；零命中时，对 `Copied::starts` 给出的每个可能的首行号 `start`，取 `drawn_from(start)` 剥掉的文本，只有它恰好从文件的第 `start` 行行首开始出现时才算被文件证实；恰有一个 `start` 被证实时，用剥掉的 `old_string`，`new_string` 只剥掉与 `old_string` 剥掉的号相同的标记，其余行原样（`tools::edit::as_the_file_spells`）。之后的唯一匹配判定照旧。
+**V3**：与 V2 只差行号——read 的头、续读点、越过末尾的那句、每 10 行的标记，与 search 命中块的标记，都按 1 基行号画：下标 `i` 画成 `i + 1`，标记画在首行与 1 基行号是 10 的倍数的行上。拒绝、`tool` 与其余工具同 V2。理由与被否见 D119。
+
+**剥标记**：标记是行首的一个或多个 ASCII 数字加 `|`，语法只写在 `rendering::read` 一处，画与剥不会分歧。`edit` 按 `CURRENT` 的编号剥：模型这一回合抄的是这一版画出的段落；升级之前画出、又被抄进升级之后的 `old_string` 的标记剥不掉，那次 edit 零命中，拒词让模型再读一次。行首长成这样的行可能是渲染器画的标记，也可能是文件本来的文本，单看段落分不出；分得出的是位置：read 只在标记所写的那个行号的行上画它，且只画在答（或搜索命中块）的首行或行号为 10 的倍数的行；这条位置规则只写在 `rendering::read::is_marked` 一处，画（read、search）与剥（`Copied`）都问它。`edit` 先按原样匹配 `old_string`；零命中时，对 `Copied::starts` 给出的每个可能的首行号 `start`，取 `drawn_from(start)` 剥掉的文本，只有它恰好从文件的第 `start` 行行首开始出现时才算被文件证实；恰有一个 `start` 被证实时，用剥掉的 `old_string`，`new_string` 只剥掉与 `old_string` 剥掉的号相同的标记，其余行原样（`tools::edit::as_the_file_spells`）。之后的唯一匹配判定照旧。
 -/
 
 /-! D107 工具结果的文本由带版本的渲染器画出，每一行记下自己的版本，V1 永久保留
@@ -61,4 +66,17 @@ impl Copied<'_> {
 **被否**：①逐行行号：token 多 18%；②每 25 行：数行更长，而 10 行间隔已有公开的「不降引用准确率」的读数；③总是先剥再匹配：会错改本来就长得像标记的行；④剥 `old_string` 而不剥 `new_string`：抄了标记的模型也把它抄进了 `new_string`，会把标记写进文件；⑤不看位置、剥掉每一个像标记的行首：会剥掉文件本来的文本，也会改掉 `new_string` 里有意写的带号行。
 
 **重开参数**：出现模型系统性地不抄标记、或抄错标记位置的读数时，重议间隔与 `new_string` 的剥法。
+-/
+
+/-! D119 模型读到的行号从 1 数起（渲染器 V3），账本里的下标仍从 0 数起
+
+**决定**：read 的 `offset` 是 1 基行号（0 也读作第一行）；渲染器 V3 把 read 与 search 的行号都画成 1 基，标记落在首行与 1 基行号为 10 的倍数的行上；edit「读后被改」的片段也写 1 基行号。账本载荷里的 `offset`、`next_offset`、`line`、`from` 不变，仍是 0 基下标，V3 在画的时候加一。
+
+**理由**：Claude Code 的 `Read` 的 `offset` 是「开始读的那一行的行号」，它给模型看的行号从 1 起；模型从 exec 里跑的 `rg -n`、`grep -n`、编译器与测试的报错里看到的行号也都从 1 起。0 基的 `offset` 让同一个数在两处差一，模型照着报错里的行号去读，读到的是下一行。账本里的下标不改，是因为已经写下的每一行都按 0 基存着，而 V2 照旧要把它们画成当时的样子（D107）；改载荷的含义就得给每一行记一个新的含义版本，而画法的版本已经有了。
+
+**代价**：一段跨过升级的对话（分叉或续接一个旧 run）里，旧的 read 与 search 答按 V2 从 0 数，新的按 V3 从 1 数；模型把旧答里的数递给新的 read，读到的是上一行。这是 D107 的必然：画法随行，重画旧行就让模型读到的不是它当时据以行动的那一份。错一行的 read 只多花一个回合，不会写错地方：edit 剥标记前要文件证实（§8-63）。
+
+**被否**：①保留 0 基，把出入写进 D114——模型每次照报错读文件都差一行，这是每天都会撞上的；②载荷也改成 1 基——账本里同一个键两种含义，读它的视图与页面都得先问版本；③V3 只改 read 不改 search——search 的行号是 read 的续读点，两者不同基就要模型自己换算。
+
+**重开参数**：Claude Code 的参考把 `offset` 改成别的含义；或读数显示模型在 V3 下系统性地差一。
 -/

@@ -135,7 +135,7 @@ fn steps(shipped: &[Shipped]) -> Vec<Step> {
         .chain([CARRIED])
         .map(|path| Step {
             tool: "read",
-            args: json!({ "path": path }),
+            args: json!({ "file_path": path }),
         })
         .collect()
 }

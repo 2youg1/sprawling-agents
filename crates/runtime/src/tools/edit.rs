@@ -421,7 +421,8 @@ fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, st
     if text.contains(old) {
         return (Cow::Borrowed(old), Cow::Borrowed(new));
     }
-    let copied = crate::rendering::Copied::of(old);
+    let numbering = crate::rendering::Numbering::of(crate::rendering::CURRENT);
+    let copied = crate::rendering::Copied::of(old, numbering);
     let mut confirmed = copied.starts().into_iter().filter_map(|start| {
         let (bare, numbers) = copied.drawn_from(start)?;
         begins_on_line(text, &bare, start).then_some((bare, numbers))
@@ -429,7 +430,7 @@ fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, st
     match (confirmed.next(), confirmed.next()) {
         (Some((bare, numbers)), None) => (
             Cow::Owned(bare),
-            Cow::Owned(crate::rendering::Copied::of(new).without(&numbers)),
+            Cow::Owned(crate::rendering::Copied::of(new, numbering).without(&numbers)),
         ),
         (Some(_), Some(_)) | (None, _) => (Cow::Borrowed(old), Cow::Borrowed(new)),
     }

@@ -155,7 +155,7 @@ impl Model for OneReadPerTurn {
         let calls = if turn <= self.turns {
             let mut args = serde_json::Map::new();
             args.insert(
-                "path".to_owned(),
+                "file_path".to_owned(),
                 serde_json::Value::String("lab/file.rs".to_owned()),
             );
             vec![ToolCall {
