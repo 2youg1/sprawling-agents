@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What the prompt lens is given (client D95: a seat, a look and this
-// file): the four segments the run was sent, each in the person's
+// file): the tool table the run's requests carried ahead of the system
+// prompt, then the four segments the run was sent, each in the person's
 // language and each with its presses decided, so a look draws the lens
 // by taking `PromptLook` and nothing else.
 //
@@ -16,7 +17,7 @@
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { count } from "../../core/time";
-import type { Address, PrefixSegment, PrefixSlot } from "../../wire";
+import type { Address, Exposure, PrefixAnswer, PrefixSegment, PrefixSlot, PromptTools } from "../../wire";
 
 // Each slot's word, which the building page's prompts section reads too.
 export const SLOT_WORD: Record<PrefixSlot, Key> = {
@@ -69,7 +70,19 @@ export interface SegmentLook {
   readonly text: string;
 }
 
+// The tool table, which folds like a segment and lists one tool a line.
+export interface ToolsLook {
+  readonly key: string;
+  readonly slot: string;
+  readonly size: string;
+  readonly open: boolean;
+  readonly fold: FoldWire;
+  readonly rows: readonly { readonly key: string; readonly name: string; readonly facts: string }[];
+}
+
 export interface PromptLook {
+  // Absent for a run frozen before its tool table was recorded.
+  readonly tools: ToolsLook | undefined;
   // `undefined` while the city has not answered.
   readonly segments: readonly SegmentLook[] | undefined;
   // What the lens says when the run was sent no prompt at all.
@@ -89,15 +102,54 @@ export interface Hands {
   readonly visit: (source: Address) => void;
 }
 
-export function lookOf(
-  segments: readonly PrefixSegment[] | undefined,
-  held: Held,
-  lang: Lang,
-  hands: Hands,
-): PromptLook {
+// What the run was sent: the answer's segments and tool table.
+export type Sent = Pick<PrefixAnswer, "segments" | "tools">;
+
+export function lookOf(sent: Sent | undefined, held: Held, lang: Lang, hands: Hands): PromptLook {
+  const tools = sent?.tools ?? null;
   return {
-    segments: segments?.map((segment) => segmentOf(segment, held, lang, hands)),
+    tools: tools === null ? undefined : toolsOf(tools, held, lang, hands),
+    segments: sent?.segments.map((segment) => segmentOf(segment, held, lang, hands)),
     none: say(lang, "run_no_prompt"),
+  };
+}
+
+// The key the tool table folds under, which no segment hash can be.
+const TOOLS_KEY = "tools";
+
+const EXPOSURE_WORD: Record<Exposure, Key> = {
+  core: "catalog_core",
+  dormant: "catalog_dormant",
+  off: "catalog_off",
+};
+
+function toolsOf(tools: PromptTools, held: Held, lang: Lang, hands: Hands): ToolsLook {
+  const open = held.open.has(TOOLS_KEY);
+  return {
+    key: TOOLS_KEY,
+    slot: say(lang, "run_prompt_tools"),
+    size: fill(say(lang, "run_prompt_tools_size"), {
+      n: count(tools.len),
+      core: String(tools.rows.filter((row) => row.exposure === "core").length),
+      all: String(tools.rows.length),
+    }),
+    open,
+    fold: {
+      type: "button",
+      "aria-expanded": open,
+      onclick: () => {
+        hands.toggle(TOOLS_KEY);
+      },
+    },
+    rows: tools.rows.map((row) => ({
+      key: row.name,
+      name: row.name,
+      facts: [
+        row.namespace,
+        say(lang, EXPOSURE_WORD[row.exposure]),
+        fill(say(lang, "run_prompt_bytes"), { n: count(row.len) }),
+      ].join(" · "),
+    })),
   };
 }
 

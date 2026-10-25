@@ -36,5 +36,8 @@ read. -->
     <span class="min-w-0 flex-1 truncate font-mono text-text-faint">{look.at}</span>
     <span class="min-w-0 truncate text-text-faint">{look.admitted}</span>
     <span class="min-w-0 truncate text-text-faint">{look.used}</span>
+    {#if look.changed !== undefined}
+      <span class="min-w-0 truncate text-text-quiet">{look.changed}</span>
+    {/if}
   </span>
 </button>

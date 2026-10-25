@@ -8,9 +8,11 @@
 <script lang="ts" module>
   // What this building can do: the city's library and the building's
   // own shelf, in one list with the shelf named on each row. A row says
-  // whether the reading room admits it and how many runs were frozen
-  // with it; opening one shows the document itself, through the same
-  // file view the tree opens a file with.
+  // whether the reading room admits it, how many runs were frozen with
+  // it, and whether the building's newest run was frozen with another
+  // version of it; opening one shows the document itself, through the
+  // same file view the tree opens a file with. It is the lower half of
+  // the capabilities section (`./catalog.svelte`).
   //
   // Where a shelved skill lives, in the two readings this page needs at
   // once: the word for which shelf it is on, and the address to open.
@@ -59,7 +61,7 @@
 <script lang="ts">
   import { readAnswer } from "../../core/answered";
   import { ui } from "../../ui";
-  import type { Query } from "../../wire";
+  import type { Query, RunId } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
   import SkillRow from "./skill_row.look.svelte";
   import type { Picked } from "./tree.svelte";
@@ -67,9 +69,20 @@
   interface Props {
     readonly building: Address;
     readonly onPick: (picked: Picked) => void;
+    // The building's newest run whose prompt was frozen, if any: an
+    // admitted skill that run did not pin at today's version is marked.
+    readonly newest?: RunId | undefined;
   }
 
-  const { building, onPick }: Props = $props();
+  const { building, onPick, newest }: Props = $props();
+
+  // Whether the next run reads another version of this skill than the
+  // newest run was frozen with: admitted, and not pinned by that run at
+  // the hash the shelf holds now.
+  function changed(skill: SkillLine): string | undefined {
+    if (newest === undefined || !skill.admitted || skill.pinned_by.includes(newest)) return undefined;
+    return say($lang, "skills_changed");
+  }
 
   const u = ui();
   const lang = u.lang;
@@ -90,7 +103,7 @@
 </script>
 
 <div>
-  <h2 class="mb-base text-note text-text-faint">{say($lang, "bld_skills")}</h2>
+  <h3 class="mb-base text-note text-text-faint">{say($lang, "bld_skills")}</h3>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {:else if answer === undefined}
@@ -110,6 +123,7 @@
               used={skill.pinned_by.length > 0
                 ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
                 : say($lang, "skills_used_never")}
+              changed={changed(skill)}
               wire={{
                 type: "button",
                 disabled: place.at === null,

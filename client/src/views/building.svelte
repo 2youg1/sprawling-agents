@@ -30,9 +30,9 @@
 
   // The sections of the index, in the order a person reads a building
   // by: what it set out to do, what it committed, what it has changed
-  // since, what its runs are told, what it knows how to do, and what it
-  // is allowed to touch.
-  const SECTIONS = ["plan", "commits", "changes", "prompts", "skills", "sandbox"] as const;
+  // since, what its runs are told, what they can reach, and what they
+  // are allowed to touch.
+  const SECTIONS = ["plan", "commits", "changes", "prompts", "catalog", "sandbox"] as const;
   type Section = (typeof SECTIONS)[number];
 
   const SECTION_WORD: Record<Section, Key> = {
@@ -40,7 +40,7 @@
     commits: "bld_commits",
     changes: "bld_changes",
     prompts: "bld_prompts",
-    skills: "bld_skills",
+    catalog: "bld_catalog",
     sandbox: "bld_sandbox",
   };
 
@@ -66,7 +66,7 @@
   import Plan from "./building/plan.svelte";
   import Prompts from "./building/prompts.svelte";
   import Sandbox from "./building/sandbox.svelte";
-  import Skills from "./building/skills.svelte";
+  import Catalog from "./building/catalog.svelte";
   import Status from "./building/status.svelte";
   import Tree from "./building/tree.svelte";
   import Rooms from "./building/rooms.svelte";
@@ -213,8 +213,8 @@
         <Status building={address} />
       {:else if section === "prompts"}
         <Prompts building={address} rooms={building?.rooms ?? []} />
-      {:else if section === "skills"}
-        <Skills building={address} onPick={pick} />
+      {:else if section === "catalog"}
+        <Catalog building={address} onPick={pick} />
       {:else if section === "sandbox"}
         <Sandbox {address} held={building?.sandbox ?? null} known={building !== undefined} />
       {:else if picked?.kind === "file"}
