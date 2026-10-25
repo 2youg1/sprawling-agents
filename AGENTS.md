@@ -194,7 +194,6 @@ Provide both English and Chinese versions of every pull request description, wit
 - A comment is one of four kinds: the MPL notice, interface documentation, a warning about consequences, or a statement of intent the code cannot carry. Any other comment marks code that should say more itself.
 - Interface documentation — rustdoc, and the comment above a declaration in the client — is written at every visibility, because this repository defaults to `pub(crate)` and most interfaces a maintainer crosses are not public. At every visibility it says what the signature cannot: invariants, failure modes, call ordering, ownership; a line that only turns the item's name into a sentence is not documentation.
 - Write a reason once, beside the code that enforces it, and let every other place that depends on it name that place — a link to the item, or the SPEC section — instead of restating it, because two copies of a reason are two authorities, and the copy nobody edits goes on asserting what the code no longer does. A function's own contract — its `# Errors` section and the guarantee it gives a caller — is not a copy: each function owns its contract, even where a neighbour's reads the same.
->>>>>>> 028c9fa (card-S12.COMMENTS01: interface documentation at every visibility, one reason in one place, no plan labels)
 
 ## Privacy
 
