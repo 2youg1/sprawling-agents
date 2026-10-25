@@ -548,3 +548,24 @@ fn a_catalog_table_moves_tools_between_core_dormant_and_off() {
         ]
     );
 }
+
+/// The skills open with the line that says what a skill is: without it,
+/// the `skill` namespace's sentence reached no model, because no tool is
+/// filed under that namespace.
+#[test]
+fn the_skills_open_with_the_skill_namespace_s_sentence() {
+    let mut catalog = Catalog::new();
+    catalog.admit_skill(skill("review")).unwrap();
+    catalog.admit_skill(skill("release")).unwrap();
+    catalog.set_mode(Mode::Work);
+    let block = dormant_block(&catalog.render());
+    let lines: Vec<&str> = block.lines().skip(1).collect();
+    assert_eq!(
+        lines,
+        vec![
+            "- skill (2): the steps this building follows for a kind of work",
+            "- skill release: release: the steps this building follows for it, with examples",
+            "- skill review: review: the steps this building follows for it, with examples",
+        ]
+    );
+}

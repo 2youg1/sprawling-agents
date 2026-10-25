@@ -697,7 +697,7 @@ status = "owed, not gated: no reading exists yet, because the User ruled to skip
 
 # What a read of a model-chosen file costs against what its design
 # claims, one judgement of the real location and one open
-# (`crates/runtime/spec/Tools/Read.lean` D10). The wall clock is the
+# (`crates/runtime/spec/Tools/Read.lean` D113). The wall clock is the
 # machine's; the ratio between two reads taken in the same process is
 # not, and a return to four resolutions per read crosses it.
 [read_handle_ratio]

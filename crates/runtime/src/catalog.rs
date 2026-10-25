@@ -24,7 +24,7 @@ pub use kernel::event::record::SkillPin;
 
 use kernel::config::{CatalogExposure, Exposure, ExposureFrom};
 use kernel::event::record::{PromptTool, PromptTools};
-use kernel::{AxCode, AxError, B3Hash, ToolCall, ToolDef, ToolMeta};
+use kernel::{AxCode, AxError, B3Hash, ReservedNamespace, ToolCall, ToolDef, ToolMeta};
 
 use crate::mode::catalog_entry;
 use kernel::Mode;
@@ -289,14 +289,29 @@ impl Catalog {
 
     /// Every admitted capability a session does not carry as a tool, in
     /// the index's order: one entry per namespace of the tools outside
-    /// the core, then one per skill.
+    /// the core, then the skills under one line that says what a skill
+    /// is, one entry each (`crates/runtime/spec/Catalog.lean` §8-60).
+    ///
+    /// The `skill` namespace's tools are counted in that line rather than
+    /// given one of their own, so the sentence is said once.
     fn dormant_entries(&self) -> Vec<dormant::Entry> {
-        self.dormant_namespaces()
+        let skill = Namespace::Own(ReservedNamespace::Skill);
+        let mut namespaces = self.dormant_namespaces();
+        let filed_as_skill = namespaces
+            .remove(&(skill.as_str(), &skill))
+            .unwrap_or_default();
+        let skills = filed_as_skill.len().saturating_add(self.skills.len());
+        let opening = (skills > 0).then(|| dormant::Entry {
+            label: format!("{} ({skills})", skill.as_str()),
+            about: skill.about(filed_as_skill.iter().copied()),
+        });
+        namespaces
             .into_iter()
             .map(|((_, namespace), members)| dormant::Entry {
                 label: format!("{} ({})", namespace.as_str(), members.len()),
                 about: namespace.about(members.iter().copied()),
             })
+            .chain(opening)
             .chain(self.skills.iter().map(|(name, admitted)| dormant::Entry {
                 label: format!("skill {name}"),
                 about: admitted.entry.disclosure.clone(),

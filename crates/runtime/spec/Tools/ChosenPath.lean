@@ -21,7 +21,7 @@ pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) 
     -> Result<Address, AxError>;
 // 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED；
 // 读界答 Confidential 或 RulesUnreadable＝E_GATE_DENIED，后者的 subject 带上规则读不出的原因。
-// 城根：written 是装配交给工具的拼写，real 是它解析过的真实位置。工具立起时锚定一次（D5），
+// 城根：written 是装配交给工具的拼写，real 是它解析过的真实位置。工具立起时锚定一次（D112），
 // 之后 land、walked 与 read 的引擎都拿锚定的 real 做城内比对，不再逐次重解析城根。
 pub(crate) struct CityRoot { written: PathBuf, real: PathBuf }
 pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError>;
@@ -66,7 +66,7 @@ pub(crate) enum Walked { Directory(PathBuf), File(PathBuf), Passed }
 
 **判的是盘打开的那个地址，不只是模型写下的那个。** 文法准入的地址仍可能穿过一个链接：开放楼里一条指向机密楼、保留区或城外的链接，打开的是链接的目标，只判字面地址就等于把 admit 拒掉的东西从侧门交出去。所以 `read` 与 `search` 的起点都走 `land`，`search` 遍历中遇到的每一个链接也走 `land`——链接的判定只有这一处。
 
-它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new` 与 `SearchTool::new` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具，两件工具立起时各自锚定一次 `CityRoot`（D5）。`BoundReader::open` 不在热路径上，每次调用锚定一次，花费与逐次重解析相同。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`crates/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
+它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new` 与 `SearchTool::new` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具，两件工具立起时各自锚定一次 `CityRoot`（D112）。`BoundReader::open` 不在热路径上，每次调用锚定一次，花费与逐次重解析相同。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`crates/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
 -/
 
 namespace Runtime.Tools.ChosenPath
@@ -205,7 +205,7 @@ theorem judging_only_the_written_address_lets_a_link_out :
 
 end Runtime.Tools.ChosenPath
 
-/-! D5 城根的真实位置在工具立起时锚定一次
+/-! D112 城根的真实位置在工具立起时锚定一次
 
 - **决定**：`CityRoot::anchor` 在工具立起时把城根的真实位置解析一次（`real_location`），`land`、`walked` 与 `read` 的引擎之后都拿这份锚定的 real 做城内比对（`CityRoot::judged_location`），不再逐次重解析。城根解析不了，工具立不起来（`ReadTool::new`、`SearchTool::new` 返回那条 `E_STORAGE_FATAL`）。
 - **理由**：每次 `land` 重解析城根是一次 canonicalize，Windows 上它内部是一次 open，在答复路径上占几十到一百多微秒，而城根在一个 run 里不换位置。锚定之后若城根真被换掉（目录被改名、链接被换上），真实位置与锚定的 real 比对落空，判定即拒绝：比对是 fail-closed 的。

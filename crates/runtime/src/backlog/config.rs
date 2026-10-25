@@ -16,7 +16,7 @@ use crate::reserve::MachineBudget;
 
 impl Backlog {
     /// Requests this affinity for each run's job. Configure before the
-    /// first command: a run keeps its first job's limits (D49).
+    /// first command: a run keeps its first job's limits (sprawling D103).
     /// Unsupported platforms and refused requests report `Os` and keep
     /// the command's own exit result.
     #[must_use]

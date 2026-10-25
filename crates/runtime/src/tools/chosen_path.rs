@@ -158,7 +158,7 @@ fn spelled_under(root: &Path, real: &Path) -> Option<String> {
 
 /// The root a tool reads under: the spelling the assembly handed it,
 /// and the real location that spelling resolved to once, when the tool
-/// was built (`crates/runtime/spec/Tools/ChosenPath.lean` D5). A run's
+/// was built (`crates/runtime/spec/Tools/ChosenPath.lean` D112). A run's
 /// root does not move while the run lives, and comparing against the
 /// anchored location is fail-closed: a root swapped for a link fails
 /// the comparison instead of leading reads out of the city.

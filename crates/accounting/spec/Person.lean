@@ -19,7 +19,7 @@ pub fn read() -> Result<PreferencesAnswer, AxError>;       // Query::Preferences
 pub fn put(patch: PreferencePatch) -> Result<(), AxError>; // Command::PutPreferences 的全部
 pub enum CorePriority { Raised, Normal }                   // 人的设置；Normal 即「关掉高优先级」
 pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
-pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `crates/sprawling/spec/Serving/Placement.lean` D41、D47、D49
+pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `crates/sprawling/spec/Serving/Placement.lean` D41、D47、D103
 pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不认识的拼写或非字符串值报 ConfigInvalid
 pub fn city() -> Result<Option<PathBuf>, AxError>;         // 顶层 city；不是绝对路径即 ConfigInvalid
 pub fn settle_city(city: &Path) -> Result<(), AxError>;    // 写顶层 city（先取绝对路径）；别的节与键留下，注释与排版不留，与 [ui] 同一条读-改-写
@@ -38,11 +38,11 @@ pub fn machine_memory() -> Result<MachineMemory, AxError>; // 缺省 Auto；既�
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
 
 **本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`、`each_placement_spelling_reads_as_its_arm`（`accounting::person::tests`）。
-- **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `crates/sprawling/spec/Serving/Placement.lean` D47，实际兑现归 `crates/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D49。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
+- **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `crates/sprawling/spec/Serving/Placement.lean` D47，实际兑现归 `crates/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D103。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
 - **`CorePriority` 的文法归 wire，本模块重导出它**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
 -/
 
-/-! D52 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
+/-! D56 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
 
 `CorePreferences { placement, priority, memory_bytes: Option<NonZeroU64> }` 同时供
 文件读者、PreferencesAnswer 的 `core` 字段和性能组使用；没有 memory_bytes 即不限。

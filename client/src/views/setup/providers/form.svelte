@@ -107,12 +107,12 @@
   const facts = $derived(answered?.facts ?? []);
   // The URL the city calls for the text in the box, when it wrote the
   // text down another way. The box itself stays the person's
-  // (client/Spec.lean D99).
+  // (client/Spec.lean D102).
   const called = $derived(normalisedFrom($belief.probed, pending, draft));
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
   // What the model table asks the city about each row: the attach this
   // form would send, so its placeholders are what that attach and the
-  // picks after it register (client D100).
+  // picks after it register (client D103).
   const about = $derived.by((): TableAbout | null => {
     if (!complete) return null;
     const sent = endpointOf(draft, null);

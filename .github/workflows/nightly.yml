@@ -220,13 +220,59 @@ jobs:
   # act on, which is how people learn to ignore a red build; here red
   # means "go and look today". It compiles nothing - it reads Cargo.lock -
   # so it is also the cheapest job in the repository.
+  #
+  # Red also files one issue for each advisory the lockfile is exposed to,
+  # because a security fix should reach a person the day it is published,
+  # and a red scheduled run is only read when somebody opens the Actions
+  # tab. Unlike the kani leads above, this queue drains itself: the fix
+  # is a lockfile change, and an advisory already filed and still open is
+  # not filed again, so a night that finds nothing new opens nothing.
+  # The title carries the advisory and the locked version, so a fix that
+  # lands on another vulnerable version is a new issue rather than a
+  # stale one.
   advisories:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
           tool: cargo-deny
       - name: what has been published against what we depend on
+        id: deny
         run: cargo deny check advisories
+      - name: one open issue for each advisory the lockfile is exposed to
+        if: failure() && steps.deny.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cargo deny --format json check advisories 2> deny.json || true
+          python3 - <<'PY' > advisories.tsv
+          import json
+          TAB, LINE = chr(9), chr(10)
+          for line in open("deny.json", encoding="utf-8"):
+              fields = json.loads(line).get("fields", {})
+              advisory = fields.get("advisory")
+              if not advisory:
+                  continue
+              locked = fields["graphs"][0]["Krate"]["version"] if fields.get("graphs") else "?"
+              solution = next((note[len("Solution: "):] for note in fields.get("notes", []) if note.startswith("Solution: ")), "see the advisory")
+              row = [advisory["id"], advisory["package"], locked, advisory["title"], solution, "https://rustsec.org/advisories/" + advisory["id"]]
+              print(TAB.join(cell.replace(TAB, " ").replace(LINE, " ") for cell in row))
+          PY
+          open=$(gh issue list --state open --label "aspect: security" --json title --jq '.[].title' --limit 200)
+          while IFS="$(printf '\t')" read -r id crate locked title solution url; do
+            [ -z "$id" ] && continue
+            name="advisory: $id against $crate $locked"
+            if printf '%s\n' "$open" | grep -qxF "$name"; then
+              echo "$name: already open"
+              continue
+            fi
+            body=$(printf '## What was published\n\n[%s](%s): %s\n\n\140Cargo.lock\140 holds \140%s\140 %s, which the advisory covers.\n\n## What to do\n\n%s. A move inside the semver range changes \140Cargo.lock\140 only; a move across it is a change of its own. Close this issue with the pull request that moves it.\n\nFiled by the nightly \140advisories\140 job.' \
+              "$id" "$url" "$title" "$crate" "$locked" "$solution")
+            gh issue create --title "$name" --label "type: bug" --label "aspect: security" --body "$body"
+          done < advisories.tsv

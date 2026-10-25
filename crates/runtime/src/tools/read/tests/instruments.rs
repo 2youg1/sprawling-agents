@@ -5,7 +5,7 @@
 
 //! What a read of a file costs, the handle read against the judged path
 //! it replaced, interleaved in one process so both sides see the same
-//! machine (`crates/runtime/spec/Tools/Read.lean` D10).
+//! machine (`crates/runtime/spec/Tools/Read.lean` D113).
 //!
 //! The judged side re-resolves the city root on every call, as the
 //! judged path did before the root was anchored, and cuts with the cut

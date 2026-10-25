@@ -260,6 +260,9 @@ function shots(run: string): readonly Shot[] {
     at("talk-palette", "#/talk/atlas/notes", palette),
     at("talk-palette-carry", "#/talk/atlas/notes", palette, { press: "palette_carry" }),
     at("talk-layers", "#/talk/atlas/notes", { press: "edge_layers" }),
+    // The layers key steps zen, blend, panorama: two presses reach the
+    // panorama workbench, the sessions beside the chosen one's gauges.
+    at("talk-panorama", "#/talk/atlas/notes", { press: "edge_layers" }, { press: "edge_layers" }),
     at("city", "#/city"),
     at("building", "#/building/atlas"),
     at("building-prompts", "#/building/atlas", { press: "bld_prompts" }),

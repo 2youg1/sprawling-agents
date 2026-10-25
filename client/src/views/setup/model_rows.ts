@@ -139,7 +139,7 @@ export function shownRows(state: TableState, served: readonly ModelFact[]): read
 // box is left to the city, which climbs the same ladder for it whether
 // the provider stated a figure or not and records which rung answered;
 // copying the provider's figure in here would record it as the
-// person's (client D100).
+// person's (client D103).
 export function windowOf(state: TableState, row: ModelFact): number | null {
   return stated(state.context[row.id] ?? "");
 }

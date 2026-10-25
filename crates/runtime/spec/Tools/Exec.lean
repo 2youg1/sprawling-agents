@@ -124,7 +124,7 @@ impl Backlog {
 ```
 
 - `Shares` 是人的配置 `[core] placement` 那一臂里属于子进程的一半，由 `bin::serving::placement::run_shares` 定（`crates/sprawling/spec/Serving/Placement.lean` D47），经 `accounting::worker::hands::Hands.shares` 交进车队的表；runtime 不读人的配置。一张没人交过份额的表是 `Unset`：测试与不起 run 命令的地方都是它。
-- `RunAffinity` 只收值：placement D49 在 pin 核心前取可用掩码减计划掩码，经 `Hands.affinity` 与车队交给 `Backlog::with_affinity`，runtime 不读配置、不算补集。Windows 创建 run 的 job 后先设置份额，再查询现有扩展限额、用 `win32job` 2.0.3 的 `limit_affinity` 加亲和、写回，保留已有内存限额。成功时 `RunProcesses.affinity` 为请求掩码；拒绝、未请求或非 Windows 时为 `Os`，份额报告仍只说明成功的份额。创建或加入 job 失败仍计 `unfollowed`，申请失败不改命令退出结果；后续命令复用第一条命令的 job 与限额。接口只约束当前组，未覆盖跨组调度与起动到加入 job 的窗口。
+- `RunAffinity` 只收值：sprawling D103 在 pin 核心前取可用掩码减计划掩码，经 `Hands.affinity` 与车队交给 `Backlog::with_affinity`，runtime 不读配置、不算补集。Windows 创建 run 的 job 后先设置份额，再查询现有扩展限额、用 `win32job` 2.0.3 的 `limit_affinity` 加亲和、写回，保留已有内存限额。成功时 `RunProcesses.affinity` 为请求掩码；拒绝、未请求或非 Windows 时为 `Os`，份额报告仍只说明成功的份额。创建或加入 job 失败仍计 `unfollowed`，申请失败不改命令退出结果；后续命令复用第一条命令的 job 与限额。接口只约束当前组，未覆盖跨组调度与起动到加入 job 的窗口。
 - `RunProcesses.share` 是这个 run 此刻实际拿到的份额：要了而平台给了，就是要的那一个；要了而平台拒绝（叶子调用失败、cgroup 不可写）或这个平台没有份额，就是 `Unset`。
 - `processes` 按 run 给出它此刻在表里的进程：owner 是这个 run（窗口内或已转后台）的每条命令自己的 pid，并上这个 run 的 job 的进程表（job 只列还活着的进程）。已经结束、还没被 `harvest` 的命令仍列出自己的 pid，读数的一方在它后面读不到计数。已 `release` 的命令（owner 为 nobody）不归任何 run。
 - `unfollowed` 是这个 run 的命令里有几条只读到了命令本身、没读到它起的进程：Windows 上创建 job、装进 job 或读 job 的进程表失败的那几条（这一次读数里整个 run 的命令都算），Unix 上是每一条，因为 Unix 上没有 Job Object（进程组是它的对应物，尚未接入）。装不进 job 不让命令起动失败：job 只服务于读数，为读数让一条构建失败是把代价付错了地方，失败落在 `unfollowed` 里给读数的人看。

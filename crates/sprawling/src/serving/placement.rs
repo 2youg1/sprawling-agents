@@ -263,7 +263,7 @@ fn soft_table() -> Seats {
 }
 
 /// The pinned arm's table: the soft seats where the platform has them,
-/// and the hard affinity taking this process (D41, D49). Where the
+/// and the hard affinity taking this process (D41, D103). Where the
 /// platform has no hard call, or the plan names no processor, the arm says
 /// so and the seats stay soft. One reading serves both, so the mask and
 /// the seats cannot name different processors.

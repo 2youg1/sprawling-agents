@@ -51,7 +51,7 @@ pub struct RunProcesses {
     pub affinity: RunAffinity,
 }
 
-/// A group-local affinity supplied by placement (D49), never calculated
+/// A group-local affinity supplied by placement (sprawling D103), never calculated
 /// from configuration inside the runtime.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RunAffinity {

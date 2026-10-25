@@ -5,7 +5,7 @@
 
 //! The whole text of a path a model chose, read through one buffered
 //! open and judged where the handle it is read from really lies
-//! (`crates/runtime/spec/Tools/Read.lean` §8-29-4-1, D10).
+//! (`crates/runtime/spec/Tools/Read.lean` §8-29-4-1, D113).
 //!
 //! The judged path (`chosen_path::land`, then `miss::text_at`) resolves
 //! a path, opens it and resolves it again; on Windows each resolution is

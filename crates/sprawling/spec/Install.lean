@@ -246,7 +246,7 @@ Nix 用户的唯一渠道是本仓库的 flake（人的决定）：项目不向 
 提出需求时，重新评估 nixpkgs 收录。README 与上手文档的 Nix 段只陈述实际验收所支持的平台。
 -/
 
-/-! D51 npm/Bun 包入口选择已安装的运行时
+/-! D104 npm/Bun 包入口选择已安装的运行时
 
 根包入口与内部运行时入口的打包契约只由 `tools/xtask/Spec.lean` D31 规定，
 `tools/xtask/src/channel.rs` 生成它们；本节规定安装与启动之间的边界。
