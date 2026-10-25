@@ -9,12 +9,29 @@
 // as a value that says whether it failed, so the walk decides what a
 // failure costs.
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
-// The engine `xtask render` also prefers when nothing names another;
-// `SPRAWLING_BROWSER` names another, as it does for the render gate.
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+// The doctor's Chromium family, the table `xtask render` reads too: one
+// brand per line, its program, and where each platform installs it.
+const FAMILY = join(import.meta.dir, "..", "..", "crates", "sprawling", "src", "doctor", "family", "chromium.tsv");
+
+// The engine to drive: the one `SPRAWLING_BROWSER` names, as for the
+// render gate, or else the first of the family installed here, in the
+// family's order; `null` when there is none.
+export function engine(): string | null {
+  const named = process.env.SPRAWLING_BROWSER;
+  if (named !== undefined && existsSync(named)) return named;
+  const column = process.platform === "win32" ? 2 : process.platform === "darwin" ? 3 : 4;
+  for (const line of readFileSync(FAMILY, "utf8").split(/\r?\n/)) {
+    if (line.startsWith("#") || line.trim() === "") continue;
+    const fields = line.split("\t");
+    const placed = (fields[column] ?? "").split("|").find((place) => place !== "" && existsSync(place));
+    const found = placed ?? Bun.which(fields[1] ?? "");
+    if (found !== null) return found;
+  }
+  return null;
+}
 
 // One window a walk photographs: the size in CSS pixels, the device
 // pixel ratio, and whether it is a phone (touch, coarse pointer).
@@ -78,10 +95,14 @@ export class DevTools {
   // page stored (the device key a pairing leaves) from one walk to the
   // next, and attaches to its first page.
   static async open(profile: string, port: number): Promise<Outcome<DevTools>> {
+    const program = engine();
+    if (program === null) {
+      return failed("no Chromium-family browser is installed here; install one, or point SPRAWLING_BROWSER at one");
+    }
     mkdirSync(profile, { recursive: true });
     const browser = Bun.spawn(
       [
-        process.env.SPRAWLING_BROWSER ?? EDGE,
+        program,
         "--headless=new",
         `--remote-debugging-port=${String(port)}`,
         `--user-data-dir=${profile}`,

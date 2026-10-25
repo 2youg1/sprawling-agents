@@ -66,6 +66,16 @@ interface Shot {
   readonly steps: readonly Step[];
 }
 
+// What a walk started and must end however it ends: the stand-in, the
+// served city and the browser hold a port each, and one left running
+// keeps the next walk from starting.
+const started: (() => void)[] = [];
+process.on("exit", () => {
+  started.forEach((stop) => {
+    stop();
+  });
+});
+
 function fail(why: string): never {
   console.error(`walk: ${why}`);
   process.exit(1);
@@ -300,6 +310,7 @@ async function photograph(tools: DevTools, wanted: Options, run: string): Promis
   writeFileSync(index, "| frame | lighting | shot | fragment | picture |\n|---|---|---|---|---|\n");
   let missed = 0;
   const taken = shots(run).filter((shot) => shot.name.includes(wanted.only));
+  if (taken.length === 0) fail(`no shot is named with "${wanted.only}"`);
   for (const frame of wanted.frames) {
     for (const lighting of wanted.lightings) {
       await tools.frame(frame, lighting);
@@ -337,6 +348,9 @@ const city = join(GROUND, "city");
 const home = join(GROUND, "home");
 mkdirSync(home, { recursive: true });
 const provider = await standIn(join(GROUND, "exchanges.jsonl"));
+started.push(() => {
+  provider.process.kill();
+});
 const env = {
   ...process.env,
   HOME: home,
@@ -347,15 +361,18 @@ const env = {
 const raised = Bun.spawnSync([binary("sprawling"), "init", city], { env });
 if (raised.exitCode !== 0) fail(`init: ${raised.stderr.toString()}`);
 const served = await serve(city, env, wanted.webDir);
+started.push(() => {
+  served.process.kill();
+});
 const run = settle(env, city);
 const tools = held(await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT), "open the browser");
+started.push(() => {
+  tools.close();
+});
 await pair(tools, served.code);
 const missed = await photograph(tools, wanted, run);
-tools.close();
 if (wanted.keep) {
   console.log(`walk: ${ORIGIN} stays served; Ctrl-C ends it`);
   await served.process.exited;
 }
-served.process.kill();
-provider.process.kill();
 process.exit(missed === 0 ? 0 : 1);
