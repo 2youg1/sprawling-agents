@@ -35,18 +35,20 @@ serde_json.workspace = true
 # The sieve's filter table is a TOML file in the reserved
 # subtree, and its shape has one reader.
 toml.workspace = true
-# Execution boundary, on the 48 LTS line (upstream supports every twelfth
-# release for 24 months and the others for two), no older than 48.0.6:
-# 48.0.3 cleared RUSTSEC-2026-0314, -0315 and -0316, and 48.0.6 clears the
-# advisories RustSec published on 2026-10-16 against the 48 line; the line
+# Execution boundary, today on the 48 LTS line (upstream supports every
+# twelfth release for 24 months and the others for two), no older than
+# 48.0.7, and moved to a newer major when its pull request compiles:
+# 48.0.3 cleared RUSTSEC-2026-0314, -0315 and -0316, 48.0.6 the advisories
+# RustSec published on 2026-10-16 against the 48 line, and 48.0.7 clears
+# RUSTSEC-2026-0378 (GHSA-9pvw-hwfg-92h5); the line
 # already carries the path_open TRUNCATE bypass fix (GHSA-2r75-cxrj-cmph)
 # and the hard-link/rename FilePerms bypass fix (CVE-2026-58494). The
 # floor is stated here rather than left to the lockfile, so no update can
 # step back below it (`crates/runtime/Spec.lean` §8-13). wasip1 only - there is no
 # socket host implementation, which is the Python arm's mechanical proof
 # that it cannot reach the network.
-wasmtime = { version = "48.0.6", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
-wasmtime-wasi = { version = "48.0.6", optional = true }
+wasmtime = { version = "48.0.7", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "48.0.7", optional = true }
 
 # One Job Object per run, so a run's whole process tree can be read
 # (`crates/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.

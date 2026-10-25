@@ -360,7 +360,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 /-! ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
-`wasmtime`／`wasmtime-wasi = "48.0.6"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+`wasmtime`／`wasmtime-wasi = "48.0.7"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 规格本身不加依赖：分部只 import 工具链的库与本 crate 的分部（ARCHITECTURE.md §3 的 `depmap` 允许 runtime 引 kernel、storage、gateway 的分部，今天一个都不需要）。
 -/

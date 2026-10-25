@@ -65,11 +65,10 @@ updates:
   # wasmtime and wasmtime-wasi require each other's exact version, and
   # cap-std and cap-fs-ext share cap-primitives with wasmtime-wasi, so any
   # one of them moved alone either fails to resolve or puts a second copy
-  # into the lockfile. They are one group. wasmtime stays on its
-  # long-term-support line (every twelfth major, supported for 24 months),
-  # which receives security fixes as patches, so its majors are ignored,
-  # and so are cap-std's, which follow wasmtime-wasi's. Moving to the next
-  # line is a change made by hand.
+  # into the lockfile. They are one group. No major of theirs is ignored:
+  # a security fix should reach a pull request the day it is published,
+  # whichever line it lands on, and a major that does not compile here
+  # stays unmerged until a person moves the code to it.
   - package-ecosystem: cargo
     directory: /
     schedule:
@@ -78,12 +77,6 @@ updates:
     commit-message:
       prefix: "card-S0.DEPS"
     ignore:
-      - dependency-name: "wasmtime*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "cap-std"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "cap-fs-ext"
-        update-types: ["version-update:semver-major"]
       # The workspace names tokio-tungstenite at axum's version so the
       # lockfile holds one WebSocket protocol (root Cargo.toml). The axum
       # group cannot hold it there: when axum has no newer release, the
