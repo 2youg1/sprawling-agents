@@ -48,6 +48,10 @@
 
   // svelte-ignore state_referenced_locally
   let typed = $state<string>(address ?? "");
+  // The address box and the folders offered under it. A pressed folder
+  // leaves the list it was pressed in, so the caret goes to the box the
+  // folder was written into rather than back to the top of the page.
+  let addressGroup = $state<HTMLDivElement>();
   let template = $state<Exclude<Template, "hall">>("minimal");
   let rules = $state("");
   // Whether the person changed the rules: until then the box follows
@@ -141,7 +145,7 @@
       raise();
     }}
   >
-    <div class="flex flex-col gap-snug">
+    <div class="flex flex-col gap-snug" bind:this={addressGroup}>
       <Field
         label={say($lang, "raise_address")}
         value={typed}
@@ -161,6 +165,7 @@
               label={folder}
               onPress={() => {
                 typed = folder;
+                addressGroup?.querySelector("input")?.focus();
               }}
             />
           {/each}
