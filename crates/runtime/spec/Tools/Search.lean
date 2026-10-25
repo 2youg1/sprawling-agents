@@ -39,6 +39,17 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 **不用正则表达式**，理由是模式引擎会把回溯放在模型和它的下一个回合之间。子串扫描是线性的，且一个模型写错的正则不会变成一次挂死。
 -/
 
+/-! D117 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件
+
+**决定**：不另开一件常驻的 `glob` 工具。search 照 Claude Code 的 `Grep` 收 `glob`，一个按文件名筛文件的 glob；不给 `pattern` 时，search 答 `path` 之下名字合 `glob` 的每个文件，形状与 `files_with_matches` 相同，按名字序，至多 `MATCH_CAP` 条。今天的 search 还只收 `text`、`path`、`context`、`mode`（§8-30-2），`pattern`、`glob` 与 `output_mode` 是它要取的形状（§8-14-1）。
+
+**理由**：每件常驻工具在每一个请求里都带着它的说明与 schema，多一件就是每个请求多一段。`Grep` 本来就有 `glob` 这个按文件名筛的参数，「名字合 `glob` 的文件」就是「名字合 `glob`、且有一行合 `pattern` 的文件」去掉后一半，模型从 Claude Code 带来的 `glob` 的意思不变。Claude Code 自己在 macOS 与 Linux 上也把 `Glob` 与 `Grep` 移出了缺省工具集，让模型经 shell 找文件（<https://code.claude.com/docs/en/tools-reference.md> 的 Glob tool behavior 一节）。按名字序而不是 Claude Code 的修改时间序，是为了同一座城、同一个问题两次答得一样（ARCHITECTURE.md §10）。
+
+**被否**：①另开一件与 Claude Code 的 `Glob` 同形的常驻 `glob`——每个请求多一件工具，而它省下的只是描述里的一句话；②放进 `tool` 的目录（休眠）——找文件是读代码的第一步，多一次 `tool` 的往返比一行 schema 贵；③给 `output_mode` 加一个只列名字的值——模型要另学一个合法值，Claude Code 的三个值里没有它。
+
+**重开参数**：读数显示模型在本城反复调用并不存在的 `glob` 或 `Glob`。
+-/
+
 /-! D109 search 有三种模式，缺省仍是 content
 
 **决定**：`mode` 取 `content`（逐条命中带行号与上下文）、`files`（只列有命中的文件）、`count`（每个文件的命中行数）；缺省 `content`。files 与 count 不读上下文、不受命中文本的字节预算约束，`MATCH_CAP` 数的是文件，停在这道上限时 `stopped` 说的是文件数。
