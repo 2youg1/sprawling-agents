@@ -1,0 +1,134 @@
+{
+  "face": "open_ai",
+  "models": [
+    "stand-in-1"
+  ],
+  "runs": [
+    [
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call-0-0",
+                  "type": "function",
+                  "function": {
+                    "name": "edit",
+                    "arguments": "{\"path\": \"atlas/notes/README.md\", \"old\": \"\", \"new\": \"# Atlas\\n\\nAtlas collects field notes from the survey team and turns them into one\\nweekly summary.\\n\\n## Layout\\n\\n| Folder | What it holds |\\n|---|---|\\n| `notes/` | raw notes, one file per day |\\n| `summary/` | the weekly summary the team reads |\\n\\n## Next steps\\n\\n1. Merge the three survey sheets into one table.\\n2. Mark every site that was visited twice.\\n3. Draft the summary for week 43.\\n\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5210,
+          "completion_tokens": 180
+        }
+      },
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call-0-1",
+                  "type": "function",
+                  "function": {
+                    "name": "read",
+                    "arguments": "{\"path\": \"atlas/notes/README.md\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5210,
+          "completion_tokens": 180
+        }
+      },
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "I created `atlas/notes/README.md` and read it back.\n\n- **Layout**: a table that says what `notes/` and `summary/` hold.\n- **Next steps**: the three tasks for week 43, in the order they depend on each other.\n\nNothing else in the building changed. When the survey sheets arrive, I can merge them into one table under `notes/`."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5840,
+          "completion_tokens": 320
+        }
+      }
+    ],
+    [
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call-1-0",
+                  "type": "function",
+                  "function": {
+                    "name": "status",
+                    "arguments": "{}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5210,
+          "completion_tokens": 180
+        }
+      },
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Here is where the building stands.\n\n| Room | Runs | Last change |\n|---|---:|---|\n| `atlas/notes` | 1 | README.md created |\n| `atlas/review` | 1 | this report |\n\nThe README reads well. Two suggestions:\n\n1. Name the survey sheets in **Next steps**, so a reader knows which three.\n2. Add the week number to the summary file name, for example `summary/week-43.md`."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5840,
+          "completion_tokens": 320
+        }
+      }
+    ],
+    [
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "A short plan for the garden sensors:\n\n```toml\n[sensors]\ninterval_s = 300\nsites = [\"north\", \"south\", \"greenhouse\"]\n```\n\n- Read each sensor every five minutes.\n- Keep one CSV per site and per day.\n- Alert when the soil moisture stays under 20 % for an hour.\n\nI have not written any file yet. Say which site to start with, and I will create its folder."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 5840,
+          "completion_tokens": 320
+        }
+      }
+    ]
+  ]
+}

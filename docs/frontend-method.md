@@ -87,7 +87,7 @@ A missing bundle, a missing engine and a gallery that drew nothing are each a vi
 
 ## The walk through the running window
 
-`render` measures properties and cannot see the rest, so the last check is a person with the running window and this list, once per fixture and once per real screen, in both lightings.
+`render` measures properties and cannot see the rest, so the last check is a person with the running window and this list, once per fixture and once per real screen, in both lightings. `just walk` photographs the real screens for that reading: it raises a throwaway city under `target/walk/` that the stand-in provider answers, serves and pairs it as a person would, and keeps every page and a few pressed states at 1920×1080, at 2560×1600 scaled to 150 % and at 390×844 on touch, in both lightings, with an index (`client/scripts/walk.ts`). The pages come from `client/src/core/route.ts` and the names it presses from `client/src/lang.json`, so a new page is walked without an edit and a renamed control fails its picture.
 
 1. **Contrast.** `text-quiet` and `text-faint` hold the WCAG ratio for body text against the pane behind them with the root's `data-theme` in either state, and large text and graphics hold the ratio for large text. The colour gate reads the tokens; only an eye reads which tier a screen put where.
 2. **Chinese typography.** No line opens with a closing bracket or a full stop, numbers beside Chinese characters sit on the mono figure face, and running text is no wider than the `talk` container.
