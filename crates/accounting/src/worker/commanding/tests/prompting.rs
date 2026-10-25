@@ -198,3 +198,54 @@ fn a_word_by_word_save_cannot_break_the_mayors_names() {
         "{refused}"
     );
 }
+
+/// A card a person accepts on `MAYOR.md` lands through the same judgement
+/// a word-by-word save does: one that would leave the identity area
+/// unreadable is refused, nothing lands, and the card stays open.
+#[test]
+fn an_accepted_card_cannot_break_the_mayors_names() {
+    let (dir, mut worker) = city();
+    let mayor = dir.path().join(".sprawling/MAYOR.md");
+    let before = std::fs::read(&mayor).unwrap();
+    let offered = kernel::event::record::ProposalOffered {
+        doc: at(".sprawling/MAYOR.md"),
+        baseline: B3Hash::digest(&before),
+        start: 0,
+        end: 0,
+        before: String::new(),
+        after: "+++\nname = [\n+++\n".to_owned(),
+    };
+    let run = RunId::from_bytes([3u8; 16]);
+    let card = documents::Offer::of(run, &offered).unwrap().id();
+    worker
+        .record_for(
+            run,
+            crate::effect::Line {
+                who: "resident".to_owned(),
+                addr: at("hall/mayor"),
+                kind: EventKind::ProposalOffered,
+                data: Payload::of(&offered).unwrap(),
+            },
+        )
+        .unwrap();
+
+    let refused = worker
+        .handle(wire::Command::DecideProposals(wire::ProposalDecisions {
+            doc: at(".sprawling/MAYOR.md"),
+            decisions: vec![wire::ProposalDecision {
+                proposal: card,
+                verdicts: vec![kernel::event::record::SliceVerdict {
+                    slice: 0,
+                    verdict: kernel::event::record::Verdict::Accept,
+                }],
+            }],
+            idem: key(b"accept"),
+        }))
+        .unwrap_err();
+
+    assert_eq!(
+        (refused.code(), std::fs::read(&mayor).unwrap()),
+        (&kernel::AxCode::ConfigInvalid, before),
+        "{refused}"
+    );
+}

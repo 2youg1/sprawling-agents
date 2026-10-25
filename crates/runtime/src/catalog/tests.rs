@@ -295,6 +295,22 @@ fn a_hint_is_cut_on_a_character_boundary() {
     assert_eq!(dormant::hint("Read a file. Then more."), "Read a file");
 }
 
+/// The sentence the city introduces each of its own namespaces by fits
+/// the index's hint whole: a model reads it in the index and in `tool`
+/// `list`, and one cut in the middle of a word tells it less.
+#[test]
+fn the_city_s_own_namespaces_are_introduced_by_a_whole_sentence() {
+    let cut: Vec<(&str, String)> = kernel::ReservedNamespace::ALL
+        .iter()
+        .map(|own| {
+            let about = namespace::Namespace::Own(*own).about(std::iter::empty());
+            (own.as_str(), about)
+        })
+        .filter(|(_, about)| dormant::hint(about) != about.as_str())
+        .collect();
+    assert_eq!(cut, Vec::<(&str, String)>::new());
+}
+
 #[test]
 fn detail_answers_a_guide_by_name_and_find_names_by_words() {
     let mut catalog = Catalog::new();
