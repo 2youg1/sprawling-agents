@@ -17,6 +17,7 @@
 use kernel::{Address, EventKind, EventRecord, Payload, RunId};
 
 mod folding;
+mod newest_prompt;
 mod released;
 mod released_ledger;
 mod roadmaps;

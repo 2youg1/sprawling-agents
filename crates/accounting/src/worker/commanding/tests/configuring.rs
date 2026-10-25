@@ -114,3 +114,31 @@ fn a_refused_search_setting_writes_nothing() {
         (kernel::AxCode::ConfigInvalid, before)
     );
 }
+
+/// A `[catalog]` the city refuses refuses the whole frame as well, even
+/// when the `[search]` beside it is one the city takes: neither lands.
+#[test]
+fn a_refused_catalog_writes_nothing_beside_an_accepted_search() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut worker = opened(dir.path());
+    let file = kernel::layout::CityLayout::new(dir.path()).city_config();
+    let before = std::fs::read(&file).ok();
+    let wire::Command::ConfigureCity(settings) = configure(custom("brave"), b"catalog") else {
+        panic!("a frame for the city's own layer");
+    };
+
+    let refused = worker
+        .handle(wire::Command::ConfigureCity(wire::CitySettings {
+            catalog: Some(kernel::config::ExposureTable {
+                tools: [("Not A Tool".to_owned(), kernel::config::Exposure::Off)].into(),
+                namespaces: std::collections::BTreeMap::new(),
+            }),
+            ..settings
+        }))
+        .unwrap_err();
+
+    assert_eq!(
+        (*refused.code(), std::fs::read(&file).ok()),
+        (kernel::AxCode::ConfigInvalid, before)
+    );
+}
