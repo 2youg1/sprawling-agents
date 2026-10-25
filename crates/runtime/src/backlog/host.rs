@@ -45,7 +45,9 @@ impl Backlog {
                 "start a command",
                 format!("{what}: {err}"),
             )
-            .with_recovery("check the program name, or use the shell arm")
+            .with_recovery(
+                "check the program name; a shell builtin such as `cd` or `echo` is no program",
+            )
         })?;
         self.enrol(
             id,

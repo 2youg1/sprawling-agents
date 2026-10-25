@@ -36,7 +36,7 @@ pub fn claim(seen: &mut BTreeSet<IdemKey>, key: IdemKey) -> Result<IdemGuard, Du
 - **两种键，一个铸口**：run 的外向动作按 `(run, seq, 规范化的动作)` 派生，恢复与重放必须派生出同一把键，所以不取时钟、不取随机数。一条命令的键归发出它的客户端，每按一次、每读一行铸一把，重试时原样再发：浏览器取浏览器的熵直接拼 `idem1-<hex>`（`client/src/core/idem.ts`），控制台与 `sprawling call` 取 OS 熵作 `derive` 的第三个参数（`crates/sprawling/src/console/terminal.rs` 的 `LineKeys`、`crates/sprawling/src/main/dispatch.rs` 的 `minted`）。命令到达时还没有 run 可派生；按字句派生则同一句话发两次只算一次，把第二次吞掉。重放读账本里记下的键，不重铸，所以命令键的随机来源不碰确定性（ARCHITECTURE.md §10 第七条）。
 - **`IdemGuard` 是判重的凭证**：它把「在任何不可重放的副作用之前判重」这条顺序约束变成编译期约束：副作用入口收 `&IdemGuard`，而 guard 只有 `claim` 造得出。seen 集合仍是调用方的状态，kernel 不持有任何状态。
 
-serde：字符串形。动作规范化（action_canonical 的构造规则）属工具面——它在那一面有且只有一个实现，`ToolCall::action`（§8-23）；本模块只定派生函数与框架。
+serde：字符串形。动作规范化（action_canonical 的构造规则）属工具面——它在那一面有且只有一个实现，`ToolCall::action`（§8-23）；本模块只定派生函数与框架。工具参数改名不改变任何已派生的键：恢复从不为账本里记下的调用重新派生，理由与证据在 `crates/runtime/spec/Tools.lean` D116。
 -/
 
 namespace Kernel.Idem

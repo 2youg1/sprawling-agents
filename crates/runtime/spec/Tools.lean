@@ -12,6 +12,23 @@
 -/
 
 /-!
+### 8-14-1 常驻工具的参数面，对照 Claude Code
+
+模型在每个请求里都看到的工具（`mode::core_tools`），参数名、合法值与描述向 Claude Code 的同类工具靠拢（D114）。对照的来源是 Claude Code 的 Agent SDK 参考里的 Tool Input Types（<https://code.claude.com/docs/en/agent-sdk/typescript.md> 与 <https://code.claude.com/docs/en/agent-sdk/python.md>，后者给每个参数一句注释）和工具参考（<https://code.claude.com/docs/en/tools-reference.md>）。
+
+| 工具 | 本城的参数 | Claude Code 的同类 | 出入 |
+|---|---|---|---|
+| `edit` | `file_path`、`old_string`、`new_string`、`replace_all`（可选，缺省 `false`） | `Edit`：同四个 | `old_string: ""` 新建一个不存在的文件，Claude Code 新建走 `Write`；读后被改即拒，Claude Code 在 `old_string` 仍唯一匹配时照改（D106）；`file_path` 收城相对路径，也收本平台落在城里的绝对路径（§8-30-1），Claude Code 要绝对路径 |
+| `exec` | `command` 或 `python` 恰给一个；`where`（可选，`sandbox`｜`host`） | `Bash`：`command`、`timeout`、`description`、`run_in_background` | 没有 `timeout` 与 `run_in_background`：前台窗口到了命令自己转进后台（§8-28）；没有 `description`；`python` 与 `where` 是本城的沙箱（§8-13-4，D118） |
+| `read` | `path`、`offset`（0 基）、`limit`（至多 512） | `Read`：`file_path`、`offset`（行号）、`limit`、`pages`、`allow_large` | 本 Step 余下的一项：改名 `file_path`，`offset` 改成 1 基行号（§8-29-1、§8-63） |
+| `search` | `text`（子串）、`path`、`context`、`mode` | `Grep`：`pattern`（ripgrep 正则）、`path`、`glob`、`output_mode`、`-i`、`context` 等；`Glob`：`pattern`、`path` | 本 Step 余下的一项：`pattern` 改成正则，`mode` 改成 `output_mode` 与它的三个值，按文件名找住在 search 里（§8-30-2，D117） |
+| `status` | 无 | 无同类 | 本城的处境查询（§8-14） |
+| `tool` | `op`、`namespace`、`query`、`name`、`args` | `ToolSearch`：`query`、`max_results` | `find` 收 `query`，与 `ToolSearch` 同名；`list`、`detail`、`run` 是本城的目录门（§8-60） |
+
+**参数之外**：工具名不改（`edit`、`exec`、`read`、`search`），因为名字是账本、页面与规则里的拼写，一个模型见到 `Edit` 而叫 `edit` 的代价是零，改名的代价是每一张提到它的表。调用里多出来的键照旧不读：Claude Code 习惯给 `Bash` 带一句 `description`，拒它只换来一个回合。
+-/
+
+/-!
 ### 8-55 「只新建」在每一条写路径上判（`runtime::tools::edit`、`runtime::tools::exec`，形状 4 适配器）
 
 
@@ -23,7 +40,7 @@ impl EditTool {
 pub struct ExecSetup { /* …既有字段… */ pub policy: crate::mode::PolicyReader }
 ```
 
-- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`crates/storage/Spec.lean` §8-32）。新建（对不存在的路径 `old: ""`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，请先读它。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
+- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`crates/storage/Spec.lean` §8-32）。新建（对不存在的路径 `old_string: ""`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，请先读它。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
 - **限制在每次写时读，不写进工具说明**：edit 与 exec 持 run 的策略格的读方（§8-62），每次写时问 `now().write`，所以 run 在中途取用的改动从下一波起就到了写门。工具说明不带写限制：说明随工具表冻结在前缀里，而写限制在一个 run 里会变；模型在 run 中途换策略后从追加的那句说明里读到它（§8-62）；一个开头就在 `Create` 下的 run，在第一次被拒时从拒词里读到，拒词说出限制与可走的路。
 - **exec 在 `Create` 下只在副本里跑。** `where: host` 的 program 与 shell 直接落在人的树上，没有任何东西能让已有文件只读，所以在起进程之前就由 `gate::replacing` 拒，主语是工作目录；`sandbox` 放置照常：写入落在同步来的副本上，副本里的东西不回到树上，所以已有文件不变、命令也新建不了任何东西。python 臂的挂载恒只读，不受影响。确认不了隔离的工具不开放写入（`crates/kernel/Spec.lean` §8-78）。`where: host` 的判在 `Placement::opened_by` 里，读的是同一个策略格。
 - **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（`crates/storage/Spec.lean` §8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
@@ -54,8 +71,8 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
-// args：{path, old, new}；准入按本 run 的读戳（§8-64，D106）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
-// old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
+// args：{file_path, old_string, new_string, replace_all?}；准入按本 run 的读戳（§8-64，D106）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
+// old_string 必唯一命中，replace_all 为真时换掉每一处（零命中＝E_INVALID_ARGS；不带 replace_all 而多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
 
 // crates/runtime/src/tools/read.rs —— 一个参数，两条路
 pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
@@ -63,8 +80,8 @@ impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
-// 创建臂：old=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new＝全文；父目录自动建（域内已证）。
-// 路径不存在而 old 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
+// 创建臂：old_string=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new_string＝全文；父目录自动建（域内已证）。
+// 路径不存在而 old_string 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
 
 // crates/runtime/src/tools/status.rs —— 十三字段
@@ -214,7 +231,7 @@ impl ToolBench {
 | 文件 | 管什么 |
 |---|---|
 | `crates/runtime/src/tools/edit.rs` | `EditTool` 与 `EditDesk`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→锁内准入（§8-64）→匹配数→落盘→记新戳），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old` 首行附近的几行，带 0 基行号 |
+| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old_string` 首行附近的几行，带 0 基行号 |
 | `crates/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：读过之后的落盘与 diff、没读过、读后被改带片段、两个 run 争一个文件、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 -/
 
@@ -225,4 +242,37 @@ impl ToolBench {
 - **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。
 - **`tools::edit::invoke`** 解析出 `target` 后调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
 - **验收**：`crates/runtime/src/tools/edit/tests.rs` 钉住「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 钉住「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」。
+-/
+
+/-! D114 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性
+
+**决定**：§8-14-1 那张表里的每件常驻工具，参数名、合法值与描述取 Claude Code 同类工具的拼写；表里「出入」一列是全部有意留下的不同，每一条带着本城的理由。工具名不改。
+
+**理由**：没有自家 harness 的模型在它们见得最多的形状下表现最好，而 Claude Code 的工具形状是其中最常见的。参数名对上，模型就不必从描述里学一个新词，也不会把习惯的名字传进来、被拒一次再改。留下的出入都是本城的合约比 Claude Code 更严或更宽的地方：读过才能改（D106）、`old_string: ""` 代替一件常驻的 `write`、python 沙箱与放置、`status` 与 `tool`。
+
+**被否**：①工具名也改成 Claude Code 的（`Edit`、`Bash`……）——名字是账本、页面与规则里的拼写，改名的代价落在每一张提到它的表上，而模型叫一个小写的名字没有困难；②同时收新旧两套参数名——同一个事实两种拼写，两份一起维护，读账本的页面也要认两套；③向 Codex 的 `apply_patch` 与 `exec_command` 对齐——Codex 以补丁格式改文件，没有专门的读与搜，和「读过才能改」的合约对不上，Claude Code 的形状与本城的工具面最接近。
+
+**重开参数**：Claude Code 的参考改了这些参数名或合法值；或者某个 provider 的模型在读数里系统性地传另一套名字。
+-/
+
+/-! D115 旧账本里的调用原样进入重建的对话，旧参数名不映射成新名
+
+**决定**：一个带着另一段对话开的会话（`OpenSession` 带 `from`：分叉，或把一段对话带到另一个房间接着做）经 `fork::inherited_indexed` 从 `model_returned` 记下的消息重建对话，消息里每个 `tool_use` 的参数逐字节照账本发给 provider；同一个房间里接着派的活开一个新 run，不重放上一个 run 的调用。旧版写下的 `{path, old, new}`、`{arm: …}` 照旧出现在历史里，它们的结果照记下的渲染器版本画（D107）。新版的工具收到用旧名字的调用时拒绝，拒词说出现在的参数名。
+
+**理由**：一次调用与它的结果是一问一答，结果照当时的版本画（D107）；把调用改成新名而结果不改，模型读到的就是对不上的一对。映射表还会是参数名的第二份权威，每改一次名字它就多一行，而且永久留着。改名之后工具表本身变了，provider 的前缀缓存从工具表起失效，映射也省不回这次缓存。推断：provider 不按当前的工具表校验历史里的 `tool_use`（Anthropic 与 OpenAI 的接口文档只对新的调用说校验），所以原样发出不会被拒；`runtime::fork::tests` 的 `an_old_call_is_rebuilt_as_it_was_recorded` 钉住重建的字节。模型照着历史用旧名字时，代价是一次被拒的调用。
+
+**被否**：①重建时把旧名映射成新名——上面的理由；②新版工具同时收旧名字——D114 ②；③给 `tool_called` 记一个形状版本，只在版本不同时映射——同①，再多一把账本键。
+
+**重开参数**：读数显示升级后的会话里模型反复用旧名字调用，被拒之后仍不改；或某个 provider 开始按当前工具表校验历史里的 `tool_use`。
+-/
+
+/-! D116 参数改名不改变任何已派生的 `IdemKey`，不做迁移
+
+**决定**：外向动作的键只在一次活的调用被准入时派生：`accounting::worker::driving::placing` 的 `Placing::admit` 从模型这次送来的调用取 `ToolCall::action`，与 run 和这次调用在 run 里的位置一起交给 `IdemKey::derive`（`crates/kernel/spec/Idem.lean` §8-6）。键只进这个 run 的 `ToolBench.seen`，在内存里，不进账本。恢复不重新准入记下的调用：启动扫描对没有结局的调用写一行 `E_TOOL_OUTCOME_UNKNOWN`（`runtime::replay::outcome_unknown_draft`），分叉与续接开一个新的 RunId，新调用的键从新 run 起算。所以新版里没有一处为旧调用重新派生键；改名改的只是新调用的规范化字节，不需要迁移。
+
+**证据**：`accounting::worker::genesis::tests` 的 `an_old_shaped_dangling_call_is_closed_and_never_run`：账本末尾一条旧形状、没有结局的 edit 调用，启动扫描把它关成 `E_TOOL_OUTCOME_UNKNOWN`，文件一个字节不动。
+
+**被否**：①派生前先把参数归一成新名——没有读者需要新旧两种拼写得到同一把键：同一把键防的是同一个 run 里同一位置的重放，而那里只有一种拼写；②提高 `IDEM_DERIVE_V`——键的框架没变，变的只是动作字节，而动作字节本来就随参数变。
+
+**重开参数**：键开始落盘（例如为了跨进程续跑同一个 run 把 `seen` 写进账本），或恢复开始重新执行记下的调用。
 -/

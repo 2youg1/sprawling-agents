@@ -45,9 +45,12 @@ impl Shell {
             Shell::Absent => Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "run shell",
-                "no shell interpreter was found",
+                "this building offers no shell",
             )
-            .with_recovery("use the program arm with an explicit executable")),
+            .with_recovery(
+                "pass the command as one program with its arguments, with no pipes, redirects \
+                 or wildcards",
+            )),
             Shell::Missing { asked } => Err(missing(*asked)),
             Shell::Found {
                 program,
@@ -79,18 +82,28 @@ impl Shell {
     }
 
     /// The sentence the tool's description ends with: which interpreter
-    /// a shell line runs under, in the spelling the result records, or
-    /// nothing when the arm is not usable, whose refusal says why at the
-    /// call. A model writes a different language for each interpreter.
+    /// a command runs under, in the spelling the result records; that a
+    /// command is one program with its arguments where there is no
+    /// shell (`crates/runtime/spec/Tools/Exec.lean` D118); or nothing
+    /// when the building asked for a shell this machine lacks, whose
+    /// refusal says why at the call. A model writes a different language
+    /// for each.
     pub(super) fn statement(&self) -> String {
         match self {
-            Shell::Absent | Shell::Missing { .. } => String::new(),
+            Shell::Absent => ABSENT.to_owned(),
+            Shell::Missing { .. } => String::new(),
             Shell::Found { program, .. } => {
-                format!(" A shell line runs under {}.", interpreter_name(program))
+                format!(" A command runs under {}.", interpreter_name(program))
             }
         }
     }
 }
+
+/// What a command is in a building that offers no shell.
+pub(super) const ABSENT: &str = " This building has no shell: a command is one program and its \
+     arguments, with no pipes, redirects or wildcards.";
+
+impl Shell {}
 
 /// The arguments that put one line in front of each interpreter.
 ///
@@ -115,8 +128,8 @@ fn missing(asked: Interpreter) -> AxError {
             "this machine's own shell is missing or does not start",
         )
         .with_recovery(
-            "use the program arm with an explicit executable; `sprawling doctor` names what is \
-             wrong with the shell",
+            "ask the User to fix the shell `sprawling doctor` names, or to turn this building's \
+             shell off so a command runs as one program with its arguments",
         ),
         Interpreter::Pwsh => AxError::failure(
             AxCode::ToolUnavailable,

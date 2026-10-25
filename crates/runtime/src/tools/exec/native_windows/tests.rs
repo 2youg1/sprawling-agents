@@ -69,9 +69,9 @@ fn native_windows_disposable_production_axes_and_cleanup() {
     ));
     let call = ToolCall {
         id: "native-production".to_owned(), name: ToolName::parse("exec").unwrap(),
-        args: Payload::new(serde_json::json!({"arm":{"program":{
-            "path":".\\probe.exe", "args":["--exact", "tools::exec::native_windows::tests::native_windows_child_axes", "--ignored", "--nocapture"]
-        }}}).as_object().unwrap().clone()).unwrap(),
+        args: Payload::new(serde_json::json!({"command":
+            ".\\probe.exe --exact tools::exec::native_windows::tests::native_windows_child_axes --ignored --nocapture"
+        }).as_object().unwrap().clone()).unwrap(),
     };
     let outcome = tool.invoke(&call).unwrap();
     let result = serde_json::to_value(outcome.result).unwrap();

@@ -80,6 +80,19 @@ fn cargo_key() -> CommandKey {
     })
 }
 
+/// A command line whose program is quoted meets the filter its program
+/// names, in a building with a shell and in one without.
+#[test]
+fn a_quoted_program_is_keyed_by_its_name() {
+    let key = CommandKey::of(&ExecArm::Shell {
+        text: "\"/usr/bin/cargo\" build --release".to_owned(),
+    });
+    assert_eq!(
+        (key.command(), key.subcommand()),
+        ("cargo".to_owned(), Some("build"))
+    );
+}
+
 fn cargo_build_output() -> String {
     let mut out = String::new();
     for n in 0..120 {

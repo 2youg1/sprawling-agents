@@ -104,10 +104,8 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
 
     let mut args = serde_json::Map::new();
     args.insert(
-        "arm".to_owned(),
-        serde_json::json!({
-            "program": { "path": cargo, "args": ["build", "--offline", "--target-dir", "target"] }
-        }),
+        "command".to_owned(),
+        serde_json::Value::String(format!("\"{cargo}\" build --offline --target-dir target")),
     );
     let outcome = tool
         .invoke(&ToolCall {

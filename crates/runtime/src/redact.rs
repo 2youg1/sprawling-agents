@@ -440,7 +440,10 @@ mod phases {
         .unwrap();
         let text = history_text();
         let edit = |path: &str, old: &str, new: &str| {
-            call("edit", json!({ "path": path, "old": old, "new": new }))
+            call(
+                "edit",
+                json!({ "file_path": path, "old_string": old, "new_string": new }),
+            )
         };
         let writes: Vec<_> = (0..32)
             .map(|at| timed(&tool, &edit(&format!("work/h{at}.txt"), "", &text)))
@@ -480,15 +483,12 @@ mod phases {
         };
         let patient = Backlog::with_window(PollBudget::new(6_000, 20));
         let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), patient).unwrap();
-        let (path, args) = if cfg!(windows) {
-            ("cmd", ["/C", "type history.txt"])
+        let line = if cfg!(windows) {
+            r#"cmd /C "type history.txt""#
         } else {
-            ("sh", ["-c", "cat history.txt"])
+            r#"sh -c "cat history.txt""#
         };
-        let exec = call(
-            "exec",
-            json!({ "arm": { "program": { "path": path, "args": args } } }),
-        );
+        let exec = call("exec", json!({ "command": line }));
         report("exec", (0..8).map(|_| timed(&tool, &exec)));
     }
 

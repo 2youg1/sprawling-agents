@@ -321,9 +321,9 @@ fn a_run_that_wrote(city_root: &Path) -> std::path::PathBuf {
     let (factory, _, _) = script::scripted(vec![Step {
         tool: "edit",
         args: json!({
-            "path": "lab/lead/notes.md",
-            "old": "",
-            "new": "# Notes\n",
+            "file_path": "lab/lead/notes.md",
+            "old_string": "",
+            "new_string": "# Notes\n",
         }),
     }]);
     let (mut worker, ledger) = city::city_with_a_model(city_root, factory);

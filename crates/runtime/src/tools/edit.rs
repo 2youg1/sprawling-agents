@@ -11,10 +11,13 @@
 //! against an understanding that is out of date is most likely wrong in
 //! a city where many residents edit at once - and the second refusal
 //! carries the passage as it now reads, which counts as a look. And an
-//! `old` string that matches zero times or many times is refused with
-//! the count, because "replace the first one" is a guess about which
-//! occurrence was meant. `crates/runtime/spec/Tools/Edit.lean` §8-64
+//! `old_string` that matches zero times, or many times without
+//! `replace_all`, is refused with the count, because "replace the first
+//! one" is a guess about which occurrence was meant. `crates/runtime/spec/Tools/Edit.lean` §8-64
 //! models the admission and proves it loses no run's update.
+//!
+//! The arguments are Claude Code's `Edit`'s, by name and by value
+//! (`crates/runtime/spec/Tools.lean` §8-14-1, D114).
 //!
 //! The echo is a unified diff. Per-edit diffs are the restoration
 //! granularity: a checkpoint restores a wave, but a diff restores one
@@ -62,6 +65,13 @@ impl EditTool {
     /// The name this tool answers to, read by `mode::core_tools` too.
     pub const NAME: &'static str = "edit";
 
+    /// The argument names, spelled once for the schema, the reads and
+    /// the refusals.
+    const FILE_PATH: &'static str = "file_path";
+    const OLD_STRING: &'static str = "old_string";
+    const NEW_STRING: &'static str = "new_string";
+    const REPLACE_ALL: &'static str = "replace_all";
+
     pub fn new(
         city_root: &Path,
         domain: kernel::Address,
@@ -71,14 +81,16 @@ impl EditTool {
         let params = Payload::of(&serde_json::json!({
             "type": "object",
             "properties": {
-                "path": { "type": "string",
-                    "description": "file to edit, relative to the city root" },
-                "old": { "type": "string", "description":
-                    "exact text to replace; must match exactly once. \"\" creates a file that does not exist" },
-                "new": { "type": "string",
-                    "description": "replacement text, or the whole file when creating" },
+                Self::FILE_PATH: { "type": "string",
+                    "description": "the file to modify, relative to the city root" },
+                Self::OLD_STRING: { "type": "string", "description":
+                    "the exact text to replace; \"\" creates a file that does not exist" },
+                Self::NEW_STRING: { "type": "string",
+                    "description": "the text to replace it with, or the whole file when creating" },
+                Self::REPLACE_ALL: { "type": "boolean",
+                    "description": "replace every occurrence of old_string (default false)" },
             },
-            "required": ["path", "old", "new"],
+            "required": [Self::FILE_PATH, Self::OLD_STRING, Self::NEW_STRING],
         }))?;
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
@@ -89,11 +101,11 @@ impl EditTool {
                 // The write limit is not spelled here: it can change
                 // while the run goes, and these bytes are frozen with the
                 // tool list (§8-62); the note a change appends spells it.
-                disclosure: "Replace an exact string in a file you have read in this run: \
-                             `old` must match exactly once or the call fails. A file that changed \
-                             after your read is refused and not overwritten, and the refusal shows \
-                             the passage as it now reads. `old: \"\"` creates a file that does \
-                             not exist."
+                disclosure: "Performs exact string replacements in a file you have read in \
+                             this run: `old_string` must match exactly once, or set `replace_all` \
+                             to change every occurrence. A file that changed after your read is \
+                             refused and not overwritten, and the refusal shows the passage as it \
+                             now reads. `old_string: \"\"` creates a file that does not exist."
                     .to_owned(),
                 params,
                 effect: Effect::Write { domain },
@@ -108,6 +120,9 @@ impl EditTool {
     }
 }
 
+/// One string argument. A call spelled the way an older build's
+/// history spells it lands here too, and the recovery names the
+/// arguments this build takes (`crates/runtime/spec/Tools.lean` D115).
 fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> {
     args.get(key).and_then(Value::as_str).ok_or_else(|| {
         AxError::failure(
@@ -115,8 +130,32 @@ fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> 
             "edit file",
             format!("missing string argument `{key}`"),
         )
-        .with_recovery("pass path, old and new - all strings")
+        .with_recovery(format!(
+            "pass {}, {} and {} - all strings - and {} when every occurrence should change",
+            EditTool::FILE_PATH,
+            EditTool::OLD_STRING,
+            EditTool::NEW_STRING,
+            EditTool::REPLACE_ALL,
+        ))
     })
+}
+
+/// Whether the call asked for every occurrence; absent is one.
+fn replacing_all(args: &Map<String, Value>) -> Result<bool, AxError> {
+    match args.get(EditTool::REPLACE_ALL) {
+        None => Ok(false),
+        Some(asked) => asked.as_bool().ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "edit file",
+                format!("`{}` is not true or false", EditTool::REPLACE_ALL),
+            )
+            .with_recovery(format!(
+                "pass `{}` as a boolean, or leave it out to replace one occurrence",
+                EditTool::REPLACE_ALL
+            ))
+        }),
+    }
 }
 
 impl Tool for EditTool {
@@ -129,7 +168,7 @@ impl Tool for EditTool {
     /// the answer stays `Domain` so that no reading of it can come out
     /// narrower than the truth.
     fn writes(&self, call: &ToolCall) -> kernel::Writes {
-        match arg(call.args.as_map(), "path")
+        match arg(call.args.as_map(), Self::FILE_PATH)
             .and_then(|asked| super::chosen_path::within_city(&self.city_root, asked, "edit file"))
             .and_then(|spelled| kernel::Address::parse(&spelled))
         {
@@ -154,11 +193,30 @@ impl Tool for EditTool {
         let policy = self.desk.policy.now();
         crate::mode::mode_admits(&policy, Self::NAME)?;
         let args = call.args.as_map();
-        let spelled =
-            super::chosen_path::within_city(&self.city_root, arg(args, "path")?, "edit file")?;
+        let spelled = super::chosen_path::within_city(
+            &self.city_root,
+            arg(args, Self::FILE_PATH)?,
+            "edit file",
+        )?;
         let rel: &str = &spelled;
-        let old = arg(args, "old")?;
-        let new = arg(args, "new")?;
+        let old = arg(args, Self::OLD_STRING)?;
+        let new = arg(args, Self::NEW_STRING)?;
+        let every = replacing_all(args)?;
+        if every && old.is_empty() {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "edit file",
+                format!(
+                    "`{}` with an empty `{}`",
+                    Self::REPLACE_ALL,
+                    Self::OLD_STRING
+                ),
+            )
+            .with_recovery(format!(
+                "leave `{}` out to create {rel}, or name the text to replace",
+                Self::REPLACE_ALL
+            )));
+        }
 
         // The path is judged before the filesystem is touched, and by the
         // same two authorities everything else uses: Address::parse kills
@@ -223,7 +281,8 @@ impl Tool for EditTool {
                     format!("{rel} does not exist"),
                 )
                 .with_recovery(
-                    "check the path; to create a new file pass old:\"\" and the whole file in `new`",
+                    "check the path; to create a new file pass old_string:\"\" and the whole \
+                     file in `new_string`",
                 ));
             }
             Admission::Unread => {
@@ -245,8 +304,8 @@ impl Tool for EditTool {
                         format!("{rel} changed after this run read it; {window}")
                     }
                     (passage::Opened::AtHead, window) => format!(
-                        "{rel} changed after this run read it, and the first line of `old` is no \
-                         longer in it; {window}"
+                        "{rel} changed after this run read it, and the first line of \
+                         `old_string` is no longer in it; {window}"
                     ),
                 };
                 return Err(AxError::failure(AxCode::VersionConflict, "edit file", why)
@@ -261,16 +320,25 @@ impl Tool for EditTool {
         }
         let (old, new) = as_the_file_spells(&text, old, new);
         let (old, new) = (old.as_ref(), new.as_ref());
-        let hits = text.matches(old).count();
-        if hits != 1 {
-            return Err(AxError::failure(
+        let updated = match (text.matches(old).count(), every) {
+            (0, _) => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "edit file",
-                format!("`old` matches {hits} times in {rel}, not once"),
+                format!("`old_string` matches 0 times in {rel}"),
             )
-            .with_recovery("include enough surrounding text to name exactly one occurrence"));
-        }
-        let updated = text.replacen(old, new, 1);
+            .with_recovery("copy `old_string` from the file as it reads, whitespace included")),
+            (1, false) => Ok(text.replacen(old, new, 1)),
+            (_, true) => Ok(text.replace(old, new)),
+            (hits, false) => Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "edit file",
+                format!("`old_string` matches {hits} times in {rel}, not once"),
+            )
+            .with_recovery(
+                "include enough surrounding text in `old_string` to name exactly one \
+                 occurrence, or set `replace_all: true` to change all of them",
+            )),
+        }?;
         // The replacement lands the way every city write does: a staging
         // file renamed over the name, so a failed write leaves the old
         // file and a hard link's other names keep their bytes
@@ -346,8 +414,9 @@ impl EditTool {
 /// passage has to start on the very line its marks number, for exactly
 /// one reading of them. The replacement loses the marks with those
 /// numbers and keeps every other line as it came, because a model that
-/// copied the marks into `old` copied them into `new`, while a numbered
-/// line it adds in `new` is text it means to write.
+/// copied the marks into `old_string` copied them into `new_string`,
+/// while a numbered line it adds in `new_string` is text it means to
+/// write.
 fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, str>, Cow<'a, str>) {
     if text.contains(old) {
         return (Cow::Borrowed(old), Cow::Borrowed(new));
@@ -413,7 +482,7 @@ fn read_whole(rel: &str, path: &Path) -> Result<(String, Option<Stamp>), AxError
 
 fn unreadable(rel: &str, err: &std::io::Error) -> AxError {
     AxError::failure(AxCode::InvalidArgs, "edit file", format!("{rel}: {err}"))
-        .with_recovery("check the path; to create a new file pass old:\"\"")
+        .with_recovery("check the path; to create a new file pass old_string:\"\"")
 }
 
 /// The answer: the path and the diff. Per-edit diffs are the
@@ -443,14 +512,14 @@ fn already_exists(rel: &str) -> AxError {
     AxError::failure(
         AxCode::VersionConflict,
         "edit file",
-        format!("{rel} already exists, so `old: \"\"` cannot create it"),
+        format!("{rel} already exists, so `old_string: \"\"` cannot create it"),
     )
     .with_recovery("read the file and replace a passage in it, or choose another path")
 }
 
 /// A minimal unified diff: enough to see what changed and where, and no
 /// dependency for the eighty lines it takes. An empty `before` is a
-/// creation - no `old` matches once in an empty text - and is written
+/// creation - no `old_string` matches once in an empty text - and is written
 /// from `/dev/null`, the way unified diffs mark a new file, which is how
 /// a reader of the echo tells a creation from a change.
 fn unified_diff(path: &str, before: &str, after: &str) -> String {

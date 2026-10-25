@@ -188,3 +188,23 @@ fn a_result_line_carries_its_microseconds_and_an_older_line_reads_without_them()
         }
     );
 }
+
+/// The names Claude Code's tools take (`crates/runtime/spec/Tools.lean`
+/// §8-14-1) are what a call acted on, ahead of whatever string sorts
+/// first.
+#[test]
+fn a_file_path_or_a_command_is_the_subject_before_the_key_order() {
+    let subject = |key: &str| {
+        let mut args = Map::new();
+        args.insert(
+            "a".to_owned(),
+            Value::String("first in key order".to_owned()),
+        );
+        args.insert(key.to_owned(), Value::String("named".to_owned()));
+        ToolCalled::subject_of(&Payload::new(args).unwrap())
+    };
+    assert_eq!(
+        [subject("file_path"), subject("command")],
+        [Some("named".to_owned()), Some("named".to_owned())]
+    );
+}

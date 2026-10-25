@@ -86,7 +86,7 @@ impl Document {
     tool: "exec",
     effect: "egress",
     render: "terminal",
-    arguments: { head: JSON.stringify({ arm: { shell: { text: "cargo nextest -p city" } } }), cut: 0 },
+    arguments: { head: JSON.stringify({ command: "cargo nextest -p city" }), cut: 0 },
     output: {
       head: JSON.stringify({
         stdout: [
@@ -107,7 +107,7 @@ impl Document {
     tool: "exec",
     effect: "egress",
     render: "terminal",
-    arguments: { head: JSON.stringify({ arm: { shell: { text: "cargo clippy -p city --all-targets -- -D warnings" } } }), cut: 0 },
+    arguments: { head: JSON.stringify({ command: "cargo clippy -p city --all-targets -- -D warnings" }), cut: 0 },
   });
   const SHOT = call(23, 880, {
     tool: "browser",

@@ -12,9 +12,11 @@ use crate::tool::{Effect, RenderIntent, ToolName};
 
 /// Argument names that say what a call acted on, in the order they are
 /// preferred. Taken from the tool definitions rather than guessed:
-/// `path` is what most of them take, and the rest name their one
-/// subject.
-const SUBJECT_KEYS: [&str; 4] = ["path", "addr", "program", "arm"];
+/// `file_path` is what `read` and `edit` take and `path` what most
+/// others take, the way Claude Code names them
+/// (`crates/runtime/spec/Tools.lean` §8-14-1); `addr` and `command`
+/// name the one subject of the tools that take them.
+const SUBJECT_KEYS: [&str; 4] = ["file_path", "path", "addr", "command"];
 
 /// `tool_called`: the call the model asked for, before anything ran.
 ///

@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::edit 的准入
 
-规定 `tools::edit`、`tools::stamp`、`tools::path_lock`（`crates/runtime/src/` 下同名的文件）。一次 edit 什么时候可以落盘：每个 run 记下它读到的每个文件的戳，edit 只在「这个 run 最后一次看到的就是文件现在的样子」时落盘；对不存在的路径 `old: ""` 新建。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面的节保留它在 runtime 规格里的标签 §8-64，别处引作 `crates/runtime/Spec.lean §8-64`。
+规定 `tools::edit`、`tools::stamp`、`tools::path_lock`（`crates/runtime/src/` 下同名的文件）。一次 edit 什么时候可以落盘：每个 run 记下它读到的每个文件的戳，edit 只在「这个 run 最后一次看到的就是文件现在的样子」时落盘；对不存在的路径 `old_string: ""` 新建。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面的节保留它在 runtime 规格里的标签 §8-64，别处引作 `crates/runtime/Spec.lean §8-64`。
 
 这一分部是形式规格：§8-64-2 的模型对它容许的每一条迹成立，Rust 的派生检查是 `runtime::tools::stamp::tests` 里的 proptest，它在随机的多 run 迹上驱动 `ReadStamps` 与 `admission`，断言与本模型相同的结论。
 -/
@@ -20,7 +20,7 @@ pub struct Stamp { /* len、modified、identity —— 私有 */ }
 impl Stamp { pub(crate) fn of(path: &Path) -> std::io::Result<Option<Stamp>>; }   // None＝路径上没有文件
 #[derive(Clone, Default)]
 pub struct ReadStamps { /* Arc<Mutex<BTreeMap<Address, Stamp>>> —— 私有 */ }      // 每个 run 一张，read 与 edit 共用
-pub(crate) enum Intent { Replace, Create }                                      // Create＝old 为空
+pub(crate) enum Intent { Replace, Create }                                      // Create＝old_string 为空
 pub(crate) enum Admission { Lands, Unread, Moved, Absent, Present }
 pub(crate) fn admission(seen: Option<&Stamp>, current: Option<&Stamp>, intent: Intent) -> Admission;
 
@@ -35,14 +35,16 @@ impl EditTool {
     pub fn new(city_root: &Path, domain: Address, writable: WriteDomain, desk: EditDesk)
         -> Result<EditTool, AxError>;
 }
-// args：{path, old, new}；old == "" 是新建。
+// args：{file_path, old_string, new_string, replace_all?}；old_string == "" 是新建（§8-14-1）。
 ```
 
+- **匹配**：`old_string` 先原样匹配（零命中时再剥抄进来的行号标记，D108）。`replace_all` 缺省为假，这时恰好一处命中才落盘，零处与多处都拒，拒词带计数，多处时恢复语说出两条路：加长 `old_string` 直到只命中一处，或设 `replace_all: true`；为真时每一处都换，一处也没有照样拒。新建时给 `replace_all: true` 拒：没有可换的东西。参数名与合法值取 Claude Code 的 `Edit`（D114）。
+
 - **戳是（长度、修改时间、文件身份）**，不是内容哈希：read 不再为一份可能永远不改的文件算 BLAKE3。身份在 Unix 是 `(dev, ino)`，在 Windows 是（卷序列号、文件索引）。edit 自己的写经暂存文件改名（`crates/storage/Spec.lean` §8-32），每次写都换一个身份，所以同一 run 的连续 edit 靠写后记下的新戳，而粗粒度时钟下同长度、同修改时间的外来改写只会漏过身份不变的原地改写——那一条由锁内的唯一匹配兜住，严格拒绝只是提示，替换是否正确由唯一匹配决定。
-- **什么算看过**：read 一个文件，答复是整份（没被截断），或者调用显式给了 `offset`／`limit`（窗口读）；读前读后各取一次戳，两次不等就不记。被截断的整读不算，因为模型以为自己看到了整份。catalog、`cas:` 定位符、包内文档不记戳：edit 改不到它们。edit 落盘后记下新戳；被「读后被改」拒绝时，拒绝里带着 `old` 附近的当前片段，这个片段算一次窗口读，记下当前戳，所以模型照片段改好 `old` 直接重试，不必整份重读。正因为拒绝算一次观察，它总要给出一段：`old` 的首行已不在文件里时，片段取文件开头，免得这个 run 凭一次什么也没看到的「观察」被准入。
+- **什么算看过**：read 一个文件，答复是整份（没被截断），或者调用显式给了 `offset`／`limit`（窗口读）；读前读后各取一次戳，两次不等就不记。被截断的整读不算，因为模型以为自己看到了整份。catalog、`cas:` 定位符、包内文档不记戳：edit 改不到它们。edit 落盘后记下新戳；被「读后被改」拒绝时，拒绝里带着 `old_string` 附近的当前片段，这个片段算一次窗口读，记下当前戳，所以模型照片段改好 `old_string` 直接重试，不必整份重读。正因为拒绝算一次观察，它总要给出一段：`old_string` 的首行已不在文件里时，片段取文件开头，免得这个 run 凭一次什么也没看到的「观察」被准入。
 - **读戳只在内存里，每个 run 一张，不进账本。** 能从账本起出来的 run——重启后续接会话（新 run 经 `origin` 继承母 run 的对话）、fork、`succeed` 的继任、`delegate` 的子 run——起点都没有读戳，第一次 edit 前要读，所以没有要从账本重建的读戳；运行时也没有同一个 run 跨进程续跑。
 - **按路径的锁**：键是这个 run 写入的树里的位置（`write_root` 加地址），所以两个工作树里的同一地址是两把锁；键按大小写折叠后比较，因为 Windows 与 macOS 的卷上 `Notes.md` 与 `notes.md` 是同一个文件，不折叠就是同一文件上的两把锁，在区分大小写的卷上折叠只让只差大小写的两个文件互相等待。锁内依次是取戳、读字节、判准入、唯一匹配、写、取新戳；在模型里这就是一步 `edit`。它只串行化 edit 与 edit：exec 与人的编辑器不拿这把锁，对它们只剩判定与改名之间的窗口。链接检查（`crates/storage/Spec.lean` §8-25）在取锁之前做一次，好让经链接的 edit 答「经链接」而不是「没读过」；改名之前再做一次，因为等锁与读字节之间可能有人放了链接。
-- **错误**：读后被改答 `E_VERSION_CONFLICT`，why 里是片段；没读过答 `E_INVALID_ARGS`，恢复语「先 read，窗口读即可」；路径已存在却 `old: ""` 答 `E_VERSION_CONFLICT`；路径不存在而 `old` 非空答 `E_INVALID_ARGS`，恢复语指向 `old: ""`。
+- **错误**：读后被改答 `E_VERSION_CONFLICT`，why 里是片段；没读过答 `E_INVALID_ARGS`，恢复语「先 read，窗口读即可」；路径已存在却 `old_string: ""` 答 `E_VERSION_CONFLICT`；路径不存在而 `old_string` 非空答 `E_INVALID_ARGS`，恢复语指向 `old_string: ""`。
 -/
 
 namespace Runtime.Tools.Edit
@@ -79,7 +81,7 @@ inductive Step where
   | read (r : Nat) (p : Nat)
   /-- 不经 edit 的写者：exec、人的编辑器。 -/
   | write (p : Nat)
-  /-- 锁内的一次 edit；`unique` 是 `old` 在当前文本里恰好命中一次。 -/
+  /-- 锁内的一次 edit；`unique` 是 `old_string` 在当前文本里满足匹配条件：恰好命中一次，或设了 `replace_all` 时至少命中一次。 -/
   | edit (r : Nat) (p : Nat) (creating : Bool) (unique : Bool)
   deriving Repr
 
@@ -346,11 +348,11 @@ end Runtime.Tools.Edit
 
 /-! D106 edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段
 
-**决定**：edit 不收模型抄写的版本。运行时为每个 run 记下它看过的每个文件的戳（§8-64），edit 在按路径的锁里取当前戳：没读过拒绝；读后被改拒绝，拒绝里带 `old` 附近的当前片段并把它记作一次窗口读；戳是当前的，`old` 恰好命中一次才落盘。对不存在的路径 `old: ""` 新建，路径已存在拒绝。§8-64-2 证明：一个 run 最后一次观察某路径之后，只要别人落过盘，它对这个路径的 edit 就不落盘；两个 run 在同一份内容上的 edit 只落一次。
+**决定**：edit 不收模型抄写的版本。运行时为每个 run 记下它看过的每个文件的戳（§8-64），edit 在按路径的锁里取当前戳：没读过拒绝；读后被改拒绝，拒绝里带 `old_string` 附近的当前片段并把它记作一次窗口读；戳是当前的，`old_string` 满足匹配条件才落盘。对不存在的路径 `old_string: ""` 新建，路径已存在拒绝。§8-64-2 证明：一个 run 最后一次观察某路径之后，只要别人落过盘，它对这个路径的 edit 就不落盘；两个 run 在同一份内容上的 edit 只落一次。
 
-**理由**：抄写版本让每次读多花约 62 个 token 的哈希串，让每次 read 为可能永远不改的文件算 BLAKE3，还造出「抄错哈希 → 冲突 → 重读」这一类回合。一座城里许多 agent 同时改文件，在过期理解上得到的「唯一匹配」更可能是错的，所以取严格的一侧：读后被改就拒，而不是像 Claude Code 那样只要 `old` 仍唯一就照改并注明。
+**理由**：抄写版本让每次读多花约 62 个 token 的哈希串，让每次 read 为可能永远不改的文件算 BLAKE3，还造出「抄错哈希 → 冲突 → 重读」这一类回合。一座城里许多 agent 同时改文件，在过期理解上得到的「唯一匹配」更可能是错的，所以取严格的一侧：读后被改就拒，而不是像 Claude Code 那样只要 `old_string` 仍唯一就照改并注明。
 
-**被否**：①保留版本但给模型一个短句柄、运行时映射回完整 Locator——省了 token，没省回合，read 仍要哈希；②宽松：读后被改而 `old` 仍唯一就照改——上面的理由；③把读戳写进账本、继承时折叠回来——与「fork、继任、子 run 起点没有读戳」这条决定相反，还让载荷多一个模型看不到的键。
+**被否**：①保留版本但给模型一个短句柄、运行时映射回完整 Locator——省了 token，没省回合，read 仍要哈希；②宽松：读后被改而 `old_string` 仍唯一就照改——上面的理由；③把读戳写进账本、继承时折叠回来——与「fork、继任、子 run 起点没有读戳」这条决定相反，还让载荷多一个模型看不到的键。
 
 **重开参数**：模型或 provider 开始在一次调用里批量改多个文件、需要跨文件的原子性时；或出现不经暂存改名就落盘的 edit 路径，身份不再随写改变时。
 -/

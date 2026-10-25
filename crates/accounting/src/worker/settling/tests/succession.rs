@@ -86,9 +86,9 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
                 "tu_4",
                 "edit",
                 serde_json::json!({
-                    "path": "lab/room1/notes.md",
-                    "old": "",
-                    "new": "the lexer\n"
+                    "file_path": "lab/room1/notes.md",
+                    "old_string": "",
+                    "new_string": "the lexer\n"
                 }),
             ),
             completion("done", None),
@@ -201,9 +201,9 @@ fn the_handoff_in_the_room_reaches_the_successor() {
                 "tu_1",
                 "edit",
                 serde_json::json!({
-                    "path": "lab/room1/Handoff.md",
-                    "old": "",
-                    "new": "# Handoff\n\nThe parser is half done; resume at the lexer.\n"
+                    "file_path": "lab/room1/Handoff.md",
+                    "old_string": "",
+                    "new_string": "# Handoff\n\nThe parser is half done; resume at the lexer.\n"
                 }),
             ),
             tool_completion(

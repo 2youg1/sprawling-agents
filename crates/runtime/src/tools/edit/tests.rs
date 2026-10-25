@@ -38,14 +38,14 @@ fn look(tool: &EditTool, root: &Path, rel: &str) {
 }
 
 fn call(path: &str, old: &str, new: &str) -> ToolCall {
-    let mut args = Map::new();
-    for (k, v) in [("path", path), ("old", old), ("new", new)] {
-        args.insert(k.to_owned(), Value::String(v.to_owned()));
-    }
+    edit_call(serde_json::json!({ "file_path": path, "old_string": old, "new_string": new }))
+}
+
+fn edit_call(args: Value) -> ToolCall {
     ToolCall {
         id: "call-1".to_owned(),
         name: ToolName::parse("edit").unwrap(),
-        args: Payload::new(args).unwrap(),
+        args: Payload::of(&args).unwrap(),
     }
 }
 
@@ -235,7 +235,7 @@ fn a_missing_file_names_the_create_form_in_its_recovery() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     let err = tool.invoke(&call("work/absent.md", "a", "b")).unwrap_err();
-    assert!(err.recovery().contains("old:\"\""), "{err}");
+    assert!(err.recovery().contains("old_string:\"\""), "{err}");
 }
 
 #[test]
@@ -250,6 +250,81 @@ fn zero_or_many_matches_refuse_with_the_count() {
 
     let err = tool.invoke(&call("work/a.txt", "absent", "y")).unwrap_err();
     assert!(err.subject().contains("0 times"), "{}", err.subject());
+}
+
+#[test]
+fn many_matches_name_both_ways_on_in_the_recovery() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    std::fs::write(tmp.path().join("work/a.txt"), "x\nx\n").unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    let err = tool.invoke(&call("work/a.txt", "x", "y")).unwrap_err();
+    assert!(
+        err.recovery().contains("old_string") && err.recovery().contains("replace_all: true"),
+        "{err}"
+    );
+}
+
+#[test]
+fn replace_all_changes_every_occurrence_and_still_refuses_none() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    std::fs::write(tmp.path().join("work/a.txt"), "x\nkeep\nx\n").unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    let every = |old: &str| {
+        edit_call(serde_json::json!({
+            "file_path": "work/a.txt", "old_string": old, "new_string": "y", "replace_all": true,
+        }))
+    };
+    tool.invoke(&every("x")).unwrap();
+    let err = tool.invoke(&every("absent")).unwrap_err();
+    assert_eq!(
+        (
+            *err.code(),
+            err.subject().contains("0 times"),
+            std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        ),
+        (AxCode::InvalidArgs, true, "y\nkeep\ny\n".to_owned())
+    );
+}
+
+#[test]
+fn replace_all_on_a_create_is_refused_and_writes_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let err = tool
+        .invoke(&edit_call(serde_json::json!({
+            "file_path": "work/new.md", "old_string": "", "new_string": "body", "replace_all": true,
+        })))
+        .unwrap_err();
+    assert_eq!(
+        (*err.code(), tmp.path().join("work/new.md").exists()),
+        (AxCode::InvalidArgs, false)
+    );
+}
+
+/// D115: a call spelled the way an older build's history spells it is
+/// refused by the names this build takes, not read the old way.
+#[test]
+fn an_edit_spelled_the_older_way_is_refused_with_the_names_it_takes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    std::fs::write(tmp.path().join("work/a.txt"), "one\n").unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    let err = tool
+        .invoke(&edit_call(serde_json::json!({
+            "path": "work/a.txt", "old": "one", "new": "two",
+        })))
+        .unwrap_err();
+    assert_eq!(
+        (
+            *err.code(),
+            err.recovery()
+                .contains("file_path, old_string and new_string"),
+            std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        ),
+        (AxCode::InvalidArgs, true, "one\n".to_owned())
+    );
 }
 
 #[test]

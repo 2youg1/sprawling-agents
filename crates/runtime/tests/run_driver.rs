@@ -1329,9 +1329,9 @@ fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
     .unwrap();
     let mut args = serde_json::Map::new();
     for (key, value) in [
-        ("path", "lab/room1/kept.md".to_owned()),
-        ("old", "own".to_owned()),
-        ("new", "changed".to_owned()),
+        ("file_path", "lab/room1/kept.md".to_owned()),
+        ("old_string", "own".to_owned()),
+        ("new_string", "changed".to_owned()),
     ] {
         args.insert(key.to_owned(), serde_json::Value::String(value));
     }

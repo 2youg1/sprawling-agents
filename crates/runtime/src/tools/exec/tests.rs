@@ -14,27 +14,47 @@ mod native_macos;
 mod shell;
 mod yielding;
 
-fn call(arm: Value) -> ToolCall {
-    let mut args = Map::new();
-    args.insert("arm".to_owned(), arm);
+fn call(args: Value) -> ToolCall {
     ToolCall {
         id: "c1".to_owned(),
         name: ToolName::parse("exec").unwrap(),
-        args: Payload::new(args).unwrap(),
+        args: Payload::of(&args).unwrap(),
     }
 }
 
-/// The call as the agent writes it: an arm, and where it runs.
-fn call_at(arm: Value, placement: &str) -> ToolCall {
-    let mut args = Map::new();
-    args.insert("arm".to_owned(), arm);
-    args.insert("where".to_owned(), Value::String(placement.to_owned()));
-    ToolCall {
-        id: "c1".to_owned(),
-        name: ToolName::parse("exec").unwrap(),
-        args: Payload::new(args).unwrap(),
-    }
+/// The call as the agent writes it: what to run, and where it runs.
+fn call_at(mut args: Value, placement: &str) -> ToolCall {
+    args["where"] = Value::String(placement.to_owned());
+    call(args)
 }
+
+fn command(text: &str) -> Value {
+    serde_json::json!({ "command": text })
+}
+
+fn python(code: &str) -> Value {
+    serde_json::json!({ "python": code })
+}
+
+/// A command line that names `path` and hands it `args` word for word,
+/// each word quoted the way the program-line grammar reads it back.
+fn line_of<S: AsRef<str>>(path: impl AsRef<str>, args: impl IntoIterator<Item = S>) -> Value {
+    let quoted = |word: &str| {
+        if word.contains('"') {
+            format!("'{word}'")
+        } else {
+            format!("\"{word}\"")
+        }
+    };
+    let line = std::iter::once(quoted(path.as_ref()))
+        .chain(args.into_iter().map(|arg| quoted(arg.as_ref())))
+        .collect::<Vec<_>>()
+        .join(" ");
+    command(&line)
+}
+
+#[cfg(unix)]
+const NO_ARGS: &[&str] = &[];
 
 /// A working directory of the test's own.
 ///
@@ -146,9 +166,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
     );
     let outcome = tool
-        .invoke(&call(serde_json::json!({
-            "program": { "path": path.clone(), "args": args.clone() }
-        })))
+        .invoke(&call(line_of(path.clone(), args.clone())))
         .unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert!(
@@ -169,11 +187,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         Box::new(EchoSandbox::new()),
         None,
     );
-    let outcome = bare
-        .invoke(&call(serde_json::json!({
-            "program": { "path": path, "args": args }
-        })))
-        .unwrap();
+    let outcome = bare.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert!(
         !result["stdout"].as_str().unwrap().contains(&value),
@@ -187,24 +201,85 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
 fn a_missing_component_refuses_and_names_the_alternative() {
     let chamber = tempfile::tempdir().unwrap();
     let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
-    let err = match tool.invoke(&call(
-        serde_json::json!({ "python": { "code": "print(1)" } }),
-    )) {
+    let err = match tool.invoke(&call(python("print(1)"))) {
         Err(err) => err,
         Ok(_) => panic!("a missing component must refuse"),
     };
     assert_eq!(*err.code(), AxCode::ToolUnavailable);
     assert!(
-        err.recovery().contains("program arm"),
+        err.recovery().contains("`command`"),
         "the refusal carries the alternative"
     );
+}
 
-    // Shell refuses too rather than silently becoming a program run.
-    let err = match tool.invoke(&call(serde_json::json!({ "shell": { "text": "ls" } }))) {
-        Err(err) => err,
-        Ok(_) => panic!("a missing shell must refuse"),
+/// D118: where the building offers no shell, a command is one program
+/// and its arguments, and shell syntax is refused rather than passed on
+/// as an argument.
+#[test]
+fn without_a_shell_a_command_runs_its_program_and_refuses_shell_syntax() {
+    let chamber = tempfile::tempdir().unwrap();
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let line = if cfg!(windows) {
+        r#"cmd /C "exit 3""#
+    } else {
+        r#"sh -c "exit 3""#
     };
-    assert_eq!(*err.code(), AxCode::ToolUnavailable);
+    let ran = serde_json::to_value(tool.invoke(&call(command(line))).unwrap().result).unwrap();
+    let Err(refused) = tool.invoke(&call(command("echo hi | sort"))) else {
+        panic!("a pipe without a shell must refuse");
+    };
+    assert_eq!(
+        (
+            ran["exit_code"].clone(),
+            ran["arm"].clone(),
+            *refused.code(),
+            refused.subject().to_owned(),
+        ),
+        (
+            serde_json::json!(3),
+            serde_json::json!("program"),
+            AxCode::InvalidArgs,
+            "`|` outside quotes".to_owned(),
+        )
+    );
+}
+
+/// What a call asks to run is read off its arguments alone: a command,
+/// a script, and nothing else - not the older `arm` spelling, not both.
+#[test]
+fn a_call_names_a_command_or_a_script_and_nothing_else() {
+    let read = |args: Value| {
+        parse_arm(args.as_object().unwrap()).map_err(|err| (*err.code(), err.subject().to_owned()))
+    };
+    assert_eq!(
+        [
+            read(command("cargo test")),
+            read(python("print(1)")),
+            read(serde_json::json!({ "arm": { "shell": { "text": "ls" } } })),
+            read(serde_json::json!({ "command": "ls", "python": "print(1)" })),
+            read(serde_json::json!({ "command": "  " })),
+        ],
+        [
+            Ok(ExecArm::Shell {
+                text: "cargo test".to_owned()
+            }),
+            Ok(ExecArm::Python {
+                code: "print(1)".to_owned()
+            }),
+            Err((
+                AxCode::InvalidArgs,
+                "`arm` is how an older build spelled this call".to_owned()
+            )),
+            Err((
+                AxCode::InvalidArgs,
+                "both `command` and `python`".to_owned()
+            )),
+            Err((
+                AxCode::InvalidArgs,
+                "`command` is not a string with something in it".to_owned()
+            )),
+        ]
+    );
 }
 
 #[test]
@@ -218,11 +293,7 @@ fn the_python_arm_runs_in_the_sandbox_and_reports_its_own_exit() {
         Box::new(echo),
         None,
     );
-    let outcome = tool
-        .invoke(&call(
-            serde_json::json!({ "python": { "code": "print(42)" } }),
-        ))
-        .unwrap();
+    let outcome = tool.invoke(&call(python("print(42)"))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(result["stdout"], "42\n");
     assert_eq!(result["exit_code"], 0);
@@ -244,18 +315,12 @@ fn exhaustion_and_traps_reach_the_caller_as_themselves() {
         Box::new(sandbox),
         None,
     );
-    let first = tool
-        .invoke(&call(
-            serde_json::json!({ "python": { "code": "while True: pass" } }),
-        ))
-        .unwrap();
+    let first = tool.invoke(&call(python("while True: pass"))).unwrap();
     assert_eq!(
         serde_json::to_value(&first.result).unwrap()["outcome"],
         "fuel_exhausted"
     );
-    let second = tool
-        .invoke(&call(serde_json::json!({ "python": { "code": "boom" } })))
-        .unwrap();
+    let second = tool.invoke(&call(python("boom"))).unwrap();
     let value = serde_json::to_value(&second.result).unwrap();
     assert_eq!(value["outcome"], "trap");
     assert_eq!(value["detail"], "unreachable");
@@ -265,7 +330,7 @@ fn exhaustion_and_traps_reach_the_caller_as_themselves() {
 fn an_unrecognised_arm_is_refused_not_guessed() {
     let chamber = tempfile::tempdir().unwrap();
     let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
-    let err = match tool.invoke(&call(serde_json::json!({ "bash": { "text": "ls" } }))) {
+    let err = match tool.invoke(&call(serde_json::json!({ "bash": "ls" }))) {
         Err(err) => err,
         Ok(_) => panic!("an unknown arm must refuse"),
     };
@@ -283,11 +348,7 @@ fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     } else {
         ("sh", vec!["-c".to_owned(), "exit 3".to_owned()])
     };
-    let outcome = tool
-        .invoke(&call(serde_json::json!({
-            "program": { "path": path, "args": args }
-        })))
-        .unwrap();
+    let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(result["exit_code"], 3, "{result}");
     assert_eq!(result["arm"], "program");
@@ -325,11 +386,7 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     std::fs::write(chamber.path().join("kept.txt"), b"the person's own\n").unwrap();
     let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let (path, args) = writes_beside_itself("made.txt");
-    let outcome = tool
-        .invoke(&call(serde_json::json!({
-            "program": { "path": path, "args": args }
-        })))
-        .unwrap();
+    let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(result["exit_code"], 0, "{result}");
     assert!(
@@ -351,13 +408,7 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     // rather than a command that never wrote anything.
     let host = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let (path, args) = writes_beside_itself("made.txt");
-    host.invoke(&call_at(
-        serde_json::json!({
-            "program": { "path": path, "args": args }
-        }),
-        "host",
-    ))
-    .unwrap();
+    host.invoke(&call_at(line_of(path, args), "host")).unwrap();
     assert!(
         chamber.path().join("made.txt").exists(),
         "the host placement is the one a person decides on, and it is the one that writes"
@@ -373,17 +424,10 @@ fn the_python_arm_has_no_sandbox_host_form() {
         Box::new(EchoSandbox::new()),
         None,
     );
-    let err = match tool.invoke(&call_at(
-        serde_json::json!({ "python": { "code": "print(1)" } }),
-        "host",
-    )) {
+    let err = match tool.invoke(&call_at(python("print(1)"), "host")) {
         Err(err) => err,
         Ok(_) => panic!("the wasip1 guest has no host interpreter to run it"),
     };
     assert_eq!(*err.code(), AxCode::SandboxDenied);
-    assert!(
-        err.recovery().contains("arm: program"),
-        "{}",
-        err.recovery()
-    );
+    assert!(err.recovery().contains("`command`"), "{}", err.recovery());
 }

@@ -3,17 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The lines around `old` as the file now reads, shown when the file
+//! The lines around `old_string` as the file now reads, shown when the file
 //! moved after the run's last look.
 //!
 //! The passage is a window read: the refusal records the current stamp
 //! (`crates/runtime/spec/Tools/Edit.lean` §8-64), so a model that fixes
-//! `old` from these lines retries at once instead of reading the whole
+//! `old_string` from these lines retries at once instead of reading the whole
 //! file again. Because the refusal counts as a look, it always shows a
-//! window: where the first line of `old` is gone, the window is the head
+//! window: where the first line of `old_string` is gone, the window is the head
 //! of the file, so the run is never admitted on a look at nothing. The
 //! lines go back unmarked, the way the file holds them, so they can be
-//! copied into `old` as they stand.
+//! copied into `old_string` as they stand.
 
 /// Lines kept on each side of the passage.
 const AROUND: usize = 3;
@@ -25,15 +25,15 @@ const MOST_BYTES: usize = 4096;
 /// Where the window opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Opened {
-    /// Three lines above where the first line of `old` now stands.
+    /// Three lines above where the first line of `old_string` now stands.
     AroundOld,
-    /// At the head of the file, because the first line of `old` is no
+    /// At the head of the file, because the first line of `old_string` is no
     /// longer anywhere in it.
     AtHead,
 }
 
-/// The window around where `old` begins in `text`, or at the head of
-/// `text` when the first line of `old` is gone, with a header naming its
+/// The window around where `old_string` begins in `text`, or at the head of
+/// `text` when the first line of `old_string` is gone, with a header naming its
 /// 0-based lines.
 pub(super) fn around(text: &str, old: &str) -> (Opened, String) {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
@@ -88,7 +88,7 @@ mod tests {
         );
     }
 
-    /// The refusal records a look, so it shows lines even where `old`
+    /// The refusal records a look, so it shows lines even where `old_string`
     /// left nothing to stand beside.
     #[test]
     fn a_gone_old_opens_the_window_at_the_head() {

@@ -427,9 +427,9 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 "content": [
                     { "type": "text", "text": "marking it done" },
                     { "type": "tool_use", "id": "c2", "name": "edit", "input": {
-                        "path": "sim/lobby/room1/notes.md",
-                        "old": "draft",
-                        "new": "final",
+                        "file_path": "sim/lobby/room1/notes.md",
+                        "old_string": "draft",
+                        "new_string": "final",
                     }},
                 ],
                 "stop_reason": "tool_use",

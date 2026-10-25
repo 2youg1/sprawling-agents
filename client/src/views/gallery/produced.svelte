@@ -72,7 +72,7 @@
   const GIVEN: readonly Call[] = [
     {
       ...call(1, "edit", "city/hall/PLAN.md", said("1 file changed\n", 0)),
-      arguments: said('{"path": "city/hall/PLAN.md", "old": "- [ ] gate", "new": "- [x] gate"', 212),
+      arguments: said('{"file_path": "city/hall/PLAN.md", "old_string": "- [ ] gate", "new_string": "- [x] gate"', 212),
     },
   ];
 

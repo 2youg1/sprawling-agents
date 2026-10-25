@@ -16,7 +16,7 @@ function exec(outcome: Call["outcome"], output: Call["output"], answered: number
   return {
     tool: "exec",
     subject: null,
-    arguments: { head: JSON.stringify({ arm: { shell: { text: "cargo nextest -p city" } } }), cut: 0 },
+    arguments: { head: JSON.stringify({ command: "cargo nextest -p city" }), cut: 0 },
     outcome,
     at: Seq.make(41),
     output,

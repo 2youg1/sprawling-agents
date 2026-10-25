@@ -207,7 +207,9 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-13 | `crates/runtime/spec/Sandbox.lean` |
 | 8-13-2 | `crates/runtime/spec/Tools/Exec.lean` |
 | 8-13-3 | `crates/runtime/spec/Tools/Exec.lean` |
+| 8-13-4 | `crates/runtime/spec/Tools/Exec.lean` |
 | 8-14 | `crates/runtime/spec/Tools.lean` |
+| 8-14-1 | `crates/runtime/spec/Tools.lean` |
 | 8-15 | `crates/runtime/spec/Run.lean` |
 | 8-16 | `crates/runtime/spec/Digest.lean` |
 | 8-17 | `crates/runtime/spec/Diagnostics.lean` |
@@ -285,7 +287,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 - **read**：剩余成本是读出所请求的字节与对这些字节的一次扫描。下界是两者各一遍：结果整段进账本，扫描必须看到结果的每个字节，不能按选区跳过。`redact` 接收载荷的所有权并原地改写（D37），零命中时扫描之外不再分配，剩下的就是这两遍。
   read 另有两个仪表，也由 `just bench` 跑。`tools::read` 的 `instrument_read_ab` 在同一进程里逐轮交替四条路：§8-29-4 的判定路径（每次重求城根）、按句柄读（`spec/Tools/Read.lean` D113）、一次 canonicalize 加裸读、裸读，文件 20 KiB 到 8 MiB；`instrument_read_after_write_ab` 在每次读之前写一个字节，读的是刚写过的文件。`turn` 的 `instrument_read_round_trip` 量端到端：从模型回复里拿到一个 `read` 调用，到下一次请求交给模型，经真实的 `ReadTool` 与落在盘上的 `JsonlLedger`，包括准入、读、秘密扫描、`settle`、使本回合可持久的屏障（`append_all` 与它的 sync，D36）和下一次组装；同时单列读本身与每道屏障，看各占多少。墙钟读数属于机器，不当门；CI 守一个比值：`a_read_costs_within_a_bound_of_a_resolved_read` 要求 20 KiB 文件按句柄读的 p50 不超过「一次 canonicalize 加裸读」p50 的 1.5 倍。按句柄读的设计正是一次判定加一次 open，所以这个比值在各台机器上都接近 1；退回 4 次 canonicalize 加再开核验的判定路径就越过它。只在 Windows 与 Linux 上守，因为其他平台上判定路径就是读法。
-- **write**（`edit` 对不存在的路径以 `old: ""` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
+- **write**（`edit` 对不存在的路径以 `old_string: ""` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
 - **edit**：剩余成本在调用一段：在按路径的锁里取两次戳、读整个文件做唯一匹配，再整份写回；不再计算哈希（D106）。回显只含改动的行，扫描几乎为零。下界是读一遍、写一遍文件；局部改写不改变「整份写回」的下界，因为落盘经暂存文件改名。
 - **exec**：剩余成本是起一个进程与沙箱臂的准备，扫描只覆盖 stdout 与 stderr。下界是一次进程创建。下一步属于沙箱臂（`spec/Tools/Exec.lean`），不属于扫描。
 - **search**：剩余成本是在读界内遍历楼的目录并逐文件匹配，扫描只覆盖命中行。下界是读界内每个文件读一遍。下一步是在多次搜索之间复用遍历结果；它需要一个随写入失效的索引，失效规则要先写进 `spec/Tools/Search.lean`。
@@ -355,6 +357,11 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D109 | search 有三种模式，缺省仍是 content | `crates/runtime/spec/Tools/Search.lean` |
 | D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
 | D111 | 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结 | `crates/runtime/spec/Catalog.lean` |
+| D114 | 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性 | `crates/runtime/spec/Tools.lean` |
+| D115 | 旧账本里的调用原样进入重建的对话，旧参数名不映射成新名 | `crates/runtime/spec/Tools.lean` |
+| D116 | 参数改名不改变任何已派生的 `IdemKey`，不做迁移 | `crates/runtime/spec/Tools.lean` |
+| D117 | 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件 | `crates/runtime/spec/Tools/Search.lean` |
+| D118 | `command` 在没有 shell 的楼里读作一个程序与它的参数 | `crates/runtime/spec/Tools/Exec.lean` |
 -/
 
 /-! ## 13 依赖选型

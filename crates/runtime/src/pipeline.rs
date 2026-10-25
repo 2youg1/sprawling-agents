@@ -368,10 +368,7 @@ mod pinned {
         let call = kernel::ToolCall {
             id: "c1".to_owned(),
             name: kernel::ToolName::parse(kernel::ToolName::EXEC).unwrap(),
-            args: kernel::Payload::of(
-                &serde_json::json!({ "arm": { "program": { "path": "cargo", "args": ["check"] } } }),
-            )
-            .unwrap(),
+            args: kernel::Payload::of(&serde_json::json!({ "command": "cargo check" })).unwrap(),
         };
         let ran = kernel::ToolOutcome {
             result: kernel::Payload::of(&serde_json::json!({ "stdout": noise, "exit_code": 0 }))

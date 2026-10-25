@@ -15,14 +15,11 @@ use super::super::*;
 use crate::worker::fixture::*;
 
 /// The command that prints one file, on this machine.
-fn print_command(name: &str) -> (String, Vec<String>) {
+fn print_command(name: &str) -> String {
     if cfg!(windows) {
-        (
-            "cmd".to_owned(),
-            vec!["/C".to_owned(), "type".to_owned(), name.to_owned()],
-        )
+        format!("cmd /C type {name}")
     } else {
-        ("cat".to_owned(), vec![name.to_owned()])
+        format!("cat {name}")
     }
 }
 
@@ -54,7 +51,7 @@ arm = \"native\"
         noise.push_str(&format!("    Checking crate{n} v0.{n}.0\n"));
     }
     std::fs::write(room.join("build.log"), &noise).unwrap();
-    let (path, args) = print_command("build.log");
+    let line = print_command("build.log");
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -62,7 +59,7 @@ arm = \"native\"
                 "reading the build",
                 "tu_1",
                 "exec",
-                serde_json::json!({ "arm": { "program": { "path": path, "args": args } } }),
+                serde_json::json!({ "command": line }),
             ),
             completion("read it", None),
         ],
@@ -157,7 +154,7 @@ fn a_served_command_result_ends_with_the_second_its_call_answered() {
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     std::fs::write(room.join("note.txt"), "hello\n").unwrap();
-    let (path, args) = print_command("note.txt");
+    let line = print_command("note.txt");
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -165,7 +162,7 @@ fn a_served_command_result_ends_with_the_second_its_call_answered() {
                 "reading the note",
                 "tu_1",
                 "exec",
-                serde_json::json!({ "arm": { "program": { "path": path, "args": args } } }),
+                serde_json::json!({ "command": line }),
             ),
             completion("read it", None),
         ],

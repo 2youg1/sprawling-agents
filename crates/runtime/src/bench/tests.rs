@@ -41,7 +41,11 @@ fn bench(root: &std::path::Path) -> ToolBench {
 
 fn edit_call(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (k, v) in [("path", path), ("old", old), ("new", new)] {
+    for (k, v) in [
+        ("file_path", path),
+        ("old_string", old),
+        ("new_string", new),
+    ] {
         args.insert(k.to_owned(), Value::String(v.to_owned()));
     }
     ToolCall {
@@ -126,10 +130,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
 
     let exec_call = |text: &str| {
         let mut args = Map::new();
-        args.insert(
-            "arm".to_owned(),
-            serde_json::json!({ "shell": { "text": text } }),
-        );
+        args.insert("command".to_owned(), Value::String(text.to_owned()));
         ToolCall {
             id: "e1".to_owned(),
             name: kernel::ToolName::parse("exec").unwrap(),
@@ -321,10 +322,7 @@ fn exec_bench(root: &std::path::Path) -> ToolBench {
 
 fn exec_call() -> ToolCall {
     let mut args = Map::new();
-    args.insert(
-        "arm".to_owned(),
-        serde_json::json!({ "shell": { "text": "echo hi" } }),
-    );
+    args.insert("command".to_owned(), Value::String("echo hi".to_owned()));
     ToolCall {
         id: "e1".to_owned(),
         name: kernel::ToolName::parse("exec").unwrap(),

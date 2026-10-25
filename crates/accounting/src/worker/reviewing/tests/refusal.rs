@@ -36,9 +36,9 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
                 "tu_1",
                 "edit",
                 serde_json::json!({
-                    "path": "lab/room1/notes.md",
-                    "old": "before",
-                    "new": "after",
+                    "file_path": "lab/room1/notes.md",
+                    "old_string": "before",
+                    "new_string": "after",
                 }),
             ),
             tool_completion(

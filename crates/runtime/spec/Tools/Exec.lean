@@ -139,6 +139,24 @@ impl Backlog {
 -/
 
 /-!
+### 8-13-4 调用参数：`command`、`python`、`where`（`tools::exec::parse_arm`、`tools::exec::program_line`）
+
+```rust
+// args：{command?: string, python?: string, where?: "sandbox" | "host"}；command 与 python 恰给一个
+pub fn parse_arm(args: &Map<String, Value>) -> Result<ExecArm, AxError>;
+// command → ExecArm::Shell { text }，python → ExecArm::Python { code }；只读参数，不问楼
+
+// crates/runtime/src/tools/exec/program_line.rs
+pub(super) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError>;
+```
+
+- **`command` 是一行命令，怎么跑由楼定**（D118）。楼给了 shell（`Shell::Found`）时它交给那个解释器，即 shell 臂；楼没要 shell（`Shell::Absent`，这是缺省，`crates/kernel/spec/Config.lean` §8-22）时它被读成一个程序与它的参数，经 program 臂跑；楼要了 shell 而所在的主机上没有（`Shell::Missing`）照旧拒（D30）。`parse_arm` 只读参数，所以 bench 的删除预判（`kernel::discard::forecast`）与 sieve 的命令键（§8-27）看到的总是 `Shell { text }`，与楼无关；换成 program 臂发生在 `ExecTool::invoke` 里，在放置之后、起进程之前。
+- **程序行的文法**（`program_line`）：引号外的空白分词；一对单引号或双引号里的字符，包括空白，原样并进当前的词，引号本身不进词，引号里不做任何展开；反斜杠是普通字符，因为它是 Windows 路径的分隔符。引号外出现 `|`、`&`、`;`、`<`、`>`、`(`、`)`、`$`、反引号、`*`、`?`、`[`、`]`、`{`、`}`、`~`、`#` 或换行时拒绝：这些字符在 shell 里有意义，原样当参数传下去，跑的就是另一条命令，而模型不会知道。引号没有闭合、整行没有一个词，也拒。拒绝是 `E_INVALID_ARGS`，主语点出那个字符，恢复语说这栋楼没有 shell，只能跑一个程序和它的参数：管道与重定向写成 `python`，或请 User 在楼的 `CONFIG.toml` 里设 `[sandbox] shell = true`。
+- **`python`** 是一段脚本，交给 python 臂（wasip1 guest，§8-13）；它没有 host 形，`where: host` 时拒。
+- **旧形状**：`arm` 是较早的版本拼这次调用的方式（D115），收到它时以 `E_INVALID_ARGS` 拒绝，恢复语说出 `command` 与 `python`。两者都给、或都不给，同码拒绝。
+-/
+
+/-!
 ### 8-26 runtime::tools::exec 目录化
 
 
@@ -312,7 +330,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 }
 ```
 
-  shell 臂可用（`Found`）时，exec 工具的说明在末尾多一句 `A shell line runs under <name>.`，`<name>` 与结果里的 `interpreter` 同一个拼写：模型写哪种语法取决于它，cmd、pwsh 与 sh 的同一行命令意思不同，不说出来就是让模型猜。`Absent` 与 `Missing` 不加这句，调用时的拒绝已经说清。
+  shell 臂可用（`Found`）时，exec 工具的说明在末尾多一句 `A command runs under <name>.`，`<name>` 与结果里的 `interpreter` 同一个拼写：模型写哪种语法取决于它，cmd、pwsh 与 sh 的同一行命令意思不同，不说出来就是让模型猜。`Absent` 换成另一句，说一个命令是一个程序与它的参数、没有管道、重定向与通配（D118）；`Missing` 不加，调用时的拒绝已经说清。
   `Missing { asked: Pwsh }` 在调用时以 `E_TOOL_UNAVAILABLE` 拒绝，主语点名 pwsh 7，恢复语是「install PowerShell 7, or set `[sandbox] interpreter = "system"` in this building's CONFIG.toml」。不退回 cmd：为 pwsh 写的命令行在 cmd 下是另一种语言，退回只会把一次清楚的拒绝换成一次看不懂的失败。三个平台行为相同，只有 `"system"` 指的程序随平台变。
 - **账本上留什么**：shell 臂的结果载荷加 `interpreter` 字段，值是实际起动的解释器的程序名（去掉扩展名、小写：`cmd`、`pwsh`、`sh`、`bash`、`zsh`……），拼写只在 `tools::exec::outcome::interpreter_name` 一处。配置不入账本（§8-31），所以要按 shell 统计，这次跑的是哪一个只能记在结果上。加这个字段之前的记录没有它，按它们实际跑的那一个计：那时只有 `"system"`，折叠把它们计在 `system` 名下。转进后台的 shell 命令（`outcome: backgrounded`）当时没有退出码，不计。
 - **失败类别**：`tools::exec::outcome` 的纯函数 `FailureClass::of(interpreter, exit_code, stdout, stderr)` 把一次 shell 臂的结果分进 `CommandNotFound`、`Syntax`、`Encoding` 或不分类（`None`）；按 shell 统计的折叠 `ShellTally::absorb(result)` 读一条 `ToolResult` 载荷里的 `result`。两者住 `outcome`，因为那个文件是 exec 结果键名（`arm`、`exit_code`、`stdout`、`stderr`、`interpreter`）的唯一主人，折叠读的正是这几个键；每个解释器打印什么也只在这一处。`runtime` 在根上导出 `FailureClass`、`ShellTally`。账本的视图（`sprawling view --shells`，`bin::main::view::shells`）读记录、把每条 `result` 交给 `ShellTally`，折出来的是每个解释器的调用数与每类失败数。规则：
@@ -491,3 +509,14 @@ theorem an_asked_ceiling_is_silent_only_when_held_and_unhit (mark : CeilingMark)
       · exact ⟨before, after, rfl, rfl, Nat.le_of_not_lt moved⟩
 
 end Runtime.Tools.Exec
+
+/-! D118 `command` 在没有 shell 的楼里读作一个程序与它的参数
+
+**决定**：exec 的调用参数是 `command`（一行命令）或 `python`（一段脚本），加可选的 `where`（§8-13-4）。楼给了 shell 时 `command` 交给 shell；楼没要 shell 时它按程序行的文法读成一个程序与它的参数，在 program 臂上跑，引号外的 shell 语法即拒。模型不再能按名字点 program 臂；`ExecArm::Program` 只由程序行造出。
+
+**理由**：Claude Code 的 `Bash` 只收一个 `command`，模型见得最多的就是 `{command: "cargo test"}` 这一形（D114）。而一栋楼的 shell 缺省是关的，因为 shell 是唯一一条从参数读不出可达范围的臂；`command` 若只能落到 shell 臂，缺省的楼里每一次这样的调用都被拒。一行不带 shell 语法的命令，就是 program 臂本来能跑的一个程序与它的参数，所以把它当程序跑没有放宽没给 shell 的楼。这也划定了 `[sandbox] shell` 管什么：它决定 `command` 由不由一个 shell 解释，不决定 shell 能不能跑——把 `sh`、`pwsh` 当作程序名、带上它们的脚本参数，与改动前点名 program 臂一样能跑，因为解释器只是众多程序中的一个，按名单拦它们拦不住 `python -c`、`node -e` 与 `env`。一次调用够得到什么，由它所在的禁闭（`where` 缺省 `sandbox`，§8-13-2）与 run 的写域判定，不由 shell 开关判定。带 shell 语法的行拒绝而不是照传：`a | b` 当作程序 `a` 带参数 `|`、`b` 跑，结果是一条模型没写过的命令。
+
+**被否**：①保留 `program` 加 `args` 作第三种形状——每个请求的工具表多一段模型几乎不用的 schema，而它说的事与程序行重复；②`command` 只映射 shell 臂——缺省的楼里每次被拒；③没有 shell 时用一个内置的解释器跑 `command`——那就是给了 shell，绕过了楼的决定；④反斜杠作转义——Windows 的路径会被吃掉。
+
+**重开参数**：楼的 shell 改为缺省开；或读数显示程序行因 shell 语法被拒的调用占 exec 调用的可观比例，那时再议是否把程序行的文法放宽到某个可判可达范围的子集（例如单个重定向到写域里的文件）。
+-/

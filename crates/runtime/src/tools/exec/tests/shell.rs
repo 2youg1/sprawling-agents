@@ -25,10 +25,7 @@ fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
         patient(),
     )
     .unwrap();
-    let Err(err) = tool.invoke(&call_at(
-        serde_json::json!({ "shell": { "text": "echo hi" } }),
-        "host",
-    )) else {
+    let Err(err) = tool.invoke(&call_at(command("echo hi"), "host")) else {
         panic!("a missing pwsh refuses rather than running the line elsewhere");
     };
     assert_eq!(*err.code(), AxCode::ToolUnavailable);
@@ -57,12 +54,7 @@ fn a_shell_result_names_the_interpreter_that_ran_it() {
         Box::new(EchoSandbox::new()),
         Some(program),
     );
-    let answer = tool
-        .invoke(&call_at(
-            serde_json::json!({ "shell": { "text": "echo hi" } }),
-            "host",
-        ))
-        .unwrap();
+    let answer = tool.invoke(&call_at(command("echo hi"), "host")).unwrap();
     let result = answer.result.as_map();
     assert_eq!(result["interpreter"], Value::String(expected.to_owned()));
     assert_eq!(result["exit_code"], Value::from(0));
@@ -185,7 +177,12 @@ fn the_tool_description_names_the_interpreter_its_shell_lines_run_under() {
         program: PathBuf::from("/opt/microsoft/powershell/7/pwsh"),
         interpreter: kernel::Interpreter::Pwsh,
     });
-    assert!(pwsh.ends_with("A shell line runs under pwsh."), "{pwsh}");
+    assert!(pwsh.ends_with("A command runs under pwsh."), "{pwsh}");
     let absent = described(Shell::Absent);
-    assert!(!absent.contains("A shell line runs under"), "{absent}");
+    assert!(
+        absent.ends_with(
+            "a command is one program and its arguments, with no pipes, redirects or wildcards."
+        ),
+        "{absent}"
+    );
 }

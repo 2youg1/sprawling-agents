@@ -17,7 +17,7 @@
                   "type": "function",
                   "function": {
                     "name": "edit",
-                    "arguments": "{\"path\": \"atlas/notes/README.md\", \"old\": \"\", \"new\": \"# Atlas\\n\\nAtlas collects field notes from the survey team and turns them into one\\nweekly summary.\\n\\n## Layout\\n\\n| Folder | What it holds |\\n|---|---|\\n| `notes/` | raw notes, one file per day |\\n| `summary/` | the weekly summary the team reads |\\n\\n## Next steps\\n\\n1. Merge the three survey sheets into one table.\\n2. Mark every site that was visited twice.\\n3. Draft the summary for week 43.\\n\"}"
+                    "arguments": "{\"file_path\": \"atlas/notes/README.md\", \"old_string\": \"\", \"new_string\": \"# Atlas\\n\\nAtlas collects field notes from the survey team and turns them into one\\nweekly summary.\\n\\n## Layout\\n\\n| Folder | What it holds |\\n|---|---|\\n| `notes/` | raw notes, one file per day |\\n| `summary/` | the weekly summary the team reads |\\n\\n## Next steps\\n\\n1. Merge the three survey sheets into one table.\\n2. Mark every site that was visited twice.\\n3. Draft the summary for week 43.\\n\"}"
                   }
                 }
               ]

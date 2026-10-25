@@ -261,7 +261,7 @@ pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 - **`ToolCalled.subject` 在写记录时算定，读方读它，不从 `args` 再推一遍。**
   两个读方各按自己的 map 序挑第一个字符串时，同一次调用读出两个主语：
   `{"10":"a","2":"b"}` 在账本的 `BTreeMap` 字节序下是 `"a"`，
-  在浏览器的自有属性序下是 `"b"`。这张优先键表（`path`／`addr`／`program`／`arm`，
+  在浏览器的自有属性序下是 `"b"`。这张优先键表（`file_path`／`path`／`addr`／`command`，
   都不在时取载荷键序里的第一个字符串）只有一处，即 `ToolCalled::subject_of`；
   写方 `runtime::turn::wave` 调它一次，`wire` 不再持有第二份。
   `None` 是这次调用的参数没有指名任何东西，是一个真实状态而不是失败。

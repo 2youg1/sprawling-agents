@@ -40,10 +40,7 @@ fn exec_meta() -> ToolMeta {
 
 fn cargo_call(id: &str) -> ToolCall {
     let mut args = Map::new();
-    args.insert(
-        "arm".to_owned(),
-        json!({"program": {"path": "cargo", "args": ["check"]}}),
-    );
+    args.insert("command".to_owned(), json!("cargo check"));
     ToolCall {
         id: id.to_owned(),
         name: ToolName::parse("exec").unwrap(),
