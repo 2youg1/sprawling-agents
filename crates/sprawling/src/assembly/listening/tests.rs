@@ -167,6 +167,62 @@ fn a_listening_city_says_what_opening_it_cost() {
     drop(listening);
 }
 
+/// Every line the writer puts down while the city opens reaches the
+/// views, as every later line does: a vault that fell back to session
+/// memory is disclosed by a `provider_degraded` line `open_for_service`
+/// writes, and the views' answers come to stand after it
+/// (`crates/sprawling/spec/Assembly/Listening.lean` D81).
+#[test]
+fn every_line_written_while_opening_reaches_the_views() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    let formed = crate::assembly::init_city(city.path()).expect("a city forms");
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port");
+    let notice = kernel::Payload::of(&kernel::event::record::ProviderDegraded::VaultFellBack(
+        kernel::event::record::VaultFellBack {
+            component: "vault".to_owned(),
+            fallback: "session-memory".to_owned(),
+            persistence: "this-process".to_owned(),
+            reason: "a test asked for it".to_owned(),
+        },
+    ))
+    .expect("a notice");
+    let serving = super::Serving {
+        vault_notice: Some(notice),
+        ..serving_at(city.path(), addr)
+    };
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let listening = executor
+        .block_on(super::listen(serving))
+        .expect("the city listens");
+
+    let written = runtime::replay::verify_ledger_dir(&formed.ledger_dir)
+        .expect("the ledger verifies")
+        .raw_lines()
+        .len();
+    // The views fold on their own thread, so the answer is asked again
+    // for up to five seconds, twenty milliseconds apart.
+    let mut folded = (listening.answering)(wire::Query::CityView).0;
+    for _ in 0..250 {
+        if folded.value() >= u64::try_from(written).expect("a count") {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        folded = (listening.answering)(wire::Query::CityView).0;
+    }
+    assert_eq!(
+        folded.value(),
+        u64::try_from(written).expect("a count"),
+        "the views stand before line {written} of the ledger"
+    );
+    drop(listening);
+}
+
 fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super::Serving {
     super::Serving {
         city_root: city_root.to_path_buf(),
