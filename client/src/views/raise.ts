@@ -40,7 +40,13 @@ export function raisingOf(typed: string, buildings: readonly BuildingProgress[])
 // city's own and is raised with the city, so it is not offered.
 export const OFFERED: readonly Exclude<Template, "hall">[] = ["minimal", "confidential"];
 
-// The folders waiting to be adopted, which the page offers to fill in.
+// The folders waiting to be adopted.
 export function waiting(buildings: readonly BuildingProgress[]): readonly Address[] {
   return buildings.filter((each) => each.adoptable).map((each) => each.addr);
+}
+
+// The waiting folders the page offers to fill in: the one already in the
+// box is not offered again, since the box says it.
+export function fillable(buildings: readonly BuildingProgress[], typed: string): readonly Address[] {
+  return waiting(buildings).filter((folder) => folder !== typed.trim());
 }

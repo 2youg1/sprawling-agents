@@ -55,7 +55,7 @@ function press(
   return event;
 }
 
-const AT: BoxState = { query: "", cursor: 1, count: 3, list: "p-list", lang: "en" };
+const AT: BoxState = { asking: "places", query: "", cursor: 1, count: 3, list: "p-list", lang: "en" };
 
 describe("the palette's box", () => {
   test("↓ and ↑ move the cursor, stop at the ends, and keep the key from the caret", () => {

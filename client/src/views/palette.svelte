@@ -360,7 +360,7 @@
       const opening = branchInto($branching, place.to);
       return {
         label: place.to,
-        hint: noteOf(opening, place.to, $lang, null)?.said ?? say($lang, "palette_carry_to"),
+        hint: noteOf(opening, place.to, $lang, null)?.said ?? "",
         why: place.why ?? waitWhy(opening),
         keeps: true,
         act: () => {
@@ -406,7 +406,7 @@ pointer's extra way out, not the only one. -->
 <Modal wire={sheet} {seat}>
   <Look
     box={boxOf(
-      { query, cursor, count: shown.length, list: listId, lang: $lang },
+      { asking: carrying ? "carry" : "places", query, cursor, count: shown.length, list: listId, lang: $lang },
       {
         write: (line) => {
           query = line;

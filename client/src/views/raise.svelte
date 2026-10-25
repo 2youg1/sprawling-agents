@@ -30,7 +30,7 @@
   import Segmented from "./parts/segmented.svelte";
   import { textBoxWire } from "./building/text_box";
   import TextBox from "./building/text_box.look.svelte";
-  import { OFFERED, raisingOf, waiting } from "./raise";
+  import { fillable, OFFERED, raisingOf } from "./raise";
 
   interface Props {
     // The address a link filled in: a folder waiting to be adopted.
@@ -118,6 +118,7 @@
     }
   }
 
+  const fills = $derived(fillable(buildings, typed));
   const note = $derived.by(() => {
     switch (raising.kind) {
       case "blank":
@@ -134,7 +135,7 @@
 
 <Page title={say($lang, "raise_title")} note={say($lang, "raise_note")} {rank}>
   <form
-    class="flex min-w-0 max-w-talk flex-col gap-wide"
+    class="flex min-w-0 flex-col gap-wide"
     onsubmit={(event) => {
       event.preventDefault();
       raise();
@@ -152,10 +153,10 @@
           typed = value;
         }}
       />
-      {#if waiting(buildings).length > 0}
+      {#if fills.length > 0}
         <div class="flex flex-wrap items-center gap-snug" role="group" aria-label={say($lang, "raise_waiting")}>
           <span class="text-note text-text-quiet">{say($lang, "raise_waiting")}</span>
-          {#each waiting(buildings) as folder (folder)}
+          {#each fills as folder (folder)}
             <Button
               label={folder}
               onPress={() => {

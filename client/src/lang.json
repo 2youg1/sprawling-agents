@@ -592,7 +592,7 @@
     "zh": "接管为楼"
   },
   "city_adoptable": {
-    "en": "a folder, not adopted yet",
+    "en": "not adopted",
     "zh": "未接管的目录"
   },
   "city_hall": {
@@ -5402,10 +5402,6 @@
   "palette_carry_hint": {
     "en": "go on from here in another room; this room keeps its session",
     "zh": "在另一个房间从这里接着；这里的会话保留"
-  },
-  "palette_carry_to": {
-    "en": "a new session, starting from this conversation",
-    "zh": "开一段新会话，从这段对话接着"
   },
   "palette_carry_here": {
     "en": "the room you are in: fork from a turn instead",

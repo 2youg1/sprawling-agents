@@ -110,7 +110,7 @@
       typed: Address.make("lab/lexer"),
       working: (room) => room === WORKING,
     }).map(
-      (place): Entry => ({ label: place.to, hint: say($lang, "palette_carry_to"), why: place.why, act: ignore }),
+      (place): Entry => ({ label: place.to, hint: "", why: place.why, act: ignore }),
     ),
   );
 </script>
@@ -131,7 +131,7 @@
   <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
     <PaletteLook
       box={boxOf(
-        { query: "/", cursor: 1, count: VERBS.length, list: "entrances-verbs", lang: $lang },
+        { asking: "places", query: "/", cursor: 1, count: VERBS.length, list: "entrances-verbs", lang: $lang },
         { write: ignore, point: ignore, pick: ignore },
       )}
       nothing={undefined}
@@ -160,7 +160,7 @@
   <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
     <PaletteLook
       box={boxOf(
-        { query: "lab/lexer", cursor: 3, count: CARRIED.length, list: "entrances-carry", lang: $lang },
+        { asking: "carry", query: "lab/lexer", cursor: 3, count: CARRIED.length, list: "entrances-carry", lang: $lang },
         { write: ignore, point: ignore, pick: ignore },
       )}
       nothing={undefined}

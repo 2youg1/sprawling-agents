@@ -89,7 +89,7 @@ describe("building table", () => {
     const look = lookOf({ city, runs: [], now: 1_000, picked: null, lang: "en" }, () => undefined);
     expect(look.rows.map((row) => [row.name, row.latest])).toEqual([
       ["docs", "no runs"],
-      ["notes", "a folder, not adopted yet"],
+      ["notes", "not adopted"],
     ]);
   });
 });
