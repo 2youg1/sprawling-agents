@@ -358,18 +358,31 @@ than any diagram of boxes.
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
    and `city::resident`. Assembling it is itself an event, and the result
-   is frozen for the whole run.
+   is frozen for the whole run. The building page does not assemble a second
+   version for display: `accounting::views::layers` reads the same disk
+   state through the freeze's own rules and lays it out in send order, and
+   `city::prompt_documents` owns the whole-document steps a person may take
+   on a prompt document, so the page can show where the next run's context
+   comes from without becoming another authority on it.
 6. **`runtime::catalog` decides what the model may see**: the built-in
    tools, the collaboration tools this building admits, the skills
    its reading room allows, and any MCP tools discovered from the
-   building's `CONFIG.toml`. Of those, only the mode's core travels as
-   tools; the rest waits in a dormant index of at most 1 KiB, one line
-   per namespace and one per skill, and a run lists, finds, details and
-   runs a dormant tool through `tool` (the truncation lock,
-   `crates/runtime/Spec.lean` §8-60). `city::neighbourhood` is scanned at
-   the same time, so the run also knows which addresses it can reach and
-   who stands at them; without that scan, `signal` would take an address
-   the model had to be told.
+   building's `CONFIG.toml`. `runtime::catalog::exposure` resolves each
+   admitted tool from the building's and the city's `[catalog]` tables:
+   `core` travels in the request's tool list, `dormant` waits in an index
+   of at most 1 KiB, one line per namespace and one per skill, and `off`
+   reaches neither; `tool` and `read` are always core, and an unstated
+   tool keeps the mode-based default. A run lists, finds, details and
+   runs a dormant tool through `tool`, and records its whole resolved
+   table, `off` included, in `prompt_assembled.tools` (the truncation
+   lock, `crates/runtime/Spec.lean` §8-60, D111).
+   `accounting::views::catalog` reads that recorded table against the
+   configuration on disk for the building page instead of assembling a
+   fresh catalog, which could start a server or a browser just to answer
+   a page. `city::neighbourhood` is scanned at the same time, so the run
+   also knows which addresses it can reach and who stands at them;
+   without that scan, `signal` would take an address the model had to be
+   told.
 7. **`runtime::turn` enters its typestate**: Assembling → Calling →
    ToolWave → Recording. `runtime::run::SafePoint` names where a cancel is
    heard: before each of those four boundaries, and before every call of a
