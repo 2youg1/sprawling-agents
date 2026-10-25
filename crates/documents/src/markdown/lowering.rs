@@ -144,6 +144,8 @@ impl Lowering<'_> {
             | NodeValue::SpoileredText
             | NodeValue::Insert
             | NodeValue::BlockDirective(_)
+            | NodeValue::CommentInline(_)
+            | NodeValue::MultilineComment(_)
             | NodeValue::EscapedTag(_) => self.unsupported(span, Construct::Extension, ""),
         }
     }
@@ -281,6 +283,8 @@ impl Lowering<'_> {
             | NodeValue::MultilineBlockQuote(_)
             | NodeValue::Alert(_)
             | NodeValue::BlockDirective(_)
+            | NodeValue::CommentInline(_)
+            | NodeValue::MultilineComment(_)
             | NodeValue::Subtext => out.push(Inline::Unsupported {
                 construct: Construct::Extension,
                 source: plain(node),
