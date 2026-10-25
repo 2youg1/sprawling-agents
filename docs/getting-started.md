@@ -49,7 +49,7 @@ A **city** is one directory on your machine, and everything else is inside it. C
 | **session** | A stretch of conversation in one room. Dispatching into a room continues its session; `/new` starts a fresh one at the same address. |
 | **Ledger** | The city's one history, under `<city>/.sprawling/ledger`. Every effect is written there as an event before it happens, and every page you read is rebuilt from it. |
 
-Every city is raised with one building already standing, `hall` (City Hall), where two residents serve every other building. `hall/mayor`, **the Mayor**, is the city's planner: it turns an idea into a plan, raises buildings for the work, and hands each building its part. It writes Markdown and nothing else, because a planner that can run code stops reading the buildings' evidence and starts producing its own. `hall/clerk`, **the clerk**, answers questions on your behalf when you delegate that to it, and writes its reason into the Ledger.
+Every city is raised with one building already standing, `hall` (City Hall), where two residents serve every other building. `hall/mayor`, **the Mayor**, is the city's planner: it turns an idea into a plan, asks you for the buildings the work needs, and hands each building its part. It writes Markdown and nothing else, because a planner that can run code stops reading the buildings' evidence and starts producing its own. `hall/clerk`, **the clerk**, answers questions on your behalf when you delegate that to it, and writes its reason into the Ledger.
 
 ## Scaffolding: the forms a building is raised with
 
@@ -70,7 +70,7 @@ A harness's *scaffolding* is the structure it puts around a model so that long w
 
 ## Tools, skills and MCP
 
-**Tools** are built in and given by the building's rules: `read`, `search`, `edit`, `exec` (run a program or a shell line), `plan`, `status`, `neighbours`, `delegate`, and more. A building with `browser = true` in its rules also gets a browser the city starts and owns.
+**Tools** are built in and given by the building's rules. Every request a run sends carries six of them: `read`, `search`, `status`, `tool`, `edit` and `exec` (run a program or a shell line), and a run in chat mode is refused the last two. `read` answers with numbered lines, at most 512 at a time, and says where to continue. `edit` replaces an exact string in a file this run has read; when the file changed after that read, the edit is refused and the refusal shows the passage as it now reads, and an empty `old` creates a file that does not exist yet. Everything else the building admits — `plan`, `neighbours`, `delegate`, the tools of its MCP servers, its skills — waits in the dormant index, one line per namespace and one per skill, and a run reaches it through `tool`, which lists, finds, details and runs it. A building with `browser = true` in its rules also gets a browser the city starts and owns.
 
 A **skill** is a folder with a `SKILL.md` file in it: a set of instructions, and sometimes scripts, that teaches an agent how to do one kind of work. If you have used skills in Claude Code, the file format is the same. The difference is admission. A city keeps skills on **shelves** — the building's own shelf at `<building>/.sprawling/skills/`, the city's library, and any outside folder the city mounts read-only, such as a skills folder another harness already keeps — but an agent sees only the skills its building admits by name in `RULES.toml`:
 
@@ -287,7 +287,9 @@ The browser `/web` opens is paired without typing. `/web` hands it a one-time op
 
 `/quit` closes the city in order, typed in the CLI or on a page this machine opened. With runs going it asks once: Enter waits for them to finish, `n` stops them now, and Esc keeps the city serving. Stopping now waits at most four seconds for the runs to reach a safe point; after that the city closes without writing its handoff, and the next start freezes the runs it left open. Ctrl+C and Ctrl+V belong to the terminal: Ctrl+C copies the selected text, and a Ctrl+C that reaches the city only prints, once per session, that `/quit` closes the city. Esc closes a menu, else clears the line, else interrupts the run in the room you speak to. A line that ends in `\` goes on to a new line when you press Enter, and so does Shift+Enter where the terminal tells the two apart. On macOS and Linux a paste arrives whole, line breaks and all; on Windows each pasted line is sent as it arrives. Closing the terminal window stops the runs at their next safe point and closes the city within a few seconds. The keys behave the same on Windows, macOS and Linux.
 
-`sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there. It opens on the CLI rather than the quiet host, and no browser opens until you type `/web`.
+This guide names its city `./cities/first` so that every command below can name it too. Without a folder, `sprawling up` opens the city your personal configuration names in its `city` line (`~/.sprawling/config.toml`, an absolute path), or `~/sprawling/city` when it names none, and raises the city there if none stands yet. The city does not live beside the binary, because an update unpacks the new binary into another folder.
+
+`sprawling` with no arguments opens the same city, on the CLI rather than the quiet host, and no browser opens until you type `/web`. When no city stands there yet, it first shows the folder it would start one in and waits: Enter starts it there, and a folder you type, which must already exist, becomes a city around the work in it. Either choice is written into the `city` line, so the next start opens it; `sprawling up <folder>` opens a folder for that launch only and writes nothing. A city that an earlier release kept beside the binary is moved to `~/sprawling/city` by the first start that names no folder and runs from that same folder, the only place a start looks for it, so a release unpacked elsewhere opens a new city unless the old folder is typed on the first screen; when the home directory is on another volume, the city stays where it is and its path goes into the `city` line instead.
 
 To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ./cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
 
@@ -317,21 +319,22 @@ A local server can also be named before the city starts: with `SPRAWLING_MODEL_U
 
 **the Mayor** is the conversation with `hall/mayor`, and the page the city opens on once a model is chosen. Enter sends a message; Shift+Enter starts a new line.
 
+While the box is empty, its placeholder says where the message goes, such as `to hall/mayor · #23…`: the room, and the number of its session once it has one. The address in it is a button. Pressing it opens the command palette, which lists this room's sessions first and then the pages, buildings and rooms, so the address is where you change room or session. A touch screen has no Ctrl+/, and on one the address is the way to the palette. The placeholder goes as soon as the box holds a character and comes back when the box is empty again.
+
 Under the box, the settings row says how the message runs, and a click changes each control:
 
 | Control | What it sets |
 |---|---|
-| **workspace** | the room that hears the message |
 | **model · provider · level** | one control in three parts: the model that answers, the provider that serves it, and the thinking level. Pressing a part opens one panel at that part's list (a key opens it at the first list), and the recent combinations at its top apply all three parts at once. A model that several providers serve is listed once, and each provider shows its price and context window. The level list holds only the levels this provider states for this model, marks the one that will be used, and says `high (default)` while you have chosen none; a model without thinking control shows no level part. The control stands only before a session starts: a session keeps the model it started on, and `/new` starts the next one |
 | **permissions** | what the run does with your message: **chat** answers what you say and changes nothing else; **work** carries out the task towards the goal you state; and the write limit |
 
 The level you choose in the control is stored as the city's `[model] effort`, the same value the settings page edits, so every browser paired with the city sees it. Choosing another model or provider keeps it: the level is a preference of its own, used whenever the model in force offers it, so moving back to a model restores it. Only `/effort <level>` names a level for one message; a model that does not offer that level refuses the message before dispatch.
 
-Write the idea in one sentence — *rewrite the ledger reader so a cold read of a million events stays under a second, and write down the numbers you measured* — leave the workspace at `hall/mayor`, and press Enter.
+Write the idea in one sentence — *rewrite the ledger reader so a cold read of a million events stays under a second, and write down the numbers you measured* — and press Enter on **the Mayor**.
 
-The Mayor reads every building's `Roadmap.md`, `Memo.md` and `Handoff.md` first. It writes the city's plan into `<city>/hall/Roadmap.md` through its `plan` tool, one row per line of work. It raises a building through its `city` tool when no existing building should hold the work, or adopts a directory you point it at, and never raises two buildings for one project. It hands each building its part, keeps each building working through `pursue` until the part runs out, and records what it decided in `<city>/hall/Memo.md` before it reports back.
+The Mayor reads every building's `Roadmap.md`, `Memo.md` and `Handoff.md`, and the hall's own, first. It writes the city's plan into `<city>/hall/Roadmap.md` through its `plan` tool, one row per line of work, and hands each building its part through the same tool. When no existing building should hold the work, it asks you to raise one or to adopt a folder you point it at, because the shape of the city is your decision, and it never asks for two buildings for one project. Once you set a building's part as its standing goal, the city keeps that building working until the part runs out. The Mayor records what it decided in `<city>/hall/Memo.md` before it reports back.
 
-You can also skip the Mayor. `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one), and switching the **workspace** chip to a room of that building sends your message straight to it.
+You can also skip the Mayor. `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one); open one of its rooms from the command palette, or with `/room <address>`, and your message goes straight to it.
 
 ## 5 Watch the city work
 
@@ -395,11 +398,12 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/raise <addr> [minimal\|confidential\|hall]` | raises a building from a template |
 | `/new [--carry]` | start a fresh session in this room; `--carry` brings the room's `Handoff.md` |
 | `/fork [addr]` | starts a second line of conversation from the newest run in a room |
+| `/room <addr>` | opens the conversation of that room |
 | `/model <id>`, `/effort <level>` | point `main` at another model; set the thinking level. Both complete their argument from what the model in force offers, and `/effort` with a level that model does not offer is refused before the run starts, naming the levels it does offer |
 | `/web`, `/quit` | in the CLI, open the page; on either face, close the city. A paired remote device cannot close the city, and a page cannot close a city served beyond loopback |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |
 
-Ctrl+/ (⌘/ on a Mac) opens the palette, which offers every command with every page, building and room beside it. No key the page binds takes a browser's own shortcut for printing, downloads, bookmarks, search or switching tabs, so three keys ship: Ctrl+/ for the palette, Ctrl+\ to change how much of the city the page draws, and `/` outside a text box to focus the box. Every other action — the pages, settings, the mailbox, **waiting on you**, the inspector, finding a file, stopping the run in front of you, the key list, forking, and answering a decide card — has no key until you give it one in **settings** → **keybindings**; until then its button, the palette or its slash command reaches it. A key you bind that holds no modifier does nothing while the focus is in a text box.
+Ctrl+/ (⌘/ on a Mac) opens the palette, which offers every command with every page, building and room beside it. The address in the box's placeholder opens the same palette when you press it, which is how a touch screen, with no Ctrl+/, reaches it. No key the page binds takes a browser's own shortcut for printing, downloads, bookmarks, search or switching tabs, so three keys ship: Ctrl+/ for the palette, Ctrl+\ to change how much of the city the page draws, and `/` outside a text box to focus the box. Every other action — the pages, settings, the mailbox, **waiting on you**, the inspector, finding a file, stopping the run in front of you, the key list, forking, and answering a decide card — has no key until you give it one in **settings** → **keybindings**; until then its button, the palette or its slash command reaches it. A key you bind that holds no modifier does nothing while the focus is in a text box.
 
 ## Sessions
 

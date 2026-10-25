@@ -8,6 +8,7 @@ The documents for people who use, run or change sprawling, grouped by who reads 
 | Someone using a city every day | [`operating.md`](operating.md) | Steering and stopping work, answering residents, driving a city from a script, and the ways out of what goes wrong |
 | An agent or script author | [`wire.md`](wire.md) | CLI, frames, answers, exit codes and generated protocol rosters |
 | Someone integrating tools | [`integrations.md`](integrations.md) | Any ACP agent as a resident, MCP servers and CLI control from an existing agent |
+| Someone deciding what a building's residents may do | [`catalog.md`](catalog.md) | Every built-in tool and namespace a resident can be given, what admits each one, and the sentence a model reads about it first |
 | Someone measuring work | [`performance.md`](performance.md) | Monitor counters, reproducible workloads and measurement provenance |
 | Someone reviewing measured workloads | [`benchmarks/v0.0.11/README.md`](benchmarks/v0.0.11/README.md) | Preliminary fixed-version Windows observations, exported samples and comparison limits |
 | Someone debugging | [`logging.md`](logging.md) | What goes in the diagnostic log and what goes in the Ledger, and why the two stay apart |

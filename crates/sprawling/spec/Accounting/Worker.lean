@@ -359,7 +359,7 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 /-!
 ## 8-18 审查中的 run 不再把自己的决策直接放上楼的书架
 
-**原因**：`dispatch_in` 的档案回收段写的是 `city::file_archive(&self.city_root, …)`，而不是 `&write_root`。ARCHITECTURE.md §5 把输线设计写在明处——「A building under review gives every run its own tree … Nothing it writes is visible until somebody else checks it — the losing line of the design made physical rather than promised」。档案不在那棵树里。
+**原因**：`dispatch_in` 的档案回收段写的是 `city::file_archive(&self.city_root, …)`，而不是 `&write_root`。审查中的楼给每个 run 一棵自己的 worktree（ARCHITECTURE.md §2 表中 Restoration 一行、§6 目录树的 `worktrees/`），它写下的东西只经合并到达楼，主干收到的唯一提交是那次合并（`docs/glossary.md` 的 landing commit）。档案不在那棵树里。
 
 具体危害：书架回头喂给 `ArchiveDesk`，成为模型看到的「这栋楼已经知道什么」。一个**被驳回**的 PR 里的决策因此会留在架上，变成后续 run 的前提。
 

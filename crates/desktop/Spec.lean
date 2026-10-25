@@ -111,7 +111,7 @@ Lean 里的名字与 Rust 的对应：`Desktop.Scope.Tool` ↔ `tools::ToolName`
 - **说什么**归 `tools`：六张卡片是数据，改它就是改行为（形状 6）。
 - **一扇窗口读起来是什么样**归 `outline`：role 的封闭词表、名字的清洗与截断、一串节点折成的文字。它平台无关，因为 macOS 臂以后把 AX 的 role 映到同一张词表；control type 编号到词表的映射是 Windows 的事实，住 `windows::tree`。
 
-**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架。workspace crate 只依赖三个：`kernel`（错误码与质量的域）、`agent_protocols`（协议修订与效果未知的键）、`desktop_ffi`（只为本 package 存在的 FFI 缝），每一条边都是为了读一个事实的唯一定义，而不是为了它的行为（D14）。
+**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架。workspace crate 只依赖四个：`kernel`（错误码与质量的域）、`agent_protocols`（协议修订与效果未知的键）、`desktop_ffi`（只为本 package 存在的 FFI 缝），这三条边都是为了读一个事实的唯一定义，而不是为了它的行为（D14）；`child` 是为了它的行为：录制起的两个 ffmpeg 从城起子进程的唯一构造点 `child::command` 起（D17）。
 
 D14 并回 workspace：本 package 继承 `forbid`，FFI 叶子自带一张只差一行的 lint 表。
 

@@ -12,17 +12,15 @@
 > provider ([`docs/operating.md`](docs/operating.md)).
 >
 > **What is written here is what is true across modules today.** A rule that
-> governs one module lives in that module's SPEC and its rustdoc; the history
-> of a decision — what was tried, what was rejected, what a gate once caught —
-> lives beside the thing it constrains, so that removing the thing removes the
-> record (§12).
+> governs one module lives in that module's SPEC and its rustdoc, and the
+> history of a decision lives beside the thing it constrains (§12).
 >
-> **Three kinds of statement, and you can tell them apart.** A figure between
+> **Each statement here is one of three kinds.** A figure between
 > `xtask:begin` and `xtask:end` markers is written from the code by
-> `cargo xtask docnum` and cannot drift. A table marked **machine authority**
-> is parsed by a gate, so a disagreement between it and the code is a red
-> build. Everything else is prose a person maintains: true when written, and
-> checked by review alone — when it contradicts the code, the code is right.
+> `cargo xtask docnum` and cannot drift. A table or block marked **machine
+> authority** is parsed by a gate, so a disagreement between it and the code
+> is a red build. Everything else is prose a person maintains and only review
+> checks; when that prose contradicts the code, the code is right.
 
 ## 1 What runs
 
@@ -70,15 +68,17 @@ The figure draws the units and how they are wired, and nothing about what
 each is for. That is stated once, in the `[family.*]` table of
 `architecture.toml`, which `crates/README.md` renders as its crate table
 (`cargo xtask docnum`); a second hand-kept list of duties here would drift
-from it. `kernel` is absent from the figure because everything above depends
-on it and nothing it holds is reached from outside the process.
+from it. The figure leaves out `kernel`, because every unit depends on it
+and nothing it holds is reached from outside the process, and the three
+platform crates `child`, `desktop_ffi` and `console_ffi`, whose rows in §3
+say what each one is for.
 
 The address the server binds is `kernel::consts_policy::DEFAULT_AT` unless a
 caller overrides it. The value is not repeated here: every verb's default and
 the first-run screen read that one constant, and `README.md` sends a person
-to the address the console prints rather than spelling it, because the
-address a person is told and the address actually bound may not be two
-spellings (`crates/sprawling/Spec.lean` §8-2b).
+to the address the console prints rather than spelling it, so the address a
+person is told and the address the server binds cannot be spelled two ways
+(`crates/sprawling/Spec.lean` §8-2b).
 
 ## 2 The stack, and what each choice costs
 
@@ -90,7 +90,7 @@ every week.
 
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
-| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
+| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types. `unsafe_code` is `forbid` in the workspace lint table, and only the two FFI crates, `desktop_ffi` and `console_ffi`, lower it to `deny` so that each call into their Zig leaf can lift it alone (*Hardening* in §10). Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio`, only in `wire` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/wire/Cargo.toml`; `crates/sprawling/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`crates/wire/Spec.lean` §8-41). |
@@ -149,6 +149,12 @@ scanning of ledger envelopes, safe Rust runs level with or faster than Zig
 `ReleaseFast`, so a Zig leaf there would cost a toolchain in every
 workflow and buy nothing. When a leaf measures the other way, re-argue the
 rule.
+
+The console's renderer, `crates/console_ffi`, entered by neither route: it
+is Zig by a separate ruling of the person, a pure leaf that reads a borrowed
+scene and writes a borrowed buffer, and its cost is that building the
+workspace on every platform needs the pinned Zig
+(`crates/console_ffi/Spec.lean` D1).
 
 ## 3 The units and the dependency law
 
@@ -218,15 +224,18 @@ crates/sprawling/src/doctor: crate::assembly, accounting::worker
 crates/sprawling/src/serving: crate::assembly, accounting::worker
 ```
 
-What each unit owns is stated once, in the `[family.*]` table of
-`architecture.toml`, and not repeated here, because two hand-kept lists of
-duties drift apart. §13 draws this block as a graph, generated from it.
+What each unit owns is stated in `architecture.toml`, for the reason §1
+gives. §13 draws this block as a graph, generated from it.
 
 **Three rules.** Dependencies point inward, and never back. A seam declares
 its trait in the inner layer and implements it in the outer one, so
 `kernel` can define what a Ledger *is* without knowing where it is written.
-And splitting into crates buys compiler-enforced layering, not reuse —
-nothing here is published.
+And splitting into crates buys compiler-enforced layering, not reuse.
+Every package is published to crates.io, but only because
+`cargo install sprawling` builds the binary from the registry and
+crates.io requires each of its dependencies to be there
+(`crates/sprawling/spec/Doctor.lean` §8-157); the packages are the parts
+of one binary, not libraries offered to other projects.
 
 **Three kinds of edge**, and telling them apart is what makes the
 repository readable:
@@ -237,19 +246,21 @@ repository readable:
 | Assembly | run time, only in `bin::assembly` | the upload sink in `wire::server` receiving `storage::cas` |
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
-Below the binary each crate that holds a domain uses at most two others:
-`runtime` and `collab` each use `kernel` and `storage`, and `agent_protocols` uses
-`kernel` and `gateway` (an MCP server reached over HTTP gets its client
-from `gateway::client_for`, the one place a client is built), and `desktop`
-uses `kernel` and `agent_protocols` beside its own FFI seam. The `depmap`
-block also lets `runtime` use `gateway`, and the code does not take that
-edge. `accounting` uses eight, because it holds the city's one writer,
-the views every page is answered from, and the ports the writer reaches
-outside itself through, and those carry the other crates' types;
-`sprawling` uses every crate. A crate may **use**
-the interfaces of what it depends on and nothing more; the moment a
-module starts passing concrete types between two of them, that edge
-moves up into the assembly layer.
+Below the binary, each crate that holds a domain uses at most two other
+domain crates, and may also use the platform crates `child` and
+`desktop_ffi`: `runtime` and `collab` each use `kernel` and `storage`;
+`agent_protocols` uses `kernel` and `gateway`, because an MCP server
+reached over HTTP gets its client from `gateway::client_for`, the one
+place a client is built; and `desktop` uses `kernel` and
+`agent_protocols`. The `depmap` block also lets `runtime` use `gateway`,
+and the code does not take that edge. `accounting` uses nine crates,
+because it holds the city's one writer, the views every page is answered
+from, and the ports through which the writer reaches outside itself, and
+those carry the other crates' types. `sprawling` uses every crate.
+
+A crate may **use** the interfaces of what it depends on and nothing
+more. When a module starts passing concrete types between two of those
+crates, that edge moves up into the assembly layer.
 
 `xtask` and `citysim` are workspace members outside the product graph.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
@@ -315,30 +326,34 @@ than any diagram of boxes.
    sends `Command::Dispatch` over the WebSocket. The frame carries no
    ceiling of any kind: nobody can price a piece of work before it runs,
    and the one brake is `Halt`.
-2. **`wire::server` decides whether to accept it.** Two pure
-   judgements — may this address be bound, may this peer be accepted — with
-   the socket code that surrounds them making no judgement at all.
+2. **`wire::server` decides whether to accept it.** Every judgement it
+   applies — may this address be bound, may this peer be accepted, what a
+   frame means in the session's state — is a pure function in
+   `wire::reception`, and the socket code around those functions makes no
+   judgement at all.
 3. **`bin::assembly` turns it into work.** This is the only place that
    samples the clock, so the timestamp enters as a parameter from here on.
-   A worker takes the dispatch and answers every refusal it can owe before
-   it writes anything: the reserved subtree, a halted scope, rules that
-   will not load, and a tag with no model behind it are all decided by
-   `agree_to_work`, which writes nothing. **Opening the room is
-   the first thing this city puts on disk for a dispatch**, so work nobody
-   could take leaves no room behind for a person to find.
+   The accounting thread that `bin::assembly` starts takes the dispatch and
+   answers every refusal it can owe before it writes anything: the
+   reserved subtree, a halted scope, rules that will not load, and a tag
+   with no model behind it are all decided by `agree_to_work`, which
+   writes nothing. **Opening the room is the first thing this city puts on
+   disk for a dispatch**, so work nobody could take leaves no room behind
+   for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect
-   becomes an event first; that ordering is the design's load-bearing rule,
-   not a logging preference. A tool that only reads (`Effect::Read`) runs
-   before its `tool_called` is durable. The lines a run appends are its
-   held lines (`runtime::turn::ledger::HeldLines`): they belong to the run
-   rather than to one turn, and every one of them is durable before the
-   next outside effect. One barrier after `model_called` covers the model
-   call and the previous turn's wave; a write's `tool_called` is durable
-   before the write runs; and the run pays one more before it freezes, is
-   cancelled, or writes a carrier event, so a carrier line never lands
-   ahead of what the run held. A turn therefore pays one barrier plus one
-   per write, seq stays the order of appending, and a power cut at any
-   line leaves a prefix with no write ahead of its intent
+   becomes an event first. The rest of the design rests on that order;
+   it is not a logging preference. A tool that only reads
+   (`Effect::Read`) is the exception within a model's run: it runs before
+   its `tool_called` is durable. The lines a run appends are its held lines
+   (`runtime::turn::ledger::HeldLines`). They belong to the run rather than
+   to one turn, and each of them is durable before the next outside
+   effect. Three barriers make that true: one after `model_called` covers
+   the model call and the previous turn's wave; a write's `tool_called` is
+   durable before the write runs; and the run pays one more before it
+   freezes, is cancelled, or writes a carrier event, so a carrier line
+   never lands ahead of what the run held. A turn therefore pays one
+   barrier plus one per write, seq stays the order of appending, and a
+   power cut at any line leaves a prefix with no write ahead of its intent
    (runtime D24 and D36, `crates/runtime/spec/Turn/Durability.lean`).
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
@@ -351,11 +366,10 @@ than any diagram of boxes.
    tools; the rest waits in a dormant index of at most 1 KiB, one line
    per namespace and one per skill, and a run lists, finds, details and
    runs a dormant tool through `tool` (the truncation lock,
-   `crates/runtime/Spec.lean` §8-60).
-   `city::neighbourhood` is scanned in the same
-   breath, so the run also knows which addresses it can reach and who
-   stands at them — without it, `signal` takes an address the model has to
-   have been told.
+   `crates/runtime/Spec.lean` §8-60). `city::neighbourhood` is scanned at
+   the same time, so the run also knows which addresses it can reach and
+   who stands at them; without that scan, `signal` would take an address
+   the model had to be told.
 7. **`runtime::turn` enters its typestate**: Assembling → Calling →
    ToolWave → Recording. `runtime::run::SafePoint` names where a cancel is
    heard: before each of those four boundaries, and before every call of a
@@ -365,10 +379,10 @@ than any diagram of boxes.
    Anthropic-shaped conversation into the provider's dialect;
    `gateway::credential` redeems a `secret:realm/name` reference into a
    header at the last moment. Each endpoint hands out permits in arrival
-   order under its `max_in_flight`, and `gateway::concurrency` narrows it
-   after a 429 until the provider's `Retry-After` instant has passed; this
-   provider queue is the one concurrency limit, because the driving pool
-   sets no lane count (`crates/gateway/Spec.lean` §8-6,
+   order under its `max_in_flight`, and `gateway::concurrency` narrows that
+   number after a 429 until the provider's `Retry-After` instant has
+   passed. The driving pool sets no lane count, so this provider queue is
+   the city's one concurrency limit (`crates/gateway/Spec.lean` §8-6,
    `crates/sprawling/Spec.lean` D34). Each endpoint keeps one HTTP client,
    so its connections stay open between calls, and a request to
    `api.openai.com` carries the conversation's id as `prompt_cache_key`,
@@ -384,8 +398,8 @@ than any diagram of boxes.
     `runtime::run::checkpoint` decides whether a wave needs a git checkpoint first,
     `storage::checkpoint` commits the checkpoint and scans the worktree after the
     wave, and anything that disappeared becomes a `file_discarded` event
-    carrying the way back. Runs checkpoint at the same time: each writer
-    builds its tree in an index of its own, and only the object store and
+    carrying the way back. Several runs may checkpoint at the same time:
+    each writer builds its tree in an index of its own, and only the object store and
     the move of HEAD are shared, the latter under one lock that guards
     HEAD alone (storage D25, D26). The scan never opens a file another
     writer is still staging, so a document mid-write or a landing's
@@ -395,69 +409,78 @@ than any diagram of boxes.
     `runtime::compaction` shortens what is too long, always reporting how
     much it dropped.
 12. **Everything lands in the Ledger, and the views follow.**
-    `storage::hot` and `storage::attribution` fold the same event stream into
-    what the pages ask for. The views fold each record on their own thread
+    `accounting::views` folds the same event stream into what the pages ask
+    for, with `storage::hot` and `storage::attribution` among its folds.
+    The views fold each record on their own thread
     (`bin::serving::folding`), and only then is it broadcast to every socket
     as one `Committed` frame, so a page that asks right after an event
     arrives is answered from views that already hold it. A socket worker
     that wakes writes every record already queued for it, each as its own
     `Event` frame, and flushes once, so a burst costs one flush rather than
     one per record; frames keep their shape and their `seq` order
-    (`crates/wire/spec/Server/Socket.lean` §8-47h, wire D45). The client folds
-    the event into what it believes. The same fold, on both sides of the
-    wire.
+    (`crates/wire/spec/Server/Socket.lean` §8-47h, wire D45). The client
+    folds the event into what it believes, so the same fold runs on both
+    sides of the wire.
 13. **A signal reaches whoever it names, working or not, when it is sent.**
-    `signal send` is recorded at the call (`signal_enqueued`, through the
-    lane's relay), and the accounting thread delivers it into the named
-    room as it shows that line, then records where it landed as the
+    `signal send` is recorded at the call as `signal_enqueued`, through the
+    lane's relay. The accounting thread delivers the signal into the named
+    room when it shows that line, then records where it landed in the
     `signal_landed` line that follows: delivered, queued or knocked
-    (kernel D38). A run working in that room receives it at its next safe
-    point, through the same door a steer uses, as one *letter*: an escaped
+    (kernel D38).
+
+    A run working in that room receives the signal at its next safe point,
+    through the same door a steer uses, as one *letter*: an escaped
     `<letter>` element that names the sending room, the sending run, the
-    kind and the sender run's state at delivery (running for a send,
-    frozen or cancelled for a handback), which its body cannot close
-    (collab D16); a room with no run is *knocked* at that delivery, once, while the sender
-    still drives — `bin::assembly` starts a run whose brief names the
-    resident who spoke, or waits for the room's current reader to leave.
-    The sender carries on. A signal counts as consumed only when a model
-    answer that read it is recorded; a run that leaves before that gives
-    it back and the room is knocked again. Work handed down with
-    `delegate` or laid out with `workshop` starts at the call, while the
-    parent still drives. A `signal send` with `wait: true` stops the
-    sending run at its next `BeforeAssemble` safe point with no model
-    call, until a signal from the room it spoke to arrives in its
-    mailslot, the injected clock reaches the stop's reading plus
-    `collab::signal_tool::PATIENCE_MS` (240 s), or the run is stopped;
-    `signal_wait_started` and `signal_wait_ended` record it, and the end
-    lands in the next request as a steer (collab D9). Who speaks is a type,
-    `runtime::conversation::Speaker`: only the person's own entrance
-    renders as `user`, the city's own words as `city`, and a resident's as
-    a letter; a delegated child's JOB.md names who handed its task down
-    (city D21). A knock addresses a resident, never a
-    frozen run: history is read, not woken. (collab D7–D11,
+    kind, and the sender run's state at delivery (running for a send,
+    frozen or cancelled for a handback). The body cannot close the element
+    (collab D16). A room with no run is *knocked* once, at that delivery,
+    while the sender still drives: the accounting thread starts a run whose
+    brief names the resident who spoke, or waits for the room's current
+    reader to leave (`accounting::worker::doorstep`). The sender carries
+    on. A signal counts as consumed only when a model answer that read it
+    is recorded; a run that leaves before that gives it back, and the room
+    is knocked again. A knock addresses a resident, never a frozen run,
+    because history is read, not woken.
+
+    Work handed down with `delegate` or laid out with `workshop` also
+    starts at the call, while the parent still drives. A `signal send`
+    with `wait: true` is the one send that stops its sender: the run stops
+    at its next `BeforeAssemble` safe point and calls no model until a
+    signal from the room it spoke to arrives in its mailslot, the injected
+    clock reaches the stop's reading plus `collab::signal_tool::PATIENCE_MS`,
+    or the run is stopped. `signal_wait_started` and `signal_wait_ended`
+    record the wait, and its end lands in the next request as a steer
+    (collab D9).
+
+    Who speaks is a type, `runtime::conversation::Speaker`: only the
+    person's own entrance renders as `user`, the city's own words as
+    `city`, and a resident's words as a letter. A delegated child's JOB.md
+    names who handed its task down (city D21). (collab D7–D11,
     `crates/collab/spec/Delivery.lean`.)
 
 When the process dies mid-call, `sprawling resume` verifies the chain,
 closes tool calls whose outcome was lost as *unknown* rather than as
 failed, and reports what waits for a person.
 
-**A room whose resident is an ACP agent takes the second drive.**
+**A room whose resident is an ACP agent takes a second path.**
 `agree_to_work` decides the resident once, as a `Seat`, and a harness
-room leaves the walk after step 4: steps 5 to 11 are the harness's own,
-because it assembles its own context, calls its own model and runs its
-own tools, so the city records what it chooses to report and governs
-none of it. The lane lends the room its own worktree whatever the
-building's `review` says, starts the harness there
-(`accounting::worker::driving::harness`), sends the brief as its one
-prompt, books each report as `harness_reported` after it was said, and
-turns a halt or the building's `harness_minutes` ceiling into
-`cancel_received` and `session/cancel`. When the harness answers, the
-city commits the tree, writes `harness_answered`, and freezes through
-`runtime::run::harness`, the one author of that order; a run frozen done
-is offered for review as a request the city opens, because the harness
-reaches none of the city's tools, and the merge stays the one way its
-writes reach the building. That is the weak form of step 4 which
-`crates/sprawling/Spec.lean` §8-4e records and
+room leaves the walk above after step 4. Steps 5 to 11 belong to the
+harness, because it assembles its own context, calls its own model and
+runs its own tools; the city records what the harness chooses to report
+and governs none of it.
+
+The lane lends the room a worktree of its own, whatever the building's
+`review` says, and starts the harness there
+(`accounting::worker::driving::harness`). It sends the brief as the
+harness's one prompt, books each report as `harness_reported` after the
+harness said it, and turns a halt or the building's `harness_minutes`
+ceiling into `cancel_received` and `session/cancel`. When the harness
+answers, the city commits the tree, writes `harness_answered`, and freezes
+the run through `runtime::run::harness`, the one author of that order. The
+harness reaches none of the city's tools, so a run frozen done is offered
+for review as a request the city opens, and the merge stays the one way
+its writes reach the building. Recording a report after the act is the
+weak form of step 4 that `crates/sprawling/Spec.lean` §8-4e records and
 `crates/agent_protocols/spec/Harness/Session.lean` proves.
 
 ### When it does not go through
@@ -466,16 +489,21 @@ The walk above is the path that succeeds. Every way it can stop is one
 shape, and that shape is a type rather than a convention.
 
 **A failure that does not say what to do next cannot be spelled.**
-`AxError` carries seven wire fields in declaration order — which is rule 6
-of §10, so an error is as replayable as an event: a stable `code`, the
-`action` and `subject` it failed on, `nearby` candidates, a `recovery`
-sentence, whether it may be sent again (`retry`: yes, no, or unknown when
-the request left and its answer was lost), and the gate's own refusal when
-a gate is what stopped it. **The model is the audience**, so `nearby` and
-`recovery` hold directly executable information rather than apologies. Both
-constructors return an `ErrorDraft`, and `with_recovery` is the only way
-across to an `AxError` — a failure with no next step is unconstructible,
-not merely discouraged.
+`AxError` writes its fields in declaration order, which is rule 6 of §10,
+so an error replays like an event. Six fields are always present: a stable
+`code`, the `action` and `subject` it failed on, `nearby` candidates, a
+`recovery` sentence, and whether the request may be sent again (`retry`:
+yes, no, or unknown when the request left and its answer was lost). Four
+appear only when they apply: `retry_after_ms`, how long to wait before
+sending again; `account`, whether the next attempt should move to another
+provider account; `gate`, the gate's own refusal when a gate stopped the
+request; and `provider`, the kind of provider failure
+(`kernel::error::shape`). **The model is the audience**, so `nearby` and
+`recovery` hold directly executable information rather than apologies.
+Every constructor (`failure`, `refusal`, `provider`) returns an
+`ErrorDraft`, and `with_recovery` is the only way from a draft to an
+`AxError`, so a failure with no next step cannot be constructed rather
+than merely being discouraged.
 
 **A gate answers one of exactly three ways.** `GateOutcome` is `Allow`,
 `Deny` carrying the refusal, or `Ask` carrying the question. Every caller
@@ -499,11 +527,14 @@ workshop. A frozen run is history, and history is read rather than woken.
 A city is one directory. Copy it and it is the same city; delete it and
 nothing outside it changes.
 
-The tree below is the **trunk, not the full set**. Every path this product
-writes is derived by `kernel::layout` from a city root and an address, and
-that module is the authority; drawing the complete list here would be a
-second home for it, and the one a person reads would be the one that went
-stale.
+The tree below is the **trunk, not the full set**. `kernel::layout` derives
+the paths this product writes from a city root and an address, and it is
+the authority for them; a complete list here would be a second copy, and
+the copy a person reads would be the one that went stale. The module's
+rustdoc claims every directory and file name, but some are still declared
+by the module that uses them: `RULES.toml` in `city::policy`, the spine
+documents such as `Memo.md` in `city::spine_files`, `worktrees/` in
+`storage::worktree`, and `sessions/` in `storage::sessions`.
 
 ```
 <city>/
@@ -665,9 +696,10 @@ stripped to nothing and the thick end stays pure. `runtime::watchdog`,
 
 ### Making illegal states unrepresentable
 
-Each of these is a type, not a slogan, and each has a compile-failure
-counterexample in the test suite — because "unrepresentable" is itself a
-claim that needs testing.
+Each of these is a type, not a slogan. "Unrepresentable" is itself a claim
+that needs testing, so six of them have a compile-failure counterexample
+under `crates/*/tests/ui`; `EventRef`, `UnplannedProgress` and the plan
+node's `Held` have none yet, and rest on their types alone.
 
 - `EventRef` has no public constructor and no serde ⇒ **a forged event reference cannot be spelled**.
 - `Completion::Done` always carries `Evidence`, and `Completion` has no serde ⇒ **a deserialised "finished" cannot be spelled**.
@@ -711,7 +743,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in nine places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `accounting::worker::errand` gives each provider request the accounting thread hands off, a keep-warm renewal or an endpoint probe, one thread, which ends once the request has answered and the answer is on the accounting thread's queue, so no provider request runs on the accounting thread; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the endpoint warm-ups that `bin::assembly::attending` starts once the city is open, one per attached endpoint, each ending with its one request, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up closing the city, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, one thread per accepted privacy operation in `bin::privacy::service`, which runs that operation after the ones before it and ends with it, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold, the socket workers and each run's lane, ask the serving placement table for a **seat** as they start and give it back as they exit; *CPU placement* below says where seats come from and what each platform does with them |
+| 3 | One spawn point | review. A library crate starts a thread in ten places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `accounting::worker::errand` gives each provider request the accounting thread hands off, a keep-warm renewal or an endpoint probe, one thread, which ends once the request has answered and the answer is on the accounting thread's queue, so no provider request runs on the accounting thread; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes; and on Windows `desktop::platform::windows::record::sink` gives each screen recording one thread that captures its frames, stopped by one flag and joined when the recording closes, so it cannot outlive the connection that started it. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the endpoint warm-ups that `bin::assembly::attending` starts once the city is open, one per attached endpoint, each ending with its one request, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up closing the city, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, one thread per accepted privacy operation in `bin::privacy::service`, which runs that operation after the ones before it and ends with it, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold, the socket workers and each run's lane, ask the serving placement table for a **seat** as they start and give it back as they exit; *CPU placement* below says where seats come from and what each platform does with them |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess, and the key a client attaches to a command it sends (rule 7) | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -727,16 +759,17 @@ model call — a changed world would diverge through no defect of the record.
 production except where a test module relaxes it locally: no `unwrap`,
 `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
-denied; `unsafe_code` is forbidden in every workspace crate but one. The
-desktop server's FFI seam (`crates/desktop/ffi`) carries the workspace's
-table with `unsafe_code` at `deny`, and holds one `unsafe` block per call
-into the Zig leaf, each with the precondition that makes it sound
-(`crates/desktop/Spec.lean` sections 8-12 and D14); `xtask guard` holds that table
-to the workspace's, key by key. Money and quantities are
+denied; `unsafe_code` is forbidden in every workspace crate but two. The
+desktop server's FFI seam (`crates/desktop/ffi`) and the console's renderer
+(`crates/console_ffi`) each carry the workspace's table with `unsafe_code`
+at `deny`, and hold one `unsafe` block per call into their Zig leaf, each
+with the precondition that makes it sound (`crates/desktop/Spec.lean`
+section 8-12 and D14, `crates/console_ffi/Spec.lean` D1); `xtask guard`
+holds both tables to the workspace's, key by key. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.
 
-**The most fragile point in the design is one paragraph long.** A database
+**The weakest point of the design fits in one sentence.** A database
 handle, one `Instant::now()`, or a bare spawn inside `kernel` disables
 replay, formal verification and deterministic simulation at the same time.
 The gates hold that line so the property survives a builder who has never
@@ -811,8 +844,8 @@ Neither is the persistent accepted package version described in
 [#131](https://github.com/2youg1/sprawling-agents/issues/131). MCP connections
 keep the tool list learned when they connect and reuse it while live;
 there is no comparison with a persistently approved server/tool definition.
-Issue #131 owns those pins, verified reads and drift handling. This table does not
-claim that implementation is present.
+Issue #131 owns those pins, their verified reads and their drift handling,
+and this section does not claim that any of it is implemented.
 
 ### CPU placement
 
@@ -944,7 +977,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
 | V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `tools/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
-**V10 is not a gate, and the difference is load-bearing.** §1 says the wire
+**V10 is deliberately not a gate.** §1 says the wire
 is the whole API and that a second client writes against it; `tools/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
@@ -960,29 +993,28 @@ what each finding cost to fix, is recorded in
 `tools/adversary/Spec.lean` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
-**Four gaps, named rather than hidden.** V9 needs a real city served by a
+**Three gaps, named rather than hidden.** V9 needs a real city served by a
 real server, and no CI job starts one, so V9 is a command a developer runs
-rather than a gate. The isometric city compares
-display lists rather than bitmaps: the preconditions for bitmap comparison
-are paid for — placement is a pure function of the id, painter order is
-total, projection and its inverse are exact — but there is no rasteriser.
-V6 stops at the worker (§3): a scripted scenario reproduces a run, not a
-dispatch, because no scenario yet hands `accounting::worker::RunWorker` a
-scripted `Hands`; what holds the dispatch policy is the worker's own tests,
-plus the integration tests that hand the worker a scripted
-`accounting::ModelFactory`. And the tree
-holds 3 kani harnesses, all of which CI proves in under a minute each — a
-harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it
-cannot bound, and one over symbolic non-linear arithmetic gives the solver
-work that grows with the data it walks, so propositions of those two shapes
-are held by the `#[test]` and the proptest instead (`crates/kernel/Spec.lean` §2). The `// not-proved:` marker and the reader that honours it stay, and
-today no harness carries one.
+rather than a gate. V6 stops at the worker (§3): a scripted scenario
+reproduces a run, not a dispatch, because no scenario yet hands
+`accounting::worker::RunWorker` a scripted `Hands`; the dispatch policy is
+held by the worker's own tests and by the integration tests that hand the
+worker a scripted `accounting::ModelFactory`. And kani reaches few
+propositions: the tree holds 3 kani harnesses, all of which CI proves in
+under a minute each. A harness that builds a `Vec`, a `String` or a
+`BTreeSet` gives CBMC loops it cannot bound, and one over symbolic
+non-linear arithmetic gives the solver work that grows with the data it
+walks, so propositions of those two shapes are held by a `#[test]` or a
+proptest instead (`crates/kernel/Spec.lean` §2). No harness carries the
+`// not-proved:` marker today; the marker, and the reader in
+`cargo xtask proof` that honours it, stay for the next harness that cannot
+be proved yet.
 
 ### Specifications in Lean
 
-A crate's specification moves from Markdown to Lean one crate at a time,
-by the method in `crates/city/skills/sdd`, and every crate that has moved, and every
-new crate, uses this layout.
+Every crate's specification is written in Lean, by the method in
+`crates/city/skills/sdd`, in the layout below, and so are the
+specifications of the checker, the simulator, the gates and the client.
 
 **One package, at the repository root.** `lakefile.toml`, `lean-toolchain`
 and `lake-manifest.json` sit at the root; they are the only Lean package
@@ -1023,11 +1055,11 @@ of a module name. A property that spans modules is named after the module
 that holds it, and the others cite that part. The Rust module's rustdoc
 names its part, and the part names the Rust module.
 
-**One effective specification per crate.** On a merged tree a crate has a
-`Spec.lean` or a `<lib>-SPEC.md`, never both. A part may exist before its
-crate's `Spec.lean`; the Markdown SPEC then cites the part as the authority
-for what it proves and stays the crate's one effective specification until
-the switch, which deletes it in the change that adds `Spec.lean`.
+**One effective specification per crate.** A crate holds exactly one
+specification: its `Spec.lean`. No Markdown `<lib>-SPEC.md` remains in the
+tree; the `spec` gate still accepts one as a package's only specification,
+and refuses a package that holds both or neither (`tools/xtask/Spec.lean`
+§8-42).
 
 **Imports follow §3.** A part imports the toolchain's libraries and the
 parts of the crates the `depmap` block lets its own crate depend on. The
@@ -1040,15 +1072,15 @@ opens with `D<n>` and gives the decision, its reason and the alternative it
 beat. It stands directly above the declaration it governs, or in the
 section comment of its subject when it governs no single declaration. `<n>`
 is unique within a crate, across `Spec.lean` and its parts, and is never
-reused; another document cites it as `<lib> D<n>`. When a Markdown SPEC
-migrates, its §12 entry N becomes `D<N>`, so an existing citation keeps its
-number.
+reused; another document cites it as `<lib> D<n>`. A crate whose
+specification was once Markdown kept its decision numbers: entry N of the
+old §12 *Decisions* is `D<N>`, so an older citation still resolves.
 
 **Language.** Comments are Chinese, with concept names in English.
 Declaration names are English and come from the glossary.
 
-**Anchors, and what the gates read.** Once a crate has migrated, each of
-its rows in `architecture.toml` names the part that specifies the module
+**Anchors, and what the gates read.** Each row of `architecture.toml`
+names the part that specifies the module
 by its module name, `spec = "crates.browser.spec.Act"`, or
 `crates.browser.Spec` where the entry itself does, and `specalign` holds
 that name to a file inside the same crate. The gates read a
@@ -1061,14 +1093,6 @@ same, so a gate compares one spelling rather than converting between two.
 which shape; the `spec` gate holds a crate to one effective
 specification, the checker and the specifications to their imports, and
 every `.lean` to no `sorry`, `admit` or `axiom`.
-
-**From the Markdown layout.** The Markdown SPECs carry nineteen headings.
-Sections 1–11 and 13–16 keep their numbers. §8.5, two designs, becomes the
-alternative recorded beside the reference definition in §10. §12 Decisions
-becomes `D<n>` comments, and §12 is error handling. §17, model experience,
-becomes the cost recorded in §10. §18, documentation sync, is §17,
-documentation relationships. This paragraph goes with the last Markdown
-SPEC.
 
 ### The performance register
 
@@ -1108,10 +1132,10 @@ class and load (idle, N concurrent runs, a build in the background); the
 criterion is written before the reading, rounds of the two arms interleave,
 and the measurement has the machine to itself. Target numbers are not set
 in advance: a target enters `budgets.toml` once its baseline is read and the
-User accepts it. The figures quoted below were taken on earlier trees:
-the User ruled to skip measurement in 0.0.9 and again in 0.0.10, so each row of the register
-that waits on a reading says this version's reading is owed and names the
-recipe that retakes it.
+User accepts it. The figures quoted below were taken on earlier trees,
+because the User ruled to skip measurement in this version; each row of the
+register that waits on a reading says that this version's reading is owed,
+and names the recipe that retakes it.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
@@ -1150,10 +1174,8 @@ build. A reading from another machine class does not enter this table.
 **One honest trade.** With network and model time removed, the throughput
 ceiling of a city is the throughput ceiling of its Ledger. That is the
 price of "the Ledger is the only history", stated in the open. The first
-wall is the endpoint's own: each endpoint hands out `max_in_flight` permits
-in arrival order (`gateway::concurrency`), and the pool sets no lane count of
-its own, so a prepared run gets a lane at once and waits, if it waits, in that
-endpoint's provider queue. Then come the walls outside:
+wall is the endpoint's own provider queue, the one concurrency limit
+(§5, step 8). Then come the walls outside:
 provider-side rate limits, Ledger fsync, worktree disk, file-descriptor
 limits, then the blocking pool. RAM is not among them. **Runs are driven in
 parallel and accounted for in series** — every line a lane writes crosses to
