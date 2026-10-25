@@ -90,7 +90,9 @@ pub(super) fn require_executable(command: &Command) -> Result<(), AxError> {
                 std::path::Path::new(program).display()
             ),
         )
-        .with_recovery("check the program name, or use the shell arm"));
+        .with_recovery(
+            "check the program name; a shell builtin such as `cd` or `echo` is no program",
+        ));
     }
     Ok(())
 }

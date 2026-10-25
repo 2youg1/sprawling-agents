@@ -5,17 +5,23 @@
 
 //! The exec tool: exactly three arms, each with its own failure story.
 //!
+//! A call names a `command` or a `python` script, the way Claude Code's
+//! `Bash` takes a `command` (`crates/runtime/spec/Tools/Exec.lean`
+//! §8-13-4, D118). The building decides which arm a command takes: the
+//! shell when it offers one, and otherwise the program the line names,
+//! read by `program_line`, which refuses shell syntax rather than pass
+//! it on as text.
+//!
 //! Program runs a host process with a pinned working directory and an
 //! environment allowlist — secrets are never passed through, because a
 //! child process inherits whatever it is given and cannot be asked to
 //! forget. Its chosen confinement applies unless the call names `where: host`; disclosure states
 //! which arm that is and what the arm does not hold. Python runs inside
 //! the wasip1 sandbox, where the capability surface is the mount list and
-//! there is no network at all. Shell probes for an interpreter and
-//! **refuses when there is none**, rather than quietly rewriting the
-//! request as a Program call: a shell line that silently becomes
-//! something else is a worse answer than a refusal naming what is
-//! missing.
+//! there is no network at all. A building that asked for a shell this
+//! machine does not have is refused, rather than having its line run
+//! as a program: a line written for a shell is a different command
+//! without one.
 //!
 //! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
 //! that would work, so the caller redirects instead of guessing.
@@ -40,6 +46,7 @@ mod dispatch;
 mod native_macos;
 #[cfg(windows)]
 pub(crate) mod native_windows;
+mod program_line;
 pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
 mod shell;
 mod yielding;
@@ -50,6 +57,11 @@ pub use confinement::{
 };
 pub use outcome::{FailureClass, ShellCount, ShellTally};
 pub use shell::Shell;
+
+/// The argument names a call is read by, spelled once for the schema,
+/// the reading and the refusals.
+const COMMAND: &str = "command";
+const PYTHON: &str = "python";
 
 /// Environment variables a child may inherit. Everything else is
 /// dropped: an allowlist stays safe when the process environment grows,
@@ -95,38 +107,18 @@ impl ExecTool {
         sandbox: Box<dyn Sandbox>,
         backlog: Backlog,
     ) -> Result<ExecTool, AxError> {
-        let mut params = Map::new();
-        params.insert("type".to_owned(), Value::String("object".to_owned()));
-        let mut properties = Map::new();
-        let mut arm = Map::new();
-        arm.insert("type".to_owned(), Value::String("object".to_owned()));
-        arm.insert(
-            "description".to_owned(),
-            Value::String(
-                "one of {program:{path,args}}, {python:{code}}, {shell:{text}}; write the \
-                 Python as a short script against the standard library - pathlib, difflib, re, \
-                 itertools, collections - with no classes, no exception handlers and no \
-                 comments, and read the error when it fails"
-                    .to_owned(),
-            ),
-        );
-        properties.insert("arm".to_owned(), Value::Object(arm));
-        let mut placement = Map::new();
-        placement.insert("type".to_owned(), Value::String("string".to_owned()));
-        placement.insert(
-            "description".to_owned(),
-            Value::String(
-                "where the program or shell line runs: `sandbox` (the default) or \
-                 `host`"
-                    .to_owned(),
-            ),
-        );
-        properties.insert("where".to_owned(), Value::Object(placement));
-        params.insert("properties".to_owned(), Value::Object(properties));
-        params.insert(
-            "required".to_owned(),
-            Value::Array(vec![Value::String("arm".to_owned())]),
-        );
+        let params = serde_json::json!({
+            "type": "object",
+            "properties": {
+                COMMAND: { "type": "string", "description": "the command to execute" },
+                PYTHON: { "type": "string", "description": "a Python script to run instead \
+                    of a command: a short script against the standard library - pathlib, \
+                    difflib, re, itertools, collections - with no classes, no exception \
+                    handlers and no comments; read the error when it fails" },
+                "where": { "type": "string", "enum": ["sandbox", "host"], "description":
+                    "where the command runs: sandbox (the default) or host" },
+            },
+        });
         let domain = setup.domain.clone();
         let confinement = Confined::detect();
         let disclosure = disclosure::describe(&setup, &confinement);
@@ -140,7 +132,7 @@ impl ExecTool {
             meta: ToolMeta {
                 name: ToolName::parse("exec")?,
                 disclosure,
-                params: Payload::new(params)?,
+                params: Payload::of(&params)?,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Heavy,
                 timeout: None,
@@ -173,7 +165,10 @@ impl ExecTool {
                 "run python",
                 "no CPython-WASI component is configured",
             )
-            .with_recovery("use the program arm, or configure a CPython-WASI component"));
+            .with_recovery(
+                "pass the work as a `command`, or ask the User to configure a CPython-WASI \
+                 component",
+            ));
         };
         let job = SandboxJob {
             wasm,
@@ -259,29 +254,52 @@ fn no_host_python() -> AxError {
         "the python arm runs a wasip1 guest and has no host form",
     )
     .with_recovery(
-        "use `arm: program` with a host interpreter, or leave `where` out to run the \
+        "pass a `command` that runs a host interpreter, or leave `where` out to run the \
          configured component",
     )
 }
 
-/// Reads the arm out of the call. An unrecognised shape is refused
-/// rather than defaulted to shell — guessing which arm was meant is how
-/// a program run becomes a shell injection.
+/// Reads what the call asks to run: a `command` is a shell line here,
+/// whichever arm the building later gives it, so the deletion forecast
+/// and the sieve read the same text in every building; a `python` is a
+/// script (§8-13-4). A call that names neither, or both, is refused
+/// rather than guessed at, and so is the older `arm` spelling (D115).
 pub fn parse_arm(args: &Map<String, Value>) -> Result<ExecArm, AxError> {
-    let arm = args.get("arm").ok_or_else(|| {
-        AxError::failure(AxCode::InvalidArgs, "run exec", "missing `arm`").with_recovery(
-            "name the arm in the call: `program` with a path and args, `python` \
-                 with code, or `shell` with one command line",
-        )
-    })?;
-    serde_json::from_value(arm.clone()).map_err(|err| {
-        AxError::failure(
+    match (text_of(args, COMMAND)?, text_of(args, PYTHON)?) {
+        (Some(text), None) => Ok(ExecArm::Shell { text }),
+        (None, Some(code)) => Ok(ExecArm::Python { code }),
+        (Some(_), Some(_)) => Err(AxError::failure(
             AxCode::InvalidArgs,
             "run exec",
-            format!("unrecognised arm: {err}"),
+            "both `command` and `python`",
         )
-        .with_recovery("use one of program, python, shell")
-    })
+        .with_recovery("pass one of them; a call runs one thing")),
+        (None, None) => Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "run exec",
+            if args.contains_key("arm") {
+                "`arm` is how an older build spelled this call"
+            } else {
+                "neither `command` nor `python`"
+            },
+        )
+        .with_recovery("pass `command` with the command line to run, or `python` with a script")),
+    }
+}
+
+/// One of the two texts a call can carry: absent, or a string that says
+/// something.
+fn text_of(args: &Map<String, Value>, key: &str) -> Result<Option<String>, AxError> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::String(text)) if !text.trim().is_empty() => Ok(Some(text.clone())),
+        Some(_) => Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "run exec",
+            format!("`{key}` is not a string with something in it"),
+        )
+        .with_recovery(format!("pass `{key}` as the text to run"))),
+    }
 }
 
 impl Tool for ExecTool {
@@ -304,6 +322,12 @@ impl Tool for ExecTool {
         crate::mode::mode_admits(&self.setup.policy.now(), kernel::ToolName::EXEC)?;
         let placement = parse_placement(call.args.as_map())?.opened_by(&self.setup)?;
         let answer = match parse_arm(call.args.as_map())? {
+            // A building that offers no shell runs the program the line
+            // names (D118).
+            ExecArm::Shell { text } if self.setup.shell == Shell::Absent => {
+                let (path, args) = program_line::program_line(&text)?;
+                self.run_program(&path, &args, placement)
+            }
             ExecArm::Program { path, args } => self.run_program(&path, &args, placement),
             // The Python arm has no host form: its interpreter is a
             // component this build runs as a wasip1 guest, and a host

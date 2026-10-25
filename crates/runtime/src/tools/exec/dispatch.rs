@@ -36,27 +36,27 @@ impl ExecTool {
         self.program_route = ProgramRoute::Confined;
         self.container = Some((limits, runtime));
         self.meta.disclosure = format!(
-            "Run a program, Python snippet, or shell line. Program and shell sandbox calls use \
-            an explicitly configured Linux container: writes land on a copy, network is closed, \
-            a non-root user and CPU/memory/process limits are inspected before start. \
-            Daemon cleanup failures are reported and retained for retry. `where: host` asks \
-            for host execution.{}",
+            "Executes a command, or a Python script. Commands in the sandbox use an explicitly \
+            configured Linux container: writes land on a copy, network is closed, a non-root \
+            user and CPU/memory/process limits are inspected before start. Daemon cleanup \
+            failures are reported and retained for retry. `where: host` asks for host \
+            execution.{}",
             match self.setup.shell {
-                Shell::Absent => "",
+                Shell::Absent => super::shell::ABSENT,
                 Shell::Missing {
                     asked: kernel::Interpreter::Pwsh,
                 }
                 | Shell::Found {
                     interpreter: kernel::Interpreter::Pwsh,
                     ..
-                } => " Container shell lines use pwsh.",
+                } => " Container commands run under pwsh.",
                 Shell::Missing {
                     asked: kernel::Interpreter::System,
                 }
                 | Shell::Found {
                     interpreter: kernel::Interpreter::System,
                     ..
-                } => " Container shell lines use /bin/sh.",
+                } => " Container commands run under /bin/sh.",
             }
         );
         self
@@ -78,7 +78,8 @@ impl ExecTool {
         self.container = None;
         self.program_route = ProgramRoute::Host;
         self.meta.disclosure = format!(
-            "Program and shell calls run on the host with no confinement.{}",
+            "Executes a command, or a Python script. Commands run on the host with no \
+             confinement.{}",
             self.setup.shell.statement()
         );
         self
@@ -89,7 +90,9 @@ impl ExecTool {
     pub fn python_only(mut self) -> Self {
         self.container = None;
         self.program_route = ProgramRoute::Python;
-        self.meta.disclosure = "Sandbox execution offers only the Python WASI arm; program and shell sandbox calls refuse.".to_owned();
+        self.meta.disclosure = "Executes a Python script. Sandbox execution offers only the \
+                                Python WASI arm; commands in the sandbox refuse."
+            .to_owned();
         self
     }
 

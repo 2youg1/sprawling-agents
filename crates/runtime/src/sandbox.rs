@@ -129,7 +129,7 @@ impl Sandbox for AbsentSandbox {
             "run in the sandbox",
             "this build carries no execution engine",
         )
-        .with_recovery("use the program arm, or install a build with the `wasm` feature"))
+        .with_recovery("pass the work as a `command`, or install a build with the `wasm` feature"))
     }
 }
 

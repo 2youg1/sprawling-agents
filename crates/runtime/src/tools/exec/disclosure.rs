@@ -9,11 +9,10 @@ use super::{ExecSetup, confinement::Confined};
 
 pub(super) fn describe(setup: &ExecSetup, confinement: &Confined) -> String {
     format!(
-        "Run a program, a Python snippet, or a shell line. A program or shell \
-         line runs in this machine's confinement, {}. Ask for `where: host` to \
-         run one outside it. Use `read` and `search` for what is already written here, \
-         and `edit` to change a file: a file a command prints or writes does not count \
-         as read for `edit`.{}",
+        "Executes a command, or a Python script. A command runs in this machine's \
+         confinement, {}. Ask for `where: host` to run one outside it. Use `read` and \
+         `search` for what is already written here, and `edit` to change a file: a file a \
+         command prints or writes does not count as read for `edit`.{}",
         confinement.statement(),
         setup.shell.statement()
     )
