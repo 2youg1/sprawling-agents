@@ -145,6 +145,7 @@
 <script lang="ts">
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
+  import { SPECIMEN } from "../talk/seat";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -157,7 +158,7 @@
 <Case label="agent messages · a child room opened by a resident, a pulled signal, two signals queued" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[640px] px-wide">
-      <Talk address={CHILD} band={false} seat="specimen" />
+      <Talk address={CHILD} band={false} seat={SPECIMEN} />
     </div>
   </Stand>
 </Case>
@@ -165,7 +166,7 @@
 <Case label="agent messages · the parent's thread, an async send as drawn today" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[520px] px-wide">
-      <Talk address={PARENT} band={false} seat="specimen" />
+      <Talk address={PARENT} band={false} seat={SPECIMEN} />
     </div>
   </Stand>
 </Case>

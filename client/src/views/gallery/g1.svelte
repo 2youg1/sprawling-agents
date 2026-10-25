@@ -103,6 +103,7 @@
 <script lang="ts">
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
+  import { PAGE } from "../talk/seat";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -112,7 +113,7 @@
 <Case label="frozen facts · the Mayor's session under the name it froze, the address line at its head, its first head with model · effort · mode, each reply with TTFT and t/s" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, true)} records={recordsAt(now)}>
     <div class="h-[520px] px-wide">
-      <Talk address={MAYOR} band={false} seat="page" />
+      <Talk address={MAYOR} band={false} seat={PAGE} />
     </div>
   </Stand>
 </Case>
@@ -120,7 +121,7 @@
 <Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, the address line at its head with no number yet" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, false)}>
     <div class="h-[420px] px-wide">
-      <Talk address={MAYOR} band={false} seat="page" />
+      <Talk address={MAYOR} band={false} seat={PAGE} />
     </div>
   </Stand>
 </Case>

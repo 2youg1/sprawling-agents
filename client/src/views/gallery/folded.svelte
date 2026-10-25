@@ -47,6 +47,7 @@
 <script lang="ts">
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
+  import { SPECIMEN } from "../talk/seat";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -56,7 +57,7 @@
 <Case label="conversation · one round, then a new session opened by a model change" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {records}>
     <div class="h-[520px] px-wide">
-      <Talk address={FOLDED} band={false} seat="specimen" />
+      <Talk address={FOLDED} band={false} seat={SPECIMEN} />
     </div>
   </Stand>
 </Case>

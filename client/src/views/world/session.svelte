@@ -33,11 +33,15 @@
     // The run of an earlier session in main, which this pane speaks for
     // instead of the room's (`null`: that session's runs are not held).
     readonly shown?: RunId | null | undefined;
+    // The session's name, given only on one column, where the sessions
+    // column is another tab and the band under the sheet draws no
+    // address, so this pane is the one place on that screen naming it.
+    readonly title?: string | undefined;
     // The pane's label: a menu that moves it, in the panorama tier.
     readonly head: Snippet;
   }
 
-  const { here, shown, head }: Props = $props();
+  const { here, shown, title, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -67,15 +71,24 @@
 
 <section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_session")}>
   {@render head()}
+  {#if title !== undefined}
+    <h3 class="truncate text-heading font-heading text-text">{title}</h3>
+  {/if}
   <!-- Where the session works and what it started from: the worktree
   and the base commit, each left out until the city has said it. -->
   <div class="flex shrink-0 items-baseline justify-between gap-pane">
-    <p class="min-w-0 truncate text-note text-text-quiet">
+    <p class="flex min-w-0 items-baseline gap-snug text-note text-text-quiet">
+      <!-- A long worktree name gives way; the base commit, seven
+      characters, stays whole. -->
       {#if worktree !== null}
-        {fill(say($lang, "world_worktree"), { name: worktree })}
+        <span class="min-w-0 truncate">{fill(say($lang, "world_worktree"), { name: worktree })}</span>
+      {/if}
+      {#if worktree !== null && base !== null}
+        <!-- wording-ok: a separator glyph between two facts, hidden from screen readers -->
+        <span aria-hidden="true">·</span>
       {/if}
       {#if base !== null}
-        {worktree === null ? "" : "· "}{fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}
+        <span class="shrink-0">{fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}</span>
       {/if}
     </p>
     {#if run !== null}

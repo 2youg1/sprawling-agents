@@ -134,6 +134,8 @@
   import { leaveSheet, openSheet } from "./sheets.svelte";
   import Talk from "./talk.svelte";
   import Past from "./talk/past.svelte";
+  import { PAGE, type Seat } from "./talk/seat";
+  import { sessionRun } from "./world/chosen.svelte";
   import Divider from "./world/divider.svelte";
   import PaneMenu from "./world/pane_menu.svelte";
   import Place from "./world/place.svelte";
@@ -190,6 +192,10 @@
   const current = $derived(
     past === undefined ? (newestWorking($belief, address) ?? heldIn($belief, address).at(-1)) : past?.runs.at(-1),
   );
+  // The run the chosen session's pane speaks for, whose frozen facts its
+  // gauge states, so the conversation under it leaves them off that run's
+  // first head (`talk/seat.ts`).
+  const gauged = $derived(past === undefined ? sessionRun($belief, address) : (current?.run ?? null));
   let answer = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
     const run = current?.run;
@@ -224,6 +230,8 @@
 
   const layout = $derived(narrow ? oneColumnOf(tier, $bench) : layoutOf(tier, open ? "open" : "closed", $bench));
   const sheet = $derived(layout.world === "sheet");
+  // Where the conversation stands (`talk/seat.ts`).
+  const column = $derived<Seat>(layout.world === "workbench" ? { kind: "workbench", gauged } : PAGE);
   // A narrow window is one column, where every region spans it whole
   // through its `narrow:` classes and stands on no line of its own.
   const at = (lines: Lines): string | undefined => (narrow ? undefined : gridColumn(lines));
@@ -344,7 +352,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
           {#if placed.pane === "sessions"}
             <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} shown={past === undefined ? undefined : (current?.run ?? null)} head={sheet ? unnamed : sessionHead} />
+            <Session here={address} shown={past === undefined ? undefined : gauged} title={sheet ? title : undefined} head={sheet ? unnamed : sessionHead} />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
@@ -361,9 +369,9 @@ taller; on one column the second row is the band, as tall as it needs. -->
     aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
     {#if past === undefined || session === undefined}
-      <Talk {address} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
+      <Talk {address} band={sheet} seat={column} />
     {:else}
-      <Past {address} {session} stretch={past} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
+      <Past {address} {session} stretch={past} band={sheet} seat={column} />
     {/if}
   </section>
   {#if open}

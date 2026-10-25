@@ -78,7 +78,7 @@
       {#each stretch?.runs ?? [] as run, at (run.run)}
         <Thread
           {run}
-          facts={factsAt(seat, at)}
+          facts={factsAt(seat, at, run.run)}
           onFork={(plan: ForkPlan) => {
             u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
               if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
