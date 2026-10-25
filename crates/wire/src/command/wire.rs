@@ -67,6 +67,7 @@ impl<Secret> Command<Secret> {
             | Self::PutGuide { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutRange(RangeWrite { ref idem, .. })
+            | Self::PutPrompt { ref idem, .. }
             | Self::DecideProposals(ProposalDecisions { ref idem, .. })
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
@@ -257,6 +258,17 @@ impl From<WireCommand> for Command {
             Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),
             Command::PutRange(write) => Self::PutRange(write),
+            Command::PutPrompt {
+                at,
+                base,
+                step,
+                idem,
+            } => Self::PutPrompt {
+                at,
+                base,
+                step,
+                idem,
+            },
             Command::DecideProposals(decisions) => Self::DecideProposals(decisions),
             Command::PutSpine {
                 building,

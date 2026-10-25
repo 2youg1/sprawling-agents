@@ -114,3 +114,34 @@ fn a_document_with_no_saves_answers_the_version_on_disk() {
         vec![version("only", true, VersionSource::OnDisk)]
     );
 }
+
+/// The city's `City.md` lists this build's default last, kept in the
+/// store, so a page compares the copy with the default the way it
+/// compares any two versions; a document with no default lists none.
+#[test]
+fn a_document_this_build_carries_lists_its_default_last() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("City.md"), "edited\n").unwrap();
+    let mut views = Views::new(dir.path());
+    let city = Address::parse("City.md").unwrap();
+    let wire::Answer::Versions(answer) = views.answer(&wire::Query::Versions { at: city.clone() })
+    else {
+        panic!("Versions answers with versions");
+    };
+    let default = city::Shipped::City.text();
+
+    assert_eq!(
+        (*answer, ask(&mut views).versions.last().map(|v| v.source)),
+        (
+            VersionsAnswer {
+                at: city,
+                versions: vec![
+                    version("edited\n", true, VersionSource::OnDisk),
+                    version(default, true, VersionSource::Shipped),
+                ],
+                more: false,
+            },
+            None
+        )
+    );
+}

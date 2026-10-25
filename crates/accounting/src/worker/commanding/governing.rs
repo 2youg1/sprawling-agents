@@ -286,6 +286,8 @@ impl RunWorker {
                 which: which.file().to_owned(),
                 bytes,
                 naming,
+                at: None,
+                removed: false,
             })?,
         )
     }

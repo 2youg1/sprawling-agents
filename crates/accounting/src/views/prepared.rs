@@ -174,6 +174,8 @@ pub enum Prepared {
     Stored(super::answering::stored::StoredAsk),
     /// One document's versions: its saves, with the disk still to read.
     Versions(super::versions::VersionsAsk),
+    /// The prompt layers of one address, all of them read off the disk.
+    Layers { city_root: PathBuf, addr: Address },
     /// A reply's text the page sent, still to be laid out.
     Reply {
         text: String,
@@ -327,6 +329,7 @@ impl Prepared {
             Self::Reply { text, state } => super::answering::reply::reply_answer(&text, state),
             Self::Stored(ask) => ask.answer(),
             Self::Versions(ask) => ask.answer(),
+            Self::Layers { city_root, addr } => super::layers::layers_answer(&city_root, addr),
             Self::Building {
                 city_root,
                 addr,

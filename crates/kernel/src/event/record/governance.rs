@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::address::Address;
 use crate::approval::{ApprovalId, Autonomy, ClusterKey, Ruling};
 use crate::error::{AxCode, AxError};
 use crate::event::scope::Scope;
@@ -167,8 +168,8 @@ pub struct CityHalted {
     pub state: Admittance,
 }
 
-/// `governed_document_written`: which of the three documents a person
-/// wrote, and how long it now is.
+/// `governed_document_written`: which document that governs runs a
+/// person wrote, and how long it now is.
 ///
 /// Never the text. The document is on disk and readable there, and a
 /// copy here would be a second authority for words a person edits.
@@ -186,6 +187,16 @@ pub struct GovernedDocumentWritten {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub naming: Option<B3Hash>,
+    /// Where the document is, for a prompt document other than the three
+    /// in the city's reserved subtree: a building's `City.md` or a model
+    /// note is not named by its file name alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub at: Option<Address>,
+    /// The step removed the document rather than writing it, so the
+    /// farther layer governs again; `bytes` is then zero.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub removed: bool,
 }
 
 /// `rules_changed`: a document a dispatch stands under holds other bytes
@@ -343,6 +354,8 @@ mod tests {
             which: "MAYOR.md".to_owned(),
             bytes: 12,
             naming: None,
+            at: None,
+            removed: false,
         })
         .unwrap();
         assert_eq!(

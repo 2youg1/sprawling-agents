@@ -144,6 +144,7 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // proposal, takes the same reading: a file changes on disk under
         // a baseline, and no run that is going is reached by it.
         | Command::PutRange(_)
+        | Command::PutPrompt { .. }
         | Command::DecideProposals(_)
         // What a person settled about their own reading of the city
         // reaches no run at all, and a skill written onto a shelf is

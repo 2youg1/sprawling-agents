@@ -43,6 +43,7 @@ mod history;
 mod hunks;
 mod identity;
 mod known_hosts;
+mod layers;
 mod listing;
 mod mcp_health;
 mod metrics;
@@ -96,6 +97,10 @@ pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use identity::{IdentityAnswer, StatedIdentity};
 pub use known_hosts::{KnownFace, KnownHost, KnownHostsAnswer};
+pub use layers::{
+    DefaultStanding, LayerDocument, LayerState, LayersAnswer, PromptKind, PromptLayer,
+    ShippedDefault,
+};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use metrics::MetricsAnswer;
@@ -247,6 +252,8 @@ pub enum Answer {
     Skills(Box<SkillsAnswer>),
     /// What a template would write as a building's rules (`Query::Template`).
     Template(Box<TemplateAnswer>),
+    /// The prompt documents of the next run at an address (`Query::Layers`).
+    Layers(Box<LayersAnswer>),
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
     SkillUsage(Box<SkillUsageAnswer>),

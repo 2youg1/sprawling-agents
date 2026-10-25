@@ -282,6 +282,7 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
         | Command::ConnectToolkit { .. }
         | Command::PutSpine { .. }
         | Command::PutRange(_)
+        | Command::PutPrompt { .. }
         | Command::DecideProposals(_)
         | Command::CreateBuilding { .. }
         | Command::RemoveBuilding { .. }

@@ -31,6 +31,7 @@ mod wire;
 pub use kind::{COMMAND_NAMES, Command};
 pub use no_secret::NoSecret;
 pub use shelf::Shelf;
+pub use step::PromptStep;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
 pub use step::{AgentAdding, AgentLoginStart, CityClosing, CloseMode, DeviceForgetting};

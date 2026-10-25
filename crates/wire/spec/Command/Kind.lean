@@ -158,6 +158,7 @@ inductive Command where
   | AddAgent
   | AgentLogin
   | ForgetDevice
+  | PutPrompt
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -273,6 +274,8 @@ def Command.reach : Command → Reach
   | .AgentLogin => .client
   -- 撤销一台配对过的浏览器（§8-91）
   | .ForgetDevice => .client
+  -- 对一份提示文档的整份动作：在这一层起一份、删掉这一层的一份、写回本版默认；文件已不是 `base` 即拒，落下写 `governed_document_written`（§8-98）
+  | .PutPrompt => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -335,6 +338,7 @@ def Command.verbClass : Command → VerbClass
   | .AddAgent => .LocalOnly
   | .AgentLogin => .LocalOnly
   | .ForgetDevice => .LocalOnly
+  | .PutPrompt => .LocalOnly
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by

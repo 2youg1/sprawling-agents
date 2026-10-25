@@ -54,4 +54,7 @@ pub enum VersionSource {
     /// The version the save at `seq` was made on, which no earlier
     /// recorded save wrote: written outside the page before it.
     Before { seq: Seq },
+    /// This build's default text, for the three documents the binary
+    /// carries (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+    Shipped,
 }

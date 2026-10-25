@@ -250,6 +250,22 @@ pub enum PursuitStep {
     Clear,
 }
 
+/// A whole-document step on one prompt document
+/// (`crates/wire/spec/Answer/Prefix.lean` §8-98); editing it word by word
+/// is `PutRange`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum PromptStep {
+    /// This layer starts a copy of its own from the one that governs
+    /// here now.
+    Own,
+    /// This layer's copy goes, and the farther one governs again.
+    Inherit,
+    /// This build's default text is written back.
+    Restore,
+}
+
 /// What `CloseCity` carries: how the runs under way end
 /// (`crates/wire/spec/Command/Kind.lean` §19-2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -393,6 +393,10 @@ pub enum Query {
         face: DialectKind,
         models: Vec<crate::FiguresAsked>,
     },
+    /// The prompt documents the next run at `addr` is frozen with, in
+    /// send order, each with its layer and whether it is sent
+    /// (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+    Layers { addr: Address },
 }
 
 /// The Query surface, in declaration order — the order the handshake

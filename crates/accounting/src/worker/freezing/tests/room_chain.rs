@@ -122,3 +122,47 @@ fn a_rooms_conventions_ride_in_the_resident_slot_after_the_buildings() {
     assert_eq!(slot(&seen[1], "resident").2, Vec::<String>::new());
     assert_eq!(slot(&seen[0], "building"), slot(&seen[1], "building"));
 }
+
+/// A directory that happens to be named `AGENTS.md` is not a
+/// convention: the run in that room starts, and its prefix names no such
+/// document. Reading it as a file refused every run of the room, on
+/// Windows with a permission error.
+#[test]
+fn a_directory_named_agents_md_does_not_stop_the_room() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let seen = watch(&mut worker);
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("lab").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
+        })
+        .unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("pkg").join("AGENTS.md")).unwrap();
+
+    let started = worker.handle(wire::Command::Dispatch {
+        addr: Address::parse("lab/pkg").unwrap(),
+        task: "measure the thing".to_owned(),
+        goal: "a number with a unit, then stop".to_owned(),
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pkg"),
+        session: None,
+        effort: None,
+        model: None,
+    });
+
+    let seen = seen.lock().unwrap_or_else(PoisonError::into_inner);
+    assert_eq!(
+        (
+            started.map_err(|err| err.to_string()),
+            seen.iter()
+                .map(|segments| slot(segments, "resident").2.clone())
+                .collect::<Vec<_>>()
+        ),
+        (Ok(()), vec![Vec::<String>::new()])
+    );
+}

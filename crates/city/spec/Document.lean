@@ -18,7 +18,10 @@ pub fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
     -> Result<T, AxError>;                        // 门面上是 city::edit_document
 pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError>;
 pub struct Held<'a> { /* 私有 */ }
-impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
+impl Held<'_> {
+    pub fn replace(&self, body: &[u8]) -> Result<(), AxError>;
+    pub fn remove(&self) -> Result<(), AxError>;      // 删掉这份文档；提示文档的 `Inherit`（§8-44）
+}
 pub(crate) enum TreeEntry<'a> { Directory(&'a str), File(&'a str, &'a [u8]) }
 pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(), AxError>;
 ```
