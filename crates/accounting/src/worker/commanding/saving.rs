@@ -34,13 +34,10 @@ impl RunWorker {
     /// fit, a result that is not text); a file that cannot be read or
     /// replaced; and a history that will not take the line.
     pub(in crate::worker) fn put_range(&mut self, write: &wire::RangeWrite) -> Result<(), AxError> {
-        let path = self.document_path(&write.doc)?;
-        let listed = city::PromptDocument::of(&write.doc);
-        let applied = city::revise_document(&path, |held, source| {
+        let to = self.destination(&write.doc)?;
+        let applied = city::revise_document(&to.path, |held, source| {
             let applied = documents::save(source, write.baseline, &write.edits)?;
-            if let Some(doc) = &listed {
-                doc.admits(applied.bytes())?;
-            }
+            to.admits(applied.bytes())?;
             keep(&self.city_root, applied.bytes())?;
             held.replace(applied.bytes())?;
             Ok(applied)
@@ -54,14 +51,15 @@ impl RunWorker {
     /// # Errors
     /// `E_OUTSIDE_WRITE_DOMAIN` for the reserved subtree;
     /// `E_INVALID_ARGS` for a card that is not open on this document;
-    /// whatever `documents::decide` refuses; a file that cannot be read
-    /// or replaced; and a history that will not take a line. Nothing is
-    /// written or recorded when the decision is refused.
+    /// whatever `documents::decide` refuses; the refusal of a prompt
+    /// document on the city's list, as a save meets it; a file that
+    /// cannot be read or replaced; and a history that will not take a
+    /// line. Nothing is written or recorded when the decision is refused.
     pub(in crate::worker) fn decide_proposals(
         &mut self,
         decisions: &wire::ProposalDecisions,
     ) -> Result<(), AxError> {
-        let path = self.document_path(&decisions.doc)?;
+        let to = self.destination(&decisions.doc)?;
         let cards = decisions
             .decisions
             .iter()
@@ -76,9 +74,10 @@ impl RunWorker {
             .iter()
             .map(|(offer, verdicts)| (offer, *verdicts))
             .collect();
-        let landed = city::revise_document(&path, |held, source| {
+        let landed = city::revise_document(&to.path, |held, source| {
             let decided = documents::decide(source, &named)?;
             if let Some(applied) = &decided {
+                to.admits(applied.bytes())?;
                 keep(&self.city_root, applied.bytes())?;
                 held.replace(applied.bytes())?;
             }
@@ -104,8 +103,9 @@ impl RunWorker {
     /// they are given before it lands (`crates/wire/Spec.lean` §8-72).
     /// The prompt documents on the city's list are the exception, judged
     /// by that list (`city::PromptDocument`).
-    fn document_path(&self, doc: &Address) -> Result<PathBuf, AxError> {
-        if doc.is_reserved() && city::PromptDocument::of(doc).is_none() {
+    fn destination(&self, doc: &Address) -> Result<Destination, AxError> {
+        let listed = city::PromptDocument::of(doc);
+        if doc.is_reserved() && listed.is_none() {
             return Err(AxError::failure(
                 AxCode::OutsideWriteDomain,
                 "save a document",
@@ -116,7 +116,10 @@ impl RunWorker {
                  through their own pages",
             ));
         }
-        Ok(self.city_root.join(doc.as_str()))
+        Ok(Destination {
+            path: self.city_root.join(doc.as_str()),
+            listed,
+        })
     }
 
     /// The receipt of one save: which document, from which version to
@@ -131,5 +134,24 @@ impl RunWorker {
                 bytes: u64::try_from(applied.bytes().len()).unwrap_or(u64::MAX),
             })?,
         )
+    }
+}
+
+/// Where a page's save or a decided card lands, and the entry of the
+/// city's prompt-document list that judges what may land there.
+struct Destination {
+    path: PathBuf,
+    listed: Option<city::PromptDocument>,
+}
+
+impl Destination {
+    /// Refuses bytes the listed prompt document may not hold; a document
+    /// off the list takes any text the save rules accept.
+    ///
+    /// # Errors
+    /// What `PromptDocument::admits` refuses: an unreadable identity area
+    /// in `MAYOR.md`, Mayor text that is not UTF-8.
+    fn admits(&self, bytes: &[u8]) -> Result<(), AxError> {
+        self.listed.as_ref().map_or(Ok(()), |doc| doc.admits(bytes))
     }
 }

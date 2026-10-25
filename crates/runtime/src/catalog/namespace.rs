@@ -67,7 +67,7 @@ fn own_about(own: ReservedNamespace) -> &'static str {
         ReservedNamespace::Record => "look back at what this building did, and propose changes",
         ReservedNamespace::Skill => "the steps this building follows for a kind of work",
         ReservedNamespace::Sprawling => {
-            "talk to other residents, split and hand off work, see your own run"
+            "talk to other residents, split and hand off work, see your run"
         }
         ReservedNamespace::Web => "search the web through the city's own supplier",
     }
