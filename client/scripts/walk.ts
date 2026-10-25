@@ -18,11 +18,13 @@
 // sends from `core/commands.ts`. A page added there is walked without an
 // edit here, and a renamed button fails its shot instead of passing it.
 //
-//   bun scripts/walk.ts [--keep] [--only <text>] [--frames <list>] [--lightings <list>]
+//   bun scripts/walk.ts [--keep] [--only <text>] [--frames <list>] [--lightings <list>] [--web-dir <dir>]
 //
 // `--keep` leaves the city served after the shots, for walking it by hand
 // in the paired profile; `--only` takes the shots whose name holds the
-// text; a frame is `<width>x<height>@<ratio>`, with `:touch` for a phone.
+// text; a frame is `<width>x<height>@<ratio>`, with `:touch` for a phone;
+// `--web-dir` serves a client bundle from disk, as `serve --web-dir` does,
+// so a rebuilt client is walked without rebuilding the binary.
 
 import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -82,6 +84,7 @@ interface Options {
   readonly only: string;
   readonly frames: readonly Frame[];
   readonly lightings: readonly Lighting[];
+  readonly webDir: string | undefined;
 }
 
 function options(args: readonly string[]): Options {
@@ -99,7 +102,7 @@ function options(args: readonly string[]): Options {
         return fail(`a lighting is dark or light, not ${named}`);
     }
   });
-  return { keep: args.includes("--keep"), only: after("--only") ?? "", frames, lightings };
+  return { keep: args.includes("--keep"), only: after("--only") ?? "", frames, lightings, webDir: after("--web-dir") };
 }
 
 function frameOf(spelled: string): Frame {
@@ -143,9 +146,11 @@ const STYLING = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`, "
 async function serve(
   city: string,
   env: Record<string, string | undefined>,
+  webDir: string | undefined,
 ): Promise<{ readonly code: string; readonly process: ReturnType<typeof Bun.spawn> }> {
   let said = "";
-  const served = Bun.spawn([binary("sprawling"), "up", city, AT, "--no-open"], {
+  const disk = webDir === undefined ? [] : ["--web-dir", webDir];
+  const served = Bun.spawn([binary("sprawling"), "up", city, AT, "--no-open", ...disk], {
     env,
     terminal: {
       cols: 120,
@@ -341,7 +346,7 @@ const env = {
 };
 const raised = Bun.spawnSync([binary("sprawling"), "init", city], { env });
 if (raised.exitCode !== 0) fail(`init: ${raised.stderr.toString()}`);
-const served = await serve(city, env);
+const served = await serve(city, env, wanted.webDir);
 const run = settle(env, city);
 const tools = held(await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT), "open the browser");
 await pair(tools, served.code);
