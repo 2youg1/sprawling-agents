@@ -48,6 +48,7 @@ mod native_macos;
 pub(crate) mod native_windows;
 mod program_line;
 pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
+pub(crate) use program_line::program_line;
 mod shell;
 mod yielding;
 

@@ -27,14 +27,27 @@ impl CommandKey {
                 program: path.clone(),
                 args: args.clone(),
             },
-            ExecArm::Shell { text } => {
-                let mut words = text.split_whitespace().map(str::to_owned);
-                CommandKey {
+            // A line the program-line grammar reads is keyed by the words it
+            // reads, quotes taken off, so `"/usr/bin/cargo" build` meets the
+            // cargo filter whichever arm the building gives the line. A line
+            // with shell syntax has no program to name; its blanks are the
+            // best guess, and a filter that misses it only leaves the output
+            // uncut.
+            ExecArm::Shell { text } => match crate::tools::program_line(text) {
+                Ok((program, args)) => CommandKey {
                     arm: "shell".to_owned(),
-                    program: words.next().unwrap_or_default(),
-                    args: words.collect(),
+                    program,
+                    args,
+                },
+                Err(_shell_syntax) => {
+                    let mut words = text.split_whitespace().map(str::to_owned);
+                    CommandKey {
+                        arm: "shell".to_owned(),
+                        program: words.next().unwrap_or_default(),
+                        args: words.collect(),
+                    }
                 }
-            }
+            },
             ExecArm::Python { code } => CommandKey {
                 arm: "python".to_owned(),
                 program: "python".to_owned(),

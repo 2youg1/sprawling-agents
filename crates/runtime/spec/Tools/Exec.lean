@@ -514,7 +514,7 @@ end Runtime.Tools.Exec
 
 **决定**：exec 的调用参数是 `command`（一行命令）或 `python`（一段脚本），加可选的 `where`（§8-13-4）。楼给了 shell 时 `command` 交给 shell；楼没要 shell 时它按程序行的文法读成一个程序与它的参数，在 program 臂上跑，引号外的 shell 语法即拒。模型不再能按名字点 program 臂；`ExecArm::Program` 只由程序行造出。
 
-**理由**：Claude Code 的 `Bash` 只收一个 `command`，模型见得最多的就是 `{command: "cargo test"}` 这一形（D114）。而一栋楼的 shell 缺省是关的，因为 shell 是唯一一条从参数读不出可达范围的臂；`command` 若只能落到 shell 臂，缺省的楼里每一次这样的调用都被拒。一行不带 shell 语法的命令，它够得到什么从它的词里读得出，与 program 臂一样，所以把它当程序跑没有放宽没给 shell 的楼。带 shell 语法的行拒绝而不是照传：`a | b` 当作程序 `a` 带参数 `|`、`b` 跑，结果是一条模型没写过的命令。
+**理由**：Claude Code 的 `Bash` 只收一个 `command`，模型见得最多的就是 `{command: "cargo test"}` 这一形（D114）。而一栋楼的 shell 缺省是关的，因为 shell 是唯一一条从参数读不出可达范围的臂；`command` 若只能落到 shell 臂，缺省的楼里每一次这样的调用都被拒。一行不带 shell 语法的命令，就是 program 臂本来能跑的一个程序与它的参数，所以把它当程序跑没有放宽没给 shell 的楼。这也划定了 `[sandbox] shell` 管什么：它决定 `command` 由不由一个 shell 解释，不决定 shell 能不能跑——把 `sh`、`pwsh` 当作程序名、带上它们的脚本参数，与改动前点名 program 臂一样能跑，因为解释器只是众多程序中的一个，按名单拦它们拦不住 `python -c`、`node -e` 与 `env`。一次调用够得到什么，由它所在的禁闭（`where` 缺省 `sandbox`，§8-13-2）与 run 的写域判定，不由 shell 开关判定。带 shell 语法的行拒绝而不是照传：`a | b` 当作程序 `a` 带参数 `|`、`b` 跑，结果是一条模型没写过的命令。
 
 **被否**：①保留 `program` 加 `args` 作第三种形状——每个请求的工具表多一段模型几乎不用的 schema，而它说的事与程序行重复；②`command` 只映射 shell 臂——缺省的楼里每次被拒；③没有 shell 时用一个内置的解释器跑 `command`——那就是给了 shell，绕过了楼的决定；④反斜杠作转义——Windows 的路径会被吃掉。
 

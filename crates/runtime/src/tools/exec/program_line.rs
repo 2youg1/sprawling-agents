@@ -33,7 +33,7 @@ const SHELL_SYNTAX: [char; 18] = [
 /// # Errors
 /// `E_INVALID_ARGS` for shell syntax outside quotes, naming the
 /// character, for a quote left open, and for a line with no word.
-pub(super) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError> {
+pub(crate) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError> {
     let mut words: Vec<String> = Vec::new();
     let mut word: Option<String> = None;
     let mut quote: Option<char> = None;

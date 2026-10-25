@@ -71,8 +71,8 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
-// args：{path, old, new}；准入按本 run 的读戳（§8-64，D106）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
-// old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
+// args：{file_path, old_string, new_string, replace_all?}；准入按本 run 的读戳（§8-64，D106）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
+// old_string 必唯一命中，replace_all 为真时换掉每一处（零命中＝E_INVALID_ARGS；不带 replace_all 而多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
 
 // crates/runtime/src/tools/read.rs —— 一个参数，两条路
 pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
@@ -80,8 +80,8 @@ impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
-// 创建臂：old=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new＝全文；父目录自动建（域内已证）。
-// 路径不存在而 old 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
+// 创建臂：old_string=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new_string＝全文；父目录自动建（域内已证）。
+// 路径不存在而 old_string 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
 
 // crates/runtime/src/tools/status.rs —— 十三字段
