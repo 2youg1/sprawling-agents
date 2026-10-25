@@ -38,6 +38,22 @@ The four placement arms were not measured against each other for this release; `
 
 Nor were the console and the local door measured for this release. The quiet host writes nothing to the terminal per record, and the CLI writes through one bounded channel, so neither should add work per event; a page visit adds one loopback round trip and one signature check when it obtains its session token, and each WebSocket upgrade or POST adds a header comparison and one digest lookup, with nothing added per frame. These are expectations from the design, not readings: the register holds no figure for them yet.
 
+### The machine's memory budget
+
+The same file holds one more memory setting, which the page does not show: the top-level `memory`, outside `[core]`.
+
+```toml
+memory = "auto"
+
+[core]
+placement = "soft_shares"
+memory_bytes = 4294967296
+```
+
+`memory` and `[core] memory_bytes` are two different numbers. `memory_bytes` is the ceiling of one run; `memory` is the total that the ceilings of the work running at one time may add up to. Before each `exec` command and each Python call of a run that has a ceiling, the run's ceiling is reserved from this budget, and it is given back when the command finishes or is moved to the background, or when the Python guest ends. A call that does not fit waits, and calls start in the order they asked, so a small call never passes a large one waiting ahead of it. A call that waited carries `memory_wait` in its result: how many reservations were ahead of it, how many bytes they held, and the size of the budget. The budget therefore takes effect only when a run ceiling is set, which means `placement = "soft_shares"` and a `memory_bytes`. A run without a ceiling reserves nothing, because no number exists to reserve ([`Reserve.lean`](../crates/runtime/spec/Reserve.lean) D104).
+
+`"auto"`, and a file with no `memory` line, size the budget as the machine's physical memory minus three amounts: what the operating system keeps for itself (`SYSTEM_KEEPS_BYTES`, 2 GiB), the browser tab that shows the city (`VIEW_KEEPS_BYTES`, 400 MiB), and the city process's own resident budget (`storage::RESIDENT_TOTAL_BYTES`, 24 MiB). The first two are in [`placement.rs`](../crates/sprawling/src/serving/placement.rs), which sizes the budget. A whole number sets the budget in bytes. A budget of `0`, written or left after the subtraction on a small machine, means one piece of heavy work at a time: a reservation larger than the whole budget starts only when no other reservation is held, and then it runs alone ([`Reserve.lean`](../crates/runtime/spec/Reserve.lean) D103). Any other value is refused with `E_CONFIG_INVALID` by [the person's configuration](../crates/accounting/src/person.rs). The city then sizes the budget as under `"auto"` and writes a notice that names the value. The budget is read once, when the city server starts.
+
 ## Interpret the fields
 
 The [wire Sample](../crates/wire/src/frames/monitor.rs), [counter readers](../crates/sprawling/src/monitor/counters.rs), [accounting health](../crates/accounting/src/worker/health.rs) and [sampler](../crates/sprawling/src/monitor/sampler.rs) define the following fields. A city field that the platform does not supply is zero; the first CPU reading is also zero because it has no earlier reading to compare with. These zeros do not prove absence of resource use.
