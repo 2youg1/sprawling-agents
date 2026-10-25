@@ -51,7 +51,7 @@ mod write;
 
 pub use agents::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use cache::keep_warm;
-pub use catalog::write_catalog;
+pub use catalog::{check as check_catalog, write_catalog};
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};

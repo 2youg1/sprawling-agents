@@ -5,6 +5,7 @@
 
 use super::{Place, view_record};
 use crate::views::Views;
+use crate::views::holding::RunPrompt;
 use kernel::{Address, EventKind, RunId, Seq};
 
 /// A building's capabilities come from the run it started last, even
@@ -42,6 +43,9 @@ fn a_building_keeps_the_prompt_of_the_run_it_started_last() {
             .building_prompts
             .get(&Address::parse("lab").unwrap())
             .copied(),
-        Some(Seq::new(3))
+        Some(RunPrompt {
+            started: Seq::new(2),
+            prompt: Seq::new(3),
+        })
     );
 }

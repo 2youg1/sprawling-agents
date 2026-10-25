@@ -125,10 +125,10 @@ pub struct Views {
     /// Where each building's newest run's first `prompt_assembled` sits,
     /// so the capabilities a page asks for are one ledger line
     /// (`crates/wire/spec/Answer/Catalog.lean` §8-99).
-    pub(super) building_prompts: std::collections::BTreeMap<Address, kernel::Seq>,
+    pub(super) building_prompts: std::collections::BTreeMap<Address, RunPrompt>,
     /// The room each started run opened in, until its first prompt is
     /// folded: the prompt line carries no address, its run's start does.
-    pub(super) unprompted: std::collections::BTreeMap<kernel::RunId, Address>,
+    pub(super) unprompted: std::collections::BTreeMap<kernel::RunId, Started>,
     /// Each address's stretches, so a room's sessions are answered without
     /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
@@ -193,6 +193,28 @@ pub struct Views {
     /// that started from a history proved before they folded it.
     #[serde(skip)]
     pub(super) proof: Option<storage::ChainHalt>,
+}
+
+/// The room a run opened in and where its start sits, held until the
+/// run's first prompt is folded.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(super) struct Started {
+    pub(super) room: Address,
+    pub(super) at: kernel::Seq,
+}
+
+/// Where one run's first `prompt_assembled` sits, beside where that run
+/// started.
+///
+/// A building keeps the prompt of the run that started last, not the
+/// prompt that was folded last: a run freezes its prompt on its model
+/// lane some time after its start is written, and runs in two rooms of
+/// one building go side by side, so the one started later can freeze
+/// first while the tool table it froze is still the newer one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(super) struct RunPrompt {
+    pub(super) started: kernel::Seq,
+    pub(super) prompt: kernel::Seq,
 }
 
 impl Views {
@@ -376,7 +398,13 @@ impl Views {
                 self.fold_predecessor(record);
                 self.fold_skill_pins(record);
                 if let Some(addr) = record.addr() {
-                    self.unprompted.insert(record.run(), addr.clone());
+                    self.unprompted.insert(
+                        record.run(),
+                        Started {
+                            room: addr.clone(),
+                            at: record.seq(),
+                        },
+                    );
                 }
             }
             Holding::Asset => {
@@ -392,13 +420,23 @@ impl Views {
                 {
                     first.insert(record.seq());
                 }
-                if let Some(building) = self
-                    .unprompted
-                    .remove(&record.run())
-                    .and_then(|room| city::Building::of(&room).ok())
+                // A run opened outside every building, such as the
+                // city's own, has no capabilities section to answer.
+                if let Some(Started { room, at: started }) = self.unprompted.remove(&record.run())
+                    && let Ok(building) = city::Building::of(&room)
                 {
+                    let folded = RunPrompt {
+                        started,
+                        prompt: record.seq(),
+                    };
                     self.building_prompts
-                        .insert(building.addr().clone(), record.seq());
+                        .entry(building.addr().clone())
+                        .and_modify(|held| {
+                            if held.started < started {
+                                *held = folded;
+                            }
+                        })
+                        .or_insert(folded);
                 }
             }
             Holding::Nothing => {}

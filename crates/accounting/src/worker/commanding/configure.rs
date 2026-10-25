@@ -52,6 +52,13 @@ impl RunWorker {
             idem: _,
         } = settings;
         let building = city::Building::of(addr)?;
+        // Taken before anything is written: the domain is
+        // `SecondThreshold`'s one construction point, so an out-of-domain
+        // percent refuses the frame here rather than after the faces
+        // beside it landed, or at the next read.
+        let threshold = context_second_threshold
+            .map(kernel::config::SecondThreshold::parse)
+            .transpose()?;
         // Judged before any other face is written, so a table the city
         // refuses leaves the building as it was.
         if let Some(table) = catalog {
@@ -73,19 +80,13 @@ impl RunWorker {
                 servers,
             )?;
         }
-        // Taken before written: the domain is `SecondThreshold`'s one
-        // construction point, so an out-of-domain percent is refused
-        // here rather than written and refused at the next read.
-        let mut context = false;
-        if let Some(percent) = *context_second_threshold {
-            let threshold = kernel::config::SecondThreshold::parse(percent)?;
+        if let Some(threshold) = threshold {
             city::write_second_threshold(
                 &self.city_root,
                 building.addr(),
                 city::Layer::Building,
                 threshold,
             )?;
-            context = true;
         }
         // Written whole and never parsed here: the connector that reads
         // it at start-up is the authority on its syntax and fails closed,
@@ -105,7 +106,7 @@ impl RunWorker {
                 sandbox: sandbox.is_some(),
                 mcp: mcp.is_some(),
                 desktop: desktop.is_some(),
-                context,
+                context: threshold.is_some(),
                 catalog: catalog.is_some(),
             },
         )?;
@@ -137,9 +138,11 @@ impl RunWorker {
     /// §8-61). A frame that states nothing writes nothing and books
     /// nothing.
     ///
-    /// `[search]` and then `[catalog]` go first: they are the facts the
-    /// city refuses for what they say, so a refused frame leaves the
-    /// other facts as they were.
+    /// `[search]` and `[catalog]` are the facts the city refuses for what
+    /// they say, so both are judged before the first byte lands: the
+    /// catalog by `city::check_catalog`, the search by its own writer,
+    /// which judges before it writes. A refused frame leaves the file as
+    /// it was.
     ///
     /// # Errors
     /// `E_CONFIG_INVALID` for a `[search]` value or a `[catalog]` key the
@@ -150,6 +153,9 @@ impl RunWorker {
         &mut self,
         settings: wire::CitySettings,
     ) -> Result<(), AxError> {
+        if let Some(table) = &settings.catalog {
+            city::check_catalog(table)?;
+        }
         let search = settings
             .search
             .map(|search| city::write_search(&self.city_root, &search));

@@ -102,7 +102,15 @@ const CHANGE_THE_KEY: &str = "name a tool as its catalog lists it, or a namespac
 /// statement that could never match anything is refused where it is
 /// written rather than silently ignored. A name no tool has today is
 /// accepted: a server's tools come and go with the server.
-pub(super) fn check(table: &ExposureTable) -> Result<(), AxError> {
+///
+/// The writers call it themselves; a frame that writes another refusable
+/// fact beside the table calls it first, so neither lands when the table
+/// is refused (`crates/wire/spec/Command/Step.lean` §8-61).
+///
+/// # Errors
+/// `E_CONFIG_INVALID` naming the first key that is not a tool name or a
+/// namespace.
+pub fn check(table: &ExposureTable) -> Result<(), AxError> {
     for tool in table.tools.keys() {
         ToolName::parse(tool).map_err(|_| {
             refuse_with(

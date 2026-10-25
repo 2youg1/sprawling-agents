@@ -40,7 +40,7 @@ impl Views {
         Prepared::Catalog(CatalogAsk {
             ledger: self.ledger_ask(),
             building: building.clone(),
-            newest: self.building_prompts.get(building).copied(),
+            newest: self.building_prompts.get(building).map(|held| held.prompt),
         })
     }
 }
