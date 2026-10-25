@@ -29,6 +29,11 @@
 //! `limit`, at most 512 lines, and a truncated answer carries the total
 //! and the offset to continue from, which is the number `search`
 //! reports for a hit.
+//!
+//! The arguments are Claude Code's `Read`'s, by name and by value: a
+//! `file_path`, and an `offset` that is the 1-based number of the first
+//! line (`crates/runtime/spec/Tools.lean` §8-14-1, D119). The answer
+//! keeps 0-based indexes, which the renderer draws as line numbers.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -70,8 +75,9 @@ enum Found {
 }
 
 /// The interval of one answer: where it starts and how much of it there
-/// is at most. `offset` stays the number the caller sent until it meets
-/// the text it counts the lines of.
+/// is at most. `offset` is the 0-based index of the line the caller
+/// numbered, kept as the caller's width until it meets the text it
+/// counts the lines of.
 struct Interval {
     offset: u64,
     limit: u16,
@@ -90,6 +96,9 @@ struct Taken {
 }
 
 impl Interval {
+    /// The caller's `offset` is a line number counted from 1; 0 reads as
+    /// the first line too, since it can mean nothing else.
+    ///
     /// # Errors
     /// `E_INVALID_ARGS` when `offset` or `limit` is not a whole number,
     /// or when `limit` is zero. A `limit` above the cap is served at the
@@ -113,7 +122,7 @@ impl Interval {
                 }),
             }
         };
-        let offset = whole("offset")?.unwrap_or(0);
+        let offset = whole("offset")?.map_or(0, |line| line.saturating_sub(1));
         // Above the cap is served at the cap, and a number no `u16`
         // holds is above it.
         let limit = whole("limit")?.map_or(LINE_CAP, |asked| {
@@ -231,6 +240,10 @@ impl ReadTool {
     /// `mode::core_tools`.
     pub const NAME: &'static str = "read";
 
+    /// The argument that names what to read, spelled once for the
+    /// schema, the reading, the refusal and the ledger's readers.
+    pub const FILE_PATH: &'static str = "file_path";
+
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
@@ -249,18 +262,19 @@ impl ReadTool {
         spec.insert(
             "description".to_owned(),
             Value::String(
-                "a file path relative to the city root, or the name of a catalog entry".to_owned(),
+                "the file to read, relative to the city root, or the name of a catalog entry"
+                    .to_owned(),
             ),
         );
-        properties.insert("path".to_owned(), Value::Object(spec));
+        properties.insert(Self::FILE_PATH.to_owned(), Value::Object(spec));
         for (name, description) in [
             (
                 "offset",
-                "the first line to return, counted from 0; default 0",
+                "the line number to start reading from, counting from 1; default 1",
             ),
             (
                 "limit",
-                "how many lines to return, at most 512, which is also the default",
+                "the number of lines to read, at most 512, which is also the default",
             ),
         ] {
             let mut spec = Map::new();
@@ -274,7 +288,7 @@ impl ReadTool {
         params.insert("properties".to_owned(), Value::Object(properties));
         params.insert(
             "required".to_owned(),
-            Value::Array(vec![Value::String("path".to_owned())]),
+            Value::Array(vec![Value::String(Self::FILE_PATH.to_owned())]),
         );
         Ok(ReadTool {
             catalog,
@@ -283,9 +297,10 @@ impl ReadTool {
             seen: ReadStamps::default(),
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
-                disclosure: "Read a file by its path, or a skill by the name the catalog lists \
-                             it under. A truncated answer states the total and the offset to \
-                             continue from. Reading a directory or a missing file is refused."
+                disclosure: "Reads a file by its path, or a skill by the name the catalog \
+                             lists it under, with line numbers counted from 1. A truncated \
+                             answer states the total and the line to continue from. Reading a \
+                             directory or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -385,15 +400,19 @@ impl Tool for ReadTool {
         let asked = call
             .args
             .as_map()
-            .get("path")
+            .get(Self::FILE_PATH)
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 AxError::failure(
                     AxCode::InvalidArgs,
                     "read",
-                    "missing string argument `path`",
+                    format!("missing string argument `{}`", Self::FILE_PATH),
                 )
-                .with_recovery("pass one string: a city-relative path, or a catalog name")
+                .with_recovery(format!(
+                    "pass `{}`: a city-relative path, or a catalog name; `offset` and `limit` \
+                     are optional",
+                    Self::FILE_PATH
+                ))
             })?;
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
@@ -409,8 +428,8 @@ impl Tool for ReadTool {
             Found::File { at, floor } => miss::text_at(asked, at, &floor)?.0,
         };
         let interval = Interval::asked_for(call)?;
-        // Where the interval starts, which the drawn header and line marks
-        // number from (`crate::rendering`); absent means line 0.
+        // Where the interval starts, as an index the drawn header and line
+        // marks number from (`crate::rendering`); absent means index 0.
         if interval.offset != 0 {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }

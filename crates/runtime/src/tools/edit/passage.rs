@@ -34,7 +34,8 @@ pub(super) enum Opened {
 
 /// The window around where `old_string` begins in `text`, or at the head of
 /// `text` when the first line of `old_string` is gone, with a header naming its
-/// 0-based lines.
+/// lines the way the current renderer numbers them
+/// (`crates/runtime/spec/Rendering.lean` D119).
 pub(super) fn around(text: &str, old: &str) -> (Opened, String) {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let found = old
@@ -64,9 +65,20 @@ pub(super) fn around(text: &str, old: &str) -> (Opened, String) {
     if !body.ends_with('\n') {
         body.push('\n');
     }
+    let numbering = crate::rendering::Numbering::of(crate::rendering::CURRENT);
+    let shown = |index: usize| {
+        u64::try_from(index)
+            .ok()
+            .and_then(|index| numbering.shown(index))
+            .map_or_else(|| index.to_string(), |number| number.to_string())
+    };
     (
         opened,
-        format!("lines {start}-{last} as the file now reads:\n{body}"),
+        format!(
+            "lines {}-{} as the file now reads:\n{body}",
+            shown(start),
+            shown(last)
+        ),
     )
 }
 
@@ -82,7 +94,7 @@ mod tests {
             around(&text, "line 10\nline 11"),
             (
                 Opened::AroundOld,
-                "lines 7-14 as the file now reads:\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\n"
+                "lines 8-15 as the file now reads:\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\n"
                     .to_owned()
             )
         );
@@ -97,7 +109,7 @@ mod tests {
             around(&text, "gone"),
             (
                 Opened::AtHead,
-                "lines 0-6 as the file now reads:\nline 0\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\n"
+                "lines 1-7 as the file now reads:\nline 0\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\n"
                     .to_owned()
             )
         );
