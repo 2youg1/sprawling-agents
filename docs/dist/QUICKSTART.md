@@ -1,6 +1,6 @@
 # sprawling — start here
 
-You have unpacked a folder. Nothing was installed and no service was registered. While this folder can be written to, nothing outside it is written, and deleting the folder removes everything; when it cannot, the city goes under your home directory instead, as *Where your data is* below says.
+You have unpacked a folder. Nothing was installed and no service was registered. The city you are about to start does not live in this folder: it lives under your home directory, as *Where your data is* below says, so deleting this folder or unpacking a newer release elsewhere leaves the city where it is.
 
 ## 1 Start it
 
@@ -27,13 +27,15 @@ This program schedules agents, records what they do, and shows it to you. **It d
 
 1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. For a subscription, use **ACP agents**: pick an agent found on this computer or in the bundled catalog, or paste its command, read the exact command line on its consent card, and add it. **add and use here** also hands the current room to that agent, which ends the room's current session record. The city does not sign in for you: if the agent needs a login, sign in with the agent's own program first, outside the city.
 2. Under **which model thinks**, choose the model for **main · thinks**. **digest · reads**, which reads long documents on `main`'s behalf, follows it until you choose another.
-3. **the Mayor**, the page the city opens on, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, raises the buildings it needs, and hands each one its part.
+3. **the Mayor**, the page the city opens on, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, asks you to raise a building when no existing one should hold it, and hands each building its part.
 
 Then **city** shows the buildings working, a count on the mailbox key says how many questions wait for you, and **cost** is what it spent. A line that begins with `/` is a command, on the page and in the CLI alike: `/help` lists them, and `/quit` closes the city.
 
 ## Where your data is
 
-In `city/`, beside this file, unless this folder cannot be written to; then the first screen names the folder it chose under your home directory instead. One folder holds the whole history, and it can be moved, copied or deleted as a unit. Each session keeps its own folder inside the building it works in.
+In `sprawling/city` under your home directory (`~/sprawling/city`), unless you typed another folder on the first screen. The first screen shows the folder before it creates anything, and the folder you choose is written as the `city` line of your personal configuration, `~/.sprawling/config.toml`, so the next start opens it again. A city that an earlier release kept beside the binary is moved to `~/sprawling/city` the first time this release starts; when your home directory is on another volume, the city stays where it is and its path goes into the `city` line instead.
+
+One folder holds the whole history, and it can be copied or deleted as a unit. To move it, stop the city, move the folder whole, then change the `city` line to its new absolute path. Each session keeps its own folder inside the building it works in.
 
 ## Is there a newer one?
 
