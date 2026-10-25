@@ -382,9 +382,9 @@ fn proposal(setup: &Setup) -> Episode {
             tool: "proposal",
             args: json!({
                 "action": "offer",
-                "file_path": draft(setup),
-                "old_string": "It cools overnight.",
-                "new_string": "It cools by dawn.",
+                "path": draft(setup),
+                "old": "It cools overnight.",
+                "new": "It cools by dawn.",
             }),
         },
         holds: |seen| {
@@ -431,19 +431,22 @@ fn rules() -> Episode {
     }
 }
 
-/// A shell is off unless a building turns it on, so the shell arm has
-/// nothing to run (`crates/runtime/Spec.lean`, `exec`).
+/// A shell is off unless a building turns it on, so a command is one
+/// program and its arguments, and a line that needs a shell is refused
+/// rather than run as some other command
+/// (`crates/runtime/spec/Tools/Exec.lean` D118).
 fn exec() -> Episode {
     Episode {
         step: Step {
             tool: "exec",
-            args: json!({ "command": "echo hi" }),
+            args: json!({ "command": "echo hi > hi.txt" }),
         },
         holds: |seen| {
             let error = failed(seen.answer)?;
             ensure(
-                error.get("code") == Some(&json!("E_TOOL_UNAVAILABLE")),
-                format!("the shell arm answered {error:?}"),
+                error.get("code") == Some(&json!("E_INVALID_ARGS"))
+                    && error.get("subject") == Some(&json!("`>` outside quotes")),
+                format!("the command answered {error:?}"),
             )
         },
     }
