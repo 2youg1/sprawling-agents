@@ -280,6 +280,11 @@ export function slashHands(reach: Reach): SlashHands {
 // `type`: an Enter that picks a candidate must not send half a sentence.
 export type BoxKey = "complete" | "menu" | "recall" | "send" | "type";
 
+// What the box holds, as the page around it needs to know: an empty
+// room's address line stands over the box until the box holds words
+// (client/Spec.lean 4-10a).
+export type BoxHolds = "nothing" | "words";
+
 export interface KeyPressed {
   readonly key: string;
   readonly shiftKey: boolean;

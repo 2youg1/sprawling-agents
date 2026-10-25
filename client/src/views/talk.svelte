@@ -36,6 +36,7 @@
   import AddressLine from "./talk/address_line.svelte";
   import type { Head } from "./talk/address_line";
   import Composer from "./talk/composer.svelte";
+  import type { BoxHolds } from "./talk/composer";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
   import Button from "./parts/button.svelte";
@@ -64,9 +65,10 @@
     // The band under the world layer's sheet on one column: the thread
     // steps aside and the last thing said stands above the box.
     readonly band: boolean;
-    // Whether the column draws the address line at its head
-    // (client/Spec.lean 4-10a): zen and blend do; the panorama workbench
-    // writes the address under the chosen session instead.
+    // Whether the column draws the address line (client/Spec.lean
+    // 4-10a): zen and blend do, at its head or over an empty room's box;
+    // the panorama workbench writes the address under the chosen session
+    // instead.
     readonly head: Head;
   }
 
@@ -222,6 +224,14 @@
   // stands in the middle. The first send lets it sink at once, before
   // the city has answered, because the words it shows are already there.
   const blank = $derived(runs.length === 0 && echo === null);
+  // Where the address line stands (client/Spec.lean 4-10a): over an empty
+  // room's box, where the eye already is, until the box holds words; at
+  // the column's head once the room has something to read.
+  let holds = $state<BoxHolds>("nothing");
+  const addressAt = $derived.by((): "head" | "over_box" | "nowhere" => {
+    if (band || head !== "address") return "nowhere";
+    return blank ? "over_box" : "head";
+  });
 
   function send(text: string): boolean {
     const going = live;
@@ -359,6 +369,9 @@
     hearing={u.hearing()}
     room={address}
     band={band ? lastSaid : undefined}
+    onHolds={(now: BoxHolds) => {
+      holds = now;
+    }}
     onSend={send}
     onStop={() => {
       const going = live;
@@ -373,7 +386,7 @@ with the room's name above it, and the first send lets it sink to its seat
 (docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
-  {#if !band && head === "address"}
+  {#if addressAt === "head"}
     <AddressLine {address} />
   {/if}
   {#if !band}
@@ -409,6 +422,14 @@ composition is rebuilt on the way. -->
     class="relative shrink-0 transition-transform duration-page"
     style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
+    {#if addressAt === "over_box"}
+      <!-- Hidden rather than taken out, so the box does not move under
+           the first word typed; a hidden line takes no focus and says
+           nothing to a screen reader. -->
+      <div class={holds === "words" ? "invisible" : undefined}>
+        <AddressLine {address} />
+      </div>
+    {/if}
     {#if branchNote !== null}
       <div class="mb-tight flex flex-wrap items-center gap-base">
         <p class="text-note text-text-faint" role="status">{branchNote.said}</p>

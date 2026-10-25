@@ -33,7 +33,7 @@
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
   import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, sessionModel, slashHands, startedIn } from "./composer";
-  import type { BoxKey, ComposerLook } from "./composer";
+  import type { BoxHolds, BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
   import { TextBox } from "./box.svelte";
@@ -66,9 +66,12 @@
     // The room this box speaks to, when the page holding it says so; the
     // address bar answers otherwise.
     readonly room?: Address | undefined;
+    // Told what the box holds whenever that changes, and once when the box
+    // is drawn.
+    readonly onHolds?: ((holds: BoxHolds) => void) | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, started = false }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, onHolds, started = false }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -103,6 +106,11 @@
     untrack(() => {
       if (next !== place) moveTo(next);
     });
+  });
+
+  const holds: BoxHolds = $derived(text === "" ? "nothing" : "words");
+  $effect(() => {
+    onHolds?.(holds);
   });
 
   function moveTo(next: string | undefined): void {
