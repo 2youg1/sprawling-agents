@@ -140,6 +140,7 @@
   import PaneMenu from "./world/pane_menu.svelte";
   import Place from "./world/place.svelte";
   import Session from "./world/session.svelte";
+  import { titleOf } from "./world/sessions";
   import Sessions from "./world/sessions.svelte";
   import SheetHead from "./world/sheet_head.svelte";
 
@@ -179,12 +180,18 @@
   // than talks to (`talk/past.svelte`): `undefined` is the room's current
   // session, `null` one the city has not answered for.
   const stretches = $derived(u.conn.asking.ask({ sessions: { room: address } }));
+  const roomStretches = $derived(
+    stretchesOf($stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [], (room) => heldIn($belief, room)),
+  );
   const past = $derived.by(() => {
     if (session === undefined) return undefined;
-    const answer = $stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [];
-    const found = stretchesOf(answer, (room) => heldIn($belief, room)).find((each) => each.line.began === session);
+    const found = roomStretches.find((each) => each.line.began === session);
     return found?.current === true ? undefined : (found ?? null);
   });
+  // The session the chosen-session pane is about, named the way the
+  // sessions column's row names it (`world/sessions.ts`'s `titleOf`): one
+  // column heads that pane with it, since the row is on another tab.
+  const chosenStretch = $derived(roomStretches.find((each) => (session === undefined ? each.current : each.line.began === session)));
 
   // The run the right pane speaks for: the past session's last, else the
   // one going, or the last one this room finished; its rounds are the
@@ -262,6 +269,7 @@
     commits: address === MAYOR ? ($belief.city ?? say($lang, "world_city")) : buildingOf(address),
   });
   const title = $derived(address === MAYOR ? say($lang, "talk_empty_mayor") : roomOf(address));
+  const chosenTitle = $derived(chosenStretch === undefined ? title : titleOf(chosenStretch));
 </script>
 
 {#snippet sessionsHead()}
@@ -352,7 +360,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
           {#if placed.pane === "sessions"}
             <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} shown={past === undefined ? undefined : gauged} title={sheet ? title : undefined} head={sheet ? unnamed : sessionHead} />
+            <Session here={address} shown={past === undefined ? undefined : gauged} title={sheet ? chosenTitle : undefined} head={sheet ? unnamed : sessionHead} />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
