@@ -183,7 +183,7 @@ export interface Asked {
 // a function of those two and nothing a person typed since. The form
 // never writes the answer into the box: the attach runs the same
 // normalisation on the same text and face, so the box needs no help to
-// be right (client/Spec.lean D99).
+// be right (client/Spec.lean D102).
 export function normalisedFrom(probed: Probed | null, pending: Sent | null, now: Asked): string | null {
   if (probed === null || pending === null || probed === pending.before || probed.name !== pending.id) return null;
   if (now.baseUrl !== pending.baseUrl || now.wireApi !== pending.wireApi) return null;

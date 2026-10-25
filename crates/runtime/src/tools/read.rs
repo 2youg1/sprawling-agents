@@ -217,7 +217,7 @@ pub struct ReadTool {
     /// a worktree does not hold. A Locator's bytes are read through it.
     reader: BoundReader,
     /// The root `reader` reads under, its real location anchored once
-    /// (`crates/runtime/spec/Tools/ChosenPath.lean` D5).
+    /// (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
     city: CityRoot,
     /// What this run has seen, written at every read of a file that
     /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`

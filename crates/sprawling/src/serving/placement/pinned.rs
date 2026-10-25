@@ -5,7 +5,7 @@
 
 //! The fourth comparison arm: the plan's processors held by hard
 //! affinity (`crates/sprawling/spec/Serving/Placement.lean`, D41 and
-//! D49). It is built to be measured later, and it is honest about what
+//! D103). It is built to be measured later, and it is honest about what
 //! each platform can do: a Windows Job Object holds this process to the
 //! plan's mask, Linux has the call but not through a safe Rust interface
 //! so the whole binary is started under `taskset -c` from outside, and
@@ -211,7 +211,7 @@ fn would(seats: &[Processor]) -> Did {
 }
 
 /// The available processors outside the core plan; an empty or
-/// unrepresentable remainder asks for no affinity (D49).
+/// unrepresentable remainder asks for no affinity (D103).
 #[cfg(any(windows, test))]
 fn remaining(available: u64, core: u64) -> runtime::backlog::RunAffinity {
     match usize::try_from(available & !core) {

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a model reads is the same bytes whichever way the engine got
-//! them (`crates/runtime/spec/Tools/Read.lean` D10): the handle read
+//! them (`crates/runtime/spec/Tools/Read.lean` D113): the handle read
 //! answers what the judged path answers, success and refusal alike, and
 //! the one-pass cut cuts what the cut it replaced cut.
 

@@ -138,7 +138,7 @@ pub enum PrivacyResult { Running, Applied { operation }, Restored { operation },
 **重开参数**：控制表出现 `REG_DWORD`、`REG_SZ` 之外的写入类型时，再考虑给它一种可读的拼写。
 -/
 
-/-! D52 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore
+/-! D62 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore
 
 restore-all 是逐个控制的单次恢复（crates/sprawling/spec/Privacy.lean D63），每次机器作用域的写入各要一次
 管理员批准；页面按 `PrivacyHistory::Disclosed.owned` 为每一条发一次 `Restore`，各带自己的 idem 与它显示的

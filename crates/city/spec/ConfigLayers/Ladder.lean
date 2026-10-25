@@ -222,7 +222,7 @@ structure Seat where
   harness : Option String
   one : model = none ∨ harness = none
 
-/-! D6 落在这里：`settled_harness` 先看地址自己那一层有没有会话写下的 `[model] name`，有就答 `none`；没有才爬梯子取最近一级点名的 harness。决定、理由与被否的备选写在 `crates/city/spec/ConfigLayers.lean` 的 D6。 -/
+/-! 这里落实 D6：`settled_harness` 先看地址自己那一层有没有会话写下的 `[model] name`，有就答 `none`；没有才爬梯子取最近一级点名的 harness。决定、理由与被否的备选写在 `crates/city/spec/ConfigLayers.lean` 的 D6。 -/
 def settledHarness (own : Seat) (rungs : List (Rung Seat)) : Option (String × Layer) :=
   match own.model with
   | some _ => none

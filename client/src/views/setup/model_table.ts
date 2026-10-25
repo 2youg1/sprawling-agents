@@ -53,7 +53,7 @@ function fromKey(from: FigureFrom): Key {
 // registers, drawn as a placeholder rather than as a value, because a
 // placeholder says "this is what the city will use" where a value would
 // claim a person decided it, and under it the rung that stated it. The
-// city answers both (`Query::ModelFigures`, client D100); until it has,
+// city answers both (`Query::ModelFigures`, client D103); until it has,
 // the box is blank and says nothing.
 interface Untouched {
   readonly placeholder: string;

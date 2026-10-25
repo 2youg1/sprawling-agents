@@ -886,7 +886,7 @@ memory ceiling the User entered, and only the processor share when
 comparison arm: on Windows the harness process is taken into a Job
 Object whose affinity limit is the plan's mask, on Linux the arm names
 the `taskset -c` list the whole binary is started under, and on macOS it
-does nothing and says so (sprawling D41 and D49). Any other spelling is
+does nothing and says so (sprawling D41 and D103). Any other spelling is
 refused as unreadable. **settings** → **performance** edits both fields,
 and they apply when the city server restarts (sprawling D47).
 `sprawling doctor` prints one line, written only in `placement::report`,

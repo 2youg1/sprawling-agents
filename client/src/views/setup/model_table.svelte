@@ -39,7 +39,7 @@
     onChosen(chosenRows(state, served));
   });
 
-  // The city's answer for every row (client D100). A table about no
+  // The city's answer for every row (client D103). A table about no
   // endpoint asks nothing, and its boxes stay blank.
   const asked = $derived(about === null ? readable(undefined) : u.conn.asking.ask(figuresQuery(about, state, served)));
   const figures = $derived(

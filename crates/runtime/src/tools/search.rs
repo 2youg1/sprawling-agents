@@ -121,7 +121,7 @@ impl Findings {
 /// What a search answers with, and what it refuses.
 pub struct SearchTool {
     /// The root the walk starts from, anchored once when the tool is
-    /// built (`crates/runtime/spec/Tools/ChosenPath.lean` D5).
+    /// built (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
     city: chosen_path::CityRoot,
     /// What this run's building may read: the prefix is admitted by it,
     /// and a walk from the city root enters only the buildings it opens.

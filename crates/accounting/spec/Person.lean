@@ -42,7 +42,7 @@ pub fn machine_memory() -> Result<MachineMemory, AxError>; // 缺省 Auto；既�
 - **`CorePriority` 的文法归 wire，本模块重导出它**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
 -/
 
-/-! D52 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
+/-! D56 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
 
 `CorePreferences { placement, priority, memory_bytes: Option<NonZeroU64> }` 同时供
 文件读者、PreferencesAnswer 的 `core` 字段和性能组使用；没有 memory_bytes 即不限。

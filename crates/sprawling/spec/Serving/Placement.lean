@@ -338,7 +338,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 **重开参数**：四臂对照里 (a)+(b)+(c) 臂的工具调用与 relay 等待 p99 不优于「不做」臂（在噪声以内）——那就删掉 (b)，只留 (a) 与 (c)；或者硬亲和臂的 p99 与 p999 都明显更好。
 -/
 
-/-! D49 第四臂住在 `placement::pinned`：一次读拓扑算出一份计划，Windows 用 job 的亲和限额、Linux 说 `taskset` 列表、macOS 说没有
+/-! D103 第四臂住在 `placement::pinned`：一次读拓扑算出一份计划，Windows 用 job 的亲和限额、Linux 说 `taskset` 列表、macOS 说没有
 
 **决定**：硬亲和臂的机制只写在 `bin::serving::placement::pinned`，它不读设置、不读拓扑，只拿调用者已经算出的计划座位（`plan::Processor` 的切片）回答这一台机器会做什么，结果每进程只取一次（`OnceLock`），做不了就作为一条进程通知说一次（`serving::journal::notice`，`refuse` 级，§8-11），doctor 那一行也说（D47）。
 
@@ -420,7 +420,7 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写�
   | `"none"` | 不关 | 不读拓扑、不要座位 | 不设 | 不设 |
   | `"soft"`（缺省） | 关 | 要 | 设 | 不设 |
   | `"soft_shares"` | 关 | 要 | 设 | User 填写的非零字节上限；缺席即不设 |
-  | `"pinned"` | 关 | 要（硬亲和，D41、D49） | 设 | 不设 |
+  | `"pinned"` | 关 | 要（硬亲和，D41、D103） | 设 | 不设 |
 
   `"pinned"` 是第四臂：除了 `"soft"` 那几项，它把 harness 进程按在计划里的处理器上（Windows 的 job 亲和限额、Linux 的 `taskset -c` 列表、macOS 说没有这一臂，D41 与 D49）；`"soft_shares"` 与 `"pinned"` 今天都读得懂，四个拼写以外的值按读不懂拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。子进程比核心低一档（Windows 的 below-normal 优先级类、Unix 的 `nice 10`、Linux 的 `ionice`）属于 §8-13-3，不归这个设置；macOS 的 `taskpolicy -c utility` 是 D29 的 CPU 份额一项，随这一臂开关。
 - 份额要的那一半能不能落地按平台与运行中的机器分：Windows 的 job 两半都设；macOS 只有 CPU 一半（`taskpolicy` 是命令外面的一层包装，`RunProcesses.share` 在 macOS 上读作 `Unset`）；Linux 上两半都要 harness 自己的 cgroup 可写（D33），不可写时只剩 `nice 10` 一档。哪一状态由 `runtime::platform_shares` 一处读（`crates/runtime/spec/Tools/Exec.lean` D33）：`backlog` 的接线用这个答案决定建不建 cgroup，doctor 那一行用同一个答案说人话。
