@@ -12,13 +12,14 @@
 //! call and writes the line.
 
 use kernel::event::record::GovernedDocumentWritten;
-use kernel::{Address, AxCode, AxError, B3Hash, EventKind, Payload};
+use kernel::{AxCode, AxError, EventKind, Payload};
 
 use super::super::RunWorker;
 
 impl RunWorker {
-    /// Takes `step` on the prompt document at `at`, only while it still
-    /// holds the version `base` names, and records what it left.
+    /// Takes the write's step on the prompt document at its `at`, only
+    /// while that file still holds the version its `base` names, and
+    /// records what it left.
     ///
     /// # Errors
     /// `E_INVALID_ARGS` for an address that is not on the city's list of
@@ -28,10 +29,9 @@ impl RunWorker {
     /// line.
     pub(in crate::worker) fn put_prompt(
         &mut self,
-        at: &Address,
-        base: B3Hash,
-        step: wire::PromptStep,
+        write: &wire::PromptWrite,
     ) -> Result<(), AxError> {
+        let at = &write.at;
         let doc = city::PromptDocument::of(at).ok_or_else(|| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -43,7 +43,7 @@ impl RunWorker {
                  subtree, a building's own City.md, or a model's note",
             )
         })?;
-        let written = city::put_prompt(&self.city_root, &doc, base, step_of(step))?;
+        let written = city::put_prompt(&self.city_root, &doc, write.base, step_of(write.step))?;
         // The three in the city's reserved subtree are named by their file
         // alone; every other prompt document needs its address.
         let (naming, place) = match doc {

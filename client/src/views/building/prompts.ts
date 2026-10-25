@@ -76,8 +76,8 @@ const ACTION_WORD: Record<"open" | PromptStep, Key> = {
 
 // The word a card's action is pressed by.
 export function actionWord(action: CardAction | PromptStep, lang: Lang): string {
-  const key = typeof action === "string" ? action : action.kind === "open" ? "open" : action.step;
-  return say(lang, ACTION_WORD[key]);
+  if (typeof action === "string") return say(lang, ACTION_WORD[action]);
+  return say(lang, ACTION_WORD[action.kind === "open" ? "open" : action.step]);
 }
 
 // The name an action is read by: the verb and the document it acts on.

@@ -320,7 +320,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D60 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版
 
-**决定**：`Query::Layers { addr }` 答这个地址下一个 run 的每份提示文档（城与楼的 `City.md`、工作区、楼与房间的 `AGENTS.md`、身份文件、两层的模型提示）：在哪、进哪一段、哪一层、送不送、被谁替换，带默认的三份另带默认的版本与副本状态。`Command::PutPrompt { at, base, step }` 做三种整份动作：`Own` 在这一层起一份、`Inherit` 删掉这一层的一份、`Restore` 写回本版默认；逐字修改仍走 `PutRange`，它对 city 名单上的保留子树文件放行。`VersionSource` 多一臂 `Shipped`，本版默认文本是 `Query::Versions` 里的一版。`WIRE_V` 68 → 69。细节在 §8-98。
+**决定**：`Query::Layers { addr }` 答这个地址下一个 run 的每份提示文档（城与楼的 `City.md`、工作区、楼与房间的 `AGENTS.md`、身份文件、两层的模型提示）：在哪、进哪一段、哪一层、送不送、被谁替换，带默认的三份另带默认的版本与副本状态。`Command::PutPrompt(PromptWrite { at, base, step, idem })` 做三种整份动作：`Own` 在这一层起一份、`Inherit` 删掉这一层的一份、`Restore` 写回本版默认；逐字修改仍走 `PutRange`，它对 city 名单上的保留子树文件放行。`VersionSource` 多一臂 `Shipped`，本版默认文本是 `Query::Versions` 里的一版。`WIRE_V` 68 → 69。细节在 §8-98。
 
 **理由**：人要在页面上看见并改下一个 run 收到的提示，而楼的 `City.md`、模型提示与房间链的 `AGENTS.md` 分层之后，只读盘的人说不清哪一份在管。「谁替换谁」今天只在冻结时算一次，页面若自己爬这几层就是第二个权威，所以由城答。编辑交给已有的 RefRain（版本、比较、提案都在），只有它做不了的三件整份动作才要新命令；默认文本作为一版放进版本列表，「与默认比较」就不需要第二个比较界面。
 

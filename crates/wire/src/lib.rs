@@ -105,7 +105,7 @@ pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
 pub use command::{DoorAnswer, DoorOpening, DoorStep, SecretForgetting};
 pub use command::{PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, SessionNaming};
-pub use command::{PromptStep, PursuitStep, Shelf, SpineDocument};
+pub use command::{PromptStep, PromptWrite, PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]
 pub use frames::wire_schema;

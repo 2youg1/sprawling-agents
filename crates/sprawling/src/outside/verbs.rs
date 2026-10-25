@@ -93,7 +93,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::PutShelved { .. }
         | wire::Command::PutGuide { .. }
         | wire::Command::PutRange(_)
-        | wire::Command::PutPrompt { .. }
+        | wire::Command::PutPrompt(_)
         | wire::Command::DecideProposals(_)
         | wire::Command::OpenRemoteDoor { .. }
         | wire::Command::ReplaceCityKey { .. }

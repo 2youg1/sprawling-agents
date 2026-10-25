@@ -90,7 +90,8 @@ pub struct ShippedDefault { pub version: B3Hash, pub standing: DefaultStanding }
 pub enum DefaultStanding { Absent, Current, Earlier, Edited }
 
 // Command
-PutPrompt { at: Address, base: B3Hash, step: PromptStep, idem: IdemKey }
+PutPrompt(PromptWrite),                      // 与 `PutRange(RangeWrite)` 同形
+pub struct PromptWrite { pub at: Address, pub base: B3Hash, pub step: PromptStep, pub idem: IdemKey }
 pub enum PromptStep { Own, Inherit, Restore }
 
 // §8-83 的来源多一臂

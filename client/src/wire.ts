@@ -5555,6 +5555,20 @@ export const PromptStep = Schema.Union([
 export type PromptStep = typeof PromptStep.Type;
 
 /**
+ * One whole-document step on the prompt document at `at`, taken only
+ * while the file is still `base`: the hash of the version the page read,
+ * or of no bytes when the file is absent
+ * (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+ */
+export const PromptWrite = Schema.Struct({
+  at: Address,
+  base: B3Hash,
+  idem: IdemKey,
+  step: PromptStep,
+}).annotate({ identifier: "PromptWrite" });
+export type PromptWrite = typeof PromptWrite.Type;
+
+/**
  * Take the sentence's change, or take an inserted sentence after
  * rewriting it.
  */
@@ -6000,12 +6014,7 @@ export const Command = Schema.Union([
     forget_device: DeviceForgetting,
   }),
   Schema.Struct({
-    put_prompt: Schema.Struct({
-      at: Address,
-      base: B3Hash,
-      idem: IdemKey,
-      step: PromptStep,
-    }),
+    put_prompt: PromptWrite,
   }),
   Schema.Struct({
     auth: Schema.Struct({

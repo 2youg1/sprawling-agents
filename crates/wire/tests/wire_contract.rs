@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "304b99777212a51cc65484e46ec2271bf213ed470c6568feef43be8b4a5ac2b0";
+const WIRE_SHAPE_GOLDEN: &str = "330fe06c9b792463b63c2bdfe93848cf6035ed2fe8eae881341e265b1de7bb53";
 
 // -------------------------------------------------------------- binding face
 
@@ -670,12 +670,12 @@ title = \"a window\"
             device: wire::DeviceId::new("browser".to_owned()),
             idem,
         }),
-        Command::PutPrompt {
+        Command::PutPrompt(wire::PromptWrite {
             at: Address::parse("acme/.sprawling/City.md").unwrap(),
             base: kernel::B3Hash::digest(b""),
             step: wire::PromptStep::Own,
             idem,
-        },
+        }),
     ]
 }
 

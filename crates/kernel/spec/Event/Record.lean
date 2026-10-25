@@ -378,7 +378,7 @@ pub struct GovernedDocumentWritten {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Address>,        // 城保留子树那三份之外的提示文档：它的地址
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
-    pub removed: bool,              // `PutPrompt { step: Inherit }` 删掉了它，`bytes` 为 0
+    pub removed: bool,              // `PutPrompt` 的 `Inherit` 删掉了它，`bytes` 为 0
 }
 pub struct RunStarted {
     // …既有字段…

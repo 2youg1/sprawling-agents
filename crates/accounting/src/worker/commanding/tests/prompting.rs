@@ -54,12 +54,12 @@ fn city() -> (tempfile::TempDir, RunWorker) {
 }
 
 fn put_prompt(doc: &str, base: &[u8], step: wire::PromptStep, idem: &[u8]) -> wire::Command {
-    wire::Command::PutPrompt {
+    wire::Command::PutPrompt(wire::PromptWrite {
         at: at(doc),
         base: B3Hash::digest(base),
         step,
         idem: key(idem),
-    }
+    })
 }
 
 /// What the layers answer says of the two `City.md` of `lab`, the

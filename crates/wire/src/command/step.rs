@@ -250,6 +250,19 @@ pub enum PursuitStep {
     Clear,
 }
 
+/// One whole-document step on the prompt document at `at`, taken only
+/// while the file is still `base`: the hash of the version the page read,
+/// or of no bytes when the file is absent
+/// (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PromptWrite {
+    pub at: Address,
+    pub base: B3Hash,
+    pub step: PromptStep,
+    pub idem: IdemKey,
+}
+
 /// A whole-document step on one prompt document
 /// (`crates/wire/spec/Answer/Prefix.lean` §8-98); editing it word by word
 /// is `PutRange`.

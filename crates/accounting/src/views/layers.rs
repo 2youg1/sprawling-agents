@@ -19,8 +19,20 @@ use wire::{
     ShippedDefault,
 };
 
-use super::prepared::unavailable_because;
+use super::holding::Views;
+use super::prepared::{Prepared, unavailable_because};
 use crate::prompt_chain::{self, Reading, addressed};
+
+impl Views {
+    /// Nothing is copied out of the views: every layer is read off the
+    /// disk once they are released.
+    pub(in crate::views) fn layers_ask(&self, addr: &Address) -> Prepared {
+        Prepared::Layers {
+            city_root: self.city_root.clone(),
+            addr: addr.clone(),
+        }
+    }
+}
 
 /// The prompt documents of the next run at `addr`, or `Unavailable`
 /// with the city's reason for an address no building holds.
@@ -178,19 +190,18 @@ fn model_notes(city_root: &Path, home: &Address) -> Result<Vec<LayerDocument>, A
             } else {
                 state
             };
-            out.push(note(at, version, PromptLayer::City, state, model));
+            out.push(note(at, PromptLayer::City, (state, version), model));
         }
-        let (state, version) = on_disk(&city_root.join(own_at.as_str()));
-        out.push(note(own_at, version, PromptLayer::Building, state, model));
+        let found = on_disk(&city_root.join(own_at.as_str()));
+        out.push(note(own_at, PromptLayer::Building, found, model));
     }
     Ok(out)
 }
 
 fn note(
     at: Address,
-    version: B3Hash,
     layer: PromptLayer,
-    state: LayerState,
+    (state, version): (LayerState, B3Hash),
     (provider, model): &(String, String),
 ) -> LayerDocument {
     LayerDocument {
@@ -212,7 +223,10 @@ fn note(
 /// # Errors
 /// `E_INVALID_ARGS` for a name the address grammar refuses, which a note
 /// `city::model_notes` listed cannot carry.
-fn note_at(building: Option<&Address>, (provider, model): &(String, String)) -> Result<Address, AxError> {
+fn note_at(
+    building: Option<&Address>,
+    (provider, model): &(String, String),
+) -> Result<Address, AxError> {
     city::model_note_at(building, provider, model).ok_or_else(|| {
         AxError::failure(
             kernel::AxCode::InvalidArgs,

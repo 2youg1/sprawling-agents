@@ -31,7 +31,6 @@ mod wire;
 pub use kind::{COMMAND_NAMES, Command};
 pub use no_secret::NoSecret;
 pub use shelf::Shelf;
-pub use step::PromptStep;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
 pub use step::{AgentAdding, AgentLoginStart, CityClosing, CloseMode, DeviceForgetting};
@@ -40,5 +39,6 @@ pub use step::{
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,
     SecretForgetting, SessionNaming,
 };
+pub use step::{PromptStep, PromptWrite};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;
