@@ -292,3 +292,29 @@ fn the_two_counts_are_held_to_their_pins() {
         ])
     );
 }
+
+/// A number heads one decision in its specification; a letter suffix is
+/// another number, another specification may reuse it, and a line that
+/// only cites a decision is not a heading.
+#[test]
+fn a_decision_number_heads_one_decision_in_its_specification() {
+    let root = crate::root::fixture::relocated("spec-decisions");
+    crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
+    crate::root::fixture::write(
+        &root,
+        "crates/j/Spec.lean",
+        "/-! D3 one -/\n/-! D3a another -/\n/-! D4 four -/\n",
+    );
+    crate::root::fixture::write(
+        &root,
+        "crates/j/spec/Part.lean",
+        "/-! here D4 lands -/\n/-- D4 cited -/\ndef x := 1\n/-! D3 again -/\n",
+    );
+    crate::root::fixture::write(&root, "client/Spec.lean", "/-! D3 the client's own -/\n");
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j/spec/Part.lean:4: D3 also heads a decision at crates/j/Spec.lean:1".to_owned(),
+        ])
+    );
+}
