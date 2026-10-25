@@ -39,7 +39,7 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 **不用正则表达式**，理由是模式引擎会把回溯放在模型和它的下一个回合之间。子串扫描是线性的，且一个模型写错的正则不会变成一次挂死。
 -/
 
-/-! D103 search 有三种模式，缺省仍是 content
+/-! D109 search 有三种模式，缺省仍是 content
 
 **决定**：`mode` 取 `content`（逐条命中带行号与上下文）、`files`（只列有命中的文件）、`count`（每个文件的命中行数）；缺省 `content`。files 与 count 不读上下文、不受命中文本的字节预算约束，`MATCH_CAP` 数的是文件，停在这道上限时 `stopped` 说的是文件数。
 

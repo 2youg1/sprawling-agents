@@ -109,7 +109,7 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 
 /-! D30 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
 
-**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；原来模板里的 `<plan>` 与 `<seen>` 原样搬进二进制文本。
+**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；`<seen>` 与 `<plan>` 都在二进制文本里。Mayor 的 `<plan>` 说计划怎么写，并按 `edit` 与 `plan` 现行的参数教这两个工具；参数的权威在工具（`crates/runtime/spec/Tools.lean` §8-14 的 `edit`，`crates/collab/Spec.lean` 的 `collab::claim_tool`），改参数的那个改动同时改这一段，因为二进制之外没有别的写者会替它改。
 
 **理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D29 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
 

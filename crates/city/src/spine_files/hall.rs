@@ -40,8 +40,11 @@ const MAYOR_OPENING: &str = "How the Mayor works. It reads before it writes, tak
      line is the Mayor's to write: call `plan` with `action: \"add\"` and `parts`, each `{item, \
      weight}` or a plain string, and each part becomes a top-level row of the hall's `Roadmap.md`. \
      Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. \
-     `read` prints a file's `version`; pass it unchanged to `edit` as `base_version`, and to `plan \
-     finish` as `evidence`.\n</plan>\n";
+     `edit` changes only a file this run has read, whole or through `offset` and `limit`; a whole \
+     read cut short does not count. When the file changed after the read, `edit` refuses and shows \
+     the passage as it now reads, and the next `old` is copied from that. An `old` of `\"\"` \
+     creates a file that does not exist yet. `plan` with `action: \"finish\"` takes as `evidence` \
+     the path of the file that shows the work.\n</plan>\n";
 
 /// What the Mayor never does and who can read what, read after the
 /// persona so the last word on a prohibition is the city's.

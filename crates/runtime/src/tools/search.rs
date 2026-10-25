@@ -63,7 +63,7 @@ struct Predicate {
 }
 
 /// What a call hands back for the files it matched
-/// (`crates/runtime/spec/Tools/Search.lean` D103).
+/// (`crates/runtime/spec/Tools/Search.lean` D109).
 #[derive(Clone, Copy)]
 enum Mode {
     /// Every hit, with its line number and context.
