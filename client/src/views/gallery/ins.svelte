@@ -72,7 +72,7 @@ impl Document {
     subject: PATH,
     effect: "read",
     render: "generic",
-    arguments: { head: JSON.stringify({ path: PATH, offset: 13 }, null, 2), cut: 0 },
+    arguments: { head: JSON.stringify({ file_path: PATH, offset: 14 }, null, 2), cut: 0 },
     output: { head: JSON.stringify({ path: PATH, text: FILE, bytes: FILE.length }), cut: 0 },
   });
   const EDIT = call(12, 31, {

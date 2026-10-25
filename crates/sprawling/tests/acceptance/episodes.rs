@@ -190,7 +190,7 @@ fn read(setup: &Setup) -> Episode {
     Episode {
         step: Step {
             tool: "read",
-            args: json!({ "path": notes(setup) }),
+            args: json!({ "file_path": notes(setup) }),
         },
         holds: |seen| {
             let text = answered_text(seen.answer)?;

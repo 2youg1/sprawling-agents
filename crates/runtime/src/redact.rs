@@ -413,7 +413,7 @@ mod phases {
         let catalog = Arc::new(Mutex::new(Catalog::new()));
         let tool =
             ReadTool::new(city.path(), catalog, everywhere(), Path::new("no-store")).unwrap();
-        let read = call("read", json!({ "path": "history.txt" }));
+        let read = call("read", json!({ "file_path": "history.txt" }));
         report("read", (0..32).map(|_| timed(&tool, &read)));
     }
 

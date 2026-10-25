@@ -109,7 +109,7 @@ fn reads() -> Vec<ToolCall> {
         .map(|id| ToolCall {
             id: id.to_owned(),
             name: ToolName::parse("read").unwrap(),
-            args: Payload::of(&serde_json::json!({ "path": id })).unwrap(),
+            args: Payload::of(&serde_json::json!({ "file_path": id })).unwrap(),
         })
         .collect()
 }

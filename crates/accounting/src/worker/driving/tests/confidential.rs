@@ -128,7 +128,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
                 "reading",
                 "tu_1",
                 "read",
-                serde_json::json!({ "path": "vault/room1/combination.md" }),
+                serde_json::json!({ "file_path": "vault/room1/combination.md" }),
             ),
             tool_completion(
                 "searching",

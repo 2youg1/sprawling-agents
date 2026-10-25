@@ -374,7 +374,7 @@ impl Seat {
     fn host(&self) -> Result<ModelReturn, AxError> {
         if self.turn == 1 {
             self.shared.reads_at_start.fetch_add(1, Ordering::SeqCst);
-            return calls("read", json!({ "path": HANDBOOK }));
+            return calls("read", json!({ "file_path": HANDBOOK }));
         }
         let asked = self.shared.asked.load(Ordering::SeqCst);
         let answered = self.shared.answered.load(Ordering::SeqCst);
@@ -413,7 +413,7 @@ impl Seat {
         match self.turn {
             1 => {
                 self.shared.reads_at_start.fetch_add(1, Ordering::SeqCst);
-                calls("read", json!({ "path": HANDBOOK }))
+                calls("read", json!({ "file_path": HANDBOOK }))
             }
             2 => {
                 self.shared.answered.fetch_add(1, Ordering::SeqCst);
@@ -1095,7 +1095,7 @@ impl Model for Planner {
             )
             .with_recovery("delegate the room again")),
             (Part::Maker, 1) => claim_node_one(),
-            (Part::Maker, 2) => calls("read", json!({ "path": format!("lab/kiln/{NOTES}") })),
+            (Part::Maker, 2) => calls("read", json!({ "file_path": format!("lab/kiln/{NOTES}") })),
             (Part::Maker, 3) => calls(
                 "edit",
                 json!({

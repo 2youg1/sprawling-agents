@@ -141,7 +141,7 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
                 "reading",
                 "tu_0",
                 "read",
-                serde_json::json!({ "path": "lab/room1/notes.md" }),
+                serde_json::json!({ "file_path": "lab/room1/notes.md" }),
             ),
             tool_completion(
                 "editing",
