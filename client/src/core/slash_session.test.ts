@@ -4,9 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
+import { get, writable } from "svelte/store";
+import type { Writable } from "svelte/store";
 
+import { keepBranches } from "../views/talk/branching";
 import { Address, RunId, Seq, Tag } from "../wire";
-import type { Command, RunId as Run, SessionTags } from "../wire";
+import type { AxError, Command, RunId as Run, SessionTags } from "../wire";
+import { createBelief } from "./belief";
+import type { Belief } from "./belief/shape";
 import type { View } from "./route";
 import { find, parse } from "./slash";
 import type { SlashHands } from "./slash_hands";
@@ -17,6 +22,15 @@ describe("the session in main", () => {
   const ROOM = Address.make("lab/room1");
   const GOING = RunId.make("00000000-0000-4000-8000-000000000007");
   const SESSION: SessionTags = { city: Address.make("harbour"), room: ROOM, began: Seq.make(5), tags: [Tag.make("bug")] };
+  const EMPTY: Belief = get(createBelief(() => 0).belief);
+  const BUSY: AxError = {
+    code: "E_BUSY",
+    action: "start a new session",
+    subject: `${ROOM}: a run is running there`,
+    recovery: "",
+    nearby: [],
+    retry: "no",
+  };
 
   interface Held {
     readonly hands: SlashHands;
@@ -89,10 +103,43 @@ describe("the session in main", () => {
     expect(opened !== undefined && "open_session" in opened ? opened.open_session.carry : null).toBe("handoff");
   });
 
-  test("/new from an earlier session opens at that session's room and brings main to the new one", () => {
-    const at = held(false);
+  // `/new` sent through the page's one branch door, over a belief the
+  // test moves: main follows once the room holds a newer session, and a
+  // refusal keeps it where it was (#120).
+  function door(live: boolean): Held & { readonly belief: Writable<Belief> } {
+    const at = held(live);
+    const belief = writable<Belief>({ ...EMPTY, sessions: { [ROOM]: Seq.make(3) } });
+    const branches = keepBranches({
+      belief,
+      send: (command) => at.hands.command(command),
+      go: (view) => {
+        at.hands.go(view);
+      },
+    });
+    return {
+      ...at,
+      belief,
+      hands: {
+        ...at.hands,
+        openSession: (room: Address, carry: "nothing" | "handoff") => branches.open(room, { kind: "fresh", carry }, () => undefined),
+      },
+    };
+  }
+
+  test("/new from an earlier session brings main to the room once the city opened the new one", () => {
+    const at = door(false);
     run(at.hands, "/new");
+    const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry, frame.open_session.from]] : []));
+    expect([opened, at.went]).toEqual([[[ROOM, "nothing", null]], []]);
+    at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
     expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
+  });
+
+  test("/new that the city refuses leaves main where it was", () => {
+    const at = door(false);
+    run(at.hands, "/new");
+    at.belief.update((belief) => ({ ...belief, refusal: BUSY }));
+    expect(at.went).toEqual([]);
   });
 
   test("/tag and /untag change the session in main by one word, folded to lower case", () => {
