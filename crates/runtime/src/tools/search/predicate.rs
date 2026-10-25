@@ -12,18 +12,26 @@
 //! matches with finite automata in time linear in the line, so a pattern
 //! a model wrote wrong cannot stall the turn behind it.
 //!
-//! **Refused where ignoring would mislead** (D121). `multiline`, `type`
-//! and a nonzero `offset` are refused, because a search that left them
-//! unread would answer wrongly rather than at more length; `-n`, `-o`
-//! and `head_limit` are left unread.
+//! **Refused where ignoring would mislead** (D121). `multiline`, `type`,
+//! a nonzero `offset` and a pattern that spells a line break are
+//! refused, because a search that let them through would answer wrongly
+//! rather than at more length; `-n`, `-o` and `head_limit` are left
+//! unread.
 
 use globset::{GlobBuilder, GlobMatcher};
 use kernel::{AxCode, AxError, ErrorDraft, ToolCall};
 use regex::{Regex, RegexBuilder};
+use regex_syntax::ParserBuilder;
+use regex_syntax::hir::{Hir, HirKind, Literal};
 use serde_json::{Map, Value};
 
 /// How many lines of context each side may be asked for.
 const CONTEXT_CAP: u8 = 4;
+
+/// The recovery for a call that asks to match across lines, whether
+/// through `multiline` or a line break in the pattern (D121).
+const ONE_LINE: &str =
+    "this search matches one line at a time; write a `pattern` that matches within one line";
 
 /// What one call is looking for, settled once from the arguments so the
 /// walk carries one value.
@@ -96,11 +104,13 @@ impl Predicate {
                  count",
             )
             .with_recovery("add a `pattern` to search their lines, or leave `output_mode` out")),
-            (None, None, _) => Err(refused("neither `pattern` nor `glob` was given")
-                .with_recovery(
-                    "pass `pattern`, a regular expression in ripgrep's syntax, to search the \
+            (None, None, Mode::Files | Mode::Content | Mode::Count) => Err(refused(
+                "neither `pattern` nor `glob` was given",
+            )
+            .with_recovery(
+                "pass `pattern`, a regular expression in ripgrep's syntax, to search the \
                      lines of files; or `glob` alone, such as `*.rs`, to find files by name",
-                )),
+            )),
         }
     }
 
@@ -222,7 +232,7 @@ impl Names {
         };
         match (self.by_path, below) {
             (true, Some(below)) => self.matcher.is_match(below),
-            (true, None) | (false, _) => self.matcher.is_match(name),
+            (true, None) | (false, Some(_) | None) => self.matcher.is_match(name),
         }
     }
 }
@@ -245,15 +255,43 @@ fn compiled(asked: &Value, args: &Map<String, Value>) -> Result<Regex, AxError> 
                 .with_recovery("pass `-i: true` to match without regard to case, or leave it out")
         })?,
     };
-    RegexBuilder::new(pattern)
+    let does_not_compile = |err: &dyn std::fmt::Display| {
+        refused(format!("`pattern` {pattern:?} does not compile: {err}")).with_recovery(
+            "write it in ripgrep's regex syntax, escaping `( ) [ ] { } . * + ? | ^ $ \\` with \
+             `\\` to match them literally",
+        )
+    };
+    let regex = RegexBuilder::new(pattern)
         .case_insensitive(caseless)
         .build()
-        .map_err(|err| {
-            refused(format!("`pattern` {pattern:?} does not compile: {err}")).with_recovery(
-                "write it in ripgrep's regex syntax, escaping `( ) [ ] { } . * + ? | ^ $ \\` \
-                 with `\\` to match them literally",
-            )
-        })
+        .map_err(|err| does_not_compile(&err))?;
+    let parsed = ParserBuilder::new()
+        .case_insensitive(caseless)
+        .build()
+        .parse(pattern)
+        .map_err(|err| does_not_compile(&err))?;
+    if spells_line_break(&parsed) {
+        return Err(
+            refused(format!("`pattern` {pattern:?} spells a line break")).with_recovery(ONE_LINE),
+        );
+    }
+    Ok(regex)
+}
+
+/// Whether `hir` can only match by matching a line break itself (D121):
+/// matched one line at a time, such a pattern answers "none" wherever
+/// it would have matched, as ripgrep refuses it outside multiline mode.
+/// A class that merely includes a line break, such as `\s` or `[^a]`,
+/// still matches within the line.
+fn spells_line_break(hir: &Hir) -> bool {
+    match hir.kind() {
+        HirKind::Empty | HirKind::Look(_) => false,
+        HirKind::Literal(Literal(bytes)) => bytes.contains(&b'\n'),
+        HirKind::Class(class) => class.literal().as_deref() == Some(b"\n".as_slice()),
+        HirKind::Repetition(repetition) => spells_line_break(&repetition.sub),
+        HirKind::Capture(capture) => spells_line_break(&capture.sub),
+        HirKind::Concat(parts) | HirKind::Alternation(parts) => parts.iter().any(spells_line_break),
+    }
 }
 
 /// The lines asked for on one side under `key`, capped at
@@ -281,8 +319,7 @@ fn refuse_misleading(args: &Map<String, Value>) -> Result<(), AxError> {
         (
             "multiline",
             args.get("multiline") == Some(&Value::Bool(true)),
-            "this search matches one line at a time; write a `pattern` that matches within one \
-             line",
+            ONE_LINE,
         ),
         (
             "type",

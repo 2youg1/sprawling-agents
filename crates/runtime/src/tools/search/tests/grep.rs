@@ -247,3 +247,27 @@ fn context_is_asked_for_each_side_or_both() {
         ]
     );
 }
+
+/// D121: a pattern that spells a line break can match no single line, so
+/// matched line by line it would answer "none" where the file holds the
+/// two lines; it is refused, as ripgrep refuses it outside multiline mode.
+/// A class that merely includes a line break, like `\s`, is matched
+/// within the line.
+#[test]
+fn a_pattern_that_spells_a_line_break_is_refused() {
+    let dir = city();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let refused: Vec<AxCode> = [r"before\nthe", "before\nthe", r"before[\n]", r"x\x0Ay"]
+        .into_iter()
+        .map(|asked| *tool.invoke(&pattern(asked)).unwrap_err().code())
+        .collect();
+    assert_eq!(refused, vec![AxCode::InvalidArgs; 4]);
+    assert_eq!(
+        tool.invoke(&pattern(r"the\s+ledger"))
+            .unwrap()
+            .result
+            .as_map()["count"],
+        2
+    );
+}

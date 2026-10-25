@@ -33,7 +33,7 @@
 // -i：为真时不分大小写。
 // -B、-A：命中行之前、之后的上下文行数；-C 与 context 同义，是两侧的行数；单侧的盖过两侧的；
 //   每侧缺省 0，上限 4（更大者夹到 4）；只在 content 下有意义。
-// multiline 为真、type、非 0 的 offset：E_INVALID_ARGS，恢复语说出本城的走法；-n、-o、head_limit 不读（D121）。
+// multiline 为真、type、非 0 的 offset，与写出换行的 pattern：E_INVALID_ARGS，恢复语说出本城的走法；-n、-o、head_limit 不读（D121）。
 const MATCH_CAP: usize = 64;      // 一次答的条数上限（content 数命中，files 与 count 数文件）；到顶即停走，结果自陈 truncated
 const LINE_CAP: usize = 512;      // 一条命中里每行至多带这么多字节（search::hit）
 const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界不读，计入 unreadable
@@ -82,13 +82,13 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 
 /-! D121 本城答不了的 Grep 参数：会让答案误导的拒，只改篇幅的不读
 
-**决定**：`multiline` 为真、给了 `type`、`offset` 不为 0 时，search 以 `E_INVALID_ARGS` 拒绝，恢复语说出本城的走法：跨行的写成逐行能匹配的 `pattern`，按语言筛的用 `glob`（如 `*.rs`），翻页的收窄 `path`、`glob` 或 `pattern`。`-n`、`-o`、`head_limit` 不读：行号恒在，`-o` 与 `head_limit` 只让答更短，答里已经说了停在哪（`stopped`）。
+**决定**：`multiline` 为真、给了 `type`、`offset` 不为 0、`pattern` 写出一个换行（字面的换行、`\n`、`[\n]`、`\x0A` 这类只能匹配换行本身的字面量，由 `regex-syntax` 解析后判）时，search 以 `E_INVALID_ARGS` 拒绝，恢复语说出本城的走法：跨行的写成逐行能匹配的 `pattern`，按语言筛的用 `glob`（如 `*.rs`），翻页的收窄 `path`、`glob` 或 `pattern`。`-n`、`-o`、`head_limit` 不读：行号恒在，`-o` 与 `head_limit` 只让答更短，答里已经说了停在哪（`stopped`）。
 
-**理由**：不读一把键，模型拿到的答要么照它的意思，要么比它要的多一些；这对 `-n`、`-o`、`head_limit` 成立。对另外三把不成立：逐行匹配一个跨行的 `pattern` 答「没有」，忽略 `type` 让每个文件都入选、看起来却像筛过，忽略 `offset` 让翻页的模型一次次拿回同一页。这三种答都是错的而不是多的，拒绝花一个回合，错答花的是模型据以行动的那个事实。§8-14-1 的「调用里多出来的键照旧不读」只对前一类成立。
+**理由**：不读一把键，模型拿到的答要么照它的意思，要么比它要的多一些；这对 `-n`、`-o`、`head_limit` 成立。对另外几种不成立：逐行匹配一个跨行的 `pattern` 答「没有」——不论跨行是 `multiline` 说的，还是 `pattern` 里写出的换行，ripgrep 在非 multiline 下同样拒绝后者；只是包含换行的类（`\s`、`[^a]`）不拒，它们在一行之内照常匹配，ripgrep 也是这样读的——忽略 `type` 让每个文件都入选、看起来却像筛过，忽略 `offset` 让翻页的模型一次次拿回同一页。这三种答都是错的而不是多的，拒绝花一个回合，错答花的是模型据以行动的那个事实。§8-14-1 的「调用里多出来的键照旧不读」只对前一类成立。
 
 **被否**：①全都不读——上面的三种错答；②全都拒——`-n: true` 是 Claude Code 的模型最常带的一把键，拒它只换来一个回合；③实现 `multiline`、`type` 与 `offset`——跨行匹配要整份文件一次匹配并把命中换算回行，`type` 要一张语言到扩展名的表（ripgrep 的那张有上百行），分页要一个跨调用稳定的次序与游标，三者都比一句恢复语贵得多，而 `glob` 与收窄已经答了同样的问题。
 
-**重开参数**：读数显示模型在本城反复传这三把键，被拒之后仍不改。
+**重开参数**：读数显示模型在本城反复传这三把键或写跨行的 `pattern`，被拒之后仍不改。
 -/
 
 /-!

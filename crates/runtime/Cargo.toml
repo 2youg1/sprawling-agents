@@ -33,6 +33,9 @@ globset = { version = "0.4", default-features = false }
 # search's `pattern`: the engine ripgrep uses by default, which matches
 # with finite automata and never backtracks (`crates/runtime/spec/Tools/Search.lean` D120).
 regex = "1"
+# search's `pattern` parsed into the syntax tree `regex` itself builds,
+# to refuse a pattern that spells a line break (`crates/runtime/spec/Tools/Search.lean` D121).
+regex-syntax = "0.8"
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.
