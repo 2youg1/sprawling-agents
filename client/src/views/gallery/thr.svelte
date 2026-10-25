@@ -186,6 +186,7 @@
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
+  import { SPECIMEN } from "../talk/seat";
   import Delivered from "../talk/delivered.svelte";
   import Head from "../talk/head.svelte";
   import Reasoning from "../talk/reasoning.look.svelte";
@@ -206,7 +207,7 @@
 <Case label="thread · heads, tool lines of every kind with send and delegate, a call running with the steer pin" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[760px] px-wide">
-      <Talk address={WORKING} band={false} seat="specimen" />
+      <Talk address={WORKING} band={false} seat={SPECIMEN} />
     </div>
   </Stand>
 </Case>
@@ -214,7 +215,7 @@
 <Case label="thread · a call past ten seconds, waiting on the person" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[420px] px-wide">
-      <Talk address={ASKING} band={false} seat="specimen" />
+      <Talk address={ASKING} band={false} seat={SPECIMEN} />
     </div>
   </Stand>
 </Case>

@@ -12,14 +12,24 @@
 // already does (docs/frontend-method.md §7D).
 //
 // `page` is the conversation on the zen and blend page; `workbench` is the
-// same column under the panorama workbench's chosen session; `specimen` is
-// a `#/gallery` fixture, which draws a thread with no address line,
-// because the fixture is not the page and names no room a palette could
-// leave.
-export type Seat = "page" | "workbench" | "specimen";
+// same column under the panorama workbench's chosen session, with the run
+// whose facts that session's gauge states (`world/chosen.svelte.ts`'s
+// answer, or a past session's last run); `specimen` is a `#/gallery`
+// fixture, which draws a thread with no address line, because the
+// fixture is not the page and names no room a palette could leave.
+
+import type { RunId } from "../../wire";
+
+export type Seat =
+  | { readonly kind: "page" }
+  | { readonly kind: "workbench"; readonly gauged: RunId | null }
+  | { readonly kind: "specimen" };
+
+export const PAGE: Seat = { kind: "page" };
+export const SPECIMEN: Seat = { kind: "specimen" };
 
 export function drawsAddress(seat: Seat): boolean {
-  switch (seat) {
+  switch (seat.kind) {
     case "page":
     case "workbench":
       return true;
@@ -32,7 +42,18 @@ export function drawsAddress(seat: Seat): boolean {
 // on the head of the run that opened the stretch, or in the gauge.
 export type FrozenFacts = "head" | "elsewhere";
 
-// The frozen facts of the run at `at` in the stretch on screen.
-export function factsAt(seat: Seat, at: number): FrozenFacts {
-  return at === 0 && seat !== "workbench" ? "head" : "elsewhere";
+// The frozen facts of `run`, at `at` in the stretch on screen: the run
+// that opens the stretch states them on its first head, unless it is the
+// run the workbench's gauge already states them for. An earlier run of a
+// session the gauge reads at a later run keeps its own, because they are
+// that run's facts, not the gauge's.
+export function factsAt(seat: Seat, at: number, run: RunId): FrozenFacts {
+  if (at !== 0) return "elsewhere";
+  switch (seat.kind) {
+    case "page":
+    case "specimen":
+      return "head";
+    case "workbench":
+      return seat.gauged === run ? "elsewhere" : "head";
+  }
 }

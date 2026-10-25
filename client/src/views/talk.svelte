@@ -392,7 +392,7 @@ composition is rebuilt on the way. -->
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
             {/if}
-            <Thread {run} facts={factsAt(seat, at)} onFork={doFork} onRetry={send} />
+            <Thread {run} facts={factsAt(seat, at, run.run)} onFork={doFork} onRetry={send} />
           {/each}
           {#if policyLine !== null && policyAt === -1}
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>

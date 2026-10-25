@@ -134,10 +134,13 @@
   import { leaveSheet, openSheet } from "./sheets.svelte";
   import Talk from "./talk.svelte";
   import Past from "./talk/past.svelte";
+  import { PAGE, type Seat } from "./talk/seat";
+  import { sessionRun } from "./world/chosen.svelte";
   import Divider from "./world/divider.svelte";
   import PaneMenu from "./world/pane_menu.svelte";
   import Place from "./world/place.svelte";
   import Session from "./world/session.svelte";
+  import { titleOf } from "./world/sessions";
   import Sessions from "./world/sessions.svelte";
   import SheetHead from "./world/sheet_head.svelte";
 
@@ -177,12 +180,18 @@
   // than talks to (`talk/past.svelte`): `undefined` is the room's current
   // session, `null` one the city has not answered for.
   const stretches = $derived(u.conn.asking.ask({ sessions: { room: address } }));
+  const roomStretches = $derived(
+    stretchesOf($stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [], (room) => heldIn($belief, room)),
+  );
   const past = $derived.by(() => {
     if (session === undefined) return undefined;
-    const answer = $stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [];
-    const found = stretchesOf(answer, (room) => heldIn($belief, room)).find((each) => each.line.began === session);
+    const found = roomStretches.find((each) => each.line.began === session);
     return found?.current === true ? undefined : (found ?? null);
   });
+  // The session the chosen-session pane is about, named the way the
+  // sessions column's row names it (`world/sessions.ts`'s `titleOf`): one
+  // column heads that pane with it, since the row is on another tab.
+  const chosenStretch = $derived(roomStretches.find((each) => (session === undefined ? each.current : each.line.began === session)));
 
   // The run the right pane speaks for: the past session's last, else the
   // one going, or the last one this room finished; its rounds are the
@@ -190,6 +199,10 @@
   const current = $derived(
     past === undefined ? (newestWorking($belief, address) ?? heldIn($belief, address).at(-1)) : past?.runs.at(-1),
   );
+  // The run the chosen session's pane speaks for, whose frozen facts its
+  // gauge states, so the conversation under it leaves them off that run's
+  // first head (`talk/seat.ts`).
+  const gauged = $derived(past === undefined ? sessionRun($belief, address) : (current?.run ?? null));
   let answer = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
     const run = current?.run;
@@ -224,6 +237,8 @@
 
   const layout = $derived(narrow ? oneColumnOf(tier, $bench) : layoutOf(tier, open ? "open" : "closed", $bench));
   const sheet = $derived(layout.world === "sheet");
+  // Where the conversation stands (`talk/seat.ts`).
+  const column = $derived<Seat>(layout.world === "workbench" ? { kind: "workbench", gauged } : PAGE);
   // A narrow window is one column, where every region spans it whole
   // through its `narrow:` classes and stands on no line of its own.
   const at = (lines: Lines): string | undefined => (narrow ? undefined : gridColumn(lines));
@@ -254,6 +269,7 @@
     commits: address === MAYOR ? ($belief.city ?? say($lang, "world_city")) : buildingOf(address),
   });
   const title = $derived(address === MAYOR ? say($lang, "talk_empty_mayor") : roomOf(address));
+  const chosenTitle = $derived(chosenStretch === undefined ? title : titleOf(chosenStretch));
 </script>
 
 {#snippet sessionsHead()}
@@ -344,7 +360,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
           {#if placed.pane === "sessions"}
             <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} shown={past === undefined ? undefined : (current?.run ?? null)} head={sheet ? unnamed : sessionHead} />
+            <Session here={address} shown={past === undefined ? undefined : gauged} title={sheet ? chosenTitle : undefined} head={sheet ? unnamed : sessionHead} />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
@@ -361,9 +377,9 @@ taller; on one column the second row is the band, as tall as it needs. -->
     aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
     {#if past === undefined || session === undefined}
-      <Talk {address} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
+      <Talk {address} band={sheet} seat={column} />
     {:else}
-      <Past {address} {session} stretch={past} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
+      <Past {address} {session} stretch={past} band={sheet} seat={column} />
     {/if}
   </section>
   {#if open}

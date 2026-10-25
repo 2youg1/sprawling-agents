@@ -166,6 +166,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
+  import { SPECIMEN } from "../talk/seat";
   import Sessions from "../world/sessions.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -191,7 +192,7 @@
   <Case {label} width={760}>
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
       <div class="h-[320px] px-wide">
-        <Talk address={room} band={false} seat="specimen" />
+        <Talk address={room} band={false} seat={SPECIMEN} />
       </div>
     </Stand>
   </Case>
