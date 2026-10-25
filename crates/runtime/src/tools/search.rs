@@ -147,7 +147,7 @@ impl SearchTool {
                 disclosure: "Find a substring in the files under one path. Literal text, no \
                              regular expressions; the line number it reports is the offset \
                              `read` continues from. A `grep` through `exec` returns the same \
-                             text without the version and without the offset."
+                             text without that offset."
                     .to_owned(),
                 params: Payload::of(&serde_json::json!({
                     "type": "object",

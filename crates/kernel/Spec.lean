@@ -54,7 +54,7 @@ import crates.kernel.spec.WriteDomain
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。两个标签各被用过两次（8-73、8-74），表里分开写出各自的分部，引用它们的地方写分部的路径。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `kernel D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：地址、段边界与保留子树（`spec/Address.lean`）、城内磁盘布局（`spec/Layout.lean`）、写域与写入限制（`spec/WriteDomain.lean`）、事件种类与窗类（`spec/Event/Kind.lean`）、可忽略性、时刻与 `seq`（`spec/Event.lean`）、链（`spec/Ledger.lean`）、错误码的 carrier、拼写与重试三态（`spec/Error.lean`）、账本版本的读法（`spec/ConstsExternal.lean`），以及几张判定表（`spec/Discard.lean`、`spec/Approval.lean`、`spec/Delegation.lean`、`spec/Backpressure.lean`、`spec/Version.lean`、`spec/Idem.lean`、`spec/Pursuit.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、kani 与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：地址、段边界与保留子树（`spec/Address.lean`）、城内磁盘布局（`spec/Layout.lean`）、写域与写入限制（`spec/WriteDomain.lean`）、事件种类与窗类（`spec/Event/Kind.lean`）、可忽略性、时刻与 `seq`（`spec/Event.lean`）、链（`spec/Ledger.lean`）、错误码的 carrier、拼写与重试三态（`spec/Error.lean`）、账本版本的读法（`spec/ConstsExternal.lean`），以及几张判定表（`spec/Discard.lean`、`spec/Approval.lean`、`spec/Delegation.lean`、`spec/Backpressure.lean`、`spec/Idem.lean`、`spec/Pursuit.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、kani 与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -67,7 +67,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 全集；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
-| `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
+| `version` | 2 值类型 | 一个主体的单调版本 |
 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | `consts_external` | 6 数据面 | 外部事实常量 |
 | `consts_policy` | 6 数据面 | 政策常量 |
@@ -106,7 +106,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 - `spec/Address.lean`：`is_within` 自反、传递、反对称；保留子树向下封闭，任一段受保护即保留，只判首段有反例（`judging_only_the_first_segment_lets_a_building_rules_through`）；读本楼不问规则，读不出的规则关上那栋楼。
 - `spec/Layout.lean`：`of_ledger` 是 `ledger` 的逆，且只认账本目录；治理一个 scope 的文件落在保留子树里，居民自己写的文件落在明处。
 - `spec/WriteDomain.lean`：收下的目标恒不在保留区里，空前缀集什么都不收，只写文档的写域永不收计划文件，写入限制只收窄不放宽，`Create` 不改动已有文件。
-- `spec/Discard.lean`、`spec/Approval.lean`、`spec/Delegation.lean`、`spec/Backpressure.lean`、`spec/Version.lean`、`spec/Idem.lean`、`spec/Pursuit.lean`：各自判定表的性质，例如没有计划或带 taint 的删除恒被拒且规模不改答、居民不批准自己的问题、委派一层深、溢出的和恒被削且准入对深度单调、超前的 base 是陈旧的、一把键只领一次凭证、完成当且仅当没有就绪的活也没有在途的 run。
+- `spec/Discard.lean`、`spec/Approval.lean`、`spec/Delegation.lean`、`spec/Backpressure.lean`、`spec/Idem.lean`、`spec/Pursuit.lean`：各自判定表的性质，例如没有计划或带 taint 的删除恒被拒且规模不改答、居民不批准自己的问题、委派一层深、溢出的和恒被削且准入对深度单调、一把键只领一次凭证、完成当且仅当没有就绪的活也没有在途的 run。
 
 每个模型都带一个可实现的正常路径（`Seq::next` 从创世行走到 1、前缀为一栋楼的 `Everything` 收楼里的一个文件、`retriable_after` 造出可再试的 draft、深度零位派得出委派），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
@@ -153,7 +153,7 @@ Address；Ledger／EventRecord／IdemKey／BLAKE3；Locator；乐观并发；AxE
 概念名一律英文原词：Ledger、EventRecord、EventDraft、EventRef、EventKind、in-window／record-only、Locator、CAS、B3Hash、GitOid、IdemKey、Address、reserved prefix、WriteDomain、AxError、AxCode、three-part refusal、carrier event、Seq、TimeMs、RunId、Version、conformance。
 Rust variant 名取 UpperCamelCase，serde 呈现名恒为线格式拼写（EventKind 蛇形小写；AxCode `E_` 全大写）。`B3Hash` 住 `locator`（`b3-` 算法标签的文法之家），`event`／`ledger` 引用之，全库仅此一个哈希值类型。
 
-Lean 里的名字与 Rust 的对应：与 kernel 枚举同名的每一个 `inductive`（`EventKind`、`WindowClass`、`AxCode`、`Carrier`、`Retry`、`LogVersion`、`ReadVerdict`、`WriteDomain`、`DomainVerdict`、`DocumentReason`、`WriteLimit`、`DiscardRequest`、`DiscardVerdict`、`DenyReason`、`Autonomy`、`Answerer`、`AnswerVerdict`、`DelegateKind`、`Depth`、`DelegationVerdict`、`Admission`、`ShedReason`、`VersionVerdict`、`PursuitState`、`PursuitVerdict`）逐构造子与 Rust 的变体同名，`cargo xtask gates specalign` 双向对账；函数名照 Rust 拼写（`is_within`、`is_reserved`、`may_read`、`of_ledger`、`readable_log_v`、`records_a_moment`、`check_base`、`claim`、`may_answer`、`admit`、`observe`、`decide`），`EventKind.windowClass` 对应 `EventKind::window_class`，`AxCode.carrier` 对应 `AxCode::carrier`。模型里另起的名字（`Spelled`、`LineClass`、`Draft`、`Step`、`Names`、`Files`、`permits`、`relative`）在 Rust 没有同名的类型，各自的文档写明它模型的是什么。
+Lean 里的名字与 Rust 的对应：与 kernel 枚举同名的每一个 `inductive`（`EventKind`、`WindowClass`、`AxCode`、`Carrier`、`Retry`、`LogVersion`、`ReadVerdict`、`WriteDomain`、`DomainVerdict`、`DocumentReason`、`WriteLimit`、`DiscardRequest`、`DiscardVerdict`、`DenyReason`、`Autonomy`、`Answerer`、`AnswerVerdict`、`DelegateKind`、`Depth`、`DelegationVerdict`、`Admission`、`ShedReason`、`PursuitState`、`PursuitVerdict`）逐构造子与 Rust 的变体同名，`cargo xtask gates specalign` 双向对账；函数名照 Rust 拼写（`is_within`、`is_reserved`、`may_read`、`of_ledger`、`readable_log_v`、`records_a_moment`、`claim`、`may_answer`、`admit`、`observe`、`decide`），`EventKind.windowClass` 对应 `EventKind::window_class`，`AxCode.carrier` 对应 `AxCode::carrier`。模型里另起的名字（`Spelled`、`LineClass`、`Draft`、`Step`、`Names`、`Files`、`permits`、`relative`）在 Rust 没有同名的类型，各自的文档写明它模型的是什么。
 -/
 
 /-! ## 7 模块边界
