@@ -347,6 +347,14 @@
     "en": "open the building",
     "zh": "进这栋楼"
   },
+  "city_adopt": {
+    "en": "adopt this folder as a building",
+    "zh": "接管为楼"
+  },
+  "city_adoptable": {
+    "en": "a folder, not adopted yet",
+    "zh": "未接管的目录"
+  },
   "city_hall": {
     "en": "City Hall",
     "zh": "市政厅"
@@ -5123,6 +5131,34 @@
     "en": "speak, transcribed into the message box",
     "zh": "说话，转写进输入框"
   },
+  "palette_carry": {
+    "en": "take this conversation to…",
+    "zh": "带着这段对话去…"
+  },
+  "palette_carry_hint": {
+    "en": "go on from here in another room; this room keeps its session",
+    "zh": "在另一个房间从这里接着；这里的会话保留"
+  },
+  "palette_carry_to": {
+    "en": "a new session, starting from this conversation",
+    "zh": "开一段新会话，从这段对话接着"
+  },
+  "palette_carry_here": {
+    "en": "the room you are in: fork from a turn instead",
+    "zh": "就是这个房间：在对话里从某一回合分叉"
+  },
+  "palette_carry_building": {
+    "en": "a building, not a room: type building/room",
+    "zh": "这是楼不是房间：写成 楼/房间"
+  },
+  "palette_carry_busy": {
+    "en": "a run is working there",
+    "zh": "那里有 run 在跑"
+  },
+  "palette_carry_working": {
+    "en": "a run is working here: stop it or wait for it first",
+    "zh": "这里有 run 在跑：先停下或等它结束"
+  },
   "panel_close": {
     "en": "close",
     "zh": "收起"
@@ -7430,6 +7466,98 @@
   "slash_raise": {
     "en": "raise a building from a template",
     "zh": "按模板新建一栋楼"
+  },
+  "raise_title": {
+    "en": "raise a building",
+    "zh": "建楼"
+  },
+  "raise_note": {
+    "en": "One building is one project: a folder under the city with its own rules. Fill in the page and it is written once.",
+    "zh": "一栋楼是一个项目：城下的一个文件夹，带它自己的规则。填完这一页，一次写下。"
+  },
+  "raise_address": {
+    "en": "address",
+    "zh": "地址"
+  },
+  "raise_address_placeholder": {
+    "en": "lab",
+    "zh": "lab"
+  },
+  "raise_address_help": {
+    "en": "one word, the folder's name under the city",
+    "zh": "一个词，城下这个文件夹的名字"
+  },
+  "raise_will_build": {
+    "en": "a new, empty building",
+    "zh": "新建一栋空楼"
+  },
+  "raise_will_adopt": {
+    "en": "this folder is already here: it is adopted as it is, and none of its files change; a large folder takes a moment",
+    "zh": "这个文件夹已经在城里：照原样接管，其中的文件一个不改；大文件夹需要一点时间"
+  },
+  "raise_unreadable": {
+    "en": "not an address the city can spell",
+    "zh": "城拼不出这个地址"
+  },
+  "raise_room": {
+    "en": "a room, not a building: name the building alone",
+    "zh": "这是房间不是楼：只写楼名"
+  },
+  "raise_taken": {
+    "en": "already a building",
+    "zh": "已经是一栋楼"
+  },
+  "raise_waiting": {
+    "en": "folders waiting to be adopted",
+    "zh": "等待接管的目录"
+  },
+  "raise_template": {
+    "en": "template",
+    "zh": "模板"
+  },
+  "raise_template_minimal": {
+    "en": "ordinary",
+    "zh": "普通"
+  },
+  "raise_template_confidential": {
+    "en": "confidential",
+    "zh": "机密"
+  },
+  "raise_template_minimal_note": {
+    "en": "data may leave, and any model may answer",
+    "zh": "数据可以出城，任何模型都可以作答"
+  },
+  "raise_template_confidential_note": {
+    "en": "data stays in, only local models answer, and writes stop at this building",
+    "zh": "数据不出城，只有本地模型作答，写入止于这栋楼"
+  },
+  "raise_rules": {
+    "en": "RULES.toml",
+    "zh": "RULES.toml"
+  },
+  "raise_rules_note": {
+    "en": "what the template writes; change it here and the city reads it before anything lands",
+    "zh": "模板写下的内容；在这里改，城会在落盘之前先读一遍"
+  },
+  "raise_rules_edited": {
+    "en": "your rules; the city reads them before anything lands",
+    "zh": "你改过的规则；城会在落盘之前先读一遍"
+  },
+  "raise_refused": {
+    "en": "{why}: {fix}",
+    "zh": "{why}：{fix}"
+  },
+  "raise_build": {
+    "en": "raise the building",
+    "zh": "建楼"
+  },
+  "raise_adopt": {
+    "en": "adopt the folder",
+    "zh": "接管为楼"
+  },
+  "raise_needs_address": {
+    "en": "type the address of a building first",
+    "zh": "先写下楼的地址"
   },
   "slash_release": {
     "en": "let a stopped building or city work again",

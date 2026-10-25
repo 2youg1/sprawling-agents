@@ -126,8 +126,9 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   ],
   "/release": [{ line: "/release", done: sending({ command: { release: { scope: "city", idem: IDEM } } }) }],
   "/raise": [
-    { line: "/raise lab", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("minimal"), idem: IDEM } } }) },
-    { line: "/raise lab hall", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("hall"), idem: IDEM } } }) },
+    { line: "/raise", done: going({ kind: "raise" }) },
+    { line: "/raise lab", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("minimal"), rules: null, idem: IDEM } } }) },
+    { line: "/raise lab hall", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("hall"), rules: null, idem: IDEM } } }) },
     { line: "/raise lab palace", done: NOTHING },
   ],
   "/new": [{ line: "/new", done: opening("nothing") }],

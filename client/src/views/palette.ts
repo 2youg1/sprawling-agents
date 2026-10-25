@@ -12,6 +12,7 @@ import { say } from "../core/lang";
 import type { Lang } from "../core/lang";
 import { completed } from "../core/completion";
 import type { View } from "../core/route";
+import { buildingOf } from "../core/route";
 import { ago } from "../core/time";
 import type { Address, Seq, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
@@ -87,6 +88,43 @@ export function sessionPlaces(at: SessionsAt, lines: readonly SessionLine[], lan
       to: index === 0 ? { kind: "talk", address: at.room } : { kind: "talk", address: at.room, session: line.began },
     };
   });
+}
+
+// Carrying the conversation in main into another room (client/Spec.lean
+// §4-64b): every room the palette offers, each with the reason it cannot
+// take the conversation, so a row says so before it is pressed. The city
+// branches a session from any line into any room; what is refused here
+// is what would fail there or do something else.
+export interface CarryReach {
+  // The room main stands in, whose conversation goes.
+  readonly here: Address;
+  // The rooms the city knows, in the order the palette lists them.
+  readonly rooms: readonly Address[];
+  // An address typed in the box, offered when the city knows no room by
+  // that name: a new room is made by going to it.
+  readonly typed: Address | null;
+  readonly working: (room: Address) => boolean;
+}
+
+export interface CarryPlace {
+  readonly to: Address;
+  readonly why: Key | undefined;
+}
+
+export function carryPlaces(reach: CarryReach): CarryPlace[] {
+  const rooms = reach.typed === null || reach.rooms.includes(reach.typed) ? reach.rooms : [...reach.rooms, reach.typed];
+  return rooms.map((to) => ({ to, why: carryWhy(reach, to) }));
+}
+
+// The same room is a fork from one of its turns, which the thread
+// already offers; a building is not a room, and a dispatch there would
+// open a room of its own that the branch is not waiting in; a room with
+// a run working refuses a new session under it (`E_BUSY`).
+function carryWhy(reach: CarryReach, to: Address): Key | undefined {
+  if (to === reach.here) return "palette_carry_here";
+  if (buildingOf(to) === to) return "palette_carry_building";
+  if (reach.working(to)) return "palette_carry_busy";
+  return undefined;
 }
 
 export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;

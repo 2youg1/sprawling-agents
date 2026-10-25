@@ -153,6 +153,7 @@ export function nestOf(view: View): Nest | null {
       return "record";
     case "talk":
     case "city":
+    case "raise":
     case "run":
     case "setup":
     case "mcp":

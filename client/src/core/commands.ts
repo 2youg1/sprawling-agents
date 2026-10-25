@@ -64,18 +64,21 @@ import {
 export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
 // The modes a run may work in, in the order a control offers
-// them (kernel `Mode::ALL`); the first is the one a page starts with.
+// them (kernel `Mode::ALL`).
 export const MODES: readonly Mode[] = ModeSchema.members.map((member) => member.literal);
 
 // The other three values of a run policy, each in the wire's order; the
 // first of each is the one that adds nothing (`crates/wire/Spec.lean`
 // §8-57): the full write limit, the building's own checks, the ordinary
-// landing. A page starts on those, which is `FIRST_POLICY`.
+// landing. A page starts on those, which is `FIRST_POLICY`, in work
+// mode: a person's first request is usually to get something done, and
+// chat - which refuses `edit` and `exec` at the call - is the read-only
+// mode they switch to (client/Spec.lean 4-60).
 export const WRITE_LIMITS: readonly WriteLimit[] = WriteLimitSchema.members.map((member) => member.literal);
 export const ADMISSIONS: readonly AdmissionRequirement[] = AdmissionSchema.members.map((member) => member.literal);
 export const LANDINGS: readonly LandingPolicy[] = LandingSchema.members.map((member) => member.literal);
 export const FIRST_POLICY: RunPolicy = {
-  mode: MODES[0] ?? "chat",
+  mode: "work",
   write: WRITE_LIMITS[0] ?? "full",
   admit: ADMISSIONS[0] ?? "standing",
   landing: LANDINGS[0] ?? "ordinary",
@@ -187,11 +190,15 @@ export function pursue(addr: Address, step: PursuitStep): Command {
 export const TEMPLATES = ["minimal", "confidential", "hall"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
-export function createBuilding(addr: Address, template: Template): Command {
+// `rules` is the `RULES.toml` the person wrote; `null` lays the
+// template's own bytes. Whether `addr` is a folder to adopt is the city's
+// to see (city D32).
+export function createBuilding(addr: Address, template: Template, rules: string | null): Command {
   return {
     create_building: {
       addr,
       template: TemplateNameSchema.make(template),
+      rules,
       idem: mintIdem(),
     },
   };

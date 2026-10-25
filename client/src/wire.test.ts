@@ -78,6 +78,7 @@ describe("server frames", () => {
               problems: [],
               blocked: [{ source: "2.3", line: "2.3 waits for 2.1", waiting: 2 }],
               ready: 1,
+              adoptable: false,
             },
           ],
           pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: { kind: "work", next: "2.3" } }],

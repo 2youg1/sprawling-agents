@@ -14,6 +14,7 @@
   import { say } from "../core/lang";
   import { ui } from "../ui";
   import Building from "./building.svelte";
+  import Raise from "./raise.svelte";
   import City from "./city.svelte";
   import Cost from "./cost.svelte";
   import Mcp from "./mcp.svelte";
@@ -59,6 +60,8 @@
     <City />
   {:else if view.kind === "building"}
     <Building address={view.address} />
+  {:else if view.kind === "raise"}
+    {#key view.address}<Raise address={view.address} />{/key}
   {:else if view.kind === "run"}
     {#key view.lens}<Run run={view.run} lens={view.lens} />{/key}
   {:else if view.kind === "mcp"}

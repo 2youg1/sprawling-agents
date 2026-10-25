@@ -65,7 +65,7 @@
   import { backLookOf } from "../pages/back";
   import Back from "../pages/back.look.svelte";
   import Palette from "../palette.svelte";
-  import { boxOf, whyFor } from "../palette";
+  import { boxOf, carryPlaces, whyFor } from "../palette";
   import PaletteLook from "../palette.look.svelte";
   import type { Entry } from "../palette/entry";
   import Rows from "../palette/rows.svelte";
@@ -97,6 +97,22 @@
   const SESSIONS = $derived([verb("/model", say($lang, "slash_model"))]);
   const VERBS = $derived([...ACTIONS, ...SESSIONS]);
   const BACK = $derived(backLookOf({ kind: "mcp" }, $lang));
+
+  // The rooms a conversation in `lab/parser` can be carried to, as the
+  // palette lists them once its first row was pressed: the room itself,
+  // a building, a room with a run working, an open room, and a new one
+  // typed in the box, each with the reason it cannot when it cannot.
+  const WORKING = Address.make("lab/review");
+  const CARRIED = $derived(
+    carryPlaces({
+      here: Address.make("lab/parser"),
+      rooms: ["lab/parser", "lab", "lab/review", "docs/notes"].map((room) => Address.make(room)),
+      typed: Address.make("lab/lexer"),
+      working: (room) => room === WORKING,
+    }).map(
+      (place): Entry => ({ label: place.to, hint: say($lang, "palette_carry_to"), why: place.why, act: ignore }),
+    ),
+  );
 </script>
 
 <Case label="palette · places, the cursor on the first row" width={640}>
@@ -135,6 +151,22 @@
           onHover={ignore}
           onPick={ignore}
         />
+      {/snippet}
+    </PaletteLook>
+  </Modal>
+</Case>
+
+<Case label="palette · carrying this conversation: the rooms it can go to, and why not" width={640}>
+  <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
+    <PaletteLook
+      box={boxOf(
+        { query: "lab/lexer", cursor: 3, count: CARRIED.length, list: "entrances-carry", lang: $lang },
+        { write: ignore, point: ignore, pick: ignore },
+      )}
+      nothing={undefined}
+    >
+      {#snippet list()}
+        <Rows id="entrances-carry" listing={{ kind: "places" }} shown={CARRIED} cursor={3} onHover={ignore} onPick={ignore} />
       {/snippet}
     </PaletteLook>
   </Modal>

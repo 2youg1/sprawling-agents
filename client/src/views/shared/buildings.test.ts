@@ -15,7 +15,7 @@ function cityOf(...addrs: readonly string[]): Answer {
   return {
     city: {
       active: 0,
-      buildings: addrs.map((addr) => ({ addr: Address.make(addr), blocked: [], problems: [], progress: IDLE, ready: 0 })),
+      buildings: addrs.map((addr) => ({ addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 })),
       frozen: 0,
       halted: [],
       pursuits: [],

@@ -160,15 +160,22 @@ export const SLASH: readonly Slash[] = [
   },
   {
     spelling: "/raise",
-    grammar: "<addr> [minimal|confidential|hall]",
+    grammar: "[addr] [minimal|confidential|hall]",
     about: "slash_raise",
     section: "actions",
     run: (hands, call) => {
+      // Without an address the page that raises a building opens, where
+      // the address, the template and the rules are filled in at once.
+      if (call.words.length === 0) {
+        hands.go({ kind: "raise" });
+        hands.write("");
+        return;
+      }
       const at = addressed(call.words.at(0));
       const asked = call.words.at(1) ?? "minimal";
       const template = TEMPLATES.find((known): known is Template => known === asked);
       if (at === null || template === undefined) return;
-      hands.command(createBuilding(at, template));
+      hands.command(createBuilding(at, template, null));
       hands.write("");
     },
   },

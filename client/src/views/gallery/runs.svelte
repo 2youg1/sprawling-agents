@@ -84,7 +84,7 @@
     halted: [],
     pursuits: [],
     runs: [],
-    buildings: ["hall", ...BUILDINGS].map((addr) => ({ addr: Address.make(addr), blocked: [], problems: [], progress: IDLE, ready: 0 })),
+    buildings: ["hall", ...BUILDINGS].map((addr) => ({ addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 })),
   };
 
   // The small board's runs as the belief holds them, for the drawing
