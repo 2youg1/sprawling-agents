@@ -74,3 +74,26 @@ pub(in crate::views) fn reply_answer(text: &str, state: documents::ReplyState) -
 
 **(a) 回复在视图锁外读，读出的块不缓存。** `prepare` 只把文字拷进 `Prepared::Reply`，`documents::reply` 在锁放开之后读（§8-29）。理由：读一窗是一次 comrak，与预览同阶，锁里多一次它，等着折叠的每一行都多等一次；同一段文字恒读出同一棵树，页面自己留着答复就够了。被否决的做法：①在 `prepare` 里当场作答——它不读盘，看上去是「视图里就答得了」的一类，但它的代价随文字长短走，不随视图走；②按文字的摘要缓存读出的块——一份要随快照编码的拷贝，换来的只是页面重问同一段文字时省一次 comrak，而页面不重问。**(b) 读内容库只有 `range::stored` 一处**，`Range` 与 `Preview` 都经它拿到编码与抬起的字节（§8-21、§8-23）。理由：打开、长度、标记、抬起这四步是「按版本读一个窗口」的前一半，两条查询的差别只在后一半（切还是读成块）；四步写两遍，改其中一处（例如内容库换了读法）时另一处不会跟着改。放在 `range` 而不另开模块，是因为 `range` 本来就拥有「按版本读一个窗口」，`preview` 是它的第二个读者。被否决的做法：①`preview` 先答一个 `Range` 再拿窗口的文字读——读法相同，却要把 `Window` 的文本再交回 `documents`，而 `documents::preview` 要的是抬起的字节，好在窗口之外判块末；②新开一个只有这一个函数的模块——两个读者都在 `answering` 里，一个函数不值得一个模块名。
 -/
+
+/-!
+### 8-38 下一个 run 的提示层（`accounting::prompt_chain`，形状 1 判定；`accounting::views::layers`，形状 7 投影）
+
+```rust
+// accounting::prompt_chain（冻结与视图共用）
+pub(crate) struct Convention { pub(crate) path: PathBuf, pub(crate) heading: String, pub(crate) whose: &'static str }
+pub(crate) fn building_conventions(city_root: &Path, building: &Address) -> Vec<Convention>;   // 工作区、楼根
+pub(crate) fn room_conventions(city_root: &Path, addr: &Address, building: &Address) -> Result<Vec<Convention>, AxError>;
+pub(crate) enum Reading { Sent(Vec<u8>), Absent, Withheld(String) }
+pub(crate) fn read_convention(city_root: &Path, building: &Address, path: &Path) -> Result<Reading, AxError>;
+pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound;               // 工作台的读界也取它
+// accounting::views::layers（锁外）
+pub(super) fn layers_answer(city_root: &Path, addr: Address) -> wire::Answer;
+```
+
+- **`AGENTS.md` 经读界读，与 `read` 工具同一个判定。** `read_convention` 先看这一项本身（`symlink_metadata`）：不在答 `Absent`；是目录答 `Withheld`。否则经 `runtime::BoundReader::open` 读，读界以这栋楼为家（`read_bound`）：链接指向城外、机密楼或保留子树时 `BoundReader` 拒（`E_GATE_DENIED`），这里答 `Withheld` 并带拒因；`E_INVALID_ARGS`（链接落空、指向目录）同样答 `Withheld`。只有在那里、却打不开的文件（`E_STORAGE_FATAL`）仍拒掉冻结，因为那是这个项目写下、而 run 收不到的约定。理由：一个 run 能在房间里建链接（例如在主机上跑的 `exec`），而前缀会被送给 provider；用 `std::fs::read` 读就是绕过读界的第二条读路。一个叫 `AGENTS.md` 的目录在 Windows 上读出 `PermissionDenied`，以前会让这个房间的每个 run 都开不起来。
+- **冻结与视图读同一个函数。** `worker::freezing` 冻 Building 段与 Resident 段时、`views::layers` 答 `Query::Layers` 时都调 `prompt_chain`，所以页面说「送」的就是下一个 run 收到的，说「不送」时给的原因就是冻结跳过它的原因。工作台给 run 的读界也从 `read_bound` 取，读界只有一处定义。
+- **`Query::Layers` 的答复**（`crates/wire/Spec.lean` §8-98）在锁外读盘：City 段经 `city::city_prompt_path`（楼的那份在时城根那份是 `Replaced`）；Building 段与 Resident 段的 `AGENTS.md` 经 `read_convention`；身份文件是 `city::urbanite_path`，City Hall 的两个座位因此落到 `MAYOR.md` 与 `CLERK.md`；Run 段是 `city::model_notes` 列出的城与楼两层的每一份，楼里有同一个模型的一份时城那份是 `Replaced`。带默认的三份经 `city::standing` 判副本，`ShippedDefault.version` 是默认文本的哈希。地址拼不出一栋楼（保留子树）答 `Unavailable`。
+- **默认文本是一版。** `Query::Versions` 问城根的 `City.md`、`MAYOR.md` 或 `CLERK.md` 时，答复在末尾多一版 `VersionSource::Shipped`；答之前把默认文本放进内容库（`keep`，已在时只是一次存在检查），所以 `kept` 恒真，RefRain 的比较与导出读得到它。它排在截断之后加上，`VERSIONS_MAX` 不会把它截掉。
+- 验收：`views::layers::tests`、`worker::freezing::tests::room_chain` 里一个叫 `AGENTS.md` 的目录与一个指向城外的链接不进前缀且冻结照常、`views::versions::tests` 里城根 `City.md` 的末一版是 `Shipped`。
+-/
+

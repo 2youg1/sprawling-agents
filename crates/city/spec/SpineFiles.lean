@@ -96,6 +96,50 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 **验收**：`cargo nextest run -p sprawling-city -E 'test(defaults)'`。
 -/
 
+/-!
+### 8-44 city::prompt_documents（形状 1 判定＋落盘动作）
+
+```rust
+pub enum PromptDocument {                                     // 页面能写的、在保留子树或城根的提示文档；穷尽
+    Shipped(Shipped),                                         // 城根的 City.md、MAYOR.md、CLERK.md
+    BuildingCity { building: Address },                       // <楼>/.sprawling/City.md（D31）
+    ModelNote { building: Option<Address>, provider: String, model: String },
+                                                              // [<楼>/].sprawling/models/<provider>/<model>.md
+}
+impl PromptDocument {
+    pub fn of(at: &Address) -> Option<PromptDocument>;        // 一个地址是不是其中一份；名单只在这里
+    pub fn at(&self) -> Result<Address, AxError>;
+    pub fn path(&self, city_root: &Path) -> Result<PathBuf, AxError>;
+}
+pub fn model_note_at(building: Option<&Address>, provider: &str, model: &str) -> Option<Address>;
+pub fn model_notes(city_root: &Path, building: Option<&Address>) -> Result<Vec<(String, String)>, AxError>;
+pub enum PromptStep { Own, Inherit, Restore }
+pub struct PromptWritten { pub bytes: usize, pub removed: bool }
+pub fn put_prompt(city_root: &Path, doc: &PromptDocument, base: B3Hash, step: PromptStep)
+    -> Result<PromptWritten, AxError>;
+// defaults
+pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, AxError>;
+```
+
+- **名单只有一处**：`PromptDocument::of` 判一个地址是不是页面能写的提示文档。`PutRange` 读它放行保留子树里的这几份，`PutPrompt` 读它决定每一步对哪一份成立；两处若各写一张表，就会有一份只能逐字改、不能恢复的文档。`PREFERENCES.md` 不在名单上：它不进任何前缀，设置页的那扇门照旧管它。房间的 `URBANITE.md` 与各级 `AGENTS.md` 不在保留子树里，本来就经 `PutRange` 写，也不在名单上。
+- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`crates/sprawling/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。
+- **三步各对哪几份成立**：`Own` 对 `BuildingCity` 与 `ModelNote` 成立，文件已在就拒；起手的字节是远一层那份（楼的 `City.md` 抄城根的，楼的模型提示抄城的那份，城没有就是空的）。`Inherit` 对 `BuildingCity` 与 `ModelNote` 成立，删掉文件，远的一层重新管。`Restore` 只对 `Shipped` 成立，经 `defaults::restore` 写回本版默认、保留 `MAYOR.md` 的身份区，所以默认文本仍只由 `defaults` 一个模块写（§8-43）。其余组合以 `E_INVALID_ARGS` 拒，恢复里说出这一份能做哪几步。
+- **以 `base` 为底**：三步都在 `document` 的锁里先读文件，哈希不等于 `base`（不在读作空字节）时以 `E_VERSION_CONFLICT` 拒、什么都不改，因为人在页面上确认的是他看到的那一版。
+- **失败**：读不了、写不了、删不掉是 `E_STORAGE_FATAL` 带路径。
+- 验收：`cargo nextest run -p sprawling-city -E 'test(prompt_documents)'`。
+-/
+
+/-! D33 页面能写的提示文档是 city 的一张名单，整份动作也在 city
+
+**决定**：页面能写哪几份保留子树里的提示文档、对每一份能做哪几步整份动作，由 `city::prompt_documents` 一处决定（§8-44）；accounting 的 `PutRange` 与 `PutPrompt` 都读它。写回默认仍经 `defaults`。
+
+**理由**：保留子树的意义是居民的写域够不到它，城自己的门要放行其中几份，就要有一张写在一处的名单，否则两扇门迟早放行不同的文件。整份动作要在 `document` 的锁里比对 `base`，这把锁与文件布局都在 city。
+
+**被否**：①在 accounting 的保存处按路径前缀放行——那是第二个「哪个文件是提示文档」的拼法，而模型提示的路径今天就只在冻结那里拼过一次；②给每份文档一条专门的命令——五种文档、三步，表会长在线上，而它们的规则只差在哪一步成立。
+
+**重开参数**：保留子树里出现第四种人要从页面写的文件时，它进这张名单，而不是另开一扇门。
+-/
+
 /-! D29 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认
 
 **决定**：`City.md`、`MAYOR.md`、`CLERK.md` 的默认文本由二进制持有（§8-43）。城里的副本与某个已发布版本逐字节相同，就视为人没改过，开城时写成本构建的默认；改过的原样保留，开城时在 diagnostics 里点名；不在的铺下。
