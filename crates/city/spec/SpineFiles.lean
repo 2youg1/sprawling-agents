@@ -122,7 +122,7 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
 ```
 
 - **名单只有一处**：`PromptDocument::of` 判一个地址是不是页面能写的提示文档。`PutRange` 读它放行保留子树里的这几份，`PutPrompt` 读它决定每一步对哪一份成立；两处若各写一张表，就会有一份只能逐字改、不能恢复的文档。`PREFERENCES.md` 不在名单上：它不进任何前缀，设置页的那扇门照旧管它。房间的 `URBANITE.md` 与各级 `AGENTS.md` 不在保留子树里，本来就经 `PutRange` 写，也不在名单上。
-- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`crates/sprawling/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。
+- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`crates/sprawling/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。**模型 id 可以带 `/`**（`vendor/model` 这样经网关转发的 id 很常见），这时提示落在 provider 目录下的子目录里；`model_notes` 走进 provider 目录下的每一层子目录（不跟随链接），`PromptDocument::of` 把 provider 之后的各段连起来读成同一个 id，所以冻结时读到的每一份，页面都列得出、改得了。验收：`prompt_documents::tests::a_model_id_with_a_slash_is_one_note_the_list_reads_back`。
 - **三步各对哪几份成立**：`Own` 对 `BuildingCity` 与 `ModelNote` 成立，文件已在就拒；起手的字节是远一层那份（楼的 `City.md` 抄城根的，楼的模型提示抄城的那份，城没有就是空的）。`Inherit` 对 `BuildingCity` 与 `ModelNote` 成立，删掉文件，远的一层重新管。`Restore` 只对 `Shipped` 成立，经 `defaults::restore` 写回本版默认、保留 `MAYOR.md` 的身份区，所以默认文本仍只由 `defaults` 一个模块写（§8-43）。其余组合以 `E_INVALID_ARGS` 拒，恢复里说出这一份能做哪几步。
 - **以 `base` 为底**：三步都在 `document` 的锁里先读文件，哈希不等于 `base`（不在读作空字节）时以 `E_VERSION_CONFLICT` 拒、什么都不改，因为人在页面上确认的是他看到的那一版。
 - **失败**：读不了、写不了、删不掉是 `E_STORAGE_FATAL` 带路径。

@@ -103,7 +103,7 @@ pub enum VersionSource { OnDisk, Saved { .. }, Before { .. }, Shipped }
 - **模型提示列出盘上的每一份**，而不只是某一个模型的：一栋楼的 run 用哪个模型由每次派活决定，问这一问时还不知道。同一个模型在楼里有一份时，城那份是 `Replaced`；没有时楼那一格也列出、为 `Absent`，与楼的 `City.md` 一样，页面因此能在那里「起一份」而不必自己拼楼层的地址。
 - **`Withheld` 带原因**：房间里一个叫 `AGENTS.md` 的目录，或一个链接指向读界之外（城外、机密楼、保留子树），下一个 run 不收到它；冻结照常进行，页面在这里说出原因，因为这是唯一说得出它没被送的地方。
 - **`shipped` 只给本版带默认文本的三份**（城根的 `City.md`、`MAYOR.md`、`CLERK.md`）：`version` 是默认文本的哈希，`standing` 是 city 的 `CopyStanding`（city §8-43）。页面据此写「当前默认／改过／旧版默认」。
-- **`VersionSource::Shipped`**：`Query::Versions` 对这三份文档在列表末尾多给一版，它是本版的默认文本，答之前放进内容库，`kept` 恒真。「与默认比较」因此就是 RefRain 已有的两版比较，不另写比较界面。
+- **`VersionSource::Shipped`**：`Query::Versions` 对这三份文档在列表末尾多给一版，它是本版的默认文本，答之前放进内容库；放进去了 `kept` 为真，内容库不收时为假，这一版照样列出。「与默认比较」因此就是 RefRain 已有的两版比较，不另写比较界面。
 - **`PutPrompt` 是整份动作，逐字的修改走 `PutRange`**（§8-72）。`Own`：这一层还没有自己的一份时，从此刻管着这里的那一份抄一份起手（楼的 `City.md` 抄城的；楼的模型提示抄城的，城没有就是空的）；`Inherit`：删掉这一层的一份，远的一层重新管（只对楼的 `City.md` 与两层的模型提示成立，城根的三份只能写）；`Restore`：写回本版默认（只对带默认的三份成立，`MAYOR.md` 的身份区保留），副本回到 `Current`，以后随二进制的默认走。`base` 是页面看到的那一版的哈希，不在时是空字节的哈希；文件已经不是 `base` 时拒（`E_VERSION_CONFLICT`），人看到的才是被替换或删掉的那一版。哪些地址是提示文档、每一步对哪一份成立，由 city 的一张名单判（city §8-44），`PutRange` 读同一张名单放行保留子树里的这几份。
 - **账本行沿用 `governed_document_written`**（kernel §8-79），多两个可缺省的键：`at`（不是城保留子树里那三份时的地址）与 `removed`（`Inherit` 删掉了文件）。
 - 验收：accounting 的 `views::layers::tests` 与 `worker::commanding::prompting::tests`——楼有自己的 `City.md` 时城那份是 `Replaced`；`Inherit` 之后城那份重新 `Sent`；RefRain 经 `PutRange` 存一份楼的 `City.md`；`Versions` 对城根 `City.md` 列出本版默认。
