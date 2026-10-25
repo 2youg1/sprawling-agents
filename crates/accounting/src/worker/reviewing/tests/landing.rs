@@ -148,9 +148,9 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
                 "tu_1",
                 "edit",
                 serde_json::json!({
-                    "path": "lab/room1/notes.md",
-                    "old": "before",
-                    "new": "after",
+                    "file_path": "lab/room1/notes.md",
+                    "old_string": "before",
+                    "new_string": "after",
                 }),
             ),
             tool_completion(

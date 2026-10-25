@@ -111,15 +111,32 @@ export interface Trace {
 const CREATED_FROM = "--- /dev/null\n";
 const CREATED_BASE = "new";
 
-const Arm = Schema.Struct({
-  arm: Schema.Union([
-    Schema.Struct({ shell: Schema.Struct({ text: Schema.String }) }),
-    Schema.Struct({
-      program: Schema.Struct({ path: Schema.String, args: Schema.optional(Schema.Array(Schema.String)) }),
-    }),
-    Schema.Struct({ python: Schema.Struct({ code: Schema.String }) }),
-  ]),
-});
+// What an exec call asked to run, in both spellings a ledger holds: the
+// `command` or `python` a call takes now, and the `arm` an older build
+// wrote, which history keeps as it was recorded
+// (crates/runtime/spec/Tools.lean D115).
+const Asked = Schema.Union([
+  Schema.Struct({ command: Schema.String }),
+  Schema.Struct({ python: Schema.String }),
+  Schema.Struct({
+    arm: Schema.Union([
+      Schema.Struct({ shell: Schema.Struct({ text: Schema.String }) }),
+      Schema.Struct({
+        program: Schema.Struct({ path: Schema.String, args: Schema.optional(Schema.Array(Schema.String)) }),
+      }),
+      Schema.Struct({ python: Schema.Struct({ code: Schema.String }) }),
+    ]),
+  }),
+]);
+
+function askedText(asked: typeof Asked.Type): string {
+  if ("command" in asked) return asked.command;
+  if ("python" in asked) return asked.python;
+  const { arm } = asked;
+  if ("shell" in arm) return arm.shell.text;
+  if ("program" in arm) return [arm.program.path, ...(arm.program.args ?? [])].join(" ");
+  return arm.python.code;
+}
 
 const MemoryCeiling = Schema.Union([
   Schema.Struct({ state: Schema.Literals(["hit", "unread"]), limit_bytes: Schema.Number }),
@@ -172,15 +189,7 @@ export function traceOf(turns: readonly Turn[]): Trace {
 
 export function commandOf(call: Call): Entry {
   const asked = call.arguments?.head ?? "";
-  const text = Option.match(read(Arm, asked), {
-    onNone: () => asked,
-    onSome: ({ arm }) =>
-      "shell" in arm
-        ? arm.shell.text
-        : "program" in arm
-          ? [arm.program.path, ...(arm.program.args ?? [])].join(" ")
-          : arm.python.code,
-  });
+  const text = Option.match(read(Asked, asked), { onNone: () => asked, onSome: askedText });
   const ran = read(Ran, call.output?.head);
   const raw = call.output?.head ?? "";
   return {

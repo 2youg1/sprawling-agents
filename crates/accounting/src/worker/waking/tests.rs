@@ -241,7 +241,7 @@ fn an_arrival_that_starts_work_is_refused_exec() {
         "[[source]]\nname = \"github\"\nmatches = \"pull request\"\naddr = \"lab/room1\"\nstarts_work = true\n",
     )
     .unwrap();
-    let exec = serde_json::json!({ "arm": { "shell": { "text": "echo hi" } } });
+    let exec = serde_json::json!({ "command": "echo hi" });
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![

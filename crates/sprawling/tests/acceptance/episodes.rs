@@ -166,9 +166,9 @@ fn edit(setup: &Setup) -> Episode {
         step: Step {
             tool: "edit",
             args: json!({
-                "path": notes(setup),
-                "old": "",
-                "new": format!("# Notes\n\n{MARK}\n"),
+                "file_path": notes(setup),
+                "old_string": "",
+                "new_string": format!("# Notes\n\n{MARK}\n"),
             }),
         },
         holds: |seen| {
@@ -382,9 +382,9 @@ fn proposal(setup: &Setup) -> Episode {
             tool: "proposal",
             args: json!({
                 "action": "offer",
-                "path": draft(setup),
-                "old": "It cools overnight.",
-                "new": "It cools by dawn.",
+                "file_path": draft(setup),
+                "old_string": "It cools overnight.",
+                "new_string": "It cools by dawn.",
             }),
         },
         holds: |seen| {
@@ -437,7 +437,7 @@ fn exec() -> Episode {
     Episode {
         step: Step {
             tool: "exec",
-            args: json!({ "arm": { "shell": { "text": "echo hi" } } }),
+            args: json!({ "command": "echo hi" }),
         },
         holds: |seen| {
             let error = failed(seen.answer)?;

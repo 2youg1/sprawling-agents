@@ -183,7 +183,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     std::fs::write(room.join("kiln.md"), "firing notes\n").unwrap();
-    let (path, args) = delete_command("kiln.md");
+    let line = delete_command("kiln.md");
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -192,7 +192,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
                 "tu_1",
                 "exec",
                 serde_json::json!({
-                    "arm": { "program": { "path": path, "args": args } },
+                    "command": line,
                     "where": "host",
                 }),
             ),
@@ -247,13 +247,10 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
 /// row that the history never mentions, and the shelf's own comment
 /// ("nothing is on the shelf that the history does not already
 /// carry") is false.
-fn delete_command(name: &str) -> (String, Vec<String>) {
+fn delete_command(name: &str) -> String {
     if cfg!(windows) {
-        (
-            "cmd".to_owned(),
-            vec!["/C".to_owned(), "del".to_owned(), name.to_owned()],
-        )
+        format!("cmd /C del {name}")
     } else {
-        ("rm".to_owned(), vec![name.to_owned()])
+        format!("rm {name}")
     }
 }

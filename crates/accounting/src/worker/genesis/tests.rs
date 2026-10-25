@@ -531,6 +531,68 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     assert!(closed, "the closing result states the unknown outcome");
 }
 
+/// `crates/runtime/spec/Tools.lean` D116: recovery never admits a call
+/// it finds in the history again, so a call an older build recorded
+/// under the argument names it took then derives no key and runs
+/// nothing here; it is closed as an unknown outcome and the file it
+/// named keeps its bytes.
+#[test]
+fn an_old_shaped_dangling_call_is_closed_and_never_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let raised = init_city(dir.path()).unwrap();
+    let notes = dir.path().join("lab/room1/notes.md");
+    std::fs::create_dir_all(notes.parent().unwrap()).unwrap();
+    std::fs::write(&notes, "draft\n").unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+    let older = serde_json::json!({
+        "id": "tu_old",
+        "name": "edit",
+        "args": { "path": "lab/room1/notes.md", "old": "draft", "new": "final" },
+        "subject": "lab/room1/notes.md",
+    });
+    worker
+        .record_for(
+            RunId::from_bytes([8u8; 16]),
+            effect::Line {
+                who: "lab/room1".to_owned(),
+                addr: Address::parse("lab/room1").unwrap(),
+                kind: EventKind::ToolCalled,
+                data: Payload::of(&older).unwrap(),
+            },
+        )
+        .unwrap();
+    let report = worker.startup_scan().unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&raised.ledger_dir).unwrap();
+    let closing = verified.lines().iter().rev().find_map(|line| match line {
+        runtime::replay::VerifiedLine::Known { record, .. }
+            if record.kind() == EventKind::ToolResult =>
+        {
+            Some(serde_json::to_value(record.data()).unwrap())
+        }
+        _ => None,
+    });
+    assert_eq!(
+        (
+            report.closed_calls,
+            closing.map(|data| (data["tool_use_id"].clone(), data["error"]["code"].clone())),
+            std::fs::read_to_string(&notes).unwrap(),
+        ),
+        (
+            1,
+            Some((
+                serde_json::json!("tu_old"),
+                serde_json::json!("E_TOOL_OUTCOME_UNKNOWN")
+            )),
+            "draft\n".to_owned(),
+        )
+    );
+}
+
 /// A city is raised with its approvals delegated to the clerk, and the
 /// delegation is a line of history rather than a default value: the
 /// person can change who answers, and a change needs something to

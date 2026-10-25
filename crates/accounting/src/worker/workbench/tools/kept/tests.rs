@@ -36,9 +36,9 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
                 "tu_1",
                 "edit",
                 serde_json::json!({
-                    "path": "lab/room1/keys.md",
-                    "old": "",
-                    "new": format!("token = {key}\n"),
+                    "file_path": "lab/room1/keys.md",
+                    "old_string": "",
+                    "new_string": format!("token = {key}\n"),
                 }),
             ),
             completion("done", None),

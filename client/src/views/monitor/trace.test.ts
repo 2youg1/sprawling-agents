@@ -49,6 +49,8 @@ const exec = turn(1, [
     outcome: "waiting",
     arguments: { cut: 0, head: JSON.stringify({ arm: { program: { path: "git", args: ["status"] } } }) },
   },
+  { at: 13, called: 1030, tool: "exec", outcome: "waiting", arguments: { cut: 0, head: JSON.stringify({ command: "cargo fmt --check", where: "host" }) } },
+  { at: 14, called: 1040, tool: "exec", outcome: "waiting", arguments: { cut: 0, head: JSON.stringify({ python: "print(1)" }) } },
 ]);
 
 const edit = turn(2, [
@@ -76,6 +78,8 @@ describe("a run's turns read as a terminal record and a code column", () => {
     expect(entries).toEqual([
       { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250, ceilings: [] },
       { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
+      { kind: "command", at: at(13), text: "cargo fmt --check", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
+      { kind: "command", at: at(14), text: "print(1)", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
     ]);
   });
 
@@ -160,7 +164,7 @@ describe("a run's turns read as a terminal record and a code column", () => {
       },
     ]);
     expect(trace.latest).toEqual({ kind: "entry", at: at(22) });
-    expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: at(12) });
+    expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: at(14) });
     expect(traceOf([turn(2, edit.calls.slice(0, 1))]).latest).toEqual({ kind: "file", path: "src/lib.rs" });
   });
 

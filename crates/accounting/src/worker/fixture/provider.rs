@@ -522,9 +522,9 @@ pub(in crate::worker) fn completion(text: &str, call: Option<(&str, &str)>) -> S
     let mut finish = "stop";
     if let Some((id, path)) = call {
         let arguments = serde_json::json!({
-            "path": path,
-            "old": "",
-            "new": "noted\n",
+            "file_path": path,
+            "old_string": "",
+            "new_string": "noted\n",
         })
         .to_string();
         message["tool_calls"] = serde_json::json!([{

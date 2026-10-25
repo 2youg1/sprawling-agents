@@ -147,8 +147,8 @@ One call per reply, so the order of the history is the order of this list. -/
 def firstRun (skills : List String) : Run := fun run =>
   calling run 0 "edit"
       (Json.mkObj
-        [ ("path", .str notesPath)
-        , ("old", .str ""), ("new", .str notesText) ])
+        [ ("file_path", .str notesPath)
+        , ("old_string", .str ""), ("new_string", .str notesText) ])
     :: skills.zipIdx.map (fun (skill, index) =>
         calling run (index + 1) "read" (Json.mkObj [("path", .str skill)]))
     ++ [saying "the file is written and every skill was read"]
@@ -189,8 +189,8 @@ def offeringRun : Run := fun run =>
   [ calling run 0 "plan" (Json.mkObj [("action", .str "claim"), ("node", .str secondLeaf)])
   , calling run 1 "edit"
       (Json.mkObj
-        [ ("path", .str offeredPath)
-        , ("old", .str ""), ("new", .str offeredText) ])
+        [ ("file_path", .str offeredPath)
+        , ("old_string", .str ""), ("new_string", .str offeredText) ])
   , calling run 2 "pr" (Json.mkObj [("action", .str "open")])
   , saying "offered for review" ]
 

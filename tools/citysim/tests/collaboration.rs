@@ -1099,9 +1099,9 @@ impl Model for Planner {
             (Part::Maker, 3) => calls(
                 "edit",
                 json!({
-                    "path": format!("lab/kiln/{NOTES}"),
-                    "old": "before",
-                    "new": "after",
+                    "file_path": format!("lab/kiln/{NOTES}"),
+                    "old_string": "before",
+                    "new_string": "after",
                 }),
             ),
             (Part::Maker, 4) => calls("pr", json!({ "action": "open" })),

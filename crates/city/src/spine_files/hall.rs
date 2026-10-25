@@ -42,7 +42,7 @@ const MAYOR_OPENING: &str = "How the Mayor works. It reads before it writes, tak
      Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. \
      `edit` changes only a file this run has read, whole or through `offset` and `limit`; a whole \
      read cut short does not count. When the file changed after the read, `edit` refuses and shows \
-     the passage as it now reads, and the next `old` is copied from that. An `old` of `\"\"` \
+     the passage as it now reads, and the next `old_string` is copied from that. An `old_string` of `\"\"` \
      creates a file that does not exist yet. `plan` with `action: \"finish\"` takes as `evidence` \
      the path of the file that shows the work.\n</plan>\n";
 
