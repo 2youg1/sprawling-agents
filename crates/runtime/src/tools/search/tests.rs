@@ -7,6 +7,7 @@ use kernel::{Address, ReadVerdict};
 
 use super::*;
 
+mod grep;
 mod limits;
 
 /// A bound under which every building is open, so a test about the walk
@@ -27,8 +28,18 @@ fn call(args: &[(&str, Value)]) -> ToolCall {
     }
 }
 
-fn text(what: &str) -> ToolCall {
-    call(&[("text", Value::String(what.to_owned()))])
+/// A search for `pattern` that answers the files holding a match, the
+/// default `output_mode`.
+fn pattern(what: &str) -> ToolCall {
+    call(&[("pattern", Value::String(what.to_owned()))])
+}
+
+/// A search for `pattern` that answers every matching line.
+fn lines(what: &str) -> ToolCall {
+    call(&[
+        ("pattern", Value::String(what.to_owned())),
+        ("output_mode", Value::String("content".to_owned())),
+    ])
 }
 
 fn city() -> tempfile::TempDir {
@@ -55,13 +66,14 @@ fn city() -> tempfile::TempDir {
 /// is the one `read`'s `offset` uses, so continuing is passing a number
 /// along rather than converting one.
 #[test]
-fn a_substring_comes_back_with_its_place_and_its_context() {
+fn a_match_comes_back_with_its_place_and_its_context() {
     let dir = city();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool
         .invoke(&call(&[
-            ("text", Value::String("ledger is".to_owned())),
+            ("pattern", Value::String("ledger is".to_owned())),
+            ("output_mode", Value::String("content".to_owned())),
             ("context", Value::Number(1.into())),
         ]))
         .unwrap();
@@ -83,12 +95,12 @@ fn every_file_under_the_prefix_is_looked_at_and_nothing_above_it() {
     let dir = city();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let whole = tool.invoke(&pattern("the ledger")).unwrap();
     assert_eq!(whole.result.as_map()["count"], 2, "two files, one each");
 
     let one_room = tool
         .invoke(&call(&[
-            ("text", Value::String("the ledger".to_owned())),
+            ("pattern", Value::String("the ledger".to_owned())),
             ("path", Value::String("lab/room1".to_owned())),
         ]))
         .unwrap();
@@ -105,14 +117,14 @@ fn a_reserved_prefix_is_refused_and_a_reserved_file_is_never_matched() {
 
     let err = tool
         .invoke(&call(&[
-            ("text", Value::String("the ledger".to_owned())),
+            ("pattern", Value::String("the ledger".to_owned())),
             ("path", Value::String(".sprawling".to_owned())),
         ]))
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::GateDenied);
     assert!(!err.recovery().is_empty());
 
-    let whole = tool.invoke(&text("governs")).unwrap();
+    let whole = tool.invoke(&pattern("governs")).unwrap();
     assert_eq!(
         whole.result.as_map()["count"],
         0,
@@ -126,7 +138,7 @@ fn a_file_that_is_not_text_is_passed_over_rather_than_reported() {
     std::fs::write(dir.path().join("lab").join("blob.bin"), [0xff, 0xfe, 0x00]).unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let outcome = tool.invoke(&pattern("the ledger")).unwrap();
     assert_eq!(outcome.result.as_map()["count"], 2);
 }
 
@@ -135,7 +147,7 @@ fn an_empty_predicate_is_refused_because_it_would_match_everything() {
     let dir = city();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let err = tool.invoke(&text("")).unwrap_err();
+    let err = tool.invoke(&pattern("")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
     let err = tool.invoke(&call(&[])).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
@@ -151,7 +163,7 @@ fn the_cap_stops_the_walk_and_the_answer_says_so() {
     std::fs::write(dir.path().join("lab").join("Many.md"), body).unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let outcome = tool.invoke(&lines("the ledger")).unwrap();
     let map = outcome.result.as_map();
     assert_eq!(map["count"], 64);
     assert_eq!(map["truncated"], Value::Bool(true));
@@ -178,7 +190,7 @@ fn a_walk_from_the_root_does_not_enter_a_building_the_bound_closes() {
     });
     let tool = SearchTool::new(dir.path(), bound).unwrap();
 
-    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let whole = tool.invoke(&pattern("the ledger")).unwrap();
     let map = whole.result.as_map();
     assert_eq!(map["count"], 2, "the two hits in lab, none in the vault");
     assert_eq!(
@@ -195,7 +207,7 @@ fn a_walk_from_the_root_does_not_enter_a_building_the_bound_closes() {
 
     let err = tool
         .invoke(&call(&[
-            ("text", Value::String("the ledger".to_owned())),
+            ("pattern", Value::String("the ledger".to_owned())),
             ("path", Value::String("vault/room1".to_owned())),
         ]))
         .unwrap_err();
@@ -212,7 +224,7 @@ fn a_file_past_the_byte_cap_is_reported_with_its_reason() {
     std::fs::write(dir.path().join("lab").join("Big.md"), big).unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let outcome = tool.invoke(&pattern("the ledger")).unwrap();
     let map = outcome.result.as_map();
     assert_eq!(map["count"], 2, "the large file was not searched");
     assert_eq!(map["unreadable"], 1);
@@ -255,7 +267,10 @@ fn a_walk_does_not_follow_a_link_into_a_closed_building() {
     let tool = SearchTool::new(dir.path(), only_lab).unwrap();
 
     for asked in [None, Some("lab")] {
-        let mut args = vec![("text", Value::String("ledger".to_owned()))];
+        let mut args = vec![
+            ("pattern", Value::String("ledger".to_owned())),
+            ("output_mode", Value::String("content".to_owned())),
+        ];
         args.extend(asked.map(|path| ("path", Value::String(path.to_owned()))));
         let outcome = tool.invoke(&call(&args)).unwrap();
         let paths: Vec<&str> = outcome.result.as_map()["matches"]
@@ -283,7 +298,7 @@ fn a_link_that_does_not_resolve_is_counted_as_unread() {
     super::super::chosen_path::make_link(&knot, &knot);
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let outcome = tool.invoke(&pattern("the ledger")).unwrap();
     let map = outcome.result.as_map();
     assert_eq!(map["unreadable"], 1, "{map:?}");
     let unread = map["unread"].as_array().unwrap();
@@ -321,7 +336,7 @@ fn a_building_whose_rules_do_not_read_is_named_among_the_unread() {
     });
     let tool = SearchTool::new(dir.path(), bound).unwrap();
 
-    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let whole = tool.invoke(&pattern("the ledger")).unwrap();
     let map = whole.result.as_map();
     assert_eq!(map["count"], 2, "the two hits in lab");
     assert_eq!(map["unreadable"], 1, "{:?}", map["unread"]);
@@ -354,7 +369,7 @@ fn the_unread_list_follows_the_walk_order() {
     });
     let tool = SearchTool::new(dir.path(), bound).unwrap();
 
-    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let whole = tool.invoke(&pattern("the ledger")).unwrap();
     let paths: Vec<&Value> = whole.result.as_map()["unread"]
         .as_array()
         .unwrap()
@@ -400,7 +415,8 @@ fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
 
     let outcome = tool
         .invoke(&call(&[
-            ("text", Value::String("ledger".to_owned())),
+            ("pattern", Value::String("ledger".to_owned())),
+            ("output_mode", Value::String("content".to_owned())),
             ("context", Value::Number(1.into())),
         ]))
         .unwrap();
@@ -413,26 +429,29 @@ fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
     );
 }
 
-/// `files` names the files that hold a hit and nothing else, and
-/// `count` adds how many lines matched in each.
+/// `files_with_matches`, the default, names the files that hold a match
+/// and nothing else, and `count` adds how many lines matched in each.
 #[test]
 fn the_files_and_count_modes_answer_without_the_lines() {
     let dir = city();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
-    let asked = |mode: &str| {
-        tool.invoke(&call(&[
-            ("text", Value::String("e".to_owned())),
-            ("mode", Value::String(mode.to_owned())),
-        ]))
-        .unwrap()
+    let asked = |mode: Option<&str>| {
+        let mut args = vec![("pattern", Value::String("e".to_owned()))];
+        args.extend(mode.map(|mode| ("output_mode", Value::String(mode.to_owned()))));
+        drawn(tool.invoke(&call(&args)).unwrap())
     };
 
     assert_eq!(
-        (drawn(asked("files")), drawn(asked("count"))),
-        (
+        [
+            asked(None),
+            asked(Some("files_with_matches")),
+            asked(Some("count"))
+        ],
+        [
+            "2 files\nlab/Notes.md\nlab/room1/Memo.md\n".to_owned(),
             "2 files\nlab/Notes.md\nlab/room1/Memo.md\n".to_owned(),
             "2 files, 6 matches\nlab/Notes.md:3\nlab/room1/Memo.md:3\n".to_owned()
-        )
+        ]
     );
 }
 
@@ -448,8 +467,11 @@ fn a_files_answer_stops_at_the_cap_counting_files() {
 
     let outcome = tool
         .invoke(&call(&[
-            ("text", Value::String("x".to_owned())),
-            ("mode", Value::String("files".to_owned())),
+            ("pattern", Value::String("x".to_owned())),
+            (
+                "output_mode",
+                Value::String("files_with_matches".to_owned()),
+            ),
         ]))
         .unwrap();
     let map = outcome.result.as_map();
@@ -466,8 +488,8 @@ fn an_unknown_mode_is_refused_with_the_modes_nearby() {
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let Err(refused) = tool.invoke(&call(&[
-        ("text", Value::String("ledger".to_owned())),
-        ("mode", Value::String("list".to_owned())),
+        ("pattern", Value::String("ledger".to_owned())),
+        ("output_mode", Value::String("files".to_owned())),
     ])) else {
         panic!("an unknown mode was answered");
     };
@@ -475,7 +497,11 @@ fn an_unknown_mode_is_refused_with_the_modes_nearby() {
         (refused.code(), refused.nearby()),
         (
             &AxCode::InvalidArgs,
-            &["content".to_owned(), "files".to_owned(), "count".to_owned()][..]
+            &[
+                "files_with_matches".to_owned(),
+                "content".to_owned(),
+                "count".to_owned()
+            ][..]
         )
     );
 }
