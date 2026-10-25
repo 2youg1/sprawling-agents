@@ -34,9 +34,8 @@
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
   import AddressLine from "./talk/address_line.svelte";
-  import type { Head } from "./talk/address_line";
+  import type { At, Head } from "./talk/address_line";
   import Composer from "./talk/composer.svelte";
-  import type { BoxHolds } from "./talk/composer";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
   import Button from "./parts/button.svelte";
@@ -224,13 +223,12 @@
   // stands in the middle. The first send lets it sink at once, before
   // the city has answered, because the words it shows are already there.
   const blank = $derived(runs.length === 0 && echo === null);
-  // Where the address line stands (client/Spec.lean 4-10a): over an empty
-  // room's box, where the eye already is, until the box holds words; at
-  // the column's head once the room has something to read.
-  let holds = $state<BoxHolds>("nothing");
-  const addressAt = $derived.by((): "head" | "over_box" | "nowhere" => {
+  // Where the address line stands (client/Spec.lean 4-10a): in an empty
+  // room's box, as the address its placeholder names, so the room is
+  // named once; at the column's head once the room has something to read.
+  const addressAt = $derived.by((): At | "nowhere" => {
     if (band || head !== "address") return "nowhere";
-    return blank ? "over_box" : "head";
+    return blank ? "box" : "head";
   });
 
   function send(text: string): boolean {
@@ -336,6 +334,10 @@
   const composer: Snippet = drawComposer;
 </script>
 
+{#snippet addressInBox()}
+  <AddressLine {address} at="box" />
+{/snippet}
+
 {#snippet lastSaid()}
   {#if said !== undefined}
     <div class="mb-snug flex flex-col gap-tight">
@@ -369,9 +371,7 @@
     hearing={u.hearing()}
     room={address}
     band={band ? lastSaid : undefined}
-    onHolds={(now: BoxHolds) => {
-      holds = now;
-    }}
+    door={addressAt === "box" ? addressInBox : undefined}
     onSend={send}
     onStop={() => {
       const going = live;
@@ -422,14 +422,6 @@ composition is rebuilt on the way. -->
     class="relative shrink-0 transition-transform duration-page"
     style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
-    {#if addressAt === "over_box"}
-      <!-- Hidden rather than taken out, so the box does not move under
-           the first word typed; a hidden line takes no focus and says
-           nothing to a screen reader. -->
-      <div class={holds === "words" ? "invisible" : undefined}>
-        <AddressLine {address} />
-      </div>
-    {/if}
     {#if branchNote !== null}
       <div class="mb-tight flex flex-wrap items-center gap-base">
         <p class="text-note text-text-faint" role="status">{branchNote.said}</p>

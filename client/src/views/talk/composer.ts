@@ -280,11 +280,6 @@ export function slashHands(reach: Reach): SlashHands {
 // `type`: an Enter that picks a candidate must not send half a sentence.
 export type BoxKey = "complete" | "menu" | "recall" | "send" | "type";
 
-// What the box holds, as the page around it needs to know: an empty
-// room's address line stands over the box until the box holds words
-// (client/Spec.lean 4-10a).
-export type BoxHolds = "nothing" | "words";
-
 export interface KeyPressed {
   readonly key: string;
   readonly shiftKey: boolean;
@@ -320,6 +315,9 @@ export interface ComposerLook {
   readonly box: HTMLTextareaAttributes;
   // The `/` menu, while it is open over the box.
   readonly menu: Snippet | undefined;
+  // What stands in the place of the placeholder while the box holds no
+  // words: an empty room's address line (client/Spec.lean 4-10a).
+  readonly door: Snippet | undefined;
   // What stands above the words in the band (the last thing said).
   readonly band: Snippet | undefined;
   // What stands at the end of the words' row: the microphone, the

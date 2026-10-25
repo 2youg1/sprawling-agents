@@ -23,6 +23,30 @@ import type { Arrival } from "../palette_door.svelte";
 // the chosen session's title (docs/frontend-method.md §7D), does not.
 export type Head = "address" | "none";
 
+// Where one address line stands (client/Spec.lean 4-10a): at the head of
+// the conversation, in a header of its own; or in an empty room's box, in
+// the place of the box's placeholder, as the words "to <address>…" whose
+// address is the button.
+export type At = "head" | "box";
+
+// The placeholder's words on either side of the address, for the line
+// that stands in an empty room's box.
+export interface BoxWords {
+  readonly before: string;
+  readonly after: string;
+}
+
+const ADDRESS_SLOT = "{address}";
+
+// The words `talk_placeholder_address` puts around the address; a phrase
+// that lost its slot is drawn whole before the address rather than lost.
+export function boxWords(lang: Lang): BoxWords {
+  const phrase = say(lang, "talk_placeholder_address");
+  const slot = phrase.indexOf(ADDRESS_SLOT);
+  if (slot < 0) return { before: phrase, after: "" };
+  return { before: phrase.slice(0, slot), after: phrase.slice(slot + ADDRESS_SLOT.length) };
+}
+
 export interface AddressLineWire {
   readonly type: "button";
   readonly "aria-haspopup": "dialog";

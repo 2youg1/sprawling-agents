@@ -8155,6 +8155,10 @@
     "en": "This call is not in its run's rounds.",
     "zh": "这次 run 的回合里没有这次调用。"
   },
+  "talk_placeholder_address": {
+    "en": "to {address}…",
+    "zh": "对 {address} 说…"
+  },
   "talk_placeholder_mayor": {
     "en": "to the Mayor…",
     "zh": "对市长说…"

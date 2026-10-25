@@ -64,6 +64,8 @@
   import { ui } from "../../ui";
   import Popover from "../parts/popover.svelte";
   import Composer from "../talk/composer.svelte";
+  import AddressLine from "../talk/address_line.look.svelte";
+  import { addressLineOf, boxWords } from "../talk/address_line";
   import Saying from "../talk/saying.svelte";
   import { WaitingCards } from "../talk/waiting.svelte";
   import Asked from "../talk/asked.svelte";
@@ -143,12 +145,17 @@ like the thread's own. -->
 <!-- The empty room lifts the box into the upper third rather than
 centring it: two thousand pixels of white under a composer in a room
 with one round in it reads as a page that broke. -->
-<Case label="composer · an empty room lifts the box">
+{#snippet inBox()}
+  <AddressLine {...addressLineOf($lang, "hall/mayor", null, () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
+{/snippet}
+
+<Case label="composer · an empty room lifts the box, the address line in its placeholder">
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
     <div class="w-full">
       <Composer
         placeholder={say($lang, "talk_placeholder_mayor")}
         sending="dispatch"
+        door={inBox}
         onSend={() => false}
         onStop={() => false}
       />
