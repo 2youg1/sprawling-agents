@@ -93,7 +93,7 @@ end Sprawling.Assembly.Listening
 **次序**，`assembly::listen` 是它唯一的定义：
 1. 判定绑定面，然后 bind（`wire::bind`，`crates/wire/Spec.lean` §8-46）。端口被占、或者暴露的地址没有令牌，都在这里拒绝，账本一字未动。
 2. 建 CAS 目录，开账本、从两份快照一遍读起视图与 Standing（§8-122）。
-3. 开写者线程：`RunWorker::new` → `JsonlLedger::open` 先取写者锁（`crates/storage/Spec.lean` §8-1），再做断尾恢复，再 `open_for_service`。锁被别的进程持着，就是 `E_LEDGER_HELD`；已经绑定的监听器随之放掉，账本一字未动。
+3. 开写者线程：`RunWorker::new` → `JsonlLedger::open` 先取写者锁（`crates/storage/Spec.lean` §8-1），再做断尾恢复，再接上视图的观察者，再 `open_for_service`（D81）。锁被别的进程持着，就是 `E_LEDGER_HELD`；已经绑定的监听器随之放掉，账本一字未动。
 4. 返回 `Listening`。到这一步，一次 serve 能做的拒绝都已经做完。
 
 然后调用方印横幅、打开浏览器，再调用 `Listening::serve` 开始应答。
@@ -115,7 +115,7 @@ impl Listening {
 - **`Listening` 不 serve 就丢掉，写者线程会一直等到进程结束**，也写不出 handoff；`#[must_use]` 让这种写法在编译时就有警告。
 - **重开参数**：如果出现一个在 `listen` 返回之后仍可能失败、失败时又需要收回横幅的步骤，就重新考虑这个切分。
 
-**本章测试**：`assembly::listening::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 storage 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
+**本章测试**：`assembly::listening::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 storage 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。`assembly::listening::tests::every_line_written_while_opening_reaches_the_views`：带一份金库退回的通知开城，`open_for_service` 写下一行 `provider_degraded`，视图答问的 `as_of` 在期限内走到账本的行数（D81）。
 
 ### 8-99 视图在自己的线程上折叠并发布快照，写线程与折叠都不等读者（`bin::serving::folding`、`accounting::views::answering`）
 
@@ -482,4 +482,9 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 /-! D4 开城变快靠少做重复的事，不靠放松保证（§8-144）
 
 末段照样逐字节哈希、与记录比对，记录之后的行照样逐行核对；第二份视图是同一个状态的克隆；重建从创世时由全量折叠逐行核对，不再先证明一遍。**被否：开账本信任末段，只核对记录之后的字节、不哈希前缀。** 省下 23 ms，却接受了段被截短再接写、或被同长改写的那种意外，而 §8-30 的记录正是为挡它才带摘要。**被否：把复制第二份视图挪到视图线程上，首字节不等它。** 首字节确实不等了，但视图线程的第一批等它，装配根起线程的次序也要改；克隆把这一段从 350 ms 降到 22 ms，不需要挪。
+-/
+
+/-! D81 视图的观察者在开城写第一行之前接上
+
+`open_for_service` 写下开城的那几行：金库退回会话内存时的 `provider_degraded`，以及 `SPRAWLING_MODEL_URL` 指的模型的 `endpoint_attached` 与 `model_selected`。视图在写者线程起来之前从账本读到这里（§8-122），此后只靠写者的观察者往前折（§8-99），而视图折一行就把「下一行」挪到它之后，不回头补缺口。所以观察者在这几行之后才接上时，视图永远缺这几行：第一次以环境变量开的城，设置页与模型选择器里没有那个 endpoint，快照还把缺口带进下一次开城。于是写者线程先交出会话分片、接上观察者，再 `open_for_service`，然后才起证明线程、报告就绪：开城那几行仍在停机值接上之前写下（§8-122），也和以后的每一行一样经观察者到达视图与页面。**被否：让视图线程发现 seq 跳号时从账本补读。** 折叠线程从此要读账本、要有自己的读取失败；而跳号只有一个来源，就是观察者接晚了，把次序排对就没有跳号。
 -/

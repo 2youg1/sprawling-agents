@@ -169,37 +169,17 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             );
             let mut worker = match RunWorker::holding(&worker_root, log, super::hands(vault), held)
             {
-                Ok(mut worker) => {
-                    // Before the banner, so a torn tail is the first
-                    // thing the person running the city reads.
-                    if let Some(notice) = worker.opening().notice() {
-                        eprintln!("{notice}");
-                    }
-                    worker.open_for_service(vault_notice);
-                    // Detached: the proof holds no part of the writer,
-                    // and what it finds reaches the writer through the
-                    // halt it attached; until then the writer takes no
-                    // line (`crates/sprawling/spec/Assembly/Listening.lean` §8-90).
-                    if let Err(err) = super::chain_watch::audit_in_background(
-                        worker.chain_under_audit(halt),
-                        audit_log,
-                        began,
-                    ) {
-                        drop(ready_tx.send(Err(err)));
-                        return;
-                    }
-                    drop(ready_tx.send(Ok((
-                        worker.vault_handle(),
-                        worker.health(),
-                        worker.relay(),
-                    ))));
-                    worker
-                }
+                Ok(worker) => worker,
                 Err(err) => {
                     drop(ready_tx.send(Err(err)));
                     return;
                 }
             };
+            // Before the banner, so a torn tail is the first thing the
+            // person running the city reads.
+            if let Some(notice) = worker.opening().notice() {
+                eprintln!("{notice}");
+            }
             // Somebody is watching, so runs ask their provider to
             // stream, the machine's look has a place to land, and a run
             // in progress can be interrupted. One call, because a
@@ -253,6 +233,24 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 kept.settle(record);
                 folding(record);
             }));
+            // After the observer, so the lines the city writes while it
+            // opens reach the views as every later line does: the views
+            // fold forward from what the observer hands them and never go
+            // back for a gap (`crates/sprawling/spec/Assembly/Listening.lean` D81).
+            worker.open_for_service(vault_notice);
+            // Detached: the proof holds no part of the writer, and what
+            // it finds reaches the writer through the halt it attached;
+            // until then the writer takes no line
+            // (`crates/sprawling/spec/Assembly/Listening.lean` §8-90).
+            if let Err(err) = super::chain_watch::audit_in_background(
+                worker.chain_under_audit(halt),
+                audit_log,
+                began,
+            ) {
+                drop(ready_tx.send(Err(err)));
+                return;
+            }
+            drop(ready_tx.send(Ok((worker.vault_handle(), worker.health(), worker.relay()))));
             worker.take_back_the_lost();
             accounting::worker::attend::attend(&mut worker, &worker_desk);
             // Dropping the worker drops the observer, which closes the fold's channel;
