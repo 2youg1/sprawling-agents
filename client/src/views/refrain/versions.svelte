@@ -59,6 +59,7 @@
   function sourceOf(each: DocumentVersion): string {
     const source = each.source;
     if (source === "on_disk") return say($lang, "refrain_version_on_disk");
+    if (source === "shipped") return say($lang, "refrain_version_shipped");
     if ("before" in source) return say($lang, "refrain_version_outside");
     return `${say($lang, "refrain_version_saved")} · ${isoDay(source.saved.at)} ${isoTime(source.saved.at)}`;
   }

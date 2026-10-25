@@ -39,5 +39,6 @@ pub use step::{
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,
     SecretForgetting, SessionNaming,
 };
+pub use step::{PromptStep, PromptWrite};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

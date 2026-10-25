@@ -236,17 +236,23 @@ impl RunWorker {
         city::write_governed(&self.city_root, which, base, body)?;
         let naming = match which {
             city::Governed::Clerk => None,
-            city::Governed::Mayor | city::Governed::Preferences => {
-                match city::read_naming(&self.city_root)? {
-                    Ok(naming) => Some(naming.version()?),
-                    // The other document's area does not read, so the
-                    // city has no names to give a version of; the page
-                    // learns why from `Query::Identity`.
-                    Err(city::Unreadable { .. }) => None,
-                }
-            }
+            city::Governed::Mayor | city::Governed::Preferences => self.naming_version()?,
         };
         self.governed_written(which, body.len(), naming)
+    }
+
+    /// The identity version the city has now, for the receipt of a write
+    /// to a document that carries names; `None` when the other document's
+    /// identity area does not read, so the city has no names to give a
+    /// version of, and the page learns why from `Query::Identity`.
+    ///
+    /// # Errors
+    /// A governed document that cannot be read at all.
+    pub(in crate::worker) fn naming_version(&self) -> Result<Option<kernel::B3Hash>, AxError> {
+        match city::read_naming(&self.city_root)? {
+            Ok(naming) => Ok(Some(naming.version()?)),
+            Err(city::Unreadable { .. }) => Ok(None),
+        }
     }
 
     /// Writes one identity card into its document, only if the document
@@ -286,6 +292,8 @@ impl RunWorker {
                 which: which.file().to_owned(),
                 bytes,
                 naming,
+                at: None,
+                removed: false,
             })?,
         )
     }

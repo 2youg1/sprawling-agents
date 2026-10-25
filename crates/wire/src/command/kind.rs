@@ -17,8 +17,8 @@ use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
-    IdentityCard, PolicyChange, ProposalDecisions, PursuitStep, RangeWrite, RulesWrite,
-    SecretForgetting, SessionNaming, SpineDocument,
+    IdentityCard, PolicyChange, PromptWrite, ProposalDecisions, PursuitStep, RangeWrite,
+    RulesWrite, SecretForgetting, SessionNaming, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -398,6 +398,10 @@ pub enum Command<Secret = Sealed<String>> {
     AddAgent(crate::AgentAdding),
     AgentLogin(crate::AgentLoginStart),
     ForgetDevice(crate::DeviceForgetting),
+    /// One whole-document step on a prompt document the city's list names
+    /// (`crates/wire/spec/Answer/Prefix.lean` §8-98); writes
+    /// `governed_document_written` with `at`.
+    PutPrompt(PromptWrite),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

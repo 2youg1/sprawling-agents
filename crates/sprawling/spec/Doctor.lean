@@ -854,7 +854,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话按 provider 与模型分文件，城一层、楼一层：
 
 ```rust
-pub(super) const MODELS_DIR: &str = "models";            // <city>/.sprawling/models/… 与 <building>/.sprawling/models/<provider>/<model>.md
+// 位置由 city::model_note_at 拼出（`crates/city/Spec.lean` §8-44）：<city>/.sprawling/models/… 与 <building>/.sprawling/models/<provider>/<model>.md
 pub(super) struct ModelNote { pub(super) at: Address, pub(super) bytes: Vec<u8> }
 /// 这次派活选中的 endpoint 名与模型 id 下的那段话：楼的那份在就用楼的，否则城的；都不在即 None。
 pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
@@ -864,7 +864,7 @@ pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, m
 - **追加在 run 段末尾，因而在整段 system prompt 的末尾。** 与楼段接 `AGENTS.md` 走同一扇门（`Assembled::extend`：空一行接上，记一行来源）。它随 run 段一同冻结、一同入库，整个 run 内字节不动，所以每一回合的缓存前缀都盖得住它；`prompt_assembled` 的 run 段哈希盖住它的字节，来源行写出它的地址与长度，WebUI 的提示词视图（§8-67）因此照原样列出「这个 run 用的是哪个模型的哪一段」。重放读的是账本里那一行，不重新读文件，故逐字节一致。
 - **文件不在，行为逐字节与没有这个功能时相同**：run 段不多一个字节，来源表不多一行。
 - **文件在却读不出**（权限、目录占位、不是文件）是 `E_STORAGE_FATAL`，指名那条路径，派活被拒；不静默跳过，理由与 `city_segment` 相同：人写下的那段话静静躺在盘上没被读，而 run 照着缺了它的提示词干活，没有人会被告知。
-- **地址先于路径。** 位置先按地址文法拼出（`Address::parse`），再落到盘上。模型 id 若含地址文法拒绝的字符（`:`、`\`、`.`／`..` 段），它在城里就没有可指名的那段话，按「没有文件」处理；先拼路径再读则会让一个含 `..` 的 id 读到保留区以外的文件。
+- **地址先于路径。** 位置先按地址文法拼出（`city::model_note_at`，页面的提示文档名单与 `Query::Layers` 读同一个函数），再落到盘上。模型 id 若含地址文法拒绝的字符（`:`、`\`、`.`／`..` 段），它在城里就没有可指名的那段话，按「没有文件」处理；先拼路径再读则会让一个含 `..` 的 id 读到保留区以外的文件。
 - **被否决的备选**：把它做成第五段。四段恒四是 `FrozenPrefix` 的类型（`crates/runtime/Spec.lean` §8-4），`verified_system_hashes` 与 `rebuild_prefix` 都按四段对拍；为一段随模型而变、随 run 冻结的文字加一个槽位，要改的是三个 crate 的冻结不变量，换来的只是一个本来就能从来源行读出的边界。重开条件：有读者需要按模型单独缓存这段话（例如跨 run 的缓存断点放在它之前）。
 
 **本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现；`freezing::tests::layers::a_buildings_note_for_a_model_replaces_the_citys_there_and_only_there`——楼的那份替换城的，别的楼仍得城的。

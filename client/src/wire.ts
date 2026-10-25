@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 68 as const;
+export const WIRE_V = 69 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "b66dddabfff0032a19136152c044337b9b03c382757fa529ec90e62d1f08bb22" as const;
+export const WIRE_HASH = "423d9007f42ac99f7ef7bbf3e26966f802d77b211df0e114903829c85e6172ab" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -2746,6 +2746,104 @@ export const Laid = Schema.Struct({
 export type Laid = typeof Laid.Type;
 
 /**
+ * Whether the next run receives a document.
+ */
+export const LayerState = Schema.Union([
+  Schema.Struct({
+    sent: Schema.Struct({
+      bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    }),
+  }),
+  Schema.Struct({
+    replaced: Schema.Struct({
+      by: Address,
+    }),
+  }),
+  Schema.Literal("absent"),
+  Schema.Struct({
+    withheld: Schema.Struct({
+      why: Schema.String,
+    }),
+  }),
+]).annotate({ identifier: "LayerState" });
+export type LayerState = typeof LayerState.Type;
+
+/**
+ * The four slots of a frozen prefix, in the order they are sent.
+ * 
+ * Exhaustive and closed: the order is the cache economics, and a
+ * spelling a page had to match against a free string would let a
+ * segment arrive under a name nothing draws.
+ */
+export const PrefixSlot = Schema.Literals(["city", "building", "resident", "run"]).annotate({ identifier: "PrefixSlot" });
+export type PrefixSlot = typeof PrefixSlot.Type;
+
+/**
+ * What a prompt document is.
+ */
+export const PromptKind = Schema.Union([
+  Schema.Literal("city"),
+  Schema.Literal("conventions"),
+  Schema.Literal("identity"),
+  Schema.Struct({
+    model_note: Schema.Struct({
+      model: Schema.String,
+      provider: Schema.String,
+    }),
+  }),
+]).annotate({ identifier: "PromptKind" });
+export type PromptKind = typeof PromptKind.Type;
+
+/**
+ * Which layer a prompt document belongs to; a nearer layer replaces a
+ * farther one where both answer the same question.
+ */
+export const PromptLayer = Schema.Literals(["city", "building", "room"]).annotate({ identifier: "PromptLayer" });
+export type PromptLayer = typeof PromptLayer.Type;
+
+/**
+ * A copy measured against this build's default (city `CopyStanding`).
+ */
+export const DefaultStanding = Schema.Literals(["absent", "current", "earlier", "edited"]).annotate({ identifier: "DefaultStanding" });
+export type DefaultStanding = typeof DefaultStanding.Type;
+
+/**
+ * This build's default for one of the three documents it carries, and
+ * what the copy in the city is measured against it.
+ */
+export const ShippedDefault = Schema.Struct({
+  standing: DefaultStanding,
+  version: B3Hash,
+}).annotate({ identifier: "ShippedDefault" });
+export type ShippedDefault = typeof ShippedDefault.Type;
+
+/**
+ * One prompt document: where it is, or would be when it is absent;
+ * which slot of the prefix it goes into; which layer it belongs to;
+ * whether the next run receives it; and the version a step on it starts
+ * from, which is the hash of no bytes when it is absent.
+ */
+export const LayerDocument = Schema.Struct({
+  at: Address,
+  kind: PromptKind,
+  layer: PromptLayer,
+  shipped: Schema.optional(Schema.NullOr(ShippedDefault)),
+  slot: PrefixSlot,
+  state: LayerState,
+  version: B3Hash,
+}).annotate({ identifier: "LayerDocument" });
+export type LayerDocument = typeof LayerDocument.Type;
+
+/**
+ * Every prompt document of the next run at `addr`, in send order.
+ */
+export const LayersAnswer = Schema.Struct({
+  addr: Address,
+  documents: Schema.Array(LayerDocument),
+}).annotate({ identifier: "LayersAnswer" });
+export type LayersAnswer = typeof LayersAnswer.Type;
+
+/**
  * What one entry is. A directory has no size worth stating: the size
  * of a directory is a question about everything under it, and this
  * answer deliberately does not walk that far.
@@ -3289,16 +3387,6 @@ export const PreferencesAnswer = Schema.Struct({
   welcomed: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "PreferencesAnswer" });
 export type PreferencesAnswer = typeof PreferencesAnswer.Type;
-
-/**
- * The four slots of a frozen prefix, in the order they are sent.
- * 
- * Exhaustive and closed: the order is the cache economics, and a
- * spelling a page had to match against a free string would let a
- * segment arrive under a name nothing draws.
- */
-export const PrefixSlot = Schema.Literals(["city", "building", "resident", "run"]).annotate({ identifier: "PrefixSlot" });
-export type PrefixSlot = typeof PrefixSlot.Type;
 
 /**
  * One document a segment was assembled from, as the assembler saw it.
@@ -4713,6 +4801,7 @@ export const VersionSource = Schema.Union([
       seq: Seq,
     }),
   }),
+  Schema.Literal("shipped"),
 ]).annotate({ identifier: "VersionSource" });
 export type VersionSource = typeof VersionSource.Type;
 
@@ -4878,6 +4967,9 @@ export const Answer = Schema.Union([
   }),
   Schema.Struct({
     template: TemplateAnswer,
+  }),
+  Schema.Struct({
+    layers: LayersAnswer,
   }),
   Schema.Struct({
     git_status: GitStatusAnswer,
@@ -5236,6 +5328,11 @@ export const Query = Schema.Union([
       models: Schema.Array(FiguresAsked),
     }),
   }),
+  Schema.Struct({
+    layers: Schema.Struct({
+      addr: Address,
+    }),
+  }),
 ]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
@@ -5444,6 +5541,32 @@ export const PrivacyRequest = Schema.Struct({
   idem: IdemKey,
 }).annotate({ identifier: "PrivacyRequest" });
 export type PrivacyRequest = typeof PrivacyRequest.Type;
+
+/**
+ * A whole-document step on one prompt document
+ * (`crates/wire/spec/Answer/Prefix.lean` §8-98); editing it word by word
+ * is `PutRange`.
+ */
+export const PromptStep = Schema.Union([
+  Schema.Literal("own"),
+  Schema.Literal("inherit"),
+  Schema.Literal("restore"),
+]).annotate({ identifier: "PromptStep" });
+export type PromptStep = typeof PromptStep.Type;
+
+/**
+ * One whole-document step on the prompt document at `at`, taken only
+ * while the file is still `base`: the hash of the version the page read,
+ * or of no bytes when the file is absent
+ * (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+ */
+export const PromptWrite = Schema.Struct({
+  at: Address,
+  base: B3Hash,
+  idem: IdemKey,
+  step: PromptStep,
+}).annotate({ identifier: "PromptWrite" });
+export type PromptWrite = typeof PromptWrite.Type;
 
 /**
  * Take the sentence's change, or take an inserted sentence after
@@ -5889,6 +6012,9 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     forget_device: DeviceForgetting,
+  }),
+  Schema.Struct({
+    put_prompt: PromptWrite,
   }),
   Schema.Struct({
     auth: Schema.Struct({

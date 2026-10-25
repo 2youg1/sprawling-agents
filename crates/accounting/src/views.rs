@@ -42,6 +42,7 @@ pub mod hearing;
 pub mod holding;
 pub mod hunks;
 mod kinds;
+mod layers;
 pub mod lines;
 pub mod listing;
 pub mod mcp_health;

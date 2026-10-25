@@ -60,6 +60,7 @@ pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use answer::{DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUse};
 pub use answer::{Decision, GovernanceAnswer};
+pub use answer::{DefaultStanding, LayerDocument, LayerState, LayersAnswer};
 pub use answer::{DeviceId, DeviceLine, DevicesAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
@@ -83,6 +84,7 @@ pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine, McpUsa
 pub use answer::{ModelFiguresAnswer, WindowLine};
 pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
+pub use answer::{PromptKind, PromptLayer, ShippedDefault};
 pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{RunSummary, Waiting};
@@ -103,7 +105,7 @@ pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
 pub use command::{DoorAnswer, DoorOpening, DoorStep, SecretForgetting};
 pub use command::{PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, SessionNaming};
-pub use command::{PursuitStep, Shelf, SpineDocument};
+pub use command::{PromptStep, PromptWrite, PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]
 pub use frames::wire_schema;

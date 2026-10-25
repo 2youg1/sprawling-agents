@@ -6,18 +6,14 @@
 //! The note a person keeps for one model, and where the city keeps it
 //! (`crates/sprawling/Spec.lean` §8-85).
 //!
-//! Two places, the city's reserved subtree and a building's: a
-//! directory at the city root would share its name space with the
-//! buildings, and a resident cannot write under a reserved prefix, so
-//! the model a note governs cannot rewrite it.
+//! Two places, the city's reserved subtree and a building's, spelled by
+//! `city::model_note_at`: a directory at the city root would share its
+//! name space with the buildings, and a resident cannot write under a
+//! reserved prefix, so the model a note governs cannot rewrite it.
 
 use std::path::Path;
 
-use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
-
-/// The directory under the reserved prefix that holds one directory per
-/// provider, each holding one `<model>.md` per model.
-pub(super) const MODELS_DIR: &str = "models";
+use kernel::{Address, AxCode, AxError};
 
 /// One model's note: the bytes, and the address a reader opens them by.
 pub(super) struct ModelNote {
@@ -50,9 +46,8 @@ pub(super) fn model_note(
     provider: &str,
     model: &str,
 ) -> Result<Option<ModelNote>, AxError> {
-    let note = format!("{RESERVED_PREFIX}/{MODELS_DIR}/{provider}/{model}.md");
-    for spelled in [format!("{}/{note}", building.as_str()), note.clone()] {
-        let Ok(at) = Address::parse(&spelled) else {
+    for layer in [Some(building), None] {
+        let Some(at) = city::model_note_at(layer, provider, model) else {
             return Ok(None);
         };
         if let Some(bytes) = read_note(&city_root.join(at.as_str()))? {

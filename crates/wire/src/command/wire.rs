@@ -29,7 +29,7 @@ use super::kind::Command;
 use super::no_secret::NoSecret;
 use super::step::{
     AgentAdding, AgentLoginStart, CityClosing, CitySettings, DeviceForgetting, DoorAnswer,
-    DoorOpening, DoorStep, PolicyChange, ProposalDecisions, RangeWrite, RulesWrite,
+    DoorOpening, DoorStep, PolicyChange, PromptWrite, ProposalDecisions, RangeWrite, RulesWrite,
     SecretForgetting, SessionNaming,
 };
 
@@ -67,6 +67,7 @@ impl<Secret> Command<Secret> {
             | Self::PutGuide { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutRange(RangeWrite { ref idem, .. })
+            | Self::PutPrompt(PromptWrite { ref idem, .. })
             | Self::DecideProposals(ProposalDecisions { ref idem, .. })
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
@@ -257,6 +258,7 @@ impl From<WireCommand> for Command {
             Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),
             Command::PutRange(write) => Self::PutRange(write),
+            Command::PutPrompt(write) => Self::PutPrompt(write),
             Command::DecideProposals(decisions) => Self::DecideProposals(decisions),
             Command::PutSpine {
                 building,

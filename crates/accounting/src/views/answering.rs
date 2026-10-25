@@ -197,6 +197,7 @@ impl Views {
             wire::Query::OpenProposals => wire::Answer::OpenProposals(self.open_proposals_answer()),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
             wire::Query::Versions { at } => return self.versions_ask(at),
+            wire::Query::Layers { addr } => return self.layers_ask(addr),
             wire::Query::Bytes { version, range } => return self.bytes_ask(*version, *range),
             wire::Query::Export { at, version } => return self.export_ask(at, *version),
             wire::Query::Preview { version, viewport } => {

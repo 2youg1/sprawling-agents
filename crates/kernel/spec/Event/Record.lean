@@ -59,7 +59,8 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize,
-                                     pub naming: Option<B3Hash> }        // §8-79
+                                     pub naming: Option<B3Hash>,         // §8-79
+                                     pub at: Option<Address>, pub removed: bool }
 pub struct RulesChanged { pub scope: Scope, pub which: GoverningDocument,
                           pub before: Option<B3Hash>, pub after: B3Hash, pub bytes: usize }
 pub enum GoverningDocument { Rules, Config }     // serde: "RULES.toml" | "CONFIG.toml"
@@ -374,6 +375,10 @@ pub struct GovernedDocumentWritten {
     pub bytes: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub naming: Option<B3Hash>,     // 写完之后城的身份版本；写 CLERK.md 与旧行为 None
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<Address>,        // 城保留子树那三份之外的提示文档：它的地址
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub removed: bool,              // `PutPrompt` 的 `Inherit` 删掉了它，`bytes` 为 0
 }
 pub struct RunStarted {
     // …既有字段…
@@ -383,9 +388,10 @@ pub struct RunStarted {
 ```
 
 - **两个键都只是摘要。** 身份本身——名字与「关于你」——在两份治理文档里，冻下的那一版在内容库里，摘要是读回它的钥匙（`cas:<naming>`）。账本不抄名字：名字是人改的字，抄进不可删的历史就有了第二个家，而人删掉的一段「关于你」会永远留在那里。
+- **提示文档的整份动作也记在这一行**（`Command::PutPrompt`，`crates/wire/Spec.lean` §8-98）：`which` 是文件名，`at` 是地址——楼的 `City.md` 与模型提示不在城保留子树里那三份的位置，只有文件名就读不出是哪一份；`removed` 说这一次删掉了它，而不是写成空的，两者对下一个 run 不同（删掉之后远的一层重新管，空文件什么也不送）。`removed` 是一位而不是第三种行，因为读者要的是同一件事——管这里的提示变了——只是变成了什么不同。
 - **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（`crates/wire/Spec.lean` §8-59）。写 `CLERK.md` 不动身份，键缺席。
 - **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`crates/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
-- 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
+- 这些键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
 -/
 

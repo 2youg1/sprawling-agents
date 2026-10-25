@@ -318,6 +318,17 @@ wire shape golden 与客户端协议。-/
 **重开参数**：下一版若只有一两处线上改动，按 D1 照常各自进位即可。
 -/
 
+/-! D60 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版
+
+**决定**：`Query::Layers { addr }` 答这个地址下一个 run 的每份提示文档（城与楼的 `City.md`、工作区、楼与房间的 `AGENTS.md`、身份文件、两层的模型提示）：在哪、进哪一段、哪一层、送不送、被谁替换，带默认的三份另带默认的版本与副本状态。`Command::PutPrompt(PromptWrite { at, base, step, idem })` 做三种整份动作：`Own` 在这一层起一份、`Inherit` 删掉这一层的一份、`Restore` 写回本版默认；逐字修改仍走 `PutRange`，它对 city 名单上的保留子树文件放行。`VersionSource` 多一臂 `Shipped`，本版默认文本是 `Query::Versions` 里的一版。`WIRE_V` 68 → 69。细节在 §8-98。
+
+**理由**：人要在页面上看见并改下一个 run 收到的提示，而楼的 `City.md`、模型提示与房间链的 `AGENTS.md` 分层之后，只读盘的人说不清哪一份在管。「谁替换谁」今天只在冻结时算一次，页面若自己爬这几层就是第二个权威，所以由城答。编辑交给已有的 RefRain（版本、比较、提案都在），只有它做不了的三件整份动作才要新命令；默认文本作为一版放进版本列表，「与默认比较」就不需要第二个比较界面。
+
+**被否**：①给 `GovernedDocument` 加 `City`、`ModelNote` 两臂、`PutDocument` 的正文改成 `Write | Inherit`——`GovernedDocument` 今天是三值的键（身份答复的 `Unreadable.document`、页面以它为键的表），带数据的臂会把这些读者全部改形，而楼与模型提示没有身份区要守；②页面拿到默认文本再整份写回来做「恢复默认」——`MAYOR.md` 的身份区要由城保留，页面拼不对；③在设置页另开一组提示——楼页本来就是一栋楼的家，城层的文档也列在那里并标「城」。
+
+**重开参数**：提示文档要支持在某一层「追加」而不是「替换」时，`LayerState` 与 `PromptStep` 都要多一臂。
+-/
+
 /-! D59 建楼页：`CreateBuilding` 带人写的规则，楼行标出可收编的文件夹，模板字节可先问
 
 **决定**：`CreateBuilding` 多一个 `rules: Option<String>`，`None` 照模板的字节，`Some` 是人在建楼页里写的整份 `RULES.toml`，城先求值、被拒什么都不落；新建还是收编由城看目录（city D32），帧不说。`BuildingProgress` 多一个必填的 `adoptable: bool`：顶层文件夹还没有规则，在它的地址上 `CreateBuilding` 就是收编它。新查询 `Template { template, addr }` 答 `TemplateAnswer { template, addr, rules }`，房间与保留子树答 `Unavailable`。`WIRE_V` 从 67 进到 68，同一个变更集重生 schema golden、wire shape golden 与 `client/src/wire.ts`。

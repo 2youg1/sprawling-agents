@@ -8,6 +8,7 @@ mod clockwork;
 mod configuring;
 mod entrance;
 mod guide;
+mod prompting;
 mod restoring;
 mod revealing;
 mod saving;
