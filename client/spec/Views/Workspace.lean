@@ -25,7 +25,7 @@ import client.spec.Views.Parts
 | 工具行 | APG Button（`aria-pressed`） | Enter／Space | 在右侧打开这次调用（`openCall`）；打开着的那行 `aria-pressed="true"` |
 | | | ↓／↑，j／k | 同一段对话里的下一条或上一条工具行 |
 | | | Escape | 右侧开着这行时收起右侧，焦点留在这行 |
-| | | Tab | 到达这行，提示写出完成（或开始）的 ISO 时刻 |
+| | | Tab | 到达这行，提示写出完成（或开始）的本地时刻，到秒 |
 | 未读计数 | APG Button | Enter／Space | 回到末尾并恢复跟随；按钮随计数消失，焦点落在对话列上 |
 | 图层键 | APG Button | Enter／Space | 关上设置面、离开别的页回到对话，换到下一档；一次过渡，焦点落进对话框（client D48） |
 | | | Accel-\ | 同上；按住超过 300 ms 临时进混合档，松开回原来的档 |
