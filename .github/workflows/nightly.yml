@@ -46,7 +46,7 @@ jobs:
       # install-action carries no recipe for cargo-fuzz and falls back to
       # cargo-binstall, which fetches the musl build. Which is fine, and
       # is also why the next step names a target.
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
+      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
           tool: cargo-fuzz
       # Three things this loop had to learn, each from a red night.
@@ -225,7 +225,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
+      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
           tool: cargo-deny
       - name: what has been published against what we depend on
