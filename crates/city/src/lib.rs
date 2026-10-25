@@ -47,6 +47,7 @@ pub use building::configured_payload as building_configured_payload;
 pub use building::created_payload as building_created_payload;
 pub use building::remove as remove_building;
 pub use building::removed_payload as building_removed_payload;
+pub use building::withdraw_adoption;
 pub use building::{Building, BuildingTemplate, Removed, create as create_building};
 pub use building::{Founding, RulesText, has_rules, raise as raise_building, template_rules};
 pub use check::{Finding, Position, Report, check};

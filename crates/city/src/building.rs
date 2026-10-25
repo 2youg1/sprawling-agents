@@ -336,6 +336,23 @@ pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError> {
     Ok(building)
 }
 
+/// Takes back the rules [`raise`] or [`adopt`] drew over a folder that
+/// was already there, for an adoption the city could not finish: the
+/// folder waits to be adopted again (`crates/city/Spec.lean` §8-3).
+///
+/// Call it only for a building whose rules this adoption wrote and whose
+/// `building_created` line has not landed. Only the rules file goes: the
+/// adoption created it new, so nothing a person wrote is lost, and the
+/// spine files and ignore rules stay because they were laid only where
+/// missing and a second adoption lays nothing twice.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the file when it cannot be removed.
+pub fn withdraw_adoption(city_root: &Path, building: &Building) -> Result<(), AxError> {
+    let file = crate::policy::rules_path(city_root, building.addr());
+    std::fs::remove_file(&file).map_err(|err| storage(&file, &err))
+}
+
 /// What the ledger records about a building coming into being.
 /// `adopted` says how: laid out empty, or drawn over an existing
 /// directory - the history should not claim it built what it found.
