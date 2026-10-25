@@ -2,11 +2,13 @@
 
 This guide is for someone who writes a building's `RULES.toml` or `CONFIG.toml` and wants to know what a resident there will be able to do, and for someone reading a transcript who wants to know why a model called one tool and never mentioned another. It names each tool the city builds in, the namespace the catalog files it under, the sentence a model reads about it first, what the tool does, what admits it, and where it appears.
 
-The rules themselves live elsewhere, and this guide points to them rather than restating them: the three tiers a capability can sit in and the shape of the dormant index are `crates/runtime/spec/Catalog.lean` §8-60, a call through `tool` is §8-61 of the same file, which tools travel in every request is `core_tools` in [`crates/runtime/src/mode.rs`](../crates/runtime/src/mode.rs), and which tools a building's runs are given is decided in one function, `lay_out_workbench` in [`crates/accounting/src/worker/workbench/tools.rs`](../crates/accounting/src/worker/workbench/tools.rs).
+The rules themselves live elsewhere, and this guide points to them rather than restating them: the three tiers a capability can sit in and the shape of the dormant index are `crates/runtime/spec/Catalog.lean` §8-60, a call through `tool` is §8-61 of the same file, which tier an admitted tool takes is `exposure_of` in [`crates/runtime/src/catalog/exposure.rs`](../crates/runtime/src/catalog/exposure.rs), whose default is the mode cores of `core_tools` in [`crates/runtime/src/mode.rs`](../crates/runtime/src/mode.rs), and which tools a building's runs are given is decided in one function, `lay_out_workbench` in [`crates/accounting/src/worker/workbench/tools.rs`](../crates/accounting/src/worker/workbench/tools.rs).
 
 ## How a model meets a capability
 
-A tool reaches a model in one of three ways. A tool the building did not admit costs nothing: it is in no prompt, no tool list and no answer of `tool`. An admitted tool that is in the core of some mode travels in the request's tool list on every turn, with its whole description and input schema. Every other admitted tool waits in the **dormant index**, a block of at most 1024 bytes in the resident's part of the prompt that gives each namespace one line, with its member count and a hint, and each admitted skill one line; the model reaches those tools through the resident tool `tool`, whose `list`, `find`, `detail` and `run` answer from the catalog. The tool list is fixed when the run starts, so admitting a tool mid-run is not something the city does.
+A tool reaches a model in one of three ways. A tool the building did not admit, or admitted at the `off` tier, costs nothing: it is in no prompt, no tool list and no answer of `tool`. An admitted tool at the `core` tier travels in the request's tool list on every turn, with its whole description and input schema. Every other admitted tool is `dormant` and waits in the **dormant index**, a block of at most 1024 bytes in the resident's part of the prompt that gives each namespace one line, with its member count and a hint, then one line for the skills as a group and one line for each admitted skill; the model reaches those tools through the resident tool `tool`, whose `list`, `find`, `detail` and `run` answer from the catalog. The tool list is fixed when the run starts, so admitting a tool mid-run is not something the city does.
+
+Where no `[catalog]` table in the building's or the city's `CONFIG.toml` names a tool or its namespace, a tool in the core of some mode is `core` and every other tool is `dormant`; `tool` and `read` are `core` whatever a table says. This guide describes that default, and the tables below give each tool's tier under it.
 
 Above the dormant index the catalog writes two rows that are not tools: the row for the run's mode (`mode:chat` or `mode:work`) and the `dev` row, which tells a run that this city's own code can be changed and opens, through `read` or `tool detail`, into the evidence such a change can be asked for. Their text is in [`crates/runtime/src/mode.rs`](../crates/runtime/src/mode.rs).
 
@@ -14,7 +16,7 @@ Each tool below opens with its first sentence in bold, copied from the file name
 
 ## Where each tool appears
 
-| Namespace | Tool | Appears as | Admitted where |
+| Namespace | Tool | Appears as, by default | Admitted where |
 |---|---|---|---|
 | `sprawling` | `read`, `search`, `status`, `tool` | resident, both modes | every building |
 | `sprawling` | `edit` | resident; refused in chat mode | every building |
@@ -28,7 +30,7 @@ Each tool below opens with its first sentence in bold, copied from the file name
 | `media` | `transcribe`, `ocr` | dormant | the endpoint book names a model for the job that this building may use |
 | `record` | `playback`, `proposal` | dormant | every building |
 | `web` | `web_search` | dormant | every building that is not confidential, unless `[search]` is `off` |
-| `skill` | each skill on the reading room | dormant, one line each | `reading_room` in `RULES.toml` |
+| `skill` | each skill on the reading room | dormant, a group line and one line each | `reading_room` in `RULES.toml` |
 | a server's label | each tool the server lists | dormant | an `[[mcp]]` row in the building's `CONFIG.toml` |
 
 City Hall is the building `hall`; its vocation is to plan, so it gets `city` and none of `exec`, `delegate` and `workshop` (`crates/city/spec/Vocation.lean`). A confidential building never holds a browser, the desktop or `web_search`, starts no MCP server, and has `transcribe` and `ocr` only when the endpoint for them is on this machine.
@@ -91,15 +93,15 @@ The call names one of three arms — a program, a Python snippet, a shell line �
 
 ## `sprawling` — working with other residents, and the run itself
 
-**talk to other residents, split and hand off work, see your own run**
+**talk to other residents, split and hand off work, see your run**
 
 The namespace's sentence is in `own_about` in [`crates/runtime/src/catalog/namespace.rs`](../crates/runtime/src/catalog/namespace.rs), with the other namespaces' sentences below. The rest of `sprawling` is dormant. In the dormant index, and in what `tool list` prints with no namespace, the whole namespace is one line; for a building that builds it reads:
 
 ```text
-- sprawling (10): talk to other residents, split and hand off work, see your own r
+- sprawling (10): talk to other residents, split and hand off work, see your run
 ```
 
-The sentence is 66 bytes long, so the 64-byte cut takes the end off its last word. In City Hall the count is 9: `city` is added, and `delegate` and `workshop` are absent. `tool list sprawling` lists every member, the resident ones included, in byte order of their names. For a building that builds, with no sandbox arm named, it prints this; the lines for `archive` and `signal` end in a space where the cut fell, which is left out here:
+The sentence is 62 bytes long, so it fits under the 64-byte cut whole. In City Hall the count is 9: `city` is added, and `delegate` and `workshop` are absent. `tool list sprawling` lists every member, the resident ones included, in byte order of their names. For a building that builds, with no sandbox arm named, it prints this; the lines for `archive` and `signal` end in a space where the cut fell, which is left out here:
 
 ```text
 - archive: Write down what this building should not have to be told twice,
@@ -332,6 +334,12 @@ It sends the query to that one supplier over MCP and returns the answer as the s
 
 **the steps this building follows for a kind of work**
 
-That is the sentence the catalog keeps for `skill`, and it reaches no model today: the index prints a namespace's sentence only on the line of a namespace that holds tools, and no tool is filed under `skill`. Each skill the building's `reading_room` admits is one line of the dormant index, `- skill <name>: <hint>`, whose hint is cut from the first non-empty line of its `SKILL.md`; `tool list skill` lists them, and `read` opens one by name. A name on the list that no shelf holds is left out.
+That is the sentence the catalog keeps for `skill`. When the building admits at least one skill, the dormant index writes it on a group line after every namespace line and before the skills themselves, with the number of skills admitted:
+
+```text
+- skill (2): the steps this building follows for a kind of work
+```
+
+Each skill the building's `reading_room` admits is then one line of the dormant index, `- skill <name>: <hint>`, whose hint is cut from the first non-empty line of its `SKILL.md`; `tool list skill` lists them, and `read` opens one by name. A name on the list that no shelf holds is left out.
 
 Every other namespace belongs to an MCP server and is named by its label. The index line for a server lists its members' names without the `<label>_` prefix, because a server writes no sentence of its own there, and each tool's description is whatever the server's `tools/list` said. A server label may not be one of the six namespaces the city keeps, so a server's tool is never listed as the city's own. How a server is configured, started and called is in [Connect an MCP tool server](integrations.md#connect-an-mcp-tool-server).
