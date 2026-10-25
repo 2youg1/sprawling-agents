@@ -213,7 +213,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 **本 crate 无 `#[non_exhaustive]`：每个枚举都是闭的，穷尽性交给编译器。** 给 `AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 这类面标开放，下游就得写永远打不到的 `_ =>`，而新增一个变体本该在每个没处理它的读者那里成为编译错误。
 
-这条判定成立的前提是工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。ARCHITECTURE.md §3 写明：每个包都发布到 crates.io，只因为 `cargo install sprawling` 从 registry 构建二进制，而 crates.io 要求它的每个依赖都在那里（`crates/sprawling/spec/Doctor.lean` §8-157）；这些包是一个二进制的部件，不是给别的项目用的库。**重开参数**：任一 kernel 类型发布到 crates.io 的那天——那天起工作区之外才有读者，兼容性才第一次值钱。kernel 已随 `cargo install sprawling` 发布，这一条件已经成立，而这条判定还没有按发布之后的情形重新论证。
+这条判定成立的前提是工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。ARCHITECTURE.md §3 写明：每个包都发布到 crates.io，只因为 `cargo install sprawling` 从 registry 构建二进制，而 crates.io 要求它的每个依赖都在那里（`crates/sprawling/spec/Doctor.lean` §8-157）；这些包是一个二进制的部件，不是给别的项目用的库。发布之后这条判定照旧成立：发布只为 `cargo install`，没有对任何外部读者承诺兼容性，所以开放枚举仍买不到东西，却要每个工作区读者写打不到的通配臂（AGENTS.md 要求 match 不带通配臂）。**重开参数**：任一 kernel 类型作为库提供给别的项目、并为它承诺 semver 兼容的那天；单是发布到 crates.io 不算。
 
 外部开放枚举（`serde_json::Value`、`std::io::ErrorKind`、`git2::Delta`、tungstenite 的帧类型）与 `EventKind` 这样的词汇表仍会逼出通配臂：前者不归我们关，后者穷举一遍就是 `EventKind` 的第二份拷贝。这两类各带 `#[expect(clippy::wildcard_enum_match_arm, reason = …)]`，理由写在当处；除此之外通配臂即红。
 
