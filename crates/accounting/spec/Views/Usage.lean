@@ -47,8 +47,8 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 - **导出**的列与格式照 wire D33；JSONL 与 CSV 由同一张行表写出，行表由 `skills` 与 `mcp` 两个答复展开。
 - **三个平台**：只读账本与书架，Windows、macOS 与 Linux 相同；CSV 的 `\r\n` 是 RFC 4180 的。
 - **工具的使用证据**（`Query::Catalog`，wire §8-99）：同一遍里每一行 `run_started` 记下它的 run 与开在的地址，每一行 `tool_called` 按它记的工具名归到它的 run，留下最后一次的时刻；经 `tool` 的 `run` 调用的一行记的是那件工具本身（runtime §8-61），所以数的是能力而不是门。`tool_evidence` 取开在这栋楼或它的房间里、账上最新的至多 `window` 个 run，答每件工具被其中几个 run 调过、最后一次在何时，以及数过几个 run。
-- **能力一问**：`views::catalog` 在快照里只取这栋楼最新 run 第一行 `prompt_assembled` 的 `seq`（`Views::building_prompts`，由 `run_started` 的地址与第一行提示一起折出），放开之后读那一行的 `tools`、`city::load_config` 冻结的两张 `[catalog]` 表与 `tool_evidence`，按 `runtime::catalog::exposure` 算每一行的档位（D55）。地址不是楼、配置读不动、账本打不开都答 `Unavailable` 带原因；这栋楼还没有 run 时 `run` 为 `None`、行为空，不读账本。
-- 验收：`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats`；`views::usage::model_tests` 的两条 proptest 判模型的三条性质。
+- **能力一问**：`views::catalog` 在快照里只取这栋楼最新 run 第一行 `prompt_assembled` 的 `seq`（`Views::building_prompts`，由 `run_started` 的地址与第一行提示一起折出），「最新」按 `run_started` 在账上的先后算，不按提示落账的先后：run 在自己的模型通道上冻结提示，晚于它的 `run_started`，同一栋楼两个房间的 run 并行时，后开始的可能先冻结，而它冻下的工具表仍是较新的那张；放开之后读那一行的 `tools`、`city::load_config` 冻结的两张 `[catalog]` 表与 `tool_evidence`，按 `runtime::catalog::exposure` 算每一行的档位（D55）。地址不是楼、配置读不动、账本打不开都答 `Unavailable` 带原因；这栋楼还没有 run 时 `run` 为 `None`、行为空，不读账本。
+- 验收：`views::tests::newest_prompt::a_building_keeps_the_prompt_of_the_run_it_started_last`（两个房间的 run 先后开始、提示倒序落账，楼仍取后开始的那个 run）；`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats`；`views::usage::model_tests` 的两条 proptest 判模型的三条性质。
 -/
 
 /-! D49 使用表在答问时从账本折，不进 `Views` 的常驻折叠

@@ -19,7 +19,7 @@
 Catalog { building: Address },               // → Answer::Catalog(Box<CatalogAnswer>)
 pub struct CatalogAnswer {
     pub building: Address,
-    pub run: Option<RunId>,                  // 这栋楼最新一个冻结了提示的 run；第一个 run 之前为 None，tools 为空
+    pub run: Option<RunId>,                  // 这栋楼冻结了提示的 run 里最后开始的那个（按 run_started 的先后）；第一个 run 之前为 None，tools 为空
     pub core_bytes: u64,                     // 那个 run 的常驻工具数组的字节
     pub index_bytes: u64,                    // 那个 run 的休眠索引的字节
     pub runs_seen: u32,                      // 使用证据数过的 run 数：至多窗口，年轻的楼更少

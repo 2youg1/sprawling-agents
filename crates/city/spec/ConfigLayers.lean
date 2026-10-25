@@ -186,6 +186,7 @@ header = "x-api-key"
 
 ```rust
 pub fn write_catalog(city_root: &Path, building: &Address, table: &ExposureTable) -> Result<(), AxError>; // 楼那一级的整张表
+pub fn check_catalog(table: &ExposureTable) -> Result<(), AxError>;   // 读面与写面共用的那一个判定，一帧要写几项时先判它
 pub enum CitySetting<'a> { KeepWarm(KeepWarm), Effort(Effort), Catalog(&'a ExposureTable) }        // 城那一级经 write_city_setting
 ```
 
@@ -204,7 +205,7 @@ github = "off"
 - **两张表各自冻结，不整值上梯**：楼的表没提到的工具仍落到城的表，所以 `load` 把城与楼两级各自那张交给 `freeze`，`FrozenConfig.catalog` 持两张（`CatalogExposure { city, building }`），不是 `LayeredValue::resolve` 取最近的一张。
 - **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：不认的键（`tools`、`namespaces` 之外）；值不是三种拼写之一；`tools` 的键不合工具名的文法（`kernel::ToolName::parse`）；`namespaces` 的键不合命名空间的文法（ASCII 小写与数字，`kernel::ServerLabel::parse`，预留命名空间也合这条文法）。今天没有哪件工具叫这个名字不拒：一台服务器的工具随服务器来去，写下的表不该因为它今天没连上就失效。
 - **只写在城与楼两级**：房间那一级写 `[catalog]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Catalog`），恢复语指向楼或城的 `CONFIG.toml`。理由见 D34。
-- **写面整张替换**：楼页的能力节一次保存整张表（`crates/wire/Spec.lean` §8-99）。`write_catalog` 写楼那一级，城那一级经 `CitySetting::Catalog`；两者都先过读面同一个 `check`，再进 `change`，`change` 落盘前复读整份文本（§8-4b）。空表把 `catalog` 键整个拿掉，这一级回到继承：写一份与上一级相同的值，上一级以后改了这一级也不跟。
+- **写面整张替换**：楼页的能力节一次保存整张表（`crates/wire/Spec.lean` §8-99）。`write_catalog` 写楼那一级，城那一级经 `CitySetting::Catalog`；两者都先过读面同一个 `check`（对外名 `check_catalog`，一帧同时写别的会被拒的项时，调用方在落任何一项之前先用它判），再进 `change`，`change` 落盘前复读整份文本（§8-4b）。空表把 `catalog` 键整个拿掉，这一级回到继承：写一份与上一级相同的值，上一级以后改了这一级也不跟。
 - **属于 format 1**：`[catalog]` 与认得 `format` 的第一版同一版发布，不另登记一级 `Rung`（`crates/city/spec/Format.lean` §8-42 的加键规则从下一版起适用）。
 -/
 
