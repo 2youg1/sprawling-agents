@@ -188,7 +188,7 @@ pub fn model_notes(
     root.push(MODELS_DIR);
     let mut notes = Vec::new();
     for provider in names_in(&root)? {
-        for file in files_under(&root.join(&provider))? {
+        for file in files_under(&root.join(&provider), &mut Vec::new())? {
             let parts: Vec<&str> = file.iter().map(String::as_str).collect();
             if let Some(PromptDocument::ModelNote {
                 provider, model, ..
@@ -204,25 +204,38 @@ pub fn model_notes(
 
 /// Every file under `dir`, each as the names of the directories on the
 /// way to it and its own: a model id with a slash keeps its note in a
-/// directory of its own (`crates/city/spec/SpineFiles.lean`). A link is
-/// not followed, so the walk stays inside the reserved subtree.
-fn files_under(dir: &Path) -> Result<Vec<Vec<String>>, AxError> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(entries) => entries,
+/// directory of its own (`crates/city/spec/SpineFiles.lean`).
+///
+/// Links are followed, because the freeze follows them when it reads a
+/// note, and a list that stopped at a link would leave out a note every
+/// run on that model is sent. `above` holds the resolved directories on
+/// the way down, so a link back to one of them is not walked again; a
+/// link to nothing is not listed, as the freeze reads it as no note.
+fn files_under(dir: &Path, above: &mut Vec<PathBuf>) -> Result<Vec<Vec<String>>, AxError> {
+    let resolved = match std::fs::canonicalize(dir) {
+        Ok(resolved) => resolved,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(err) => return Err(storage(dir, &err)),
     };
+    if above.contains(&resolved) {
+        return Ok(Vec::new());
+    }
+    let entries = std::fs::read_dir(dir).map_err(|err| storage(dir, &err))?;
+    above.push(resolved);
     let mut files = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|err| storage(dir, &err))?;
         let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
             continue;
         };
-        let kind = entry
-            .file_type()
-            .map_err(|err| storage(&entry.path(), &err))?;
+        let path = entry.path();
+        let kind = match std::fs::metadata(&path) {
+            Ok(meta) => meta.file_type(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(storage(&path, &err)),
+        };
         if kind.is_dir() {
-            for mut below in files_under(&entry.path())? {
+            for mut below in files_under(&path, above)? {
                 below.insert(0, name.clone());
                 files.push(below);
             }
@@ -230,6 +243,7 @@ fn files_under(dir: &Path) -> Result<Vec<Vec<String>>, AxError> {
             files.push(vec![name]);
         }
     }
+    above.pop();
     Ok(files)
 }
 
