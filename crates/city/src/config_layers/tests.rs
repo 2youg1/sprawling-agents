@@ -408,4 +408,68 @@ fn every_transport_the_writer_emits_is_read_back_as_the_same_transport() {
     assert_eq!(load(dir.path(), &room).unwrap().mcp, servers);
 }
 
+/// A building and the city each state how tools reach a run; both tables
+/// are frozen whole, a room may not state one, and writing an empty table
+/// takes the key out so the layer inherits again (§8-4g).
+#[test]
+fn the_city_and_a_building_state_how_tools_reach_a_run_and_a_room_may_not() {
+    use kernel::config::{CatalogExposure, Exposure, ExposureTable};
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
+    let building = addr("lab");
+    let city_table = ExposureTable {
+        tools: [("plan".to_owned(), Exposure::Core)].into(),
+        namespaces: [("apps".to_owned(), Exposure::Off)].into(),
+    };
+    let building_table = ExposureTable {
+        tools: [("exec".to_owned(), Exposure::Dormant)].into(),
+        namespaces: std::collections::BTreeMap::new(),
+    };
+    write_city_setting(dir.path(), CitySetting::Catalog(&city_table)).unwrap();
+    write_catalog(dir.path(), &building, &building_table).unwrap();
+    assert_eq!(
+        load(dir.path(), &room).unwrap().catalog,
+        CatalogExposure {
+            city: city_table.clone(),
+            building: building_table,
+        }
+    );
+
+    write_catalog(dir.path(), &building, &ExposureTable::default()).unwrap();
+    let text = std::fs::read_to_string(path(dir.path(), &room, Layer::Building).unwrap()).unwrap();
+    assert!(
+        !text.contains("catalog"),
+        "an empty table takes the key out: {text}"
+    );
+    assert_eq!(
+        load(dir.path(), &room).unwrap().catalog,
+        CatalogExposure {
+            city: city_table,
+            building: ExposureTable::default(),
+        }
+    );
+
+    write(
+        &path(dir.path(), &room, Layer::Resident).unwrap(),
+        "[catalog.tools]
+exec = \"off\"
+",
+    );
+    let refused = load(dir.path(), &room).unwrap_err();
+    assert!(
+        refused.subject().contains("[catalog]"),
+        "a room's table is refused where it is written: {refused:?}"
+    );
+    let misnamed = ExposureTable {
+        tools: [("not a tool".to_owned(), Exposure::Off)].into(),
+        namespaces: std::collections::BTreeMap::new(),
+    };
+    assert_eq!(
+        *write_catalog(dir.path(), &building, &misnamed)
+            .unwrap_err()
+            .code(),
+        AxCode::ConfigInvalid
+    );
+}
+
 mod container;

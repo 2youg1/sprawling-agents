@@ -301,6 +301,14 @@ impl Freezing<'_> {
             self.assemble_run_slot(site, at, &brief)?
                 .freeze(SegmentSlot::Run),
         )?;
+        // The tool table rides with the prefix: the array is kept in the
+        // store beside the four segments, and every `prompt_assembled`
+        // names it (`crates/runtime/Spec.lean` §8-60).
+        let table = held(&workbench.catalog, "read the catalog")?.tool_table()?;
+        self.cas
+            .put(&table.array)
+            .map_err(storage::StorageError::into_ax)?;
+        let prefix = prefix.with_tools(table.record);
         self.intern_prefix(&prefix)?;
 
         let plan = RunPlan {

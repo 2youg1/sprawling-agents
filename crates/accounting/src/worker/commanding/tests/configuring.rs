@@ -51,6 +51,7 @@ fn configure(search: SearchConfiguration, tag: &[u8]) -> wire::Command {
         keep_warm: Some(kernel::KeepWarm::FiveMinute),
         effort: None,
         search: Some(search),
+        catalog: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, tag),
     })
 }

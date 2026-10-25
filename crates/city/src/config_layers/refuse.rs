@@ -14,6 +14,7 @@ use kernel::layout::CONFIG_FILE;
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
 use super::agents::AGENT_KEY;
+use super::catalog::CATALOG_KEY;
 use super::ladder::Layer;
 use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
@@ -78,6 +79,10 @@ pub(super) enum Confined {
     /// building or a room that added one would start it for every room
     /// below (`crates/city/spec/ConfigLayers.lean` §8-4f).
     Agents,
+    /// The tool array sits ahead of the system prompt in a provider's
+    /// cache, so rooms of one building that exposed different tools would
+    /// split that building's cache (`crates/city/spec/ConfigLayers.lean` §8-4g).
+    Catalog,
 }
 
 impl Confined {
@@ -85,7 +90,7 @@ impl Confined {
     pub(super) fn nearest(self) -> Layer {
         match self {
             Confined::Shelves | Confined::Remote | Confined::Agents => Layer::City,
-            Confined::Search => Layer::Building,
+            Confined::Search | Confined::Catalog => Layer::Building,
         }
     }
 
@@ -101,6 +106,7 @@ impl Confined {
             Confined::Remote => REMOTE_KEY,
             Confined::Search => SEARCH_KEY,
             Confined::Agents => AGENT_KEY,
+            Confined::Catalog => CATALOG_KEY,
         }
     }
 
@@ -109,6 +115,10 @@ impl Confined {
             Confined::Shelves => "a shelf is mounted for every building at once",
             Confined::Remote => "the remote door opens onto the whole city",
             Confined::Agents => "an agent runs as the person, for every room that names it",
+            Confined::Catalog => {
+                "the tool array is cached ahead of the system prompt, and rooms of one \
+                 building that differed would split its cache"
+            }
             Confined::Search => {
                 "the settings page shows the city's and each building's choice, and a room's \
                 would govern runs it never shows"

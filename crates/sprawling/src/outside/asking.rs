@@ -271,7 +271,7 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
         Command::CloseRemoteDoor(_) => Ok(Verb::Close),
         Command::Dispatch { .. }
         | Command::ProbeEndpoint { .. }
-        | Command::ConfigureBuilding { .. }
+        | Command::ConfigureBuilding(_)
         | Command::AttachEndpoint { .. }
         | Command::SelectModel { .. }
         | Command::OpenSession { .. }

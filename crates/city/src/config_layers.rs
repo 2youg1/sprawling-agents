@@ -34,6 +34,7 @@ use clock::ClockSection;
 use context::ContextSection;
 mod agents;
 mod cache;
+mod catalog;
 mod city_layer;
 mod clock;
 mod context;
@@ -50,6 +51,7 @@ mod write;
 
 pub use agents::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use cache::keep_warm;
+pub use catalog::write_catalog;
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};
@@ -104,6 +106,8 @@ pub struct ConfigLayer {
     remote: Option<RemoteRoute>,
     /// The ACP agents the person added (§8-4f); refused on every other rung.
     agents: Option<Vec<AgentRow>>,
+    /// How each admitted tool reaches a run (§8-4g); refused on a room's rung.
+    catalog: Option<kernel::config::ExposureTable>,
 }
 
 impl ConfigLayer {
@@ -196,6 +200,7 @@ impl ConfigLayer {
             naming: file.identity.map(|section| section.version),
             remote: file.remote.map(remote::stated).transpose()?,
             agents: file.agent.map(agents::rows).transpose()?,
+            catalog: file.catalog.map(catalog::stated).transpose()?,
         })
     }
 
@@ -273,6 +278,7 @@ impl ConfigLayer {
             self.remote.as_ref().map(|_| Confined::Remote),
             self.search.as_ref().map(|_| Confined::Search),
             self.agents.as_ref().map(|_| Confined::Agents),
+            self.catalog.as_ref().map(|_| Confined::Catalog),
         ]
         .into_iter()
         .flatten()
@@ -303,6 +309,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
         mcp: ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
         second_threshold: ladder.resolve(|layer| layer.second_threshold),
         search: ladder.resolve(|layer| layer.search().cloned()),
+        catalog: ladder.resolve(|layer| layer.catalog().cloned()),
     }))
 }
 
@@ -338,6 +345,8 @@ pub(crate) struct ConfigFile {
     remote: Option<RemoteRoute>,
     #[serde(default)]
     agent: Option<Vec<agents::AgentSection>>,
+    #[serde(default)]
+    catalog: Option<catalog::CatalogSection>,
 }
 
 /// The `[identity]` table: the version of the names a session froze,

@@ -25,6 +25,7 @@ use crate::preference::PreferencesAnswer;
 mod agents;
 mod automation;
 mod building;
+mod catalog;
 mod commits;
 mod config;
 mod cost;
@@ -71,6 +72,7 @@ pub use agents::{
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine, TemplateAnswer};
+pub use catalog::{CatalogAnswer, CatalogTool};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,
@@ -254,6 +256,8 @@ pub enum Answer {
     Template(Box<TemplateAnswer>),
     /// The prompt documents of the next run at an address (`Query::Layers`).
     Layers(Box<LayersAnswer>),
+    /// How each tool a building admits reaches its runs (`Query::Catalog`).
+    Catalog(Box<CatalogAnswer>),
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
     SkillUsage(Box<SkillUsageAnswer>),

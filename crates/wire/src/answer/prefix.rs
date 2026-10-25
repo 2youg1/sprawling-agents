@@ -69,6 +69,10 @@ pub struct PrefixAnswer {
     pub run: RunId,
     /// City, building, resident, run - always four, in that order.
     pub segments: Vec<PrefixSegment>,
+    /// The tool table the run's requests carried ahead of the four
+    /// segments, as its `prompt_assembled` recorded it; `None` for a run
+    /// frozen before the table was recorded.
+    pub tools: Option<kernel::event::record::PromptTools>,
 }
 
 /// One object of the content store, cut to what travels.

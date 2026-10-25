@@ -50,6 +50,7 @@ fn genesis_lines_keep_their_bytes() {
             mcp: false,
             desktop: false,
             context: true,
+            catalog: false,
         },
         r#"{"addr":"lab","context":true,"desktop":false,"mcp":false,"sandbox":true}"#,
     );

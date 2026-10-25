@@ -110,5 +110,6 @@ pub use skill::{AuditSource, AuditVerdict, ShelvedFrom, SkillAudited, SkillShelv
 pub use tool::{Rendering, ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
-    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,
+    PromptSkip, PromptSource, PromptTool, PromptTools, ShapeChanged, ShapePart, SkipReason,
+    SteerReceived,
 };

@@ -122,7 +122,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     assert!(!before.sandbox.shell, "the shell arm is off by default");
 
     worker
-        .handle(wire::Command::ConfigureBuilding {
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
             addr: room.clone(),
             sandbox: Some(kernel::SandboxLimits {
                 shell: true,
@@ -143,8 +143,9 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
             }]),
             desktop: None,
             context_second_threshold: None,
+            catalog: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"reach"),
-        })
+        }))
         .unwrap();
 
     // The ladder is the authority: what a run in the room resolves
@@ -195,14 +196,15 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
 
     let allowlist = "[[window]]\ntitle = \"kusanagi\"\n";
     worker
-        .handle(wire::Command::ConfigureBuilding {
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
             addr: lab.clone(),
             sandbox: None,
             mcp: None,
             desktop: Some(allowlist.to_owned()),
             context_second_threshold: None,
+            catalog: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"desktop"),
-        })
+        }))
         .unwrap();
 
     let at = city::desktop_scope_path(dir.path(), &lab);

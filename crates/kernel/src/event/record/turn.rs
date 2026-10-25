@@ -34,6 +34,51 @@ pub struct PromptAssembled {
     /// before the plan existed holds the four slot names here instead.
     #[serde(default)]
     pub breakpoints: Vec<String>,
+    /// The tool table the request carried and every tool the building
+    /// admitted beside it (`crates/runtime/spec/Catalog.lean` §8-60).
+    /// Absent on a line written before the table was recorded, and on
+    /// a prefix assembled without a catalog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<PromptTools>,
+}
+
+/// The tools a run was frozen with: the array every request carries,
+/// kept whole in the content store, and one row per tool the assembler
+/// built, whatever its exposure.
+///
+/// A row is written for an `Off` tool as well, because the page that
+/// turns a tool back on reads its rows here: a tool that was not admitted
+/// is still one the building could admit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PromptTools {
+    /// The BLAKE3 of the core tool array as the catalog serialises it,
+    /// which the content store holds under this hash.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub hash: B3Hash,
+    /// Bytes of that array.
+    pub len: u64,
+    /// Bytes of the dormant index in the resident segment.
+    pub index: u64,
+    /// One row per tool, in name order.
+    pub rows: Vec<PromptTool>,
+}
+
+/// One tool of a frozen table.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PromptTool {
+    pub name: String,
+    /// The namespace the catalog files it under.
+    pub namespace: String,
+    pub exposure: crate::config::Exposure,
+    pub from: crate::config::ExposureFrom,
+    /// Bytes of this tool's definition as the array spells it, counted
+    /// whatever its exposure: what moving it into the core would add.
+    pub len: u64,
+    /// The first sentence of its description, cut as the dormant index
+    /// cuts a hint.
+    pub hint: String,
 }
 
 /// One frozen segment, as `prompt_assembled` states it.

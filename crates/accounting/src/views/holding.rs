@@ -122,6 +122,13 @@ pub struct Views {
     /// prompt a page asks for is one ledger line rather than a walk
     /// back through the whole run.
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
+    /// Where each building's newest run's first `prompt_assembled` sits,
+    /// so the capabilities a page asks for are one ledger line
+    /// (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    pub(super) building_prompts: std::collections::BTreeMap<Address, kernel::Seq>,
+    /// The room each started run opened in, until its first prompt is
+    /// folded: the prompt line carries no address, its run's start does.
+    pub(super) unprompted: std::collections::BTreeMap<kernel::RunId, Address>,
     /// Each address's stretches, so a room's sessions are answered without
     /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
@@ -232,6 +239,8 @@ impl Views {
             next_unfolded: kernel::Seq::FIRST,
             index,
             first_prompts: std::collections::BTreeMap::new(),
+            building_prompts: std::collections::BTreeMap::new(),
+            unprompted: std::collections::BTreeMap::new(),
             sessions: super::sessions::RoomSessions::default(),
             saves: super::versions::DocumentSaves::default(),
             plans,
@@ -366,6 +375,9 @@ impl Views {
             Holding::RunStarted => {
                 self.fold_predecessor(record);
                 self.fold_skill_pins(record);
+                if let Some(addr) = record.addr() {
+                    self.unprompted.insert(record.run(), addr.clone());
+                }
             }
             Holding::Asset => {
                 if let Some(line) = registry_line(record) {
@@ -375,9 +387,19 @@ impl Views {
             Holding::Ruling => self.fold_ruling(record)?,
             Holding::Document => self.saves.absorb(record)?,
             Holding::Prompt => {
-                self.first_prompts
-                    .entry(record.run())
-                    .or_insert(record.seq());
+                if let std::collections::btree_map::Entry::Vacant(first) =
+                    self.first_prompts.entry(record.run())
+                {
+                    first.insert(record.seq());
+                }
+                if let Some(building) = self
+                    .unprompted
+                    .remove(&record.run())
+                    .and_then(|room| city::Building::of(&room).ok())
+                {
+                    self.building_prompts
+                        .insert(building.addr().clone(), record.seq());
+                }
             }
             Holding::Nothing => {}
         }

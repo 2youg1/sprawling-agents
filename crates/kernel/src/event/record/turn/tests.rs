@@ -90,6 +90,7 @@ fn a_prompt_line_writes_the_bytes_the_hand_written_map_wrote() {
             .into_iter()
             .map(str::to_owned)
             .collect(),
+        tools: None,
     };
     let typed = Payload::of(&assembled).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand_written_prompt(&hash)));

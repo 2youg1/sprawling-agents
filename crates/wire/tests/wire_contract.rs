@@ -46,7 +46,7 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 49, "command table");
-    assert_eq!(QUERY_NAMES.len(), 62, "query table");
+    assert_eq!(QUERY_NAMES.len(), 63, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -56,7 +56,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 62, "query names are distinct");
+    assert_eq!(sorted.len(), 63, "query names are distinct");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 69,
+        WIRE_V, 70,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "423d9007f42ac99f7ef7bbf3e26966f802d77b211df0e114903829c85e6172ab";
+const WIRE_SCHEMA_GOLDEN: &str = "8bc47ef8ba6c205a854f7796b5c85e210b548763f9035a51636aae079c613c03";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "330fe06c9b792463b63c2bdfe93848cf6035ed2fe8eae881341e265b1de7bb53";
+const WIRE_SHAPE_GOLDEN: &str = "0c049238b05a97cb217ee5b25529c1c32797f31f09dd0d325295f2375a4cb3a5";
 
 // -------------------------------------------------------------- binding face
 
@@ -425,6 +425,7 @@ fn sample_of_every_command() -> Vec<Command> {
             keep_warm: Some(kernel::KeepWarm::FiveMinute),
             effort: None,
             search: Some(kernel::config::SearchConfiguration::Off),
+            catalog: None,
             idem,
         }),
         Command::PutRange(wire::RangeWrite {
@@ -464,7 +465,7 @@ fn sample_of_every_command() -> Vec<Command> {
             .to_owned(),
             idem,
         },
-        Command::ConfigureBuilding {
+        Command::ConfigureBuilding(wire::BuildingSettings {
             addr: Address::parse("lab").unwrap(),
             sandbox: Some(kernel::SandboxLimits::default()),
             mcp: Some(Vec::new()),
@@ -475,8 +476,12 @@ title = \"a window\"
                 .to_owned(),
             ),
             context_second_threshold: None,
+            catalog: Some(kernel::config::ExposureTable {
+                tools: [("exec".to_owned(), kernel::config::Exposure::Dormant)].into(),
+                namespaces: [("apps".to_owned(), kernel::config::Exposure::Off)].into(),
+            }),
             idem,
-        },
+        }),
         Command::ProbeEndpoint {
             name: ProviderName::parse("house").unwrap(),
             base_url: "https://api.example.test/v1".to_owned(),

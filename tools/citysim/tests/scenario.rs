@@ -43,6 +43,7 @@ fn quiet_config() -> FrozenConfig {
         effort: None,
         second_threshold: None,
         search: kernel::config::SearchConfiguration::Default,
+        catalog: kernel::config::CatalogExposure::default(),
     }
 }
 
@@ -461,6 +462,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             effort: None,
             second_threshold: None,
             search: kernel::config::SearchConfiguration::Default,
+            catalog: kernel::config::CatalogExposure::default(),
         },
         // The real net over the real tree: a checkpoint before every wave.
         checkpoint: Some((

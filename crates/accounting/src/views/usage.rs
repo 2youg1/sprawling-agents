@@ -12,7 +12,9 @@
 //! server. The fold reads the ledger alone; the shelves and the
 //! configuration are read once the fold is done, by [`UsageAsk::answer`].
 //! The same pass hands every tool result to `runtime::ShellTally`, whose
-//! reading is the shell table (wire D48).
+//! reading is the shell table (wire D48), and files every call by the
+//! tool it names, which is the evidence `Query::Catalog` reads
+//! ([`Usage::tool_evidence`], accounting D55).
 
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -133,6 +135,21 @@ pub(crate) struct Usage {
     audits: BTreeMap<String, Vec<(B3Hash, AuditVerdict, Seq)>>,
     outcomes: BTreeMap<(RunId, String), wire::UseOutcome>,
     shells: runtime::ShellTally,
+    /// Every run that started at an address, in ledger order.
+    started: Vec<(RunId, Address)>,
+    /// The tools each run called, each with the moment of its last call.
+    /// A `tool` `run` line records the tool it stood for, so this counts
+    /// capabilities rather than the door they were reached through.
+    tool_calls: BTreeMap<RunId, BTreeMap<String, TimeMs>>,
+}
+
+/// How a building's newest runs used its tools.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ToolEvidence {
+    /// How many runs the counts were taken over.
+    pub(crate) runs_seen: u32,
+    /// Per tool: in how many of those runs it was called, and when last.
+    pub(crate) by_tool: BTreeMap<String, (u32, TimeMs)>,
 }
 
 impl UsageAsk {
@@ -192,7 +209,7 @@ impl LedgerAsk {
     /// Every record from the first to the tail, folded. A line that will
     /// not read ends the fold rather than emptying it: what was read is
     /// still true, the rule `history` follows.
-    fn usage(&self) -> Result<Usage, storage::StorageError> {
+    pub(super) fn usage(&self) -> Result<Usage, storage::StorageError> {
         let (index, dir) = self.indexed()?;
         let Some(tail) = index.tail_seq() else {
             return Ok(Usage::default());
@@ -243,6 +260,9 @@ impl Usage {
         if kind == EventKind::RunStarted
             && let Ok(started) = record.data().read::<RunStarted>()
         {
+            if let Some(addr) = record.addr() {
+                self.started.push((record.run(), addr.clone()));
+            }
             self.pinned(record, started);
         } else if kind == EventKind::ToolCalled
             && let Ok(called) = record.data().read::<ToolCalled>()
@@ -326,8 +346,42 @@ impl Usage {
         }
     }
 
-    /// Files one call as a skill read, a server call, or nothing.
+    /// How `building`'s newest `window` runs used each tool: the runs
+    /// that started in it or in one of its rooms, newest last in the
+    /// ledger, and for each tool the runs among them that called it and
+    /// the moment of its last call there.
+    pub(crate) fn tool_evidence(&self, building: &Address, window: usize) -> ToolEvidence {
+        let within =
+            |addr: &Address| city::Building::of(addr).is_ok_and(|held| held.addr() == building);
+        let runs: Vec<RunId> = self
+            .started
+            .iter()
+            .rev()
+            .filter(|(_, addr)| within(addr))
+            .map(|(run, _)| *run)
+            .take(window)
+            .collect();
+        let mut by_tool: BTreeMap<String, (u32, TimeMs)> = BTreeMap::new();
+        for calls in runs.iter().filter_map(|run| self.tool_calls.get(run)) {
+            for (tool, at) in calls {
+                let seen = by_tool.entry(tool.clone()).or_insert((0, *at));
+                seen.0 = seen.0.saturating_add(1);
+                seen.1 = seen.1.max(*at);
+            }
+        }
+        ToolEvidence {
+            runs_seen: u32::try_from(runs.len()).unwrap_or(u32::MAX),
+            by_tool,
+        }
+    }
+
+    /// Files one call as a skill read, a server call, or nothing, and
+    /// under the tool it names.
     fn called(&mut self, record: &EventRecord, called: &ToolCalled) {
+        self.tool_calls
+            .entry(record.run())
+            .or_default()
+            .insert(called.name.as_str().to_owned(), record.t());
         let used = Use {
             run: record.run(),
             resident: record.addr().cloned(),

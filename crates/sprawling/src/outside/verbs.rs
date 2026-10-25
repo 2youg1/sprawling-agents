@@ -70,7 +70,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::ChangeRunPolicy(_)
         | wire::Command::PutSpine { .. } => VerbClass::Act,
         wire::Command::ProbeEndpoint { .. }
-        | wire::Command::ConfigureBuilding { .. }
+        | wire::Command::ConfigureBuilding(_)
         | wire::Command::AttachEndpoint { .. }
         | wire::Command::SelectModel { .. }
         | wire::Command::CreateBuilding { .. }

@@ -149,6 +149,7 @@ fn scenario(steps: u32, pauses: Pauses) -> Result<Scenario, AxError> {
             effort: None,
             second_threshold: None,
             search: kernel::config::SearchConfiguration::Default,
+            catalog: kernel::config::CatalogExposure::default(),
         },
         checkpoint: None,
         cancel: None,

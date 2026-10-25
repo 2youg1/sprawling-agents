@@ -18,6 +18,7 @@
 
 use std::path::Path;
 
+use kernel::event::record::PromptTools;
 use kernel::{Address, B3Hash, EventKind, EventRecord, Locator, RunId, Seq};
 
 use super::document::read_bytes;
@@ -53,27 +54,33 @@ impl PrefixAsk {
     /// would read as a run that was told nothing.
     pub(super) fn read(self) -> wire::Answer {
         match self.segments() {
-            Some(segments) => wire::Answer::Prefix(Box::new(wire::PrefixAnswer {
+            Some((segments, tools)) => wire::Answer::Prefix(Box::new(wire::PrefixAnswer {
                 run: self.run,
                 segments,
+                tools,
             })),
             None => unavailable(format!("Prefix({})", self.run)),
         }
     }
 
-    fn segments(&self) -> Option<Vec<wire::PrefixSegment>> {
+    /// The four segments, and the tool table the record names beside
+    /// them when it names one.
+    fn segments(&self) -> Option<(Vec<wire::PrefixSegment>, Option<PromptTools>)> {
         let record = self.first_prompt()?;
         let store = store(&self.ledger.city_root)?;
-        Some(
-            record
-                .data()
-                .as_map()
-                .get("segments")?
-                .as_array()?
-                .iter()
-                .filter_map(|row| segment_of(row, &store))
-                .collect(),
-        )
+        let data = record.data().as_map();
+        let segments = data
+            .get("segments")?
+            .as_array()?
+            .iter()
+            .filter_map(|row| segment_of(row, &store))
+            .collect();
+        // A table that will not read is left out rather than guessed at,
+        // as a segment row that will not read is.
+        let tools = data
+            .get("tools")
+            .and_then(|table| serde_json::from_value(table.clone()).ok());
+        Some((segments, tools))
     }
 
     /// The `prompt_assembled` record that opened this run.

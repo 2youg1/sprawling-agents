@@ -126,6 +126,9 @@ pub(super) enum Change<'a> {
     /// A room's resident named as this agent: the session record taken
     /// out as [`Change::Forget`] takes it, then `[resident] harness`.
     Seat(&'a str),
+    /// A layer's whole `[catalog]` table (§8-4g), already judged by the
+    /// reader's own check; an empty one takes the key out.
+    Catalog(&'a kernel::config::ExposureTable),
 }
 
 impl Change<'_> {
@@ -176,6 +179,14 @@ impl Change<'_> {
                     super::search::spelled(configuration, file)?,
                 );
             }
+            Change::Catalog(table) => match super::catalog::spelled(table, file)? {
+                Some(spelled) => {
+                    document.insert("catalog".to_owned(), spelled);
+                }
+                None => {
+                    document.remove("catalog");
+                }
+            },
             Change::Mcp(servers) => {
                 document.insert("mcp".to_owned(), toml::Value::Array(rows(servers)));
             }

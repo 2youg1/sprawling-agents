@@ -176,6 +176,9 @@ pub enum Prepared {
     Versions(super::versions::VersionsAsk),
     /// The prompt layers of one address, all of them read off the disk.
     Layers { city_root: PathBuf, addr: Address },
+    /// A building's tools: its newest run's table, the configuration and
+    /// the evidence of use, all read once the views are released.
+    Catalog(super::catalog::CatalogAsk),
     /// A reply's text the page sent, still to be laid out.
     Reply {
         text: String,
@@ -330,6 +333,7 @@ impl Prepared {
             Self::Stored(ask) => ask.answer(),
             Self::Versions(ask) => ask.answer(),
             Self::Layers { city_root, addr } => super::layers::layers_answer(&city_root, addr),
+            Self::Catalog(ask) => ask.answer(),
             Self::Building {
                 city_root,
                 addr,
