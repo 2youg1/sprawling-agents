@@ -6,7 +6,7 @@
 /-!
 # accounting::views::usage：skill 与 MCP 的使用表
 
-规定 `crates/accounting/src/views/usage.rs` 与它的三个子模块 `answers`、`export`、`shelves`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `crates/accounting/src/views/usage.rs` 与它的三个子模块 `answers`、`export`、`shelves`，以及读它的 `crates/accounting/src/views/catalog.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
 前半是接口与决定，后半是折叠的模型：一次读在没有钉住那件 skill 的 run 里不算使用，折叠只往使用列表的末尾加，每一次使用都有一个钉住它的 run。Rust 侧由 `accounting::views::usage::model_tests` 的 proptest 从同一个输入空间抽轨迹，判同三条性质。
 -/
@@ -23,7 +23,11 @@ impl Usage {
     pub(crate) fn skills(&self, shelves: &[Shelved], only: Option<&str>) -> wire::SkillUsageAnswer;
     pub(crate) fn mcp(&self, configured: &BTreeSet<String>, only: Option<&str>) -> wire::McpUsageAnswer;
     pub(crate) fn shells(&self) -> wire::ShellsAnswer;
+    pub(crate) fn tool_evidence(&self, building: &Address, window: usize) -> ToolEvidence;  // §8-34 末两条，D55
 }
+pub(crate) struct ToolEvidence { pub(crate) runs_seen: u32, pub(crate) by_tool: BTreeMap<String, (u32, TimeMs)> }
+// accounting::views::catalog
+pub struct CatalogAsk { /* 楼、它最新 run 第一行 prompt_assembled 的 seq、LedgerAsk —— 私有 */ }   // Query::Catalog 在快照放开后答
 // accounting::views::usage::export
 pub(super) fn skill_rows(answer: &wire::SkillUsageAnswer) -> Vec<Row>;
 pub(super) fn mcp_rows(answer: &wire::McpUsageAnswer) -> Vec<Row>;
@@ -42,6 +46,8 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 - **从没用过的 MCP 服务器**：每栋楼的配置（`city::load_config`）里列出的服务器各有一项，没有用过的工具表为空；此刻提供哪些工具要一次握手，那是 `McpHealth` 的问题。
 - **导出**的列与格式照 wire D33；JSONL 与 CSV 由同一张行表写出，行表由 `skills` 与 `mcp` 两个答复展开。
 - **三个平台**：只读账本与书架，Windows、macOS 与 Linux 相同；CSV 的 `\r\n` 是 RFC 4180 的。
+- **工具的使用证据**（`Query::Catalog`，wire §8-99）：同一遍里每一行 `run_started` 记下它的 run 与开在的地址，每一行 `tool_called` 按它记的工具名归到它的 run，留下最后一次的时刻；经 `tool` 的 `run` 调用的一行记的是那件工具本身（runtime §8-61），所以数的是能力而不是门。`tool_evidence` 取开在这栋楼或它的房间里、账上最新的至多 `window` 个 run，答每件工具被其中几个 run 调过、最后一次在何时，以及数过几个 run。
+- **能力一问**：`views::catalog` 在快照里只取这栋楼最新 run 第一行 `prompt_assembled` 的 `seq`（`Views::building_prompts`，由 `run_started` 的地址与第一行提示一起折出），放开之后读那一行的 `tools`、`city::load_config` 冻结的两张 `[catalog]` 表与 `tool_evidence`，按 `runtime::catalog::exposure` 算每一行的档位（D55）。地址不是楼、配置读不动、账本打不开都答 `Unavailable` 带原因；这栋楼还没有 run 时 `run` 为 `None`、行为空，不读账本。
 - 验收：`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats`；`views::usage::model_tests` 的两条 proptest 判模型的三条性质。
 -/
 
@@ -54,6 +60,17 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 **被否**：①常驻折叠：快照多一张表，`VIEWS_FOLD_RULES` 进位，而这两页不常开；②按此刻的配置拆名字：服务器删掉后它的使用全变成「已移除」，且要握手；③凡 `<x>_<y>` 都归给服务器 `x`：城自己的工具名里也有 `_`（wire D33 ③）。
 
 **重开参数**：一座城的使用表答复超过 100 ms 时（wire D33），改成常驻折叠。
+-/
+
+/-! D55 能力一问读最新 run 记下的工具表，使用证据数这栋楼最新的 50 个 run
+
+**决定**：`Query::Catalog` 的行取这栋楼最新 run 的 `prompt_assembled.tools`，不在答问时装配工作台；档位用此刻盘上的表经 runtime 的同一个函数算。使用证据在 D49 的同一遍账本折叠里数：这栋楼最新的至多 50 个 run 里，每件工具被几个 run 调过、最后一次何时。`Views` 只多两张小表（每栋楼一个 `seq`，以及还没折到第一行提示的 run 的地址），用来一步找到那一行。
+
+**理由**：装配一次工作台要与这栋楼的每台 MCP 服务器握手，还可能起浏览器，只为了画一个页面；最新 run 记下的表就是这栋楼此刻真实建得出的工具，差别只在上一个 run 之后新加的服务器，那要到下一个 run 才出现，页面照实写。按 run 数而不按次数，是因为一件工具在一个 run 里调一百次与调一次对「这栋楼还用不用它」是同一个答案；50 个 run 覆盖一栋常用的楼几天的工作，又让一次重构之前的旧习惯在几十个 run 之后退出窗口。
+
+**被否**：①答问时装配：见理由；②证据按天或按次数：一件只在长 run 里被反复调用的工具会显得比每个 run 都用一次的工具更重要；③把证据做成常驻折叠：D49 的理由照旧成立，能力节只在人打开时问。
+
+**重开参数**：窗口内的 run 常常多于 50 而人觉得证据过时，或一问的答复超过 100 ms（与 D49 同一个数）。
 -/
 
 namespace Accounting.Views.Usage

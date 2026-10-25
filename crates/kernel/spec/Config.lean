@@ -6,7 +6,7 @@
 /-!
 # kernel::config
 
-规定 `kernel::config`（`crates/kernel/src/config.rs`、`crates/kernel/src/config/interpreter.rs` 与 `crates/kernel/src/config/search.rs`）：分层配置与 Run 起点冻结的那一份。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::config`（`crates/kernel/src/config.rs`、`crates/kernel/src/config/interpreter.rs`、`crates/kernel/src/config/search.rs` 与 `crates/kernel/src/config/exposure.rs`）：分层配置与 Run 起点冻结的那一份。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::config::tests` 守住。
 -/
@@ -24,19 +24,28 @@ pub struct FrozenConfig {                                            // Run 起�
     pub sandbox: SandboxLimits, pub mcp: Vec<McpServer>,
     pub effort: Option<Effort>, pub second_threshold: Option<SecondThreshold>,
     #[serde(default)] pub search: SearchConfiguration,               // 缺省 Default
+    #[serde(default)] pub catalog: CatalogExposure,                  // 城与楼两张 [catalog] 表；缺省两张空表
 }
 pub struct LiveConfig {}                                             // 热载面；今天没有字段
 pub struct StatedConfig {                                            // 梯子上每个关切各一格，一起交给 freeze
     pub clock_stamp: LayeredValue<ClockStampGranularity>, pub clock_zones: LayeredValue<Vec<ClockZone>>,
     pub effort: LayeredValue<Effort>, pub sandbox: LayeredValue<SandboxLimits>,
     pub mcp: LayeredValue<Vec<McpServer>>, pub second_threshold: LayeredValue<SecondThreshold>,
-    pub search: LayeredValue<SearchConfiguration>,
+    pub search: LayeredValue<SearchConfiguration>, pub catalog: LayeredValue<ExposureTable>,
 }
 pub fn freeze(stated: &StatedConfig) -> FrozenConfig;
+
+// kernel::config::exposure
+pub enum Exposure { Core, Dormant, Off }                              // 文件与线上写 "core" | "dormant" | "off"
+pub struct ExposureTable { pub tools: BTreeMap<String, Exposure>, pub namespaces: BTreeMap<String, Exposure> }
+pub enum ExposureFrom { Fixed, Default, City, Building }
+pub struct CatalogExposure { pub city: ExposureTable, pub building: ExposureTable }
+impl CatalogExposure { pub fn stated(&self, tool: &str, namespace: &str) -> Option<(Exposure, ExposureFrom)>; }
 ```
 
 - **`freeze` 收一个 `StatedConfig`，不收七个参数**：每个关切的 `LayeredValue` 总是一起从 `city::load_config` 走到 `freeze`，一起走的值是一个具名的值；`search` 是第七个关切，七个参数会越过每个函数四个参数的上限。加一个关切因此是 `StatedConfig` 多一个字段，`freeze` 的签名不再变。
 
+- **工具的档位（config）**：`Exposure` 是截断锁的三档（`crates/runtime/spec/Catalog.lean` §8-60）：`Core` 每次请求都带它的定义，`Dormant` 在休眠索引里占它命名空间的一行、经 `tool` 调用，`Off` 不准入。`ExposureTable` 是一级 `[catalog]` 表照写下的样子：工具名到档位、命名空间到档位。`FrozenConfig.catalog` 持城与楼两张，不是梯子上最近的一整张：楼没提到的工具仍落到城的表（city D34）。`CatalogExposure::stated` 是两张表读法的唯一一处：楼的工具键、楼的命名空间键、城的工具键、城的命名空间键依次，先说的算，并答说它的是哪一级；都不说时答 `None`，由 `runtime::catalog::exposure` 取缺省（runtime D111）。`ExposureFrom` 的 `Fixed` 与 `Default` 两臂由 runtime 填，放在这里是因为记录与线上都要拼它，而拼法只该有一处。冻结的理由同 `mcp`：档位决定哪些定义进工具数组，provider 把它哈希在 system prompt 之前。
 - **无字段交集可机械判**：单测将两型缺省值 serde 成 JSON，断言键集交集为空；新增字段自动入判。
 - `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime D8）。
 

@@ -44,8 +44,12 @@ Dispatch { addr, task, goal, policy, idem, session, effort }   // 删去 budget:
 ### 8-26 `ConfigureBuilding` 长出 `desktop`：一栋楼的桌面白名单走同一条帧
 
 ```rust
-ConfigureBuilding { addr: Address, sandbox: Option<SandboxLimits>, mcp: Option<Vec<McpServer>>,
-                    desktop: Option<String>, idem: IdemKey },
+ConfigureBuilding(BuildingSettings),
+pub struct BuildingSettings { pub addr: Address, pub sandbox: Option<SandboxLimits>,
+                              pub mcp: Option<Vec<McpServer>>, pub desktop: Option<String>,
+                              pub context_second_threshold: Option<u64>,           // §8-45
+                              pub catalog: Option<ExposureTable>,                  // §8-99
+                              pub idem: IdemKey }
 ```
 
 - **不新起一条命令，也不给 `GovernedDocument` 加变体**。这条帧问的本来就是「这栋楼的 runs 够得到什么」——沙箱、外部服务器、运行中的机器上的哪些窗口，是同一个问题的三面；各自可缺省，缺省即不动那一面。而 `GovernedDocument` 是**城**的三份文件（`<city>/.sprawling/`），桌面白名单是**楼**的（`<building>/.sprawling/`）：把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数（`crates/city/Spec.lean` §8-26 已写下这条）。
@@ -67,7 +71,7 @@ ConfigureBuilding { addr: Address, sandbox: Option<SandboxLimits>, mcp: Option<V
 -/
 
 /-!
-### 8-45 `ConfigureBuilding` 长出第二道阈值的面
+### 8-45 `ConfigureBuilding` 长出第二道阈值的面（第五个面 `catalog` 见 §8-99）
 
 `Command::ConfigureBuilding` 多一个可选字段 `context_second_threshold: Option<u64>`，`Query::Config` 的回答多一个 `second: Option<SettledSecond>`；schema 哈希随之变，故同集进位 36→37。
 

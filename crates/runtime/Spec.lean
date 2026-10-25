@@ -354,6 +354,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D108 | read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配 | `crates/runtime/spec/Rendering.lean` |
 | D109 | search 有三种模式，缺省仍是 content | `crates/runtime/spec/Tools/Search.lean` |
 | D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
+| D111 | 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结 | `crates/runtime/spec/Catalog.lean` |
 -/
 
 /-! ## 13 依赖选型
