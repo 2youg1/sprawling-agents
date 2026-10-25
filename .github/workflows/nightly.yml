@@ -274,5 +274,5 @@ jobs:
             fi
             body=$(printf '## What was published\n\n[%s](%s): %s\n\n\140Cargo.lock\140 holds \140%s\140 %s, which the advisory covers.\n\n## What to do\n\n%s. A move inside the semver range changes \140Cargo.lock\140 only; a move across it is a change of its own. Close this issue with the pull request that moves it.\n\nFiled by the nightly \140advisories\140 job.' \
               "$id" "$url" "$title" "$crate" "$locked" "$solution")
-            gh issue create --title "$name" --label "aspect: security" --body "$body"
+            gh issue create --title "$name" --label "type: bug" --label "aspect: security" --body "$body"
           done < advisories.tsv
