@@ -318,6 +318,17 @@ wire shape golden 与客户端协议。-/
 **重开参数**：下一版若只有一两处线上改动，按 D1 照常各自进位即可。
 -/
 
+/-! D59 建楼页：`CreateBuilding` 带人写的规则，楼行标出可收编的文件夹，模板字节可先问
+
+**决定**：`CreateBuilding` 多一个 `rules: Option<String>`，`None` 照模板的字节，`Some` 是人在建楼页里写的整份 `RULES.toml`，城先求值、被拒什么都不落；新建还是收编由城看目录（city D32），帧不说。`BuildingProgress` 多一个必填的 `adoptable: bool`：顶层文件夹还没有规则，在它的地址上 `CreateBuilding` 就是收编它。新查询 `Template { template, addr }` 答 `TemplateAnswer { template, addr, rules }`，房间与保留子树答 `Unavailable`。`WIRE_V` 从 67 进到 68，同一个变更集重生 schema golden、wire shape golden 与 `client/src/wire.ts`。
+
+**理由**：#91 要一页填完、一次写下楼与它的规则。先 `CreateBuilding` 再 `PutRules` 是两次写，第二次被拒时一栋按模板规则立起的楼已经留在城里。页面不写也不判 TOML（城是这门语法唯一的读者），所以预填的字节要向城问，判定也在城里做。可收编的文件夹本来就在楼列表里（`city::buildings` 不要求规则），所以标在楼行上，而不是另开一张会与楼列表重复的清单。
+
+**被否**：另开 `Query::Adoptable` 列可收编的文件夹——它们已经在 `CityAnswer.buildings` 里，一屏上同一个文件夹会在两处出现；`rules` 用模板名之外的结构化开关表达——页面就要知道 `RULES.toml` 的键，那是第二个读者（结构化开关另立一步再定）。
+
+**重开参数**：建楼页要结构化的开关时，城给出一个改规则的值类型，帧改带它而不是整份文本。
+-/
+
 /-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
 
 **决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `tools/adversary/src/Sprawling/Door.lean` 的帧与 `tools/adversary/src/Sprawling/Regression.lean` 的渲染。
