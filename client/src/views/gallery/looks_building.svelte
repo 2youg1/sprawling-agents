@@ -53,7 +53,7 @@
     { at: Address.make(".sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "city", state: { sent: { bytes: 96 } }, shipped: null },
     { at: Address.make("shop/.sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "building", state: "absent", shipped: null },
   ];
-  const PROMPTS: PromptsLook = $derived({
+  const PROMPTS = $derived.by((): PromptsLook => ({
     rooms: [
       { label: "shop", current: false, onPress: still },
       { label: "shop/checkout", current: true, onPress: still },
@@ -73,7 +73,7 @@
     actionLabel: (action) => actionWord(action, $lang),
     actionName: (card, action) => actionName(card, action, $lang),
     onAction: still,
-  });
+  }));
   const TASK = "fix the checkout total";
 
   const MARKS: readonly { readonly name: string; readonly mark: TreeMark; readonly size: string | undefined }[] = [
