@@ -30,14 +30,16 @@
 
   // The sections of the index, in the order a person reads a building
   // by: what it set out to do, what it committed, what it has changed
-  // since, what it knows how to do, and what it is allowed to touch.
-  const SECTIONS = ["plan", "commits", "changes", "skills", "sandbox"] as const;
+  // since, what its runs are told, what it knows how to do, and what it
+  // is allowed to touch.
+  const SECTIONS = ["plan", "commits", "changes", "prompts", "skills", "sandbox"] as const;
   type Section = (typeof SECTIONS)[number];
 
   const SECTION_WORD: Record<Section, Key> = {
     plan: "bld_plan",
     commits: "bld_commits",
     changes: "bld_changes",
+    prompts: "bld_prompts",
     skills: "bld_skills",
     sandbox: "bld_sandbox",
   };
@@ -62,6 +64,7 @@
   import FileView from "./building/file.svelte";
   import Goal from "./building/goal.svelte";
   import Plan from "./building/plan.svelte";
+  import Prompts from "./building/prompts.svelte";
   import Sandbox from "./building/sandbox.svelte";
   import Skills from "./building/skills.svelte";
   import Status from "./building/status.svelte";
@@ -208,6 +211,8 @@
         <Commits building={address} />
       {:else if section === "changes"}
         <Status building={address} />
+      {:else if section === "prompts"}
+        <Prompts building={address} rooms={building?.rooms ?? []} />
       {:else if section === "skills"}
         <Skills building={address} onPick={pick} />
       {:else if section === "sandbox"}

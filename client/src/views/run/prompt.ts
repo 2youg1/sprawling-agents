@@ -18,7 +18,8 @@ import { fill, say } from "../../core/lang";
 import { count } from "../../core/time";
 import type { Address, PrefixSegment, PrefixSlot } from "../../wire";
 
-const SLOT_WORD: Record<PrefixSlot, Key> = {
+// Each slot's word, which the building page's prompts section reads too.
+export const SLOT_WORD: Record<PrefixSlot, Key> = {
   city: "slot_city",
   building: "slot_building",
   resident: "slot_resident",

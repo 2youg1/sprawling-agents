@@ -9,7 +9,7 @@
   // The building page's looks, each drawn from a value of its own type
   // with the states its seat hands it, so the roles and boxes each look
   // draws are read here rather than only inside a whole building page.
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import ArmSelect from "../building/arm_select.look.svelte";
   import { armSelectWire } from "../building/arm_select";
@@ -31,10 +31,49 @@
   import TreeRow from "../building/tree_row.look.svelte";
   import { treeRowWire } from "../building/tree_row";
   import type { TreeMark } from "../building/tree_row";
+  import Prompts from "../building/prompts.look.svelte";
+  import { actionName, actionWord, cardsOf } from "../building/prompts";
+  import type { PromptsLook } from "../building/prompts";
+  import { Address, B3Hash } from "../../wire";
+  import type { LayerDocument } from "../../wire";
   import Case from "./case.svelte";
 
   const { lang } = ui();
   const still = (): void => undefined;
+  const SHOP = Address.make("shop");
+  const VERSION = B3Hash.make("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262");
+  // One room's prompt documents: the city's City.md replaced by the
+  // building's, a project file withheld, an identity absent, and a note
+  // the building has no place of its own for yet.
+  const LAYERS: readonly LayerDocument[] = [
+    { at: Address.make("City.md"), version: VERSION, slot: "city", kind: "city", layer: "city", state: { replaced: { by: Address.make("shop/.sprawling/City.md") } }, shipped: { version: VERSION, standing: "edited" } },
+    { at: Address.make("shop/.sprawling/City.md"), version: VERSION, slot: "city", kind: "city", layer: "building", state: { sent: { bytes: 2048 } }, shipped: null },
+    { at: Address.make("shop/AGENTS.md"), version: VERSION, slot: "building", kind: "conventions", layer: "building", state: { withheld: { why: "AGENTS.md is a directory, not a file" } }, shipped: null },
+    { at: Address.make("shop/checkout/URBANITE.md"), version: VERSION, slot: "resident", kind: "identity", layer: "room", state: "absent", shipped: null },
+    { at: Address.make(".sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "city", state: { sent: { bytes: 96 } }, shipped: null },
+    { at: Address.make("shop/.sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "building", state: "absent", shipped: null },
+  ];
+  const PROMPTS: PromptsLook = $derived({
+    rooms: [
+      { label: "shop", current: false, onPress: still },
+      { label: "shop/checkout", current: true, onPress: still },
+    ],
+    roomsLabel: say($lang, "prompts_rooms"),
+    heading: fill(say($lang, "prompts_last_run"), { room: "shop/checkout" }),
+    slots: [
+      { key: "city", slot: say($lang, "slot_city"), size: "2,048" },
+      { key: "building", slot: say($lang, "slot_building"), size: "1,310" },
+      { key: "resident", slot: say($lang, "slot_resident"), size: "4,120" },
+      { key: "run", slot: say($lang, "slot_run"), size: "512" },
+    ],
+    run: { label: say($lang, "prompts_open_run"), href: "#/run/00000000-0000-4000-8000-000000000001/prompt" },
+    note: say($lang, "prompts_next_run"),
+    documentsLabel: say($lang, "prompts_documents"),
+    cards: cardsOf(LAYERS, SHOP, $lang),
+    actionLabel: (action) => actionWord(action, $lang),
+    actionName: (card, action) => actionName(card, action, $lang),
+    onAction: still,
+  });
   const TASK = "fix the checkout total";
 
   const MARKS: readonly { readonly name: string; readonly mark: TreeMark; readonly size: string | undefined }[] = [
@@ -143,4 +182,8 @@
     <TextBox size="list" wire={textBoxWire("shop/**\ndocs/**", "paths", false, still)} />
     <TextBox size="document" wire={textBoxWire("# Plan\n\nFix the total.", "plan", true, still)} />
   </div>
+</Case>
+
+<Case label="building prompts · the newest run's slots and one room's documents, each with its steps">
+  <Prompts {...PROMPTS} />
 </Case>

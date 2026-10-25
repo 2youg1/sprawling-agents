@@ -59,8 +59,11 @@ const DRAFT_PAUSE_MS = 300;
 
 // The address a building's document is read at: the two joined, `null`
 // when the join is not an address the city reads.
+// A path that begins with `/` is the city's, from its root: the city's
+// own prompt documents open beside a building's page (client/Spec.lean
+// 4-50, its ninth part) though they sit in no building.
 export function documentAt(building: Address, path: string): Address | null {
-  return Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`));
+  return Option.getOrNull(Schema.decodeOption(Address)(path.startsWith("/") ? path.slice(1) : `${building}/${path}`));
 }
 
 // The sessions that hold words the city has not taken, by document and

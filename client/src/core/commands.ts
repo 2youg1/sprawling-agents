@@ -17,6 +17,7 @@ import type {
   AdmissionRequirement,
   ApprovalId,
   Autonomy,
+  B3Hash,
   Carry,
   Ceiling,
   Command,
@@ -35,6 +36,7 @@ import type {
   LandingPolicy,
   ModelTag,
   PreferencePatch,
+  PromptStep,
   PursuitStep,
   Restoration,
   RunId,
@@ -345,6 +347,14 @@ export { configureContext, configureDesktop, configureMcp, configureSandbox } fr
 // refused and the draft stays in the box.
 export function putDocument(which: GovernedDocument, base: string, body: string): Command {
   return { put_document: { which, base, body, idem: mintIdem() } };
+}
+
+// One whole-document step on a prompt document (wire D60): start this
+// layer's own copy, give it up, or write the default back, only while
+// the file is still the version `base` names. Editing its words is
+// `PutRange`.
+export function putPrompt(at: Address, base: B3Hash, step: PromptStep): Command {
+  return { put_prompt: { at, base, step, idem: mintIdem() } };
 }
 
 // One identity card. The city rewrites the card's keys in `base`'s

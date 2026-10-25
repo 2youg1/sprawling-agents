@@ -211,6 +211,126 @@
     "en": "changes",
     "zh": "变更"
   },
+  "bld_prompts": {
+    "en": "prompts",
+    "zh": "提示"
+  },
+  "prompts_rooms": {
+    "en": "rooms",
+    "zh": "房间"
+  },
+  "prompts_last_run": {
+    "en": "The newest run in {room} was sent, slot by slot:",
+    "zh": "{room} 里最新一个 run 收到的，按段："
+  },
+  "prompts_no_run": {
+    "en": "No run in {room} yet: the next run freezes its prompt when it starts.",
+    "zh": "{room} 里还没有 run：下一个 run 在开始时冻结它的提示。"
+  },
+  "prompts_open_run": {
+    "en": "open that run's prompt",
+    "zh": "打开那个 run 的提示"
+  },
+  "prompts_next_run": {
+    "en": "A change takes effect when the next run starts. A prompt changes only what the model is told; the gates still follow RULES.toml.",
+    "zh": "改动在下一个 run 开始时生效。提示只改变模型被告知什么，门照 RULES.toml 执行。"
+  },
+  "prompts_documents": {
+    "en": "prompt documents, in the order they are sent",
+    "zh": "提示文档，按发送的次序"
+  },
+  "prompts_layer_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "prompts_layer_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "prompts_layer_room": {
+    "en": "room",
+    "zh": "房间"
+  },
+  "prompts_kind_city": {
+    "en": "how the city works",
+    "zh": "这座城怎么运作"
+  },
+  "prompts_kind_conventions": {
+    "en": "the project's conventions",
+    "zh": "项目的约定"
+  },
+  "prompts_kind_identity": {
+    "en": "who the resident is",
+    "zh": "居民是谁"
+  },
+  "prompts_kind_note": {
+    "en": "the note for {model}",
+    "zh": "给 {model} 的提示"
+  },
+  "prompts_sent": {
+    "en": "sent · {n} bytes",
+    "zh": "送出 · {n} 字节"
+  },
+  "prompts_replaced": {
+    "en": "not sent: {by} replaces it",
+    "zh": "不送：被 {by} 替换"
+  },
+  "prompts_absent": {
+    "en": "not here",
+    "zh": "不在"
+  },
+  "prompts_withheld": {
+    "en": "not sent: {why}",
+    "zh": "不送：{why}"
+  },
+  "prompts_default_current": {
+    "en": "this build's default",
+    "zh": "当前默认"
+  },
+  "prompts_default_earlier": {
+    "en": "an earlier build's default",
+    "zh": "旧版默认"
+  },
+  "prompts_default_edited": {
+    "en": "edited",
+    "zh": "改过"
+  },
+  "prompts_open": {
+    "en": "open",
+    "zh": "打开"
+  },
+  "prompts_own": {
+    "en": "start one here",
+    "zh": "在这一层起一份"
+  },
+  "prompts_inherit": {
+    "en": "remove this copy",
+    "zh": "去掉这一份"
+  },
+  "prompts_restore": {
+    "en": "restore the default",
+    "zh": "恢复默认"
+  },
+  "prompts_action_on": {
+    "en": "{action} · {at}",
+    "zh": "{action} · {at}"
+  },
+  "prompts_inherit_title": {
+    "en": "Remove {at}?",
+    "zh": "去掉 {at}？"
+  },
+  "prompts_inherit_detail": {
+    "en": "The layer further out governs again from the next run. These words are not kept anywhere else.",
+    "zh": "从下一个 run 起由远一层的那一份管。这段文字不会另外保存。"
+  },
+  "prompts_restore_title": {
+    "en": "Restore {at} to this build's default?",
+    "zh": "把 {at} 恢复为本版默认？"
+  },
+  "prompts_restore_detail": {
+    "en": "The edited words are replaced; the Mayor's names stay.",
+    "zh": "改过的文字会被替换；Mayor 的名字保留。"
+  },
   "bld_clear": {
     "en": "clear",
     "zh": "清除"
@@ -882,6 +1002,10 @@
   "refrain_version_on_disk": {
     "en": "on disk now, written outside the page",
     "zh": "盘上此刻的一版，页面之外写下"
+  },
+  "refrain_version_shipped": {
+    "en": "this build's default",
+    "zh": "本版默认"
   },
   "refrain_version_outside": {
     "en": "written outside the page",
