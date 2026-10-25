@@ -73,6 +73,8 @@
   import { openFinder } from "./finding.svelte";
   import Rows from "./palette/rows.svelte";
   import Listening from "./talk/listening.svelte";
+  import { noteOf, waitWhy } from "./talk/branch_note";
+  import { branchInto } from "./talk/branching";
   import { askToSpeak } from "./talk/speak_asked";
   import { sessionHands } from "./talk/session_hands";
 
@@ -234,8 +236,14 @@
     }
     const answer = $city;
     if (answer !== undefined && "city" in answer) {
+      // A folder waiting to be adopted has no building page yet; it goes
+      // where the city page sends it, the raise page (4-50b).
       for (const building of answer.city.buildings) {
-        out.push(goTo({ kind: "building", address: building.addr }, building.addr, say($lang, "palette_building")));
+        out.push(
+          building.adoptable
+            ? goTo({ kind: "raise", address: building.addr }, building.addr, say($lang, "city_adoptable"))
+            : goTo({ kind: "building", address: building.addr }, building.addr, say($lang, "palette_building")),
+        );
       }
     }
     for (const room of $belief.rooms.keys()) {
@@ -335,7 +343,10 @@
   });
   const commands = $derived(grouped.flatMap((group) => group.entries));
 
-  // The rooms this conversation can go to, while `carrying`.
+  // The rooms this conversation can go to, while `carrying`. The box
+  // stays open until the city opens the branch, so the row that sent it
+  // can say it is opening, or why the city refused it (4-64b).
+  const branching = u.branches.held;
   const carried = $derived.by((): Entry[] => {
     const from = carryFrom;
     if (!carrying || here === null || from === null) return [];
@@ -345,14 +356,18 @@
       rooms: known,
       typed: Option.getOrNull(Schema.decodeOption(Address)(query.trim())),
       working: (room) => newestWorking($belief, room) !== undefined,
-    }).map((place) => ({
-      label: place.to,
-      hint: say($lang, "palette_carry_to"),
-      why: place.why,
-      act: () => {
-        u.branches.open(place.to, { run: from.run, at_seq: from.at }, () => undefined);
-      },
-    }));
+    }).map((place) => {
+      const opening = branchInto($branching, place.to);
+      return {
+        label: place.to,
+        hint: noteOf(opening, place.to, $lang, null)?.said ?? say($lang, "palette_carry_to"),
+        why: place.why ?? waitWhy(opening),
+        keeps: true,
+        act: () => {
+          u.branches.open(place.to, { kind: "branch", origin: { run: from.run, at_seq: from.at } }, onClose);
+        },
+      };
+    });
   });
 
   const shown = $derived.by((): Entry[] => {

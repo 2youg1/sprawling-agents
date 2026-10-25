@@ -34,6 +34,8 @@ describe("the session in main", () => {
 
   interface Held {
     readonly hands: SlashHands;
+    // The page's belief, which the test moves as the city would.
+    readonly belief: Writable<Belief>;
     readonly sent: Command[];
     readonly went: View[];
     readonly written: string[];
@@ -42,20 +44,29 @@ describe("the session in main", () => {
     readonly waiting: [Run, () => void][];
   }
 
+  // Hands as a page fills them: `/new` and `/compact` open their session
+  // through the page's one branch door, so main follows once the room
+  // holds a newer session and a refusal keeps it where it was (#120).
   function held(live: boolean, tagged: SessionTags | null = SESSION): Held {
     const sent: Command[] = [];
     const went: View[] = [];
     const written: string[] = [];
     const retagged: SessionTags[] = [];
     const waiting: [Run, () => void][] = [];
+    const belief = writable<Belief>({ ...EMPTY, sessions: { [ROOM]: Seq.make(3) } });
+    const command = (frame: Command): boolean => {
+      sent.push(frame);
+      return true;
+    };
+    const go = (view: View): void => {
+      went.push(view);
+    };
+    const branches = keepBranches({ belief, send: command, go });
     return {
-      sent, went, written, retagged, waiting,
+      belief, sent, went, written, retagged, waiting,
       hands: {
-        command: (command) => {
-          sent.push(command);
-          return true;
-        },
-        go: (view) => went.push(view),
+        command,
+        go,
         here: ROOM,
         live: live ? { run: GOING, at: Seq.make(9) } : null,
         newest: () => null,
@@ -72,6 +83,7 @@ describe("the session in main", () => {
           return true;
         },
         whenFrozen: (run, then) => waiting.push([run, then]),
+        openSession: (room, carry) => branches.open(room, { kind: "fresh", carry }, () => undefined),
       },
     };
   }
@@ -85,11 +97,29 @@ describe("the session in main", () => {
 
   const kinds = (sent: readonly Command[]): string[] => sent.flatMap((frame) => Object.keys(frame));
 
-  test("/compact with nothing running opens a session carrying the handoff and brings main to it", () => {
+  test("/new from an earlier session brings main to the room once the city opened the new one", () => {
+    const at = held(false);
+    run(at.hands, "/new");
+    const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry, frame.open_session.from]] : []));
+    expect([opened, at.went]).toEqual([[[ROOM, "nothing", null]], []]);
+    at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
+    expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
+  });
+
+  test("/new that the city refuses leaves main where it was", () => {
+    const at = held(false);
+    run(at.hands, "/new");
+    at.belief.update((belief) => ({ ...belief, refusal: BUSY }));
+    expect(at.went).toEqual([]);
+  });
+
+  test("/compact with nothing running opens a session carrying the handoff, and main follows once it is open", () => {
     const at = held(false);
     run(at.hands, "/compact");
     const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry]] : []));
-    expect([opened, at.went]).toEqual([[[ROOM, "handoff"]], [{ kind: "talk", address: ROOM }]]);
+    expect([opened, at.went]).toEqual([[[ROOM, "handoff"]], []]);
+    at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
+    expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
   });
 
   test("/compact stops the run going first and opens the session only once it froze", () => {
@@ -101,45 +131,6 @@ describe("the session in main", () => {
     expect(kinds(at.sent)).toEqual(["cancel", "open_session"]);
     const opened = at.sent[1];
     expect(opened !== undefined && "open_session" in opened ? opened.open_session.carry : null).toBe("handoff");
-  });
-
-  // `/new` sent through the page's one branch door, over a belief the
-  // test moves: main follows once the room holds a newer session, and a
-  // refusal keeps it where it was (#120).
-  function door(live: boolean): Held & { readonly belief: Writable<Belief> } {
-    const at = held(live);
-    const belief = writable<Belief>({ ...EMPTY, sessions: { [ROOM]: Seq.make(3) } });
-    const branches = keepBranches({
-      belief,
-      send: (command) => at.hands.command(command),
-      go: (view) => {
-        at.hands.go(view);
-      },
-    });
-    return {
-      ...at,
-      belief,
-      hands: {
-        ...at.hands,
-        openSession: (room: Address, carry: "nothing" | "handoff") => branches.open(room, { kind: "fresh", carry }, () => undefined),
-      },
-    };
-  }
-
-  test("/new from an earlier session brings main to the room once the city opened the new one", () => {
-    const at = door(false);
-    run(at.hands, "/new");
-    const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry, frame.open_session.from]] : []));
-    expect([opened, at.went]).toEqual([[[ROOM, "nothing", null]], []]);
-    at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
-    expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
-  });
-
-  test("/new that the city refuses leaves main where it was", () => {
-    const at = door(false);
-    run(at.hands, "/new");
-    at.belief.update((belief) => ({ ...belief, refusal: BUSY }));
-    expect(at.went).toEqual([]);
   });
 
   test("/tag and /untag change the session in main by one word, folded to lower case", () => {

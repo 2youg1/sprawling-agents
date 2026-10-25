@@ -30,5 +30,6 @@ export function sessionHands(u: Ui, room: Address | null, asked?: Seq): SessionH
     whenFrozen: (run, then) => {
       onceFrozen(u.conn.belief, run, then);
     },
+    openSession: (at, carry) => u.branches.open(at, { kind: "fresh", carry }, () => undefined),
   };
 }

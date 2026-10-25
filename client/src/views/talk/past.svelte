@@ -79,7 +79,7 @@
           {run}
           opens={at === 0}
           onFork={(plan: ForkPlan) => {
-            u.branches.open(address, plan.origin, () => {
+            u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
               if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
             });
           }}

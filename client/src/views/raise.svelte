@@ -51,7 +51,10 @@
   let template = $state<Exclude<Template, "hall">>("minimal");
   let rules = $state("");
   // Whether the person changed the rules: until then the box follows
-  // the template and the address.
+  // the template and the address. The rules belong to that pair, so a
+  // new address or template starts the box over from its bytes (4-50b):
+  // edited ordinary rules sent under the confidential template would
+  // raise the ordinary building the person had just turned away from.
   let edited = $state(false);
   // The raise in flight, and the refusal the city held when it left, so
   // only a newer one is read as this raise's answer.
@@ -66,12 +69,18 @@
   let offered = $state<string | null>(null);
   $effect(() => {
     const at = target;
+    const picked = template;
     offered = null;
+    edited = false;
+    rules = "";
     if (at === null) return;
-    return u.conn.asking.ask({ template: { template: TemplateName.make(template), addr: at } }).subscribe((answer) => {
+    return u.conn.asking.ask({ template: { template: TemplateName.make(picked), addr: at } }).subscribe((answer) => {
       offered = answer !== undefined && "template" in answer ? answer.template.rules : null;
     });
   });
+  // Whether the press sends rules the person has seen: their own, or the
+  // template's once the city has said what those are.
+  const ready = $derived(target !== null && (edited || offered !== null));
   $effect(() => {
     const text = offered;
     if (text !== null && !untrack(() => edited)) rules = text;
@@ -95,7 +104,7 @@
   });
 
   function raise(): void {
-    if (target === null || sent !== null) return;
+    if (target === null || !ready || sent !== null) return;
     refusal = null;
     const before = $belief.refusal;
     if (u.send(createBuilding(target, template, edited ? rules : null))) {
@@ -187,7 +196,11 @@
         tone="primary"
         loading={sent !== null}
         label={say($lang, raising.kind === "adopt" ? "raise_adopt" : "raise_build")}
-        {...target === null ? { why: say($lang, "raise_needs_address") } : {}}
+        {...target === null
+          ? { why: say($lang, "raise_needs_address") }
+          : ready
+            ? {}
+            : { why: say($lang, "raise_rules_waiting") }}
       />
     </div>
   </form>
