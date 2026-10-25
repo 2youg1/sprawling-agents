@@ -59,18 +59,18 @@
 
 <Case label="address line · a session, the lesson before the palette was ever opened, a long address cut in its building, a room with no session yet">
   <div class="flex flex-col gap-snug">
-    <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), still)} />
-    <AddressLine {...addressLineOf($lang, "hall/mayor", null, still)} {lesson} />
-    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
-    <AddressLine {...addressLineOf($lang, "atlas/api", null, still)} />
+    <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), still)} seat={{ at: "head" }} />
+    <AddressLine {...addressLineOf($lang, "hall/mayor", null, still)} seat={{ at: "head" }} {lesson} />
+    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} />
+    <AddressLine {...addressLineOf($lang, "atlas/api", null, still)} seat={{ at: "head" }} />
   </div>
 </Case>
 
 <Case label="address line · at a phone's width, the room kept whole, a room too long for the column cut last, and the lesson giving way first" width={320}>
   <div class="flex flex-col gap-snug">
-    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
-    <AddressLine {...addressLineOf($lang, "atlas/payments-reconciliation-ledger-close-and-settlement-overnight", Seq.make(4182), still)} />
-    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} {lesson} />
+    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} />
+    <AddressLine {...addressLineOf($lang, "atlas/payments-reconciliation-ledger-close-and-settlement-overnight", Seq.make(4182), still)} seat={{ at: "head" }} />
+    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} {lesson} />
   </div>
 </Case>
 

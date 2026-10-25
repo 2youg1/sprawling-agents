@@ -18,7 +18,8 @@
   import type { Address, Seq } from "../../wire";
   import { openPalette } from "../palette_door.svelte";
   import type { Arrival } from "../palette_door.svelte";
-  import { addressLineOf } from "./address_line";
+  import { addressLineOf, boxWords } from "./address_line";
+  import type { At } from "./address_line";
   import Look from "./address_line.look.svelte";
 
   interface Props {
@@ -27,9 +28,12 @@
     readonly session?: Seq | undefined;
     // What a press does; the shell's palette unless a fixture says.
     readonly onOpen?: ((arrival: Arrival) => void) | undefined;
+    // Where the line stands; the conversation's head unless an empty
+    // room's box holds it.
+    readonly at?: At | undefined;
   }
 
-  const { address, session, onOpen = openPalette }: Props = $props();
+  const { address, session, onOpen = openPalette, at = "head" }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -41,5 +45,6 @@
 
 <Look
   {...addressLineOf($lang, address, began, onOpen)}
+  seat={at === "box" ? { at, ...boxWords($lang) } : { at }}
   lesson={$found ? undefined : { words: say($lang, "talk_address_hint"), chord: marks(keys.chord("palette"), keys.platform).join(" ") }}
 />

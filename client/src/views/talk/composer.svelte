@@ -66,9 +66,13 @@
     // The room this box speaks to, when the page holding it says so; the
     // address bar answers otherwise.
     readonly room?: Address | undefined;
+    // Drawn in the place of the placeholder while the box holds no words,
+    // the placeholder then naming the box without being drawn: an empty
+    // room's address line (client/Spec.lean 4-10a).
+    readonly door?: Snippet | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, started = false }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, door, started = false }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -283,6 +287,10 @@
 
   // ------------------------------------------------------- the look
 
+  // The door is drawn only while the box is empty; the words an input
+  // method is composing are in `text` already, so they never stand under it.
+  const opened = $derived(text === "" ? door : undefined);
+
   const look: ComposerLook = $derived({
     form: {
       "aria-label": say($lang, "region_composer"),
@@ -297,7 +305,7 @@
     over: zone.over,
     box: {
       rows: 1,
-      placeholder,
+      placeholder: opened === undefined ? placeholder : undefined,
       "aria-label": placeholder,
       "aria-activedescendant": showing.length > 0 ? activeId : null,
       "aria-controls": showing.length > 0 ? menuBinding?.controls.join(" ") : undefined,
@@ -315,6 +323,7 @@
       [field.key]: field.hold,
     },
     menu: open && showing.length > 0 ? drawMenu : undefined,
+    door: opened,
     band,
     keys: drawKeys,
     line: drawLine,

@@ -249,7 +249,7 @@ function settle(env: Record<string, string | undefined>, city: string): string {
 
 function shots(run: string): readonly Shot[] {
   const at = (name: string, fragment: string, ...steps: Step[]): Shot => ({ name, fragment, steps });
-  const palette: Step = { select: "header button[aria-haspopup=dialog]" };
+  const palette: Step = { select: "form button[aria-haspopup=dialog]" };
   const shown = new Set(["talk", "city", "raise", "setup", "record", "gallery"]);
   return [
     at("talk-empty-room", "#/talk/hall/mayor"),
