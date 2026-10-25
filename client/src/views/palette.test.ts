@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 
 import { completed } from "../core/completion";
 import type { BoxHands, BoxState } from "./palette";
-import { boxOf, sessionPlaces, whyFor } from "./palette";
+import { boxOf, carryPlaces, sessionPlaces, whyFor } from "./palette";
 import { Address, Seq, TimeMs } from "../wire";
 import type { SessionLine } from "../wire";
 import type { Entry } from "./palette/entry";
@@ -172,5 +172,30 @@ describe("the sessions of the room main stands in", () => {
       { label: "#23 · the ledger is short", hint: "shown now · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(23) } },
       { label: "#9", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(9) } },
     ]);
+  });
+});
+
+describe("carrying this conversation to another room", () => {
+  const at = (room: string): Address => Address.make(room);
+
+  test("each room the city knows, and a new one typed in the box, says before it is pressed why it cannot take the conversation", () => {
+    const places = carryPlaces({
+      here: at("lab/parser"),
+      rooms: [at("lab/parser"), at("lab"), at("lab/review"), at("docs/notes")],
+      typed: at("lab/lexer"),
+      working: (room) => room === at("lab/review"),
+    });
+    expect(places).toEqual([
+      { to: at("lab/parser"), why: "palette_carry_here" },
+      { to: at("lab"), why: "palette_carry_building" },
+      { to: at("lab/review"), why: "palette_carry_busy" },
+      { to: at("docs/notes"), why: undefined },
+      { to: at("lab/lexer"), why: undefined },
+    ]);
+  });
+
+  test("a typed address the city already knows is not offered twice", () => {
+    const places = carryPlaces({ here: at("lab/parser"), rooms: [at("docs/notes")], typed: at("docs/notes"), working: () => false });
+    expect(places).toEqual([{ to: at("docs/notes"), why: undefined }]);
   });
 });

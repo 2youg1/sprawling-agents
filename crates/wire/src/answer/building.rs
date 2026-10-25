@@ -36,6 +36,22 @@ pub struct BuildingProgress {
     /// How many nodes could be started right now. The number that says
     /// whether a city with a standing goal has anything left to do.
     pub ready: u32,
+    /// No rules have been drawn over this top-level folder yet: it is
+    /// listed because it is a directory a building could be, and a
+    /// `create_building` at its address adopts it, leaving its files as
+    /// they are (`city::raise_building`).
+    pub adoptable: bool,
+}
+
+/// The `RULES.toml` a template lays a building out with at one address:
+/// what a page shows a person before they raise it, read from the one
+/// place the template's bytes live (`city::template_rules`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct TemplateAnswer {
+    pub template: crate::TemplateName,
+    pub addr: Address,
+    pub rules: String,
 }
 
 /// One cause, and how much is waiting behind it.

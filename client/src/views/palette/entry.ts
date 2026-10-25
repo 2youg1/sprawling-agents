@@ -20,6 +20,9 @@ export interface Entry {
   readonly act: () => void;
   // Present means the verb cannot run here, and names why.
   readonly why?: Key | undefined;
+  // Present means pressing the row changes the list rather than going
+  // somewhere, so the box stays open.
+  readonly keeps?: true | undefined;
 }
 
 export interface Group {

@@ -56,6 +56,7 @@ fn a_command_reaches_the_ledger_through_the_door_the_wire_uses() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .unwrap();

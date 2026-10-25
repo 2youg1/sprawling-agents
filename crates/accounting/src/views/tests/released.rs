@@ -153,6 +153,67 @@ fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_r
     assert_eq!(read, views.prepare(&wire::Query::CityView).finish());
 }
 
+/// A top-level folder nobody has drawn rules over is listed with the
+/// buildings and said to be adoptable; a building with rules is not.
+#[test]
+fn the_city_page_says_which_folders_are_waiting_to_be_adopted() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("notes")).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("lab").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    let views = Views::new(dir.path());
+
+    let read = views.prepare(&wire::Query::CityView).finish();
+    let wire::Answer::City(city) = &read else {
+        panic!("CityView answers with a city: {read:?}");
+    };
+    assert_eq!(
+        city.buildings
+            .iter()
+            .map(|line| (line.addr.as_str().to_owned(), line.adoptable))
+            .collect::<Vec<_>>(),
+        vec![("lab".to_owned(), false), ("notes".to_owned(), true)]
+    );
+}
+
+/// The rules a template would lay a building out with, read before the
+/// building exists; a room has none.
+#[test]
+fn a_template_is_read_for_an_address_before_anything_is_raised() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let template = wire::TemplateName::parse("confidential").unwrap();
+    let ask = |views: &mut Views, addr: &str| {
+        views.answer(&wire::Query::Template {
+            template: template.clone(),
+            addr: Address::parse(addr).unwrap(),
+        })
+    };
+
+    let read = ask(&mut views, "vault");
+    let wire::Answer::Template(answer) = &read else {
+        panic!("Template answers with the rules: {read:?}");
+    };
+    assert!(
+        city::evaluate(&answer.addr, &answer.rules)
+            .unwrap()
+            .policy()
+            .confidential
+    );
+    assert!(
+        !dir.path().join("vault").exists(),
+        "reading a template raises nothing"
+    );
+    assert!(matches!(
+        ask(&mut views, "vault/room1"),
+        wire::Answer::Unavailable { .. }
+    ));
+}
+
 /// A change list, a patch, a stored object and an archive search read the
 /// disk after the views are released: a city that appears between
 /// `prepare` and `finish` is the one each of them reports.

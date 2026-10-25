@@ -18,6 +18,7 @@ import type { View } from "../../core/route";
 export function backOf(page: View): View | null {
   switch (page.kind) {
     case "building":
+    case "raise":
       return { kind: "city" };
     case "city":
     case "mcp":

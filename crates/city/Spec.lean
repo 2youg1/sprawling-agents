@@ -288,6 +288,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D29 | 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认 | `crates/city/spec/SpineFiles.lean` |
 | D30 | City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里 | `crates/city/spec/SpineFiles.lean` |
 | D31 | 楼级 `City.md` 放在楼的保留区，近者替换远者 | `crates/city/spec/SpineFiles.lean` |
+| D32 | 人从页面立楼时，目录在不在由城看：在就收编，不在就新建 | `crates/city/spec/Building.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

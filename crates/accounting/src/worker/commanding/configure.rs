@@ -126,14 +126,9 @@ impl RunWorker {
     /// Propagates the evaluation's refusal, a file that is no longer
     /// `base`, a file that cannot be written or read back, and a history
     /// that will not take the line.
-    pub(in crate::worker) fn put_rules(
-        &mut self,
-        building: &Address,
-        base: &str,
-        body: &str,
-    ) -> Result<(), AxError> {
-        let building = city::Building::of(building)?;
-        city::write_rules_against(&self.city_root, building.addr(), base, body)?;
+    pub(in crate::worker) fn put_rules(&mut self, write: &wire::RulesWrite) -> Result<(), AxError> {
+        let building = city::Building::of(&write.building)?;
+        city::write_rules_against(&self.city_root, building.addr(), &write.base, &write.body)?;
         self.book_document(
             Scope::Building(building.addr().clone()),
             GoverningDocument::Rules,

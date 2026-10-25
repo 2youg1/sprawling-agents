@@ -118,6 +118,6 @@ pub use tool::{CostTier, Effect, ExecArm, GateSubject, RenderIntent};
 pub use tool::{ReservedNamespace, ServerLabel};
 pub use tool::{Temporal, TimeoutMs};
 pub use tool::{Tool, ToolCall, ToolMeta, ToolName, ToolOutcome};
-pub use version::{Version, VersionVerdict};
+pub use version::Version;
 pub use write_domain::{DocumentReason, DomainPrefixes, DomainVerdict, EditSample};
 pub use write_domain::{EditWarVerdict, WriteDomain, WriteLimit};

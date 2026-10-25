@@ -69,7 +69,7 @@ pub use agents::{
 };
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
-pub use building::{BuildingProgress, PlanRow, PursuitLine};
+pub use building::{BuildingProgress, PlanRow, PursuitLine, TemplateAnswer};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,
@@ -245,6 +245,8 @@ pub enum Answer {
     Prefix(Box<PrefixAnswer>),
     Content(Box<ContentAnswer>),
     Skills(Box<SkillsAnswer>),
+    /// What a template would write as a building's rules (`Query::Template`).
+    Template(Box<TemplateAnswer>),
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
     SkillUsage(Box<SkillUsageAnswer>),

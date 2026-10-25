@@ -34,6 +34,7 @@ export function underOf(view: View): Address {
       return buildingOf(view.address);
     case "building":
       return buildingOf(view.address);
+    case "raise":
     case "city":
     case "run":
     case "setup":

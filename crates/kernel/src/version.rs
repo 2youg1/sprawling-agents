@@ -3,13 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Optimistic concurrency: writes carry a
-//! `base_version`; a stale base yields a verdict, never a silent merge.
+//! The version of one subject: a counter that starts at
+//! [`Version::FIRST`] and only moves forward, checked. A signal records
+//! the version of the room it was sent to (`room_version`).
 //! The part `crates/kernel/spec/Version.lean` specifies this module.
 //!
-//! The mapping from [`VersionVerdict::Stale`] to `E_VERSION_CONFLICT`
-//! plus a fresh diff lives with the edit tool; kernel only judges
-//! freshness and knows nothing about diffs.
+//! A file a run edits is guarded by the run's own read, not by a
+//! version (`crates/runtime/Spec.lean` §8-64), so no write
+//! judges freshness here.
 
 use serde::{Deserialize, Serialize};
 
@@ -40,23 +41,6 @@ impl Version {
     }
 }
 
-/// Freshness verdict — exhaustive, not a bool (decision-function shape).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VersionVerdict {
-    Fresh,
-    Stale { current: Version },
-}
-
-/// Pure freshness judgment. A base ahead of `current` is caller fiction
-/// and reports `Stale` too: only `current` is the truth.
-pub fn check_base(current: Version, base: Version) -> VersionVerdict {
-    if base == current {
-        VersionVerdict::Fresh
-    } else {
-        VersionVerdict::Stale { current }
-    }
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -73,24 +57,6 @@ mod tests {
         assert_eq!(Version::FIRST.value(), 1);
         assert_eq!(Version::FIRST.next().unwrap().value(), 2);
         assert!(Version::new(u64::MAX).next().is_err());
-    }
-
-    #[test]
-    fn matching_base_is_fresh() {
-        let current = Version::new(7);
-        assert_eq!(check_base(current, Version::new(7)), VersionVerdict::Fresh);
-    }
-
-    #[test]
-    fn stale_and_ahead_bases_both_report_stale_with_current() {
-        let current = Version::new(7);
-        for base in [Version::new(6), Version::new(8)] {
-            assert_eq!(
-                check_base(current, base),
-                VersionVerdict::Stale { current },
-                "only `current` is the truth; an ahead base is caller fiction"
-            );
-        }
     }
 
     #[test]

@@ -23,6 +23,7 @@ fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
             .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
                 template: wire::TemplateName::parse("minimal").unwrap(),
+                rules: None,
                 idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, &[n]),
             })
             .unwrap();

@@ -12,8 +12,8 @@ import { lookOf, tableOf } from "./table";
 
 const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
 
-function building(addr: string): BuildingProgress {
-  return { addr: Address.make(addr), blocked: [], problems: [], progress: IDLE, ready: 0 };
+function building(addr: string, adoptable = false): BuildingProgress {
+  return { addr: Address.make(addr), adoptable, blocked: [], problems: [], progress: IDLE, ready: 0 };
 }
 
 function run(id: string, addr: string, started: number, doing: BoardRun["doing"]): BoardRun {
@@ -82,5 +82,14 @@ describe("building table", () => {
     ]);
     look.rows[1]?.wire.onclick();
     expect(picks).toEqual(["hall"]);
+  });
+
+  test("a folder waiting to be adopted says so where a building says when it last ran", () => {
+    const city: CityAnswer = { active: 0, frozen: 0, halted: [], pursuits: [], runs: [], buildings: [building("docs"), building("notes", true)] };
+    const look = lookOf({ city, runs: [], now: 1_000, picked: null, lang: "en" }, () => undefined);
+    expect(look.rows.map((row) => [row.name, row.latest])).toEqual([
+      ["docs", "no runs"],
+      ["notes", "a folder, not adopted yet"],
+    ]);
   });
 });

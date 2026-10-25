@@ -26,6 +26,12 @@
   // list that omits them teaches that the verb does not exist. The
   // reason is drawn where the row's hint is (`palette/rows.svelte`).
   //
+  // **The conversation can be carried to another room** (client/Spec.lean
+  // §4-64b): once this room's session has a run, a row offers to take it
+  // elsewhere, and pressing it turns the list into the rooms, each a
+  // branch from the end of this conversation (`palette.ts`'s
+  // `carryPlaces`, through the page's one branch door).
+  //
   // **Who is listening stands under the list** while the palette stands
   // over a room and nothing is typed (client D36): the palette is where
   // the room is changed, and that is when a person asks who hears it.
@@ -38,6 +44,7 @@
   // `palette.look.svelte` and `palette/rows.look.svelte`.
   import { Option, Schema } from "effect";
   import { heldIn } from "../core/belief/rooms";
+  import { newestWorking } from "../core/belief/live";
   import { runInFront } from "../core/in_front";
 
   import { QUERIES } from "../core/asking";
@@ -59,7 +66,7 @@
   import type { Arrival } from "./palette_door.svelte";
   import type { Seat } from "./modal";
   import Modal from "./modal.look.svelte";
-  import { boxOf, SESSIONS_AT_REST, sessionPlaces, whyFor } from "./palette";
+  import { boxOf, carryPlaces, SESSIONS_AT_REST, sessionPlaces, whyFor } from "./palette";
   import Look from "./palette.look.svelte";
   import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
@@ -92,6 +99,8 @@
 
   let query = $state("");
   let cursor = $state(0);
+  // Whether the list is the rooms this conversation can be carried to.
+  let carrying = $state(false);
 
   const uid = $props.id();
   const listId = `${uid}-list`;
@@ -138,6 +147,13 @@
     });
   });
   const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
+  // Where a carried conversation branches from: the end of the newest run
+  // of the room's current session, once that session has one.
+  const carryFrom = $derived(
+    here !== null && viewed?.kind === "talk" && viewed.session === undefined && (sessionLines[0]?.runs ?? 0) > 0
+      ? newest(here)
+      : null,
+  );
 
   const entries = $derived.by((): Entry[] => {
     // The hint beside a page is the address bar's own spelling of it,
@@ -159,8 +175,25 @@
     const sessions = (here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now()))
       .filter((place, at) => at < SESSIONS_AT_REST || query.trim() !== "")
       .map((place) => goTo(place.to, place.label, place.hint));
+    const carry: Entry[] =
+      carryFrom === null
+        ? []
+        : [
+            {
+              label: say($lang, "palette_carry"),
+              hint: say($lang, "palette_carry_hint"),
+              why: live === null ? undefined : "palette_carry_working",
+              keeps: true,
+              act: () => {
+                carrying = true;
+                query = "";
+                cursor = 0;
+              },
+            },
+          ];
     const out: Entry[] = [
       ...sessions,
+      ...carry,
       page("go.talk", { kind: "talk", address: MAYOR }),
       page("go.city", { kind: "city" }),
       page("go.setup", { kind: "setup" }),
@@ -302,12 +335,32 @@
   });
   const commands = $derived(grouped.flatMap((group) => group.entries));
 
+  // The rooms this conversation can go to, while `carrying`.
+  const carried = $derived.by((): Entry[] => {
+    const from = carryFrom;
+    if (!carrying || here === null || from === null) return [];
+    const known = [...$belief.rooms.keys()].flatMap((room) => Option.toArray(Schema.decodeOption(Address)(room)));
+    return carryPlaces({
+      here,
+      rooms: known,
+      typed: Option.getOrNull(Schema.decodeOption(Address)(query.trim())),
+      working: (room) => newestWorking($belief, room) !== undefined,
+    }).map((place) => ({
+      label: place.to,
+      hint: say($lang, "palette_carry_to"),
+      why: place.why,
+      act: () => {
+        u.branches.open(place.to, { run: from.run, at_seq: from.at }, () => undefined);
+      },
+    }));
+  });
+
   const shown = $derived.by((): Entry[] => {
     const needle = query.trim().toLowerCase();
-    if (needle.startsWith("/")) {
+    if (needle.startsWith("/") && !carrying) {
       return commands;
     }
-    const all = entries;
+    const all = carrying ? carried : entries;
     return needle === ""
       ? all
       : all.filter((entry) => `${entry.label} ${entry.hint}`.toLowerCase().includes(needle));
@@ -316,9 +369,10 @@
   function pick(entry: Entry | undefined): void {
     if (entry === undefined || entry.why !== undefined) return;
     entry.act();
-    // A verb decides for itself whether the box stays; everything else
-    // is a place to go, and going there closes it.
-    if (!query.trim().startsWith("/")) {
+    // A verb decides for itself whether the box stays; a row that keeps
+    // it changed the list; everything else is a place to go, and going
+    // there closes it.
+    if (entry.keeps !== true && (carrying || !query.trim().startsWith("/"))) {
       onClose();
     }
   }
@@ -349,12 +403,12 @@ pointer's extra way out, not the only one. -->
       },
     )}
     nothing={shown.length === 0 ? nothingFound(query) : undefined}
-    foot={here !== null && query.trim() === "" ? listening : undefined}
+    foot={here !== null && query.trim() === "" && !carrying ? listening : undefined}
   >
     {#snippet list()}
       <Rows
         id={listId}
-        listing={query.trim().startsWith("/") ? { kind: "verbs", groups: grouped } : { kind: "places" }}
+        listing={query.trim().startsWith("/") && !carrying ? { kind: "verbs", groups: grouped } : { kind: "places" }}
         {shown}
         {cursor}
         onHover={(at) => {

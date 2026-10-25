@@ -201,7 +201,7 @@ const CITY: CityAnswer = {
   halted: [],
   pursuits: [],
   runs: [],
-  buildings: ["hall", "lab", "shop"].map((name) => ({ addr: Address.make(name), blocked: [], problems: [], progress: unplanned, ready: 0 })),
+  buildings: ["hall", "lab", "shop"].map((name) => ({ addr: Address.make(name), adoptable: false, blocked: [], problems: [], progress: unplanned, ready: 0 })),
 };
 
 export function answering(query: Query): Answer | undefined {

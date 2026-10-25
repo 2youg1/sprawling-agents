@@ -28,12 +28,21 @@ impl Building {
     pub fn root(&self, city_root: &Path) -> PathBuf;
     pub fn holds(&self, addr: &Address) -> bool;
 }
+pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError>;    // city::buildings
+pub(crate) fn names_a_building(name: &str) -> Option<Address>;   // all 与 wizard::survey 共用
+pub enum RulesText<'a> { Template, Written(&'a str) }
+pub enum Founding { Built, Adopted }
+pub fn raise(city_root: &Path, addr: &Address, template: BuildingTemplate, rules: RulesText<'_>)
+    -> Result<(Building, Founding), AxError>;                 // city::raise_building
+pub fn template_rules(addr: &Address, template: BuildingTemplate) -> Result<String, AxError>;
+pub fn has_rules(city_root: &Path, building: &Building) -> Result<bool, AxError>;
 pub fn create(city_root: &Path, addr: &Address, template: BuildingTemplate)
     -> Result<Building, AxError>;
 pub fn created_payload(building: &Building, template: BuildingTemplate)
     -> Result<Payload, AxError>;
 pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;
-pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;          // adopted: true
+pub fn adopted_payload(building: &Building, template: BuildingTemplate)
+    -> Result<Payload, AxError>;                              // adopted: true
 pub fn configured_payload(building: &Building, wrote: Written)
     -> Result<Payload, AxError>;                              // building_configured
 
@@ -59,7 +68,20 @@ pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         /
 - **先落盘再产事件**：`building_created` 记的是已经发生的事。反过来的顺序会让历史声称一栋目录不存在的楼存在，而重放会把这个谎再说一遍。
 - **只写不读的 payload**：`created_payload` 只有写面，因为没有读它的投影——楼列表读盘（`city::buildings`）。读面随第一个真正需要它的投影落地，不提前建。
 - **占位符只有一个家**：`NAME_PLACEHOLDER` 住 `building::template`，`pub(crate)`；楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。
-- **adopt（兑现「导入一个已有目录」这件事）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录先由人搬入城内再收编，本体不做拷贝。
+- **哪个目录名是一栋楼，只有一条规则**：`names_a_building` 拒点开头的目录（保留子树在其中）、地址文法拼不出的名字与保留名；`all` 按它列楼，`wizard::survey` 按它向新城提供可收编的文件夹，所以新城提供的与旧城列出的不会不一致。`all` 不要求 `RULES.toml`：一个还没有规则的顶层文件夹也被列出，`has_rules` 答它有没有规则，页面据此把它标为可收编（`wire::BuildingProgress.adoptable`）。
+- **`raise` 是人从页面立楼的门**（`Command::CreateBuilding`）：目录在就收编、不在就新建，由 `Founding` 说是哪一种（D32）。`rules` 为 `Written` 时先经 `policy::evaluate`（每次派活读规则的同一个读者）求值，被拒就什么都不落：没有目录、没有文件、没有账本行。`Template` 照模板的字节。`template_rules` 答一个模板在一个地址会写下的 `RULES.toml`，页面在立楼之前给人看；它与 `create` 拒同样的地址（房间、保留子树）。
+- **adopt（兑现「导入一个已有目录」这件事）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录先由人搬入城内再收编，本体不做拷贝。`adopted_payload` 记规则来自哪个模板：命令行与开城时的收编是 `minimal`，页面上的收编是人选的那个。
+-/
+
+/-! D32 人从页面立楼时，目录在不在由城看：在就收编，不在就新建
+
+**决定**：`Command::CreateBuilding` 不带「新建还是收编」的字段。城在 `raise` 里看地址上有没有目录：有就收编（`building_created.adopted = true`，做 base checkpoint，目录里的文件一个不改），没有就新建。
+
+**理由**：目录在不在是磁盘上的事实，城是它的读者；帧里再带一个 `source`，就是同一个事实的第二个答案，页面读到的城答与人按下的那一刻之间目录可能已经变了，两份就会不一致。改之前，页面对一个已有目录 `/raise` 会在它上面铺一栋楼、记成 `adopted: false`、不做 base checkpoint，历史声称城建了它只是找到的东西。
+
+**被否**：帧带 `source: Empty | Adopt`，城核对与目录是否一致——多一个必须与磁盘同步的字段，不一致时只能拒，而人并没有做错什么。
+
+**重开参数**：若要支持「从仓库克隆」或「从别的楼复制」这类目录尚不存在、却不是空楼的来源，那时来源成了人的选择而不再是磁盘的事实，帧再加字段。
 -/
 
 /-!

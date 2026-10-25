@@ -21,6 +21,7 @@ export function runInFront(belief: Belief, view: View): RunBelief | undefined {
       return belief.live.find((each) => each.run === view.run);
     case "city":
     case "building":
+    case "raise":
     case "setup":
     case "mcp":
     case "record":

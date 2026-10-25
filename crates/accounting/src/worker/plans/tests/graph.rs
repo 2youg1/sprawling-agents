@@ -58,6 +58,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();

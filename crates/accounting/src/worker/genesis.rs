@@ -268,6 +268,40 @@ impl RunWorker {
     pub(super) fn create_building(&mut self, addr: Address, template: &str) -> Result<(), AxError> {
         let template = city::BuildingTemplate::parse(template)?;
         let building = city::create_building(&self.city_root, &addr, template)?;
+        self.built(&building, template)
+    }
+
+    /// Raises the building a person asked for: laid out where no
+    /// directory stands, or the directory already there adopted, which
+    /// the city decides by looking (`city::raise_building`). `rules` is the
+    /// text the person wrote, evaluated before anything lands; `None`
+    /// lays the template's own.
+    ///
+    /// # Errors
+    /// Propagates the template name, the address and the rules the city
+    /// refuses, an adoption's base checkpoint, and a history that will
+    /// not take the line.
+    pub(super) fn raise_building(
+        &mut self,
+        addr: &Address,
+        template: &str,
+        rules: Option<&str>,
+    ) -> Result<(), AxError> {
+        let template = city::BuildingTemplate::parse(template)?;
+        let written = rules.map_or(city::RulesText::Template, city::RulesText::Written);
+        let (building, founding) = city::raise_building(&self.city_root, addr, template, written)?;
+        match founding {
+            city::Founding::Built => self.built(&building, template),
+            city::Founding::Adopted => self.adopted(&building, template),
+        }
+    }
+
+    /// Records a building laid out from `template`.
+    fn built(
+        &mut self,
+        building: &city::Building,
+        template: city::BuildingTemplate,
+    ) -> Result<(), AxError> {
         self.note(
             runtime::diagnostics::Level::Effect,
             "city::building",
@@ -277,7 +311,7 @@ impl RunWorker {
                 template.name()
             ),
         );
-        let payload = city::building_created_payload(&building, template)?;
+        let payload = city::building_created_payload(building, template)?;
         self.record(EventKind::BuildingCreated, payload)
     }
 
@@ -290,10 +324,21 @@ impl RunWorker {
     /// ledger says about the record.
     pub fn adopt_building(&mut self, addr: Address) -> Result<(), AxError> {
         let building = city::adopt_building(&self.city_root, &addr)?;
+        self.adopted(&building, city::BuildingTemplate::Minimal)
+    }
+
+    /// Takes an adopted directory's base checkpoint, then records that it
+    /// was found rather than built.
+    fn adopted(
+        &mut self,
+        building: &city::Building,
+        template: city::BuildingTemplate,
+    ) -> Result<(), AxError> {
+        let addr = building.addr();
         self.note(
             runtime::diagnostics::Level::Effect,
             "city::building",
-            &format!("{} adopted as a building", building.addr().as_str()),
+            &format!("{} adopted as a building", addr.as_str()),
         );
         // The base checkpoint is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
@@ -320,7 +365,7 @@ impl RunWorker {
                 })
             })
             .map_err(storage::StorageError::into_ax)?;
-        let payload = city::building_adopted_payload(&building)?;
+        let payload = city::building_adopted_payload(building, template)?;
         self.record(EventKind::BuildingCreated, payload)
     }
 

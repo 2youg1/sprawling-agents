@@ -113,6 +113,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -187,6 +188,7 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
         .handle(wire::Command::CreateBuilding {
             addr: lab.clone(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -246,6 +248,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -299,6 +302,7 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -342,6 +346,7 @@ fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() 
         .handle(wire::Command::CreateBuilding {
             addr: lab.clone(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();

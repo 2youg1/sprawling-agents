@@ -112,9 +112,10 @@
     pursuits: [],
     runs: [],
     buildings: [
-      { addr: Address.make("notes"), blocked: [], problems: [], progress: idle, ready: 0 },
+      { addr: Address.make("notes"), adoptable: false, blocked: [], problems: [], progress: idle, ready: 0 },
       {
         addr: Address.make("the model changed from one provider to the next"),
+        adoptable: false,
         blocked: [],
         problems: [],
         progress: idle,

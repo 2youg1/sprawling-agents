@@ -559,6 +559,7 @@ fn raise(worker: &mut RunWorker, addr: &str) {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(addr).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: idem(addr.as_bytes()),
         })
         .unwrap();

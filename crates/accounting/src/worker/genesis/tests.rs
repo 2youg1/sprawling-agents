@@ -186,6 +186,7 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
     let create = |name: &str| wire::Command::CreateBuilding {
         addr: Address::parse("vault").unwrap(),
         template: wire::TemplateName::parse(name).unwrap(),
+        rules: None,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
     };
 
@@ -216,6 +217,123 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
             .unwrap()
             .policy()
             .confidential
+    );
+}
+
+/// The `building_created` line the history holds for `addr`.
+fn created_line(ledger_dir: &std::path::Path, addr: &str) -> serde_json::Value {
+    runtime::replay::verify_ledger_dir(ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .find(|line| line["kind"] == "building_created" && line["data"]["addr"] == addr)
+        .unwrap_or_else(|| panic!("no building_created line for {addr}"))
+}
+
+/// A folder a person put under the city and then raised from a page is
+/// found, not built: the history says it was adopted, its files are as
+/// they were, and it has the base checkpoint `sprawling adopt` takes.
+/// Before, the page laid a building over it and recorded that the city
+/// had made it.
+#[test]
+fn a_folder_raised_from_the_control_surface_is_adopted_and_its_files_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let notes = dir.path().join("notes");
+    std::fs::create_dir_all(&notes).unwrap();
+    std::fs::write(notes.join("Roadmap.md"), "the owner's plan\n").unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("notes").unwrap(),
+            template: wire::TemplateName::parse("confidential").unwrap(),
+            rules: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"adopt"),
+        })
+        .unwrap();
+
+    let line = created_line(&report.ledger_dir, "notes");
+    assert_eq!(
+        (
+            line["data"]["adopted"].clone(),
+            line["data"]["template"].clone()
+        ),
+        (serde_json::json!(true), serde_json::json!("confidential"))
+    );
+    assert_eq!(
+        std::fs::read_to_string(notes.join("Roadmap.md")).unwrap(),
+        "the owner's plan\n"
+    );
+    assert!(
+        city::load(dir.path(), &Address::parse("notes").unwrap())
+            .unwrap()
+            .policy()
+            .confidential
+    );
+}
+
+/// Rules a person wrote on the page are the building's rules, and rules
+/// the city cannot read leave nothing behind: no directory, no file and
+/// no line, so a refused raise can be sent again as it stands.
+#[test]
+fn written_rules_govern_the_new_building_and_refused_ones_lay_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+    let raise = |addr: &str, rules: Option<String>| wire::Command::CreateBuilding {
+        addr: Address::parse(addr).unwrap(),
+        template: wire::TemplateName::parse("minimal").unwrap(),
+        rules,
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, addr.as_bytes()),
+    };
+    // A confidential building's rules, as a person would paste them.
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("model").unwrap(),
+            template: wire::TemplateName::parse("confidential").unwrap(),
+            rules: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"model"),
+        })
+        .unwrap();
+    let written = std::fs::read_to_string(city::rules_path(
+        dir.path(),
+        &Address::parse("model").unwrap(),
+    ))
+    .unwrap();
+
+    worker.handle(raise("vault", Some(written))).unwrap();
+    assert!(
+        city::load(dir.path(), &Address::parse("vault").unwrap())
+            .unwrap()
+            .policy()
+            .confidential,
+        "the written rules, not the minimal template's, govern the building"
+    );
+
+    let refused = worker
+        .handle(raise("broken", Some("confidential = [not toml".to_owned())))
+        .unwrap_err();
+    assert_eq!(refused.code(), &kernel::AxCode::ConfigInvalid, "{refused}");
+    assert!(!dir.path().join("broken").exists());
+    let history = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    assert!(
+        !history
+            .raw_lines()
+            .iter()
+            .any(|line| String::from_utf8_lossy(line).contains("\"broken\"")),
+        "a refused raise writes no line"
     );
 }
 

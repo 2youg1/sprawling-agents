@@ -29,15 +29,17 @@
     pursuits: [{ addr: Address.make("lab"), goal: "read every unicode escape the spec names", state: "running", verdict: { kind: "work", next: NodeId.make("1.2") } }],
     runs: [],
     buildings: [
-      { addr: Address.make("hall"), blocked: [], problems: [], progress: { unplanned: { steps: 3, budget: { tokens: Tokens.make(120_000), usd: usd(0.84) } } }, ready: 0 },
+      { addr: Address.make("hall"), adoptable: false, blocked: [], problems: [], progress: { unplanned: { steps: 3, budget: { tokens: Tokens.make(120_000), usd: usd(0.84) } } }, ready: 0 },
       {
         addr: Address.make("lab"),
+        adoptable: false,
         blocked: [{ line: "waiting on a reviewer", source: NodeId.make("2.1"), waiting: 1 }],
         problems: [],
         progress: { planned: { blocked: 1, blocked_ppb: 0, done: 1, done_ppb: 250_000_000, total: 3 } },
         ready: 1,
       },
-      { addr: Address.make("docs"), blocked: [], problems: [], progress: { planned: { blocked: 0, blocked_ppb: 0, done: 4, done_ppb: 1_000_000_000, total: 4 } }, ready: 0 },
+      { addr: Address.make("docs"), adoptable: false, blocked: [], problems: [], progress: { planned: { blocked: 0, blocked_ppb: 0, done: 4, done_ppb: 1_000_000_000, total: 4 } }, ready: 0 },
+      { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: { unplanned: { steps: 0, budget: { tokens: Tokens.make(0), usd: usd(0) } } }, ready: 0 },
     ],
   };
 
@@ -67,7 +69,15 @@
     registry_view: { registry: { assets: [...ASSETS] } },
   };
 
+  // What the minimal template writes, cut to a few lines: the raise
+  // page shows whatever the city answers, and a fixture need not be the
+  // whole file.
+  const RULES = ['# What this building is.', 'purpose = ""', 'confidential = false', 'write = "building"', 'reading_room = []', ''].join("\n");
+
   function answers(query: Query): Answer | undefined {
+    if (typeof query === "object" && "template" in query) {
+      return { template: { template: query.template.template, addr: query.template.addr, rules: RULES } };
+    }
     return typeof query === "string" ? ANSWERS[query] : undefined;
   }
 </script>
@@ -76,6 +86,7 @@
   import City from "../city.svelte";
   import Cost from "../cost.svelte";
   import Desktop from "../desktop.svelte";
+  import Raise from "../raise.svelte";
   import Registry from "../registry.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -90,6 +101,18 @@
   </Case>
   <Case label="registry · the page, three assets" width={PAGE_WIDTH}>
     <Registry rank="section" />
+  </Case>
+  <Case label="raise · a new building, nothing typed yet" width={PAGE_WIDTH}>
+    <Raise rank="section" />
+  </Case>
+  <Case label="raise · a folder waiting under the city, adopted as it is" width={PAGE_WIDTH}>
+    <Raise rank="section" address={Address.make("notes")} />
+  </Case>
+  <Case label="raise · a room typed where a building goes" width={PAGE_WIDTH}>
+    <Raise rank="section" address={Address.make("lab/parser")} />
+  </Case>
+  <Case label="raise · at a phone's width, the waiting folder one tap away" width={390}>
+    <Raise rank="section" />
   </Case>
   <Case label="desktop · a building with no allowlist yet">
     <Desktop addr={Address.make("lab")} />

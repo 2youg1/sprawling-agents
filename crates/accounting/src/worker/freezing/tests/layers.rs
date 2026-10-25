@@ -28,6 +28,7 @@ fn system_prompt_at(room: &str, lay: impl FnOnce(&std::path::Path)) -> String {
             .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(building).unwrap(),
                 template: wire::TemplateName::parse("minimal").unwrap(),
+                rules: None,
                 idem: kernel::IdemKey::derive(
                     &RunId::CITY,
                     kernel::Seq::FIRST,

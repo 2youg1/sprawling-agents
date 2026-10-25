@@ -68,6 +68,9 @@ export type View =
   | { readonly kind: "talk"; readonly address: Address; readonly item?: ItemLink; readonly session?: Seq }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address }
+  // The page a building is raised on; with an address, that address is
+  // filled in, which is how a folder waiting to be adopted is opened.
+  | { readonly kind: "raise"; readonly address?: Address }
   // A run, and the lens a link opened it at; without one the page picks
   // its lens from the run's state.
   | { readonly kind: "run"; readonly run: RunId; readonly lens?: RunLens }
@@ -107,6 +110,8 @@ export function toFragment(view: View): string {
       return "#/city";
     case "building":
       return `#/building/${escaped(view.address)}`;
+    case "raise":
+      return view.address === undefined ? "#/raise" : `#/raise/${escaped(view.address)}`;
     case "run":
       return view.lens === undefined ? `#/run/${view.run}` : `#/run/${view.run}/${view.lens}`;
     case "setup":
@@ -199,6 +204,7 @@ const BARE: Readonly<Record<string, View>> = {
   record: { kind: "record", lens: "ledger" },
   cost: { kind: "cost" },
   registry: { kind: "registry" },
+  raise: { kind: "raise" },
   welcome: { kind: "welcome" },
   monitor: { kind: "monitor" },
   gallery: { kind: "gallery" },
@@ -295,6 +301,8 @@ export function fromFragment(raw: string): Option.Option<View> {
         kind: "building",
         address,
       }));
+    case "raise":
+      return Option.map(readEscapedAddress(tail), (address) => ({ kind: "raise", address }));
     case "setup":
     case "settings": {
       const group = SETUP_GROUPS.find((named) => named === tail);

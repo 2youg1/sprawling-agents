@@ -297,7 +297,8 @@ def Verb.frame : Verb → String
       , ("idem", .str idem.value) ]
   | .createBuilding addr template idem =>
     command "create_building"
-      [("addr", .str addr), ("template", .str template.name), ("idem", .str idem.value)]
+      [ ("addr", .str addr), ("template", .str template.name), ("rules", .null)
+      , ("idem", .str idem.value) ]
   | .dispatch addr session idem =>
     command "dispatch"
       [ ("addr", .str addr)

@@ -60,7 +60,12 @@ export function panelLookOf(seat: PanelSeat, onClose: () => void): PanelLook {
     name: addr,
     close: { label: say(lang, "panel_close"), onPress: onClose },
     badges: building === undefined ? [] : badgesOf(building, lang),
-    enter: { label: say(lang, "city_enter"), wire: { href: toFragment({ kind: "building", address: addr }) } },
+    // A folder nobody has drawn rules over is not a building yet: the
+    // link goes to the page that adopts it, its address filled in.
+    enter:
+      building?.adoptable === true
+        ? { label: say(lang, "city_adopt"), wire: { href: toFragment({ kind: "raise", address: addr }) } }
+        : { label: say(lang, "city_enter"), wire: { href: toFragment({ kind: "building", address: addr }) } },
     pursuit: pursuit === undefined ? null : { goal: pursuit.goal, running: pursuit.state === "running" },
     problems: building?.problems ?? [],
     blocked: (building?.blocked ?? []).map((line) => ({ key: `${line.source}\u0000${line.line}`, source: line.source, line: line.line })),
@@ -98,5 +103,6 @@ function badgesOf(building: CityAnswer["buildings"][number], lang: Lang): PanelL
     building.blocked.length > 0
       ? [{ key: "stuck", text: fill(say(lang, "city_stuck"), { n: String(building.blocked.length) }), weight: "alert" as const }]
       : [];
-  return [...progress, ...ready, ...stuck];
+  const adoptable = building.adoptable ? [{ key: "adoptable", text: say(lang, "city_adoptable"), weight: "quiet" as const }] : [];
+  return [...adoptable, ...progress, ...ready, ...stuck];
 }

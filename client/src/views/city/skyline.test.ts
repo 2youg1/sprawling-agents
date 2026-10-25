@@ -15,7 +15,7 @@ import type { SkylineSeat } from "./skyline";
 const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
 
 function building(addr: string): BuildingProgress {
-  return { addr: Address.make(addr), blocked: [], problems: [], progress: IDLE, ready: 0 };
+  return { addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 };
 }
 
 function cityOf(...addrs: readonly string[]): CityAnswer {

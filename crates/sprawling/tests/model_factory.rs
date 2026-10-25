@@ -156,6 +156,7 @@ fn city_on(
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse(template).unwrap(),
+            rules: None,
             idem: idem(b"create"),
         })
         .unwrap();

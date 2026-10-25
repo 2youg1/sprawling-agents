@@ -17,6 +17,7 @@ import { fill, say } from "../../core/lang";
 import { ago } from "../../core/time";
 import type { Address, BuildingProgress, CityAnswer } from "../../wire";
 import { FOLDS, along } from "../runs/fold";
+import { waiting } from "../raise";
 import type { BoardRun, Phase } from "../runs/lineage";
 import { ended, guide, phaseOf, placeByNeed, placeOf } from "../runs/lineage";
 
@@ -112,6 +113,7 @@ export interface TableSeat {
 
 export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableLook {
   const { lang, now } = seat;
+  const unadopted = waiting(seat.city.buildings);
   return {
     label: say(lang, "city_table"),
     folds: FOLDS.filter((fold) => fold.minutes > 0).map((fold) => ({
@@ -131,7 +133,13 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
         waiting: row.waiting,
         working: row.working,
         done: row.done,
-        latest: row.latest === null ? say(lang, "city_table_none") : ago(lang, row.latest, now),
+        // A folder waiting to be adopted has had no run; the row says what
+        // it is instead, and its panel offers the adoption.
+        latest: unadopted.includes(row.addr)
+          ? say(lang, "city_adoptable")
+          : row.latest === null
+            ? say(lang, "city_table_none")
+            : ago(lang, row.latest, now),
         live: from === null ? null : { left: from, width: 100 - from },
         starts: row.starts.map((start) => ({ key: start.run, at: along(start.at, now), phase: start.phase })),
         wire: {

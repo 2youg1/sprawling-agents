@@ -14,7 +14,7 @@ import { panelLookOf } from "./panel";
 const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
 
 function building(addr: string, more: Partial<BuildingProgress> = {}): BuildingProgress {
-  return { addr: Address.make(addr), blocked: [], problems: [], progress: IDLE, ready: 0, ...more };
+  return { addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0, ...more };
 }
 
 function city(buildings: readonly BuildingProgress[]): CityAnswer {
@@ -60,6 +60,17 @@ describe("the picked building's panel", () => {
       { key: "progress", text: "3/8", weight: "quiet" },
       { key: "ready", text: "2 ready to start", weight: "live" },
       { key: "stuck", text: "1 stuck", weight: "alert" },
+    ]);
+  });
+
+  test("a folder nobody has adopted is said to be one, and its link opens the raise page with its address filled in", () => {
+    const look = panelLookOf(
+      { addr: Address.make("notes"), city: city([building("notes", { adoptable: true })]), held: [], lang: "en" },
+      () => undefined,
+    );
+    expect([look.badges, look.enter]).toEqual([
+      [{ key: "adoptable", text: "a folder, not adopted yet", weight: "quiet" }],
+      { label: "adopt this folder as a building", wire: { href: "#/raise/notes" } },
     ]);
   });
 

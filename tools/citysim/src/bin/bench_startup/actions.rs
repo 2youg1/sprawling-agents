@@ -213,6 +213,7 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
     worker.handle(wire::Command::CreateBuilding {
         addr: Address::parse("lab")?,
         template: wire::TemplateName::parse("minimal")?,
+        rules: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"bench-create"),
     })?;
     let room = Address::parse("lab/room1")?;
