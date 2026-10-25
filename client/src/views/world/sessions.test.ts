@@ -98,6 +98,28 @@ describe("a row as the look draws it", () => {
       past: [undefined, null],
     });
   });
+
+  test("the row in main keeps its name and a running session's time, and leaves the rest to the screen beside it", () => {
+    const held = run({ kind: "thinking" });
+    const said = (row: ReturnType<typeof rowOf>) => ({
+      dot: row.dot,
+      title: row.title,
+      when: row.when,
+      about: row.about,
+      context: row.context,
+      tags: row.tags,
+    });
+    const tags = [Tag.make("parser")];
+    expect({
+      running: said(rowOf(stretch(LAB, true, [held]), at({ chosen: true, tags }))),
+      done: said(rowOf(stretch(LAB, false, [held]), at({ chosen: true }))),
+      beside: said(rowOf(stretch(LAB, true, [held]), at({ tags }))),
+    }).toEqual({
+      running: { dot: undefined, title: "room1", when: "1m 00s", about: undefined, context: undefined, tags },
+      done: { dot: undefined, title: "room1", when: undefined, about: undefined, context: undefined, tags: [] },
+      beside: { dot: "run", title: "room1", when: "1m 00s", about: "new", context: { room: LAB, run: held.run }, tags },
+    });
+  });
 });
 
 describe("the tag filter", () => {

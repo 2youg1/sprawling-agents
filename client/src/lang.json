@@ -9856,8 +9856,8 @@
     "zh": "标签由城市保管，而城市没有连上"
   },
   "talk_past": {
-    "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
-    "zh": "{room} 较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
+    "en": "An earlier session. It is read-only: the city goes on with the room's current session.",
+    "zh": "较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
   },
   "talk_current": {
     "en": "Back to the current session",
@@ -9890,10 +9890,6 @@
   "world_waiting": {
     "en": "waiting for you",
     "zh": "等你"
-  },
-  "world_frozen": {
-    "en": "frozen",
-    "zh": "已冻结"
   },
   "world_running": {
     "en": "running",

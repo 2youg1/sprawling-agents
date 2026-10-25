@@ -5,8 +5,11 @@
 
 <script lang="ts">
   // The chosen session, the panorama workbench's middle pane (client/Spec.lean
-  // §7K): its name and state, one line saying where it works and which
-  // commit it started from, the instrument sheet, and the timeline.
+  // §7K): one line saying where it works and which commit it started
+  // from, with the way to its run page, then the instrument sheet and the
+  // timeline. Its name and its state are not written here: the sessions
+  // column's chosen row names it and draws its state, and the box under
+  // the pane carries its address (§7K, "one place on a screen").
   //
   // The session is `chosen.svelte.ts`'s answer - a picked commit's run, or
   // the room's newest - and this pane asks that run's rounds once for the
@@ -30,13 +33,11 @@
     // The run of an earlier session in main, which this pane speaks for
     // instead of the room's (`null`: that session's runs are not held).
     readonly shown?: RunId | null | undefined;
-    // The room's name as the conversation calls it.
-    readonly title: string;
     // The pane's label: a menu that moves it, in the panorama tier.
     readonly head: Snippet;
   }
 
-  const { here, shown, title, head }: Props = $props();
+  const { here, shown, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -62,54 +63,25 @@
   // changes are measured from.
   const worktree = $derived(rounds?.worktree ?? null);
   const base = $derived(rounds?.opened_at ?? null);
-
-  type State = "running" | "waiting" | "frozen" | "unknown";
-
-  const posture = $derived.by((): State => {
-    const doing = run === null ? undefined : $belief.runs[run]?.doing;
-    if (doing === undefined) return rounds?.closing === undefined || rounds.closing === null ? "unknown" : "frozen";
-    switch (doing.kind) {
-      case "frozen":
-        return "frozen";
-      case "waiting":
-        return "waiting";
-      case "unknown":
-      case "thinking":
-      case "calling":
-      case "awaiting_reply":
-        return "running";
-    }
-  });
 </script>
 
 <section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_session")}>
   {@render head()}
+  <!-- Where the session works and what it started from: the worktree
+  and the base commit, each left out until the city has said it. -->
   <div class="flex shrink-0 items-baseline justify-between gap-pane">
-    <h3 class="truncate text-heading font-heading text-text">{title}</h3>
-    <span class="flex shrink-0 items-center gap-snug text-note text-text-quiet">
-      {#if posture === "running"}
-        <span class="size-dot pulse rounded-pill bg-accent" aria-hidden="true"></span>
-        {say($lang, "world_running")}
-      {:else if posture === "waiting"}
-        <span class="size-dot rounded-pill bg-alert" aria-hidden="true"></span>
-        {say($lang, "world_waiting")}
-      {:else if posture === "frozen"}
-        {say($lang, "world_frozen")}
+    <p class="min-w-0 truncate text-note text-text-quiet">
+      {#if worktree !== null}
+        {fill(say($lang, "world_worktree"), { name: worktree })}
       {/if}
-      {#if run !== null}
-        <a class="text-accent hover:text-accent-hover" href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a>
+      {#if base !== null}
+        {worktree === null ? "" : "· "}{fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}
       {/if}
-    </span>
+    </p>
+    {#if run !== null}
+      <a class="shrink-0 text-note text-accent hover:text-accent-hover" href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a>
+    {/if}
   </div>
-  <p class="shrink-0 truncate text-note text-text-faint">
-    <span class="text-text-quiet">{here}</span>
-    {#if worktree !== null}
-      · {fill(say($lang, "world_worktree"), { name: worktree })}
-    {/if}
-    {#if base !== null}
-      · {fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}
-    {/if}
-  </p>
   {#if run === null}
     <div class="mt-snug border-t border-edge">
       <Empty missing="world_no_session" seat="inset" />

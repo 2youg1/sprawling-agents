@@ -34,7 +34,6 @@
 </script>
 
 <script lang="ts">
-  import { roomOf } from "../../core/route";
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";
   import Edge from "../edge.svelte";
@@ -104,7 +103,7 @@
 <Case label="workbench · the chosen session's pane at its panorama width" width={640}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering} {records}>
     <div class="flex h-[640px] flex-col">
-      <Session here={ROOM} title={roomOf(ROOM)} head={bare} />
+      <Session here={ROOM} head={bare} />
     </div>
   </Stand>
 </Case>
