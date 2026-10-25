@@ -7,14 +7,14 @@
   // The record's one timeline, in the three ways a person reads it: the
   // ledger and the log together, the log alone (what `#/record/log`
   // opens on), and a city whose ledger page is empty. The records cross
-  // midnight in UTC, so the day is written twice, once above each day's
-  // first row.
+  // the reader's local midnight, so the day is written twice, once above
+  // each day's first row.
 
   import type { Answer, EventKind, EventRecord, LogLevel, LogLine, Payload, Query } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
   const RUN = RunId.make("3f2a9c4e-0d1b-4e7a-9a55-1c2b3d4e5f60");
-  const MIDNIGHT = Date.UTC(2026, 9, 2);
+  const MIDNIGHT = new Date(2026, 9, 2).getTime();
 
   function written(seq: number, ms: number, kind: EventKind, data: Payload, addr: string | null): EventRecord {
     return {

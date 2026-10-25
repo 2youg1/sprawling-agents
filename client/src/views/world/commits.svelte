@@ -9,7 +9,7 @@
   // the Mayor's room, the building from a room inside one - newest
   // first, as a swimlane graph drawn from each commit's parents. A row
   // is the graph's node, the short oid, the message and the room that
-  // made it; the time is the timeline's, so it is not said here.
+  // made it; the time is said only under the picked row.
   //
   // The chosen session's commits and its lane take the accent (docs/frontend-method.md §7B); a
   // node takes the phase of the run that made it (`runs/phase.ts`), so a
@@ -17,8 +17,8 @@
   // its session - the conversation moves to that room when it is another
   // - opens what it changed against its first parent on the right side
   // (refrain §3-9, client/Spec.lean §4-63), and states the commit under its
-  // row: its full oid, the B3 of the checkpoint that announced it and its
-  // parents. Both hashes are written whole on one line and cut by the
+  // row: its full oid, the B3 of the checkpoint that announced it, its
+  // parents and the moment it was made. Both hashes are written whole on one line and cut by the
   // pane's edge, so a copy takes the whole value.
   //
   // This file is the seat: it asks, picks and opens; `./commits.ts`
@@ -81,7 +81,12 @@
         pick,
       });
     }),
-    labels: { oid: say($lang, "world_commit_oid"), b3: say($lang, "world_commit_b3"), parents: say($lang, "world_parents") },
+    labels: {
+      oid: say($lang, "world_commit_oid"),
+      b3: say($lang, "world_commit_b3"),
+      parents: say($lang, "world_parents"),
+      at: say($lang, "world_commit_at"),
+    },
     more:
       read.kind === "held" && read.value.more && here !== MAYOR
         ? {

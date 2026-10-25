@@ -18,7 +18,7 @@
 
   import { fill, say } from "../../core/lang";
   import { encode } from "../../core/remote/base32";
-  import { isoDay, isoTime } from "../../core/time";
+  import { isoInstant, moment } from "../../core/time";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Dialog from "../parts/dialog.svelte";
@@ -141,7 +141,7 @@
         <dt class={LABEL}>{say($lang, "remote_device_id")}</dt>
         <dd class={VALUE}>{encode(standing.device.id)}</dd>
         <dt class={LABEL}>{say($lang, "remote_device_at")}</dt>
-        <dd class={VALUE}>{`${isoDay(standing.device.at)} ${isoTime(standing.device.at)}`}</dd>
+        <dd class={VALUE}><time datetime={isoInstant(standing.device.at)}>{moment(standing.device.at)}</time></dd>
       </dl>
       <p class="text-note text-text-faint">{say($lang, restartOf(keeps))}</p>
       <div class="flex flex-wrap gap-snug">

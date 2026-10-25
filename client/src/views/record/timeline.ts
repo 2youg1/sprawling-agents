@@ -17,7 +17,7 @@
 // were - the head page also every line written since.
 
 import type { Key } from "../../core/lang";
-import { isoDay } from "../../core/time";
+import { ymd } from "../../core/time";
 import type { EventRecord, LogLevel, LogLine, RunId, Seq } from "../../wire";
 
 // Which source the timeline reads. `log` is what `#/record/log` named
@@ -73,7 +73,7 @@ export function entriesOf(page: Page, lines: readonly LogLine[], source: Source,
   return entries.sort((a, b) => b.seq - a.seq || order(a) - order(b));
 }
 
-// The day written above each entry that opens one, in UTC, and `null`
+// The local day written above each entry that opens one, and `null`
 // above every other: the day is written once, above the first row of
 // each day. A log line the page holds without a time opens no day and
 // does not end one, so the next timed entry is read against the last
@@ -82,7 +82,7 @@ export function daysOf(entries: readonly Entry[]): readonly (string | null)[] {
   let above: string | null = null;
   return entries.map((entry) => {
     if (entry.t === null) return null;
-    const day = isoDay(entry.t);
+    const day = ymd(entry.t);
     const opens = day === above ? null : day;
     above = day;
     return opens;

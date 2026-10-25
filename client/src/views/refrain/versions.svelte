@@ -19,7 +19,7 @@
   import { positionsOf } from "../../core/document_pos";
   import { recorded, whole } from "../../core/document_windows";
   import { fill, say } from "../../core/lang";
-  import { isoDay, isoTime, kib } from "../../core/time";
+  import { kib, moment } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, DocumentVersion } from "../../wire";
   import Button from "../parts/button.svelte";
@@ -61,7 +61,7 @@
     if (source === "on_disk") return say($lang, "refrain_version_on_disk");
     if (source === "shipped") return say($lang, "refrain_version_shipped");
     if ("before" in source) return say($lang, "refrain_version_outside");
-    return `${say($lang, "refrain_version_saved")} · ${isoDay(source.saved.at)} ${isoTime(source.saved.at)}`;
+    return `${say($lang, "refrain_version_saved")} · ${moment(source.saved.at)}`;
   }
 
   function nameOf(each: DocumentVersion): string {

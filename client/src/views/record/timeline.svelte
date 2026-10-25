@@ -7,9 +7,9 @@
   // The record's diagnostics as one timeline (refrain S7.6 6c): what the
   // ledger wrote and what the process logged, in one column on one axis,
   // the ledger position. `timeline.ts` decides what stands in the column;
-  // `entry` draws each row the way the panorama's timeline is drawn - the
-  // day once at the head, then a row per entry: the time of day to the
-  // millisecond in UTC, the ledger position, what happened, and where.
+  // `entry` draws each row: the day once above the first row of it, then
+  // a row per entry: the local time of day to the millisecond, the ledger
+  // position, what happened, and where.
   // This file places the choices above the column and the column itself.
   //
   // **The process log is a source, not a lens.** It used to be a tab of

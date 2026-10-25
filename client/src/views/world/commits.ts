@@ -8,8 +8,9 @@
 // (client/Spec.lean §7K): one row per commit with its piece of the
 // swimlane graph (`./lanes.ts`) in the drawing's own pixels, the node's
 // phase, and - under the picked row - the commit's identity written
-// whole.
+// whole and the moment it was made.
 
+import { isoInstant, moment } from "../../core/time";
 import type { Phase } from "../runs/lineage";
 import type { CommitAnswer, GitOid } from "../../wire";
 import type { Graph, Line } from "./lanes";
@@ -45,10 +46,13 @@ export interface CommitWire {
 }
 
 // The picked commit's identity: each value whole, so a copy takes it.
+// Its moment is the reader's local day and time to the second, and the
+// instant in UTC for the `<time datetime>` (client/Spec.lean 4-58).
 export interface Facts {
   readonly oid: GitOid;
   readonly b3: string | undefined;
   readonly parents: string;
+  readonly at: { readonly text: string; readonly iso: string };
 }
 
 export interface CommitRow {
@@ -75,9 +79,9 @@ export interface CommitsLook {
   readonly width: number;
   readonly height: number;
   readonly rows: readonly CommitRow[];
-  // The words of the identity's three labels, already in the person's
+  // The words of the facts' four labels, already in the person's
   // language.
-  readonly labels: { readonly oid: string; readonly b3: string; readonly parents: string };
+  readonly labels: { readonly oid: string; readonly b3: string; readonly parents: string; readonly at: string };
   // The link to the building's page while older commits are left out.
   readonly more: { readonly href: string; readonly word: string } | undefined;
 }
@@ -120,6 +124,7 @@ export function rowOf(input: CommitInput): CommitRow {
           oid: commit.oid,
           b3: commit.b3 ?? undefined,
           parents: (commit.parents ?? []).map((oid) => oid.slice(0, SHORT)).join(" · ") || "—",
+          at: { text: moment(commit.at), iso: isoInstant(commit.at) },
         }
       : undefined,
   };
