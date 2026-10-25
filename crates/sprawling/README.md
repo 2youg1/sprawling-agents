@@ -11,7 +11,7 @@ just build-web                      # the client bundle, written to crates/spraw
 cargo run -p sprawling -- --help    # every verb, from the table in src/main/verbs.rs
 ```
 
-Without the bundle the binary still builds, so `just check` needs no JavaScript toolchain: it then carries a placeholder page, the build prints a warning, and the `budget` gate refuses a release binary whose client is missing. The default feature `sandbox` turns on `runtime`'s wasm engine, so `cargo install sprawling` builds the binary the release archives carry; `--no-default-features` builds one whose tool execution is refused, with a recovery that names the missing feature, and `just features` compiles it. How a person installs and uses the binary is [`docs/getting-started.md`](../../docs/getting-started.md); how it is driven from a script is [`docs/wire.md`](../../docs/wire.md).
+Without the bundle the binary still builds, so `cargo build -p sprawling` needs no JavaScript toolchain (`just check` does, because it runs `build-web`): the binary then carries a placeholder page, the build prints a warning, and the `budget` gate refuses a release binary whose client is missing. The default feature `sandbox` turns on `runtime`'s wasm engine, so `cargo install sprawling` builds the binary the release archives carry; `--no-default-features` builds one whose tool execution is refused, with a recovery that names the missing feature, and `just features` compiles it. How a person installs and uses the binary is [`docs/getting-started.md`](../../docs/getting-started.md); how it is driven from a script is [`docs/wire.md`](../../docs/wire.md).
 
 ## Specification
 
