@@ -127,7 +127,7 @@ You need a desktop browser and a callable model: a compatible provider or a loca
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.13<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.14<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
 
 Choose one channel:
 
@@ -253,6 +253,8 @@ Update through the original channel:
 | Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
 
 After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`, which opens the page. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
+
+From 0.0.13 to 0.0.14 nothing has to be converted by hand. WIRE_V stays 70, EVENT_LOG_V stays 2 and the configuration formats do not change, so a city written by 0.0.13 opens without a new migration, and there is no protocol-driven requirement to reload an existing browser tab. Keep the verified backup above even though this release has no migration.
 
 From 0.0.12 to 0.0.13 nothing has to be converted by hand, but the first open can change where the city lives and how its default files are stored. To move an unnamed city that 0.0.12 kept in `city/` beside the binary, start the new binary from that same folder with no path: the city moves to `~/sprawling/city`, its worktrees are re-pointed, and `~/.sprawling/config.toml` gains a `city` line. A binary unpacked elsewhere cannot find that old city; type its folder on the first screen, or use `sprawling up <folder>` for one launch. A city on another volume from the home directory stays where it is. Writing the `city` line drops the configuration file's comments and layout, and an unedited `City.md`, `MAYOR.md` or `CLERK.md` is refreshed from the binary. The wire moved from WIRE_V 67 to 70, so reload an old browser tab against the new city. An `[[mcp]]` label that uses one of the city's reserved tool namespaces — `computer`, `media`, `record`, `skill`, `sprawling` or `web` — must be renamed. Going back to 0.0.12 is not promised: among other differences, it refuses `[catalog]`, draws V2/V3 tool results as JSON, and needs prompt procedure sections that 0.0.13 moves into the binary.
 

@@ -127,7 +127,7 @@ shelves = ["~/.claude/skills"]
 
 ## 1 安装
 
-本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.13<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
+本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.14<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
 
 选择一种渠道：
 
@@ -253,6 +253,8 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行 [Nix 命令](#用-nix)。 | 使用原固定 checkout 和 lockfile；固定 commit 不会跟随新版。 |
 
 更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城市，它会打开页面。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。
+
+从 0.0.13 升到 0.0.14 不需要手工转换任何文件。WIRE_V 保持 70，EVENT_LOG_V 保持 2，配置格式不变，所以 0.0.13 写下的城市不需要新的迁移即可打开，也不要求因为协议而重新加载现有浏览器标签页。虽然本版没有迁移，仍请保留上面验证过的备份。
 
 从 0.0.12 升到 0.0.13 不需要手工转换任何文件，但第一次打开可能改变城市的位置和默认文件的存放方式。要搬走 0.0.12 放在二进制旁边 `city/` 里的未指名城市，请在同一个旧文件夹里不带路径启动新版：城市会搬到 `~/sprawling/city`，工作树改指新位置，`~/.sprawling/config.toml` 写入 `city` 一行。解压到别处的新版找不到这座旧城；在第一屏输入它的文件夹，或用 `sprawling up <文件夹>` 只开这一次。城市与家目录不在同一个卷上时留在原处。写入 `city` 一行会丢掉配置文件的注释和排版；未改过的 `City.md`、`MAYOR.md`、`CLERK.md` 会按二进制里的默认文字刷新。协议从 WIRE_V 67 升到 70，请对新城市重新加载旧浏览器标签页。`[[mcp]]` 的标签如果使用城市保留的工具命名空间——`computer`、`media`、`record`、`skill`、`sprawling` 或 `web`——必须改名。不保证能退回 0.0.12：它会拒绝 `[catalog]`，把 V2／V3 工具结果画成 JSON，并需要 0.0.13 已收进二进制的提示词规程，这些只是其中一部分差异。
 

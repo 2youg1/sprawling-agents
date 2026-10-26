@@ -20,6 +20,31 @@ release notes and their commits.
 
 ---
 
+## v0.0.14-Alpha-261027
+
+**sprawling 0.0.14 still walking**
+
+Alpha, cut on 2026-10-27 (UTC+8) as `v0.0.14-Alpha-261027`. The workspace manifest carries 0.0.14; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.13-Alpha-261026`. The wire and stored-data contracts do not change: WIRE_V stays 70, EVENT_LOG_V stays 2, and the configuration formats stay at format 1. A city written by 0.0.13 opens without conversion or a new migration, and there is no protocol-driven requirement to reload a 0.0.13 browser tab. Most of the diff is mechanical client formatting rather than behaviour change. Keep the backup the [update guide](docs/getting-started.md#updating) asks for before updating; the compatibility limits already documented for 0.0.13 itself are unchanged.
+
+### Behaviour changes
+
+- **One layer table puts composer popovers above the content they open over.** The theme owns the order of the client's positioned surfaces, so the permissions panel and model picker no longer share an arbitrary z-index with the address line. At the former intersection, the address no longer paints through the permissions control or intercepts its press. The change is client-only and adds no Main button (#201, #205).
+- **Workspace creation, adoption and switching are discoverable on city and hall, with `/cd` for building-level navigation.** Both pages link to the existing raise page; the hall switcher opens an established building or pre-fills an adoptable folder. Bare `/cd` opens the city, an established top-level name opens its building, and an adoptable or unknown top-level name opens its prefilled raise page. `/cd` only navigates and pre-fills: creation and adoption still happen only after confirmation on the raise page, and room addresses, malformed input and extra arguments do nothing. The wire, saved data, overwrite protection and the meanings of `/room` and `/raise` are unchanged (#202, #205).
+
+### Toolchain, CI and repository gates
+
+- **Bun 1.4.4 has one version authority.** `client/package.json` supplies `packageManager` to every CI `setup-bun` call and to the Nix build, which fetches that release instead of using nixpkgs' Bun 1.4.2. The Bun types move to 1.4.4 (#206, #207).
+- **`bun fmt` and `bun check` join the required checks.** The root `bunfig.toml` formats code at rustfmt's 100-column width; Markdown and TOML stay outside its scope, and generated files and recorded fixtures keep their bytes. `bun check` supplements TypeScript checking and does not replace `svelte-check`, which still reads Svelte components. ESLint caches across runs. The `wording` waiver and `artifact` shim readers now read structure rather than depending on line layout, and the generated `client/src/wire.ts` is excluded from the formatter (#203, #207).
+- **The release guide states the trusted-publisher prerequisite.** Every new publishable package must be registered on crates.io as trusted to this repository's `release.yml` before CI can publish it; a missing registration fails with 403 after the other channels stand, and registering it then rerunning the failed job finishes the pending packages without a new tag (#204).
+- **Dependencies and actions.** `uuid` moves to 1.29.0 (#200); `taiki-e/install-action` moves to 2.87.31 and `cachix/install-nix-action` to 31.11.3 (#199).
+
+### Known and unfixed
+
+- The Windows binary is still unsigned. The SignPath Foundation has not issued the project's certificate; `release.yml` signs through SignPath once the certificate and policy are available.
+- Forking a session that contains tool calls still fails on an endpoint of the Anthropic dialect: the Ledger stores the provider's tool call id redacted as `secret:redacted/<hash>`, the rebuilt history sends that id, and Anthropic refuses an id outside `^[a-zA-Z0-9_-]+$` with a 400, so the run ends cancelled. 0.0.13 behaves the same way, and the proposed fix in #189 is not included in this release. An endpoint of the OpenAI dialect accepts the redacted id, and a new session is not affected (#185).
+
+---
+
 ## v0.0.13-Alpha-261026
 
 **sprawling 0.0.13 odyssey**
