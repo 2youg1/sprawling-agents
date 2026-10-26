@@ -57,7 +57,7 @@ toml.workspace = true
 # step back below it (`crates/runtime/Spec.lean` §8-13). wasip1 only - there is no
 # socket host implementation, which is the Python arm's mechanical proof
 # that it cannot reach the network.
-wasmtime = { version = "48.0.7", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime = { version = "50.0.0", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "48.0.7", optional = true }
 
 # One Job Object per run, so a run's whole process tree can be read
