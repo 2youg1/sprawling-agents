@@ -41,6 +41,7 @@
   import Board from "./runs/board.svelte";
   import { boardRuns } from "./runs/lineage";
   import Showing from "./shared/showing.svelte";
+  import WorkspaceNav from "./shared/workspace.svelte";
 
   // The two ways the page draws the city's buildings, the first the one
   // it opens on.
@@ -94,6 +95,7 @@
       <div class="flex flex-wrap items-center justify-between gap-base">
         <h2 class="text-note text-text-faint">{say($lang, "city_buildings")}</h2>
         <div class="flex flex-wrap items-center gap-base">
+          <WorkspaceNav />
           {#if $held.showing !== "results"}
             <Segmented
               label={say($lang, "city_view")}
@@ -133,10 +135,6 @@
         />
         <Legend {...legendOf($lang)} />
       {:else}
-        <!-- A city with no buildings is a city nobody has asked for
-        anything yet, and the Mayor is where a person asks: raising a
-        building is a sentence in that conversation rather than a button
-        this page could press. -->
         <EmptyState missing="city_no_buildings">
           {#snippet action()}
             <AskMayor />

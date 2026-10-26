@@ -74,6 +74,7 @@
   import Sections from "./building/sections.look.svelte";
   import { openItems, type RightItem } from "./inspect/open.svelte";
   import Right from "./right.svelte";
+  import WorkspaceNav from "./shared/workspace.svelte";
 
   interface Props {
     readonly address: Address;
@@ -180,6 +181,7 @@
 {/snippet}
 
 <Page title={address} {rank} {aside}>
+  <WorkspaceNav current={address} />
   <Goal {address} />
   <!-- In source order the index, the section and the tree: one column
        under 768 px reads them in that order, so a phone reaches the
