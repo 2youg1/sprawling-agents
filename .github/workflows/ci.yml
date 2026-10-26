@@ -175,6 +175,12 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with:
           tool: just
+      # `fmt-check` includes `bun fmt --check`, so Bun has to be present
+      # before the early verdicts rather than only inside client-artifacts
+      # below, which prepares the later bundle gates.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: client/package.json
       - name: native payloads in system channel validation
         if: ${{ !cancelled() }}
         env:
