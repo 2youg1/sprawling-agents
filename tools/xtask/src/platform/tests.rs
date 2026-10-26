@@ -43,8 +43,8 @@ fn a_matrix_row_is_read_as_its_runner_and_its_target() {
 /// The shim's table maps a machine to a package and the file to exec.
 #[test]
 fn a_shim_entry_is_read_as_its_key_its_package_and_its_binary() {
-    let text = "  \"win32 x64\": { package: \"@sprawling/sprawling-windows-x64\", \
-                binary: \"sprawling.exe\" },\n  const RELEASES = \"https://example.invalid\";\n";
+    let text = "const PLATFORMS = {\n  \"win32 x64\": { package: \"@sprawling/sprawling-windows-x64\", \
+                binary: \"sprawling.exe\" },\n};\nconst RELEASES = \"https://example.invalid\";\n";
     assert_eq!(
         shim(text),
         vec![(
@@ -52,6 +52,28 @@ fn a_shim_entry_is_read_as_its_key_its_package_and_its_binary() {
             "@sprawling/sprawling-windows-x64".to_owned(),
             "sprawling.exe".to_owned()
         )]
+    );
+}
+
+/// An entry the formatter wrapped still reads: the table is an object,
+/// not one line per platform.
+#[test]
+fn a_wrapped_entry_is_read_as_one_row() {
+    let text = "const PLATFORMS = {\n  \"darwin arm64\": {\n    package: \"@sprawling/sprawling-darwin-arm64\",\n    binary: \"sprawling\",\n  },\n  \"linux x64\": {\n    package: \"@sprawling/sprawling-linux-x64-musl\",\n    binary: \"sprawling\",\n  },\n};\n";
+    assert_eq!(
+        shim(text),
+        vec![
+            (
+                "darwin arm64".to_owned(),
+                "@sprawling/sprawling-darwin-arm64".to_owned(),
+                "sprawling".to_owned()
+            ),
+            (
+                "linux x64".to_owned(),
+                "@sprawling/sprawling-linux-x64-musl".to_owned(),
+                "sprawling".to_owned()
+            ),
+        ]
     );
 }
 

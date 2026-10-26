@@ -90,3 +90,55 @@ fn both_seats_are_read() {
         ]
     );
 }
+
+/// The waiver covers the block the marker stands in, so wrapping a start
+/// tag across lines leaves it in force. This is the shape `bun fmt`
+/// produces from `<Field placeholder="…" label={…}>`: the attribute is
+/// eight columns deeper than the marker, and the marker still waives it.
+#[test]
+fn a_waiver_holds_across_the_lines_a_formatter_adds() {
+    let lines = [
+        r#"    <!-- wording-ok: the placeholder is an address -->"#,
+        r#"    <Field"#,
+        r#"      placeholder="https://api.openai.com/v1""#,
+        r#"      label={say("setup_base_url")}"#,
+        r#"    />"#,
+    ];
+    assert!(waived(&lines, 3));
+}
+
+/// A marker inside an object waives the entries below it in that object,
+/// which is where `bun fmt` puts the inline comment of an entry it
+/// expands.
+#[test]
+fn a_marker_inside_a_construct_covers_its_entries() {
+    let lines = [
+        r#"    rows: ["#,
+        r#"      // wording-ok: fixture states the wire's own refusal"#,
+        r#"      {"#,
+        r#"        code: "E_CONFIG_INVALID","#,
+        r#"      },"#,
+    ];
+    assert!(waived(&lines, 4));
+}
+
+/// The block a marker stands in ends where it outdents: a marker in a
+/// construct that closed above the word waives nothing below it.
+#[test]
+fn a_block_that_closed_above_the_word_waives_nothing() {
+    let lines = [
+        r#"  function earlier(): void {"#,
+        r#"        // wording-ok: a name, not a sentence"#,
+        r#"        const url = "https://api.openai.com/v1";"#,
+        r#"  }"#,
+        r#"  const later = "the city said no";"#,
+    ];
+    assert!(!waived(&lines, 5));
+}
+
+/// A marker written after the word on its own line waives that line.
+#[test]
+fn a_marker_after_the_word_waives_its_line() {
+    let lines = [r#"  const host = "api.openai.com"; // wording-ok: a host"#];
+    assert!(waived(&lines, 1));
+}
