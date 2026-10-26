@@ -313,6 +313,7 @@ export const SLASH: readonly Slash[] = [
       if (call.words.length !== 1) return;
       const addr = addressed(call.words.at(0));
       if (addr === null || buildingOf(addr) !== addr) return;
+      if (hands.buildings === undefined) return;
       hands.go(buildingDestination(addr, hands.buildings).view);
       hands.write("");
     },

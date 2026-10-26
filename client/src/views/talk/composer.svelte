@@ -187,7 +187,7 @@
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const city = u.conn.asking.ask(QUERIES.city);
-  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
+  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : undefined);
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );

@@ -68,7 +68,8 @@ export interface SlashHands extends SessionHands {
   readonly newest: (room: string) => Reached | null;
   // The buildings and adoptable folders the city already answered with;
   // `/cd` classifies a destination against these, never another store.
-  readonly buildings: readonly BuildingProgress[];
+  // Undefined until a city answer is available; an empty list is answered.
+  readonly buildings: readonly BuildingProgress[] | undefined;
   readonly models: readonly Offered[];
   // How hard a run this verb opens should think, or `null` when the
   // person has chosen no level and the provider decides. It comes from

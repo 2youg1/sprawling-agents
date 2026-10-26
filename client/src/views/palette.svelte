@@ -128,7 +128,7 @@
   );
 
   const city = u.conn.asking.ask(QUERIES.city);
-  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
+  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : undefined);
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
 
   const halted = $derived(cityIsShut($belief.halted));

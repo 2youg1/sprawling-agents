@@ -252,7 +252,7 @@ export interface Reach extends SessionHands {
   readonly here: Address | null;
   readonly live: RunBelief | undefined;
   readonly belief: Belief;
-  readonly buildings: readonly BuildingProgress[];
+  readonly buildings: readonly BuildingProgress[] | undefined;
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;

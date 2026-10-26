@@ -59,7 +59,7 @@ interface Case {
   readonly done: Done;
 }
 
-function ran(line: string): Done {
+function ran(line: string, buildings: SlashHands["buildings"]): Done {
   const sent: ClientFrame[] = [];
   const went: View[] = [];
   const written: string[] = [];
@@ -75,7 +75,7 @@ function ran(line: string): Done {
     here: ROOM,
     live: { run: LIVE, at: Seq.make(3) },
     newest: (room) => (room === MAYOR ? { run: NEWEST, at: Seq.make(9) } : null),
-    buildings: BUILDINGS,
+    buildings,
     models: [{ endpoint: "local", model: "m-local" }],
     effort: "high",
     setEffort: (effort) => efforts.push(effort),
@@ -218,6 +218,19 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
 };
 
 describe("every / verb", () => {
+  test("/cd keeps the line and stays put until the city answers", () => {
+    for (const line of ["/cd lab", "/cd notes", "/cd new-project"]) {
+      expect(ran(line, undefined)).toEqual(NOTHING);
+    }
+    expect(ran("/cd lab", BUILDINGS)).toEqual(going({ kind: "building", address: Address.make("lab") }));
+    expect(ran("/cd notes", BUILDINGS)).toEqual(going({ kind: "raise", address: Address.make("notes") }));
+    expect(ran("/cd new-project", [])).toEqual(going({ kind: "raise", address: Address.make("new-project") }));
+  });
+
+  test("bare /cd opens the city before the city answers", () => {
+    expect(ran("/cd", undefined)).toEqual(going({ kind: "city" }));
+  });
+
   test("has its frames written down here", () => {
     expect(Object.keys(CASES).sort()).toEqual(SLASH.map((verb) => verb.spelling).sort());
   });
@@ -225,7 +238,7 @@ describe("every / verb", () => {
   for (const [verb, cases] of Object.entries(CASES)) {
     for (const each of cases) {
       test(`${verb}: ${each.line}`, () => {
-        expect(ran(each.line)).toEqual(each.done);
+        expect(ran(each.line, BUILDINGS)).toEqual(each.done);
       });
     }
   }
