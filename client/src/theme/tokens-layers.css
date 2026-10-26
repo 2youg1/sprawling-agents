@@ -1,0 +1,16 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* The client's one stacking order. Components read these semantic layers
+ * through `z-(--layer-*)`; no component keeps a second numeric table.
+ * Native top-layer dialogs need no entry: no page z-index outranks them. */
+@theme {
+  --layer-mailbox: -1;
+  --layer-raised: 1;
+  --layer-popover: 10;
+  --layer-edge: 20;
+  --layer-sheet: 30;
+  --layer-skip-link: 40;
+}

@@ -62,6 +62,7 @@
 @import "./theme/tokens-type.css";
 @import "./theme/tokens-space.css";
 @import "./theme/tokens-motion.css";
+@import "./theme/tokens-layers.css";
 @import "./theme/colour.css";
 @import "./theme/preference.css";
 @import "./theme/surface.css";

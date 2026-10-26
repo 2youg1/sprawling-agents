@@ -27,7 +27,7 @@ comes in the bags. -->
       </button>
     </h2>
     {#if look.open}
-      <ul {...look.popup} {...look.list} class="absolute top-full left-0 flex min-w-[16ch] flex-col rounded-card bg-raised p-tight shadow-float">
+      <ul {...look.popup} {...look.list} class="absolute top-full left-0 z-(--layer-popover) flex min-w-[16ch] flex-col rounded-card bg-raised p-tight shadow-float">
         {#each look.items as item (item.key)}
           <li {...item.holder}>
             <button

@@ -351,7 +351,7 @@
   class="frame visual-viewport relative overflow-x-clip bg-page font-sans text-body text-text">
   <a
     href="#main"
-    class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-(--layer-skip-link) focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"
   >
     {say($lang, "skip_main")}
   </a>

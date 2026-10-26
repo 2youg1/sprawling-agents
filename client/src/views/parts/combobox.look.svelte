@@ -27,12 +27,12 @@
 		<span class={["truncate", look.unset && "text-text-faint"]}>{look.face}</span>
 	</button>
 	{#if look.layer !== undefined}
-		<!-- A stacking number, because every combobox root is positioned:
-			without one the next picker in the same form, later in the
-			document, is painted over this list. -->
+		<!-- The theme's popover layer, because every combobox root is
+			positioned: without it the next picker in the same form, later
+			in the document, is painted over this list. -->
 		<div
 			class={[
-				"layer absolute left-0 z-10 w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-float",
+				"layer absolute left-0 z-(--layer-popover) w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-float",
 				look.side === "below" ? "top-full mt-tight" : "bottom-full mb-tight",
 				look.open && "open",
 			]}

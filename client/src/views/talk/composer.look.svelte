@@ -31,7 +31,7 @@
         {#if look.door !== undefined}
           <!-- In the place of the placeholder, above the box so its one
                control takes a press; the rest lets a press through. -->
-          <div class="pointer-events-none absolute inset-x-0 top-0 z-1 flex py-snug text-body leading-relaxed text-text-faint">
+          <div class="pointer-events-none absolute inset-x-0 top-0 z-(--layer-raised) flex py-snug text-body leading-relaxed text-text-faint">
             {@render look.door()}
           </div>
         {/if}
