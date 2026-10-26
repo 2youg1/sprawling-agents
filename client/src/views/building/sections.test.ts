@@ -20,7 +20,9 @@ const SECTIONS = [
 describe("the building index", () => {
   test("the section in the middle column is the one current entry", () => {
     const look = sectionsLookOf(SECTIONS, "commits", () => undefined);
-    expect(look.entries.map((entry) => [entry.key, entry.current, entry.wire["aria-current"]])).toEqual([
+    expect(
+      look.entries.map((entry) => [entry.key, entry.current, entry.wire["aria-current"]]),
+    ).toEqual([
       ["plan", false, undefined],
       ["commits", true, "true"],
       ["skills", false, undefined],
@@ -29,7 +31,9 @@ describe("the building index", () => {
 
   test("while the tree's pick fills the middle column no entry is current", () => {
     const look = sectionsLookOf(SECTIONS, null, () => undefined);
-    expect(look.entries.some((entry) => entry.current || entry.wire["aria-current"] !== undefined)).toBe(false);
+    expect(
+      look.entries.some((entry) => entry.current || entry.wire["aria-current"] !== undefined),
+    ).toBe(false);
   });
 
   test("a press asks for the entry's own section", () => {

@@ -26,8 +26,15 @@ function item(id: number, created: number, detail: string, tainted: boolean): Ap
 }
 
 test("identical questions share a card, a tainted one stands alone, in the order they arrived", () => {
-  const items = [item(1, 30, "lib.rs", false), item(2, 10, "lib.rs", false), item(3, 20, "lib.rs", true), item(4, 40, "main.rs", false)];
-  expect(grouped(items).map((group) => [group.key, group.items.map((each) => each.action_desc)])).toEqual([
+  const items = [
+    item(1, 30, "lib.rs", false),
+    item(2, 10, "lib.rs", false),
+    item(3, 20, "lib.rs", true),
+    item(4, 40, "main.rs", false),
+  ];
+  expect(
+    grouped(items).map((group) => [group.key, group.items.map((each) => each.action_desc)]),
+  ).toEqual([
     ["question:lib.rs", ["question 2", "question 1"]],
     ["item:3", ["question 3"]],
     ["question:main.rs", ["question 4"]],

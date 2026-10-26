@@ -31,7 +31,11 @@ export function registryLineOf(line: RegistryNewest): RegistryLine {
   const reading = line.reading;
   return "read" in reading
     ? { registry, newest: reading.read.newest, reason: null }
-    : { registry, newest: null, reason: { key: "release_registry_refused", said: reading.refused.refusal.recovery } };
+    : {
+        registry,
+        newest: null,
+        reason: { key: "release_registry_refused", said: reading.refused.refusal.recovery },
+      };
 }
 
 const CHANNEL: Readonly<Record<InstallChannel, Key>> = {

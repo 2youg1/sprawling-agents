@@ -143,7 +143,8 @@
   </div>
 
   <h2 class="flex justify-between text-note text-text-faint">
-    <span>{say($lang, "run_calls")} <span class="figure text-text-quiet">{calls.length}</span></span>
+    <span>{say($lang, "run_calls")} <span class="figure text-text-quiet">{calls.length}</span></span
+    >
     <span>{say($lang, "run_calls_axis")}</span>
   </h2>
   {#if calls.length > 0}
@@ -159,20 +160,31 @@
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
           {@const took = tookOf(placed.call)}
           {@const landed = placed.call.answered ?? null}
-          <li class="grid h-control-sm grid-cols-[14ch_minmax(0,1fr)_10ch] items-center gap-x-base whitespace-nowrap @min-[40rem]:grid-cols-[14ch_9ch_12ch_minmax(0,1fr)_10ch]">
+          <li
+            class="grid h-control-sm grid-cols-[14ch_minmax(0,1fr)_10ch] items-center gap-x-base whitespace-nowrap @min-[40rem]:grid-cols-[14ch_9ch_12ch_minmax(0,1fr)_10ch]"
+          >
             {#if landed === null}
               <span class="figure text-text-faint">{say($lang, "run_call_running")}</span>
             {:else}
-              <time class="figure text-text-faint" datetime={isoInstant(landed)}>{hhmmssms(landed)}</time>
+              <time class="figure text-text-faint" datetime={isoInstant(landed)}
+                >{hhmmssms(landed)}</time
+              >
             {/if}
             <span class="hidden truncate text-text-faint @min-[40rem]:block"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span
             >
-            <span class={["hidden truncate font-mono @min-[40rem]:block", placed.call.outcome === "failed" ? "text-alert" : "text-text"]}
-              >{placed.call.tool}</span
+            <span
+              class={[
+                "hidden truncate font-mono @min-[40rem]:block",
+                placed.call.outcome === "failed" ? "text-alert" : "text-text",
+              ]}>{placed.call.tool}</span
             >
-            <span class="min-w-0 truncate font-mono text-text-quiet">{placed.call.subject ?? placed.call.tool}</span>
-            <span class="figure text-right text-text-faint">{took === null ? "" : tookWords(took, $lang)}</span>
+            <span class="min-w-0 truncate font-mono text-text-quiet"
+              >{placed.call.subject ?? placed.call.tool}</span
+            >
+            <span class="figure text-right text-text-faint"
+              >{took === null ? "" : tookWords(took, $lang)}</span
+            >
           </li>
         {/each}
       </ol>
@@ -182,4 +194,3 @@
     <p class="text-note text-text-faint">{say($lang, "run_no_calls")}</p>
   {/if}
 </section>
-

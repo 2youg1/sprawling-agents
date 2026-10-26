@@ -34,31 +34,41 @@
   const groups = $derived(resultsOf(runs, FIRST));
   const listed = $derived(groups.reduce((sum, group) => sum + group.total, 0));
   const tabs = $derived<readonly Choice<Tab>[]>([
-    { value: "all", label: fill(say($lang, "results_tab"), { name: say($lang, "results_all"), n: String(listed) }) },
+    {
+      value: "all",
+      label: fill(say($lang, "results_tab"), {
+        name: say($lang, "results_all"),
+        n: String(listed),
+      }),
+    },
     // "ended" is a frozen run whose ending nobody saw; it earns a tab
     // only when some run is in it.
     ...groups
       .filter((group) => group.outcome !== "ended" || group.total > 0)
       .map((group) => ({
-      value: group.outcome,
-      label: fill(say($lang, "results_tab"), {
-        name: say($lang, `results_${group.outcome}`),
-        n: String(group.total),
-      }),
-    })),
+        value: group.outcome,
+        label: fill(say($lang, "results_tab"), {
+          name: say($lang, `results_${group.outcome}`),
+          n: String(group.total),
+        }),
+      })),
   ]);
   const bands = $derived(
     bandsOf(
-      groups.filter((group) => tab === "all" || group.outcome === tab).flatMap((group) => group.first),
+      groups
+        .filter((group) => tab === "all" || group.outcome === tab)
+        .flatMap((group) => group.first),
       u.now(),
     ),
   );
-
 </script>
 
 <div class="mx-auto w-full max-w-page">
   <p class="text-note text-text-quiet">
-    {fill(say($lang, "results_city"), { runs: String(runs.length), rest: String(runs.length - listed) })}
+    {fill(say($lang, "results_city"), {
+      runs: String(runs.length),
+      rest: String(runs.length - listed),
+    })}
   </p>
   <div class="mt-snug">
     <Segmented

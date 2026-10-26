@@ -139,7 +139,9 @@ export function readProbed(data: Record<string, unknown>): Probed | null {
   return {
     name,
     baseUrl: str(data.base_url),
-    models: Array.isArray(models) ? models.filter((each): each is string => typeof each === "string") : [],
+    models: Array.isArray(models)
+      ? models.filter((each): each is string => typeof each === "string")
+      : [],
     facts: Array.isArray(facts)
       ? facts.map(fact).filter((each): each is ModelFact => each !== null)
       : [],
@@ -184,8 +186,18 @@ export interface Asked {
 // never writes the answer into the box: the attach runs the same
 // normalisation on the same text and face, so the box needs no help to
 // be right (client/Spec.lean D102).
-export function normalisedFrom(probed: Probed | null, pending: Sent | null, now: Asked): string | null {
-  if (probed === null || pending === null || probed === pending.before || probed.name !== pending.id) return null;
+export function normalisedFrom(
+  probed: Probed | null,
+  pending: Sent | null,
+  now: Asked,
+): string | null {
+  if (
+    probed === null ||
+    pending === null ||
+    probed === pending.before ||
+    probed.name !== pending.id
+  )
+    return null;
   if (now.baseUrl !== pending.baseUrl || now.wireApi !== pending.wireApi) return null;
   const recorded = probed.baseUrl;
   return recorded === null || recorded === pending.baseUrl.trim() ? null : recorded;
@@ -237,7 +249,8 @@ export function stoppedAt(reach: Reached, listed: Probed["failure"]): Key {
 
 function byStatus(status: number | null, listed: Probed["failure"]): Key {
   if (status === null) return "setup_reach_unreachable";
-  if (status === 401 || status === 403) return listed === null ? "setup_reach_ok" : "setup_reach_key";
+  if (status === 401 || status === 403)
+    return listed === null ? "setup_reach_ok" : "setup_reach_key";
   if (status === 404) return "setup_reach_path";
   if (status >= 200 && status < 400) return "setup_reach_ok";
   return "setup_reach_status";

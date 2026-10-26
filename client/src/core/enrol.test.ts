@@ -19,8 +19,7 @@ import { enrol, keyField, referenceFor, referenceText, secretFor } from "./enrol
 // mocked and the body under test is the production path.
 function answering(body: string, status: number): () => void {
   const held = globalThis.fetch;
-  const answer = (): Promise<Response> =>
-    Promise.resolve(new Response(body, { status }));
+  const answer = (): Promise<Response> => Promise.resolve(new Response(body, { status }));
   globalThis.fetch = Object.assign(answer, { preconnect: held.preconnect });
   return () => {
     globalThis.fetch = held;

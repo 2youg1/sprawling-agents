@@ -50,7 +50,9 @@
 
   const asked = $derived(commitsIn(here));
   const answer = $derived(u.conn.asking.ask(asked));
-  const read = $derived(readAnswer($answer, (held) => ("commits" in held ? held.commits : undefined)));
+  const read = $derived(
+    readAnswer($answer, (held) => ("commits" in held ? held.commits : undefined)),
+  );
   const commits = $derived(read.kind === "held" ? read.value.commits : []);
   const graph = $derived(graphOf(commits));
 
@@ -99,7 +101,7 @@
 
 <div class="min-h-0 flex-1 overflow-y-auto">
   {#if read.kind === "unavailable"}
-    <Unanswered query={read.query} asked={asked} />
+    <Unanswered query={read.query} {asked} />
   {:else if read.kind === "held" && commits.length === 0}
     <p class="py-snug text-note text-text-faint">{say($lang, "world_no_commits")}</p>
   {:else}

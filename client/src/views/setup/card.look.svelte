@@ -27,7 +27,10 @@ press saves, so the two kinds of card share one rhythm in one grid. -->
         <span class="text-note text-text-faint">{constraint}</span>
       {/if}
       {#if receipt !== undefined}
-        <span {...receipt.wire} class="ml-auto inline-flex items-center gap-tight text-note text-text-quiet">
+        <span
+          {...receipt.wire}
+          class="ml-auto inline-flex items-center gap-tight text-note text-text-quiet"
+        >
           {#if receipt.said !== undefined}
             <span class="fade inline-flex items-center gap-tight">
               <Glyph name="check" size="sm" class="shrink-0" />

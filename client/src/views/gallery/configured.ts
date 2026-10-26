@@ -33,7 +33,15 @@ export const ACCOUNTED: EndpointSummary = {
   has_credential: true,
   label: "ZenMux",
   local: false,
-  models: [{ id: "fable", input_modalities: [], canonical: "fable", listing: "listed", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
+  models: [
+    {
+      id: "fable",
+      input_modalities: [],
+      canonical: "fable",
+      listing: "listed",
+      thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+    },
+  ],
   name: "zenmux",
   tuning: {
     ...UNTUNED,
@@ -58,19 +66,36 @@ export const UNLISTED: EndpointSummary = { ...ACCOUNTED, account_status: [], tun
 // with one keyed account, while the hall's own file turns search off:
 // the card edits the city's value and says the hall's stands apart.
 export const SEARCH_CUSTOM: SettledSearch = {
-  account_status: [{ supplier: ServerLabel.make("brave"), accounts: [{ id: ServerLabel.make("main"), key: "stored" }] }],
+  account_status: [
+    {
+      supplier: ServerLabel.make("brave"),
+      accounts: [{ id: ServerLabel.make("main"), key: "stored" }],
+    },
+  ],
   city: {
     custom: {
       selected: ServerLabel.make("brave"),
       suppliers: [
-        { id: ServerLabel.make("tavily"), url: "https://mcp.tavily.invalid/mcp", remote: "tavily_search", query_field: "query", accounts: [] },
+        {
+          id: ServerLabel.make("tavily"),
+          url: "https://mcp.tavily.invalid/mcp",
+          remote: "tavily_search",
+          query_field: "query",
+          accounts: [],
+        },
         {
           id: ServerLabel.make("brave"),
           url: "https://mcp.brave.invalid/mcp",
           remote: "brave_web_search",
           query_field: "query",
           count_field: "count",
-          accounts: [{ id: ServerLabel.make("main"), reference: "secret:search/brave.main", header: "x-subscription-token" }],
+          accounts: [
+            {
+              id: ServerLabel.make("main"),
+              reference: "secret:search/brave.main",
+              header: "x-subscription-token",
+            },
+          ],
         },
       ],
     },

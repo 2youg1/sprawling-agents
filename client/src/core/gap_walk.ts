@@ -159,7 +159,10 @@ export function createGapWalk(
   // between and asks again only what the dead socket took with it;
   // any other page asks every watched question again.
   function resume(head: Seq | null): void {
-    const owed = gaps.reduce((far, gap) => (gap.to > far ? gap.to : far), mark ?? head ?? Seq.make(0));
+    const owed = gaps.reduce(
+      (far, gap) => (gap.to > far ? gap.to : far),
+      mark ?? head ?? Seq.make(0),
+    );
     if (mark === null || head === null || head < mark || head - owed > RESUME_PAGES * GAP_PAGE) {
       asking.reconnected();
       return;
@@ -191,7 +194,8 @@ export function createGapWalk(
     answered(askId, outcome) {
       if (askId !== gapAsk) return false;
       gapAsk = null;
-      if ("answer" in outcome && "history_range" in outcome.answer) filled(outcome.answer.history_range);
+      if ("answer" in outcome && "history_range" in outcome.answer)
+        filled(outcome.answer.history_range);
       return true;
     },
   };

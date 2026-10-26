@@ -71,7 +71,11 @@
   // The pages under each nest, read when the nest is drawn.
   const leaves = $derived<Record<Nest, readonly Page[]>>({
     buildings: buildingPages($buildings),
-    record: LENSES.map((lens) => ({ kind: "page", view: { kind: "record", lens }, word: `rec_${lens}` })),
+    record: LENSES.map((lens) => ({
+      kind: "page",
+      view: { kind: "record", lens },
+      word: `rec_${lens}`,
+    })),
   });
 
   let nav: HTMLElement | null = null;

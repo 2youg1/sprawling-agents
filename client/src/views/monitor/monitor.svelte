@@ -1,27 +1,27 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Following one run over the agent's shoulder: the files it changed on
-// one side and its terminal on the other (the workbench). The terminal
-// folds away; folded, a column of the changed files takes its place as
-// the way to jump around the code.
-//
-// Following is on when the page opens and lands on whatever the agent
-// touched last - the file it edited or the call it made. The first
-// wheel turn, touch drag or scrolling key in either pane pauses it,
-// because a person who scrolls is reading, and a page that pulls the
-// text away mid-sentence is fighting them. Those three inputs are what
-// a person does and a scroll the page makes itself is not, which is why
-// pausing listens to them and not to the `scroll` event. `F`, or the
-// follow button, takes it up again; the key is heard page-wide because
-// it only means something while this view is on the page.
-//
-// This file is the seat (client D95): it holds the two states and the
-// two panes, and `./monitor.ts` turns them into the value the look
-// (`monitor.look.svelte`) draws.
+  // Following one run over the agent's shoulder: the files it changed on
+  // one side and its terminal on the other (the workbench). The terminal
+  // folds away; folded, a column of the changed files takes its place as
+  // the way to jump around the code.
+  //
+  // Following is on when the page opens and lands on whatever the agent
+  // touched last - the file it edited or the call it made. The first
+  // wheel turn, touch drag or scrolling key in either pane pauses it,
+  // because a person who scrolls is reading, and a page that pulls the
+  // text away mid-sentence is fighting them. Those three inputs are what
+  // a person does and a scroll the page makes itself is not, which is why
+  // pausing listens to them and not to the `scroll` event. `F`, or the
+  // follow button, takes it up again; the key is heard page-wide because
+  // it only means something while this view is on the page.
+  //
+  // This file is the seat (client D95): it holds the two states and the
+  // two panes, and `./monitor.ts` turns them into the value the look
+  // (`monitor.look.svelte`) draws.
 </script>
 
 <script lang="ts">
@@ -50,7 +50,15 @@
     readonly terminal?: Pane;
   }
 
-  const { turns, tail, live, onDraft, onSteer, following: openFollowing = "following", terminal: openTerminal = "open" }: Props = $props();
+  const {
+    turns,
+    tail,
+    live,
+    onDraft,
+    onSteer,
+    following: openFollowing = "following",
+    terminal: openTerminal = "open",
+  }: Props = $props();
   const { lang } = ui();
 
   // svelte-ignore state_referenced_locally (the props say how the monitor opens; the person moves both after that)
@@ -79,7 +87,8 @@
       }
       case "entry": {
         const entry = record?.querySelector<HTMLElement>(`[data-at="${String(target.at)}"]`);
-        if (record !== undefined && entry != null) record.scrollTop = entry.offsetTop + entry.offsetHeight - record.clientHeight;
+        if (record !== undefined && entry != null)
+          record.scrollTop = entry.offsetTop + entry.offsetHeight - record.clientHeight;
         return;
       }
     }
@@ -117,8 +126,18 @@
   );
 
   function resumeBy(event: KeyboardEvent): void {
-    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-    if (resumes({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, typing })) following = "following";
+    const typing =
+      event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+    if (
+      resumes({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        altKey: event.altKey,
+        typing,
+      })
+    )
+      following = "following";
   }
 </script>
 

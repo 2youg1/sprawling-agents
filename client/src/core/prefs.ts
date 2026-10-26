@@ -45,7 +45,17 @@ import {
 } from "../wire";
 import { appearanceOnWire, type Keeper } from "./prefs_city";
 import { readTheme, type Theme } from "./theme_override";
-import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, READING_FACES, blendOf, type Appearance } from "./appearance";
+import {
+  CHROMAS,
+  DENSITIES,
+  FACES,
+  GLASSES,
+  LIGHTINGS,
+  MOTIONS,
+  READING_FACES,
+  blendOf,
+  type Appearance,
+} from "./appearance";
 import { readBody, readLang, readOne, readStack, writeFigure } from "./prefs_values";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";

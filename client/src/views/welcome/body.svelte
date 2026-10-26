@@ -31,7 +31,9 @@
   const { lang } = u;
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
-  const answer = $derived(readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)));
+  const answer = $derived(
+    readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)),
+  );
 </script>
 
 {#if step === "provider"}

@@ -18,7 +18,14 @@
 
 {#each readings as reading (reading.key)}
   <details class="rounded-card bg-chrome px-base py-snug text-note">
-    <summary class="w-fit cursor-pointer rounded-control px-tight text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive">{reading.title}</summary>
-    <pre class={["mt-snug overflow-auto font-mono text-text-faint", reading.wraps && "whitespace-pre-wrap"]}>{reading.text}</pre>
+    <summary
+      class="w-fit cursor-pointer rounded-control px-tight text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
+      >{reading.title}</summary
+    >
+    <pre
+      class={[
+        "mt-snug overflow-auto font-mono text-text-faint",
+        reading.wraps && "whitespace-pre-wrap",
+      ]}>{reading.text}</pre>
   </details>
 {/each}

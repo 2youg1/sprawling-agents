@@ -74,7 +74,11 @@
     <AddressLine {address} {session} />
   {/if}
   {#if !band}
-    <Scroller empty={false} rejoined={0} place={stretch === null ? address : `${address}:${String(stretch.line.began)}`}>
+    <Scroller
+      empty={false}
+      rejoined={0}
+      place={stretch === null ? address : `${address}:${String(stretch.line.began)}`}
+    >
       {#each stretch?.runs ?? [] as run, at (run.run)}
         <Thread
           {run}

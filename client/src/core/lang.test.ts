@@ -60,9 +60,7 @@ describe("lang", () => {
 
   test("both languages of a sentence ask for the same values", () => {
     for (const [key, phrase] of Object.entries(table)) {
-      expect(slotsOf(phrase.zh), `${key} fills different slots`).toEqual(
-        slotsOf(phrase.en),
-      );
+      expect(slotsOf(phrase.zh), `${key} fills different slots`).toEqual(slotsOf(phrase.en));
     }
   });
 

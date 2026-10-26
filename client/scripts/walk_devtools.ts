@@ -14,7 +14,17 @@ import { dirname, join } from "node:path";
 
 // The doctor's Chromium family, the table `xtask render` reads too: one
 // brand per line, its program, and where each platform installs it.
-const FAMILY = join(import.meta.dir, "..", "..", "crates", "sprawling", "src", "doctor", "family", "chromium.tsv");
+const FAMILY = join(
+  import.meta.dir,
+  "..",
+  "..",
+  "crates",
+  "sprawling",
+  "src",
+  "doctor",
+  "family",
+  "chromium.tsv",
+);
 
 // The engine to drive: the one `SPRAWLING_BROWSER` names, as for the
 // render gate, or else the first of the family installed here, in the
@@ -26,7 +36,9 @@ export function engine(): string | null {
   for (const line of readFileSync(FAMILY, "utf8").split(/\r?\n/)) {
     if (line.startsWith("#") || line.trim() === "") continue;
     const fields = line.split("\t");
-    const placed = (fields[column] ?? "").split("|").find((place) => place !== "" && existsSync(place));
+    const placed = (fields[column] ?? "")
+      .split("|")
+      .find((place) => place !== "" && existsSync(place));
     const found = placed ?? Bun.which(fields[1] ?? "");
     if (found !== null) return found;
   }
@@ -45,7 +57,8 @@ export interface Frame {
 
 export type Lighting = "dark" | "light";
 
-export type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly why: string };
+export type Outcome<T> =
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly why: string };
 
 const ok = <T>(value: T): Outcome<T> => ({ ok: true, value });
 const failed = <T>(why: string): Outcome<T> => ({ ok: false, why });
@@ -97,7 +110,9 @@ export class DevTools {
   static async open(profile: string, port: number): Promise<Outcome<DevTools>> {
     const program = engine();
     if (program === null) {
-      return failed("no Chromium-family browser is installed here; install one, or point SPRAWLING_BROWSER at one");
+      return failed(
+        "no Chromium-family browser is installed here; install one, or point SPRAWLING_BROWSER at one",
+      );
     }
     mkdirSync(profile, { recursive: true });
     const browser = Bun.spawn(
@@ -136,7 +151,9 @@ export class DevTools {
       }
     }
     browser.kill();
-    return failed("the browser never offered a page to attach to; set SPRAWLING_BROWSER to a Chromium-family browser");
+    return failed(
+      "the browser never offered a page to attach to; set SPRAWLING_BROWSER to a Chromium-family browser",
+    );
   }
 
   close(): void {
@@ -144,7 +161,10 @@ export class DevTools {
     this.browser.kill();
   }
 
-  send(method: string, params: Record<string, unknown> = {}): Promise<Outcome<Record<string, unknown>>> {
+  send(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<Outcome<Record<string, unknown>>> {
     this.next += 1;
     const id = this.next;
     this.socket.send(JSON.stringify({ id, method, params }));
@@ -170,8 +190,13 @@ export class DevTools {
       deviceScaleFactor: frame.dpr,
       mobile: frame.touch,
     });
-    await this.send("Emulation.setTouchEmulationEnabled", frame.touch ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-    await this.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: lighting }] });
+    await this.send(
+      "Emulation.setTouchEmulationEnabled",
+      frame.touch ? { enabled: true, maxTouchPoints: 5 } : { enabled: false },
+    );
+    await this.send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-color-scheme", value: lighting }],
+    });
   }
 
   async load(url: string, settle: number): Promise<void> {
@@ -185,13 +210,19 @@ export class DevTools {
   // what the page drew once it was still.
   async settle(ms: number): Promise<void> {
     await sleep(ms);
-    await this.run("document.fonts.ready.then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))");
+    await this.run(
+      "document.fonts.ready.then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))",
+    );
   }
 
   // Runs `expression` in the page and waits for the promise it returns;
   // a page that threw comes back as a failure naming what it said.
   async run(expression: string): Promise<Outcome<unknown>> {
-    const answer = await this.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    const answer = await this.send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
     if (!answer.ok) return answer;
     const thrown = answer.value.exceptionDetails;
     if (isRecord(thrown)) {
@@ -206,8 +237,18 @@ export class DevTools {
   }
 
   async key(key: string, code: string, virtual: number): Promise<void> {
-    await this.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, windowsVirtualKeyCode: virtual });
-    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: virtual });
+    await this.send("Input.dispatchKeyEvent", {
+      type: "keyDown",
+      key,
+      code,
+      windowsVirtualKeyCode: virtual,
+    });
+    await this.send("Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key,
+      code,
+      windowsVirtualKeyCode: virtual,
+    });
   }
 
   async keep(path: string): Promise<Outcome<string>> {

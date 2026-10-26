@@ -82,7 +82,9 @@ export function sectionsOf(answer: PrivacyAnswer): readonly Section[] {
 }
 
 function ownedOf(history: PrivacyHistory, control: PrivacyControl): PrivacyIntent | null {
-  return "disclosed" in history ? (history.disclosed.owned.find((each) => each.control === control) ?? null) : null;
+  return "disclosed" in history
+    ? (history.disclosed.owned.find((each) => each.control === control) ?? null)
+    : null;
 }
 
 export function offersOf(row: PrivacyControlEntry, history: PrivacyHistory): readonly Offer[] {
@@ -96,10 +98,12 @@ export function offersOf(row: PrivacyControlEntry, history: PrivacyHistory): rea
   const offers: Offer[] = [];
   const written = row.written ?? null;
   // wording-ok: the wire name of a privacy action, not a word for a reader
-  if (written !== null && !sameValue(value, written)) offers.push({ action: "apply", expected: value });
+  if (written !== null && !sameValue(value, written))
+    offers.push({ action: "apply", expected: value });
   const mine = owned.find((each) => each.control === row.control);
   // wording-ok: the wire name of a privacy action, not a word for a reader
-  if (mine !== undefined && sameValue(value, mine.modified)) offers.push({ action: "restore", expected: value });
+  if (mine !== undefined && sameValue(value, mine.modified))
+    offers.push({ action: "restore", expected: value });
   return offers;
 }
 
@@ -173,7 +177,8 @@ export function valueWord(lang: Lang, value: PrivacyValue): string {
 function currentWord(lang: Lang, current: PrivacyCurrent): string {
   if (current === "access_denied") return say(lang, "privacy_current_access_denied");
   if (current === "not_read") return say(lang, "privacy_current_not_read");
-  if ("failed" in current) return fill(say(lang, "privacy_current_failed"), { why: current.failed.error.recovery });
+  if ("failed" in current)
+    return fill(say(lang, "privacy_current_failed"), { why: current.failed.error.recovery });
   return valueWord(lang, current.read.value);
 }
 
@@ -202,7 +207,11 @@ export function hostFacts(lang: Lang, host: PrivacyHost): readonly Fact[] | stri
       ? fill(say(lang, "privacy_host_edition_unlisted"), { id: windows.edition_id })
       : `${say(lang, editionWord(windows.edition))} (${windows.edition_id})`;
   return [
-    { label: say(lang, "privacy_host_version"), value: windows.display_version ?? say(lang, "privacy_host_unrecorded"), figure: true },
+    {
+      label: say(lang, "privacy_host_version"),
+      value: windows.display_version ?? say(lang, "privacy_host_unrecorded"),
+      figure: true,
+    },
     { label: say(lang, "privacy_host_edition"), value: edition, figure: false },
     { label: say(lang, "privacy_host_build"), value: windows.build, figure: true },
   ];
@@ -254,14 +263,21 @@ function statusOf<I>(
 
 function settledStatus(lang: Lang, shown: PrivacyResult): EntryLook["status"] {
   if (shown === "running") return { text: say(lang, "privacy_waiting"), weight: "live" };
-  if (shown === "already_written") return { text: say(lang, "privacy_result_already"), weight: "quiet" };
+  if (shown === "already_written")
+    return { text: say(lang, "privacy_result_already"), weight: "quiet" };
   if ("applied" in shown) return { text: say(lang, "privacy_result_applied"), weight: "quiet" };
   if ("restored" in shown) return { text: say(lang, "privacy_result_restored"), weight: "quiet" };
   if ("reconciled" in shown) {
     const settlement: Key = `privacy_settlement_${shown.reconciled.settlement}`;
-    return { text: fill(say(lang, "privacy_result_reconciled"), { settlement: say(lang, settlement) }), weight: "quiet" };
+    return {
+      text: fill(say(lang, "privacy_result_reconciled"), { settlement: say(lang, settlement) }),
+      weight: "quiet",
+    };
   }
-  return { text: fill(say(lang, "privacy_result_refused"), { why: shown.refused.error.recovery }), weight: "alert" };
+  return {
+    text: fill(say(lang, "privacy_result_refused"), { why: shown.refused.error.recovery }),
+    weight: "alert",
+  };
 }
 
 // The id an entry carries under the id root of the page drawing it, so a
@@ -280,9 +296,12 @@ export interface Drawn<I> {
 // The whole look of one entry in the person's language.
 export function lookOf<I>(lang: Lang, model: EntryModel, drawn: Drawn<I>): EntryLook {
   const { row, owned } = model;
-  const word = (field: Parameters<typeof controlWord>[1]) => say(lang, controlWord(row.control, field));
+  const word = (field: Parameters<typeof controlWord>[1]) =>
+    say(lang, controlWord(row.control, field));
   const list = (editions: readonly PrivacyControlEntry["editions"]["honoured"][number][]) =>
-    editions.length === 0 ? say(lang, "privacy_none_listed") : editions.map((each) => say(lang, editionWord(each))).join(", ");
+    editions.length === 0
+      ? say(lang, "privacy_none_listed")
+      : editions.map((each) => say(lang, editionWord(each))).join(", ");
   const presses: Press[] = model.offers.map((offer) => ({
     label: say(lang, pressWord(offer.action)),
     onPress: () => {
@@ -295,7 +314,10 @@ export function lookOf<I>(lang: Lang, model: EntryModel, drawn: Drawn<I>): Entry
     lines:
       row.originals.length === 0
         ? { label: say(lang, "privacy_lines"), text: say(lang, "privacy_added") }
-        : { label: say(lang, "privacy_lines"), text: row.originals.map((line) => line.text).join("  ·  ") },
+        : {
+            label: say(lang, "privacy_lines"),
+            text: row.originals.map((line) => line.text).join("  ·  "),
+          },
     notes: [
       { label: say(lang, "privacy_does"), text: word("does") },
       { label: say(lang, "privacy_benefit"), text: word("benefit") },
@@ -317,7 +339,8 @@ export function lookOf<I>(lang: Lang, model: EntryModel, drawn: Drawn<I>): Entry
       { label: say(lang, "privacy_current"), value: currentWord(lang, row.current), figure: true },
       {
         label: say(lang, "privacy_written"),
-        value: row.written == null ? say(lang, "privacy_written_unknown") : valueWord(lang, row.written),
+        value:
+          row.written == null ? say(lang, "privacy_written_unknown") : valueWord(lang, row.written),
         figure: true,
       },
       {
@@ -325,7 +348,11 @@ export function lookOf<I>(lang: Lang, model: EntryModel, drawn: Drawn<I>): Entry
         value: owned === null ? say(lang, "privacy_not_changed") : valueWord(lang, owned.original),
         figure: owned !== null,
       },
-      { label: say(lang, "privacy_scope"), value: say(lang, `privacy_scope_${row.scope}`), figure: false },
+      {
+        label: say(lang, "privacy_scope"),
+        value: say(lang, `privacy_scope_${row.scope}`),
+        figure: false,
+      },
     ],
     target: { label: say(lang, "privacy_target"), text: targetPath(row.target) },
     presses,
@@ -350,7 +377,9 @@ export function confirmOf(lang: Lang, model: EntryModel, action: Action): Confir
   const to = (): string => {
     switch (action) {
       case "apply":
-        return row.written == null ? say(lang, "privacy_written_unknown") : valueWord(lang, row.written);
+        return row.written == null
+          ? say(lang, "privacy_written_unknown")
+          : valueWord(lang, row.written);
       case "restore":
         return owned === null ? say(lang, "privacy_not_changed") : valueWord(lang, owned.original);
       case "reconcile":
@@ -363,14 +392,30 @@ export function confirmOf(lang: Lang, model: EntryModel, action: Action): Confir
     confirmLabel: say(lang, pressWord(action)),
     facts: [
       { label: say(lang, "privacy_current"), value: now, figure: true },
-      { label: say(lang, action === "reconcile" ? "privacy_recorded" : "privacy_after"), value: to(), figure: true },
-      { label: say(lang, "privacy_scope"), value: say(lang, `privacy_scope_${row.scope}`), figure: false },
+      {
+        label: say(lang, action === "reconcile" ? "privacy_recorded" : "privacy_after"),
+        value: to(),
+        figure: true,
+      },
+      {
+        label: say(lang, "privacy_scope"),
+        value: say(lang, `privacy_scope_${row.scope}`),
+        figure: false,
+      },
     ],
     notes:
       action === "reconcile"
-        ? [{ label: say(lang, "privacy_reconcile_label"), text: say(lang, "privacy_reconcile_detail") }]
+        ? [
+            {
+              label: say(lang, "privacy_reconcile_label"),
+              text: say(lang, "privacy_reconcile_detail"),
+            },
+          ]
         : [
-            { label: say(lang, "privacy_overlooked"), text: say(lang, controlWord(row.control, "overlooked")) },
+            {
+              label: say(lang, "privacy_overlooked"),
+              text: say(lang, controlWord(row.control, "overlooked")),
+            },
             { label: say(lang, "privacy_undo"), text: say(lang, controlWord(row.control, "undo")) },
           ],
   };

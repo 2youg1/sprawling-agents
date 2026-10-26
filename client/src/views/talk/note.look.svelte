@@ -25,7 +25,9 @@ stills. -->
 <div class="flex flex-wrap items-baseline gap-snug text-note text-text-faint" {role}>
   {#each pieces as piece, at (at)}
     {#if piece.kind === "link"}
-      <a href={piece.href} class={["name", piece.face === "mono" && "font-mono underline"]}>{piece.text}</a>
+      <a href={piece.href} class={["name", piece.face === "mono" && "font-mono underline"]}
+        >{piece.text}</a
+      >
     {:else}
       <span class={INK[piece.ink]}>{piece.text}</span>
     {/if}

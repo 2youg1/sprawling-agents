@@ -35,7 +35,12 @@ describe("the recycle bin", () => {
 
   test("offers the press only on a tracked row that is still gone, and the press sends that row's way back", () => {
     const sent: Restoration[] = [];
-    const rows = [line(TRACKED, false), line(TRACKED, true), line(INTERRED, false), line(REBUILT, false)];
+    const rows = [
+      line(TRACKED, false),
+      line(TRACKED, true),
+      line(INTERRED, false),
+      line(REBUILT, false),
+    ];
     const look = lookOf(rows, "en", (restoration) => sent.push(restoration));
     expect(look.rows.map((row) => [row.standing, row.standingWord, row.restore?.label])).toEqual([
       ["gone", "gone", "put back"],
@@ -48,7 +53,11 @@ describe("the recycle bin", () => {
   });
 
   test("every row states its own way back, one arm per storage authority", () => {
-    const look = lookOf([line(TRACKED, false), line(INTERRED, false), line(REBUILT, false)], "en", () => undefined);
+    const look = lookOf(
+      [line(TRACKED, false), line(INTERRED, false), line(REBUILT, false)],
+      "en",
+      () => undefined,
+    );
     expect(look.rows.map((row) => row.way)).toEqual([
       "in git at 9c41e07:shop/notes/draft.md",
       "in the store at interred/2026-10-02/draft.md",
@@ -58,7 +67,9 @@ describe("the recycle bin", () => {
 
   test("a path discarded twice is two rows, told apart by the moment", () => {
     const later = { ...line(TRACKED, false), at: TimeMs.make(AT + 1) };
-    const keys = lookOf([line(TRACKED, false), later], "en", () => undefined).rows.map((row) => row.key);
+    const keys = lookOf([line(TRACKED, false), later], "en", () => undefined).rows.map(
+      (row) => row.key,
+    );
     expect(new Set(keys).size).toBe(2);
   });
 });

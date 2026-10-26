@@ -44,8 +44,20 @@ export interface WordsWire {
 // left out; an inserted one can be left out or rewritten.
 export type RowLook =
   | { readonly key: number; readonly kind: "kept"; readonly text: string }
-  | { readonly key: number; readonly kind: "struck"; readonly text: string; readonly taken: boolean; readonly take: TakeWire }
-  | { readonly key: number; readonly kind: "written"; readonly taken: boolean; readonly take: TakeWire; readonly words: WordsWire };
+  | {
+      readonly key: number;
+      readonly kind: "struck";
+      readonly text: string;
+      readonly taken: boolean;
+      readonly take: TakeWire;
+    }
+  | {
+      readonly key: number;
+      readonly kind: "written";
+      readonly taken: boolean;
+      readonly take: TakeWire;
+      readonly words: WordsWire;
+    };
 
 // One sentence of the diff as the city will land it, with its own
 // spacing. `said` is the word a screen reader hears before a changed
@@ -108,7 +120,10 @@ export function cardLookOf(card: ProposalCard, held: Held, lang: Lang, hands: Ha
     status: statusOf(held.deciding, lang),
     body:
       held.edit === null
-        ? { kind: "diff", pieces: card.slices.map((slice, place) => pieceOf(card, slice, place, lang)) }
+        ? {
+            kind: "diff",
+            pieces: card.slices.map((slice, place) => pieceOf(card, slice, place, lang)),
+          }
         : { kind: "edit", rows: rowsOf(card, held.edit, lang, hands) },
   };
 }
@@ -128,7 +143,8 @@ export function refusalsOf(held: Omit<Held, "lead">, lang: Lang): Refusals {
   const stale = held.standing.kind === "stale";
   const busyWhy = busy ? say(lang, "proposal_busy_why") : undefined;
   const staleWhy = stale ? say(lang, "proposal_stale_why") : undefined;
-  const emptyWhy = held.edit !== null && !takesAny(held.edit) ? say(lang, "proposal_nothing_taken") : undefined;
+  const emptyWhy =
+    held.edit !== null && !takesAny(held.edit) ? say(lang, "proposal_nothing_taken") : undefined;
   return {
     accept: busyWhy ?? staleWhy ?? emptyWhy,
     edit: busyWhy ?? staleWhy,
@@ -158,7 +174,10 @@ function statusOf(deciding: Deciding, lang: Lang): StatusLook | undefined {
 }
 
 function pieceOf(card: ProposalCard, slice: Slice, place: number, lang: Lang): PieceLook {
-  const said = slice.kind === "same" ? undefined : say(lang, slice.kind === "delete" ? "proposal_removed" : "proposal_added");
+  const said =
+    slice.kind === "same"
+      ? undefined
+      : say(lang, slice.kind === "delete" ? "proposal_removed" : "proposal_added");
   return {
     key: place,
     kind: slice.kind,
@@ -173,7 +192,8 @@ function pieceOf(card: ProposalCard, slice: Slice, place: number, lang: Lang): P
 function rowsOf(card: ProposalCard, edit: Edit, lang: Lang, hands: Hands): readonly RowLook[] {
   return card.slices.map((slice, place): RowLook => {
     const take = edit.get(place);
-    if (slice.kind === "same" || take === undefined) return { key: place, kind: "kept", text: slice.text };
+    if (slice.kind === "same" || take === undefined)
+      return { key: place, kind: "kept", text: slice.text };
     const box: TakeWire = {
       type: "checkbox",
       checked: take.taken,
@@ -182,7 +202,8 @@ function rowsOf(card: ProposalCard, edit: Edit, lang: Lang, hands: Hands): reado
         hands.retake(place, { taken: event.currentTarget.checked });
       },
     };
-    if (slice.kind === "delete") return { key: place, kind: "struck", text: slice.text, taken: take.taken, take: box };
+    if (slice.kind === "delete")
+      return { key: place, kind: "struck", text: slice.text, taken: take.taken, take: box };
     return {
       key: place,
       kind: "written",

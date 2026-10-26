@@ -42,4 +42,6 @@
   <span class="truncate text-text">{subject}</span>
 {/if}
 <span class="truncate font-mono text-text-faint narrow:hidden">{roomOf(commit.actor)}</span>
-<time class="figure text-text-faint narrow:hidden" datetime={isoInstant(commit.at)}>{moment(commit.at)}</time>
+<time class="figure text-text-faint narrow:hidden" datetime={isoInstant(commit.at)}
+  >{moment(commit.at)}</time
+>

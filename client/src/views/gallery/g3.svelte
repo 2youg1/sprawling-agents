@@ -37,7 +37,10 @@
 
   // wording-ok: fixture text is a file's contents, not a page's words
   const REPORT_BYTES = pdfOf([
-    { latin: ["Quarterly report", "Every version the city reads is kept."], chinese: ["城读到的每一版都存下。"] },
+    {
+      latin: ["Quarterly report", "Every version the city reads is kept."],
+      chinese: ["城读到的每一版都存下。"],
+    },
   ]);
 
   // A picture of the page the browser tool looked at: a drawing rather
@@ -94,7 +97,8 @@
 
   function answering(query: Query): Answer | undefined {
     if (typeof query !== "object") return undefined;
-    if ("document" in query) return { document: { at: query.document.at, state: STATES[query.document.at] ?? "missing" } };
+    if ("document" in query)
+      return { document: { at: query.document.at, state: STATES[query.document.at] ?? "missing" } };
     if ("versions" in query) {
       return {
         versions: {
@@ -102,8 +106,18 @@
           versions: [
             { version: V3, bytes: bytesOf(TEXTS[V3] ?? ""), kept: true, source: "on_disk" },
             { version: V2, kept: false, source: { before: { seq: Seq.make(412) } } },
-            { version: V1, bytes: bytesOf(TEXTS[V1] ?? ""), kept: true, source: at(388, 1_790_000_000_000) },
-            { version: V0, bytes: bytesOf(TEXTS[V0] ?? ""), kept: true, source: { before: { seq: Seq.make(388) } } },
+            {
+              version: V1,
+              bytes: bytesOf(TEXTS[V1] ?? ""),
+              kept: true,
+              source: at(388, 1_790_000_000_000),
+            },
+            {
+              version: V0,
+              bytes: bytesOf(TEXTS[V0] ?? ""),
+              kept: true,
+              source: { before: { seq: Seq.make(388) } },
+            },
           ],
           more: false,
         },
@@ -112,20 +126,40 @@
     if ("range" in query) {
       const text = TEXTS[query.range.version] ?? "";
       const start = query.range.range.start;
-      const window = start === 0 ? { span: { start: 0, end: bytesOf(text) }, text } : { span: { start, end: start }, text: "" };
+      const window =
+        start === 0
+          ? { span: { start: 0, end: bytesOf(text) }, text }
+          : { span: { start, end: start }, text: "" };
       return { range: { version: query.range.version, window } };
     }
     if ("bytes" in query) {
-      const whole = query.bytes.version === PDF ? REPORT_BYTES : query.bytes.version === SHOT ? shotBytes() : null;
+      const whole =
+        query.bytes.version === PDF
+          ? REPORT_BYTES
+          : query.bytes.version === SHOT
+            ? shotBytes()
+            : null;
       if (whole === null) return { unavailable: { query: "Bytes" } };
       const start = Math.min(query.bytes.range.start, whole.length);
       const end = Math.min(whole.length, start + WINDOW, query.bytes.range.end);
-      return { bytes: { version: query.bytes.version, span: { start, end }, size: whole.length, base64: base64Of(whole.slice(start, end)) } };
+      return {
+        bytes: {
+          version: query.bytes.version,
+          span: { start, end },
+          size: whole.length,
+          base64: base64Of(whole.slice(start, end)),
+        },
+      };
     }
     return undefined;
   }
 
-  const PICTURE = { image: Locator.make(`cas:b3-${SHOT}`), width: 1280, height: 720, media_type: "image/svg+xml" };
+  const PICTURE = {
+    image: Locator.make(`cas:b3-${SHOT}`),
+    width: 1280,
+    height: 720,
+    media_type: "image/svg+xml",
+  };
 </script>
 
 <script lang="ts">
@@ -139,9 +173,17 @@
 </script>
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
-  <Case label="refrain · every version the city knows, one written outside the page and not kept" width={600}>
+  <Case
+    label="refrain · every version the city knows, one written outside the page and not kept"
+    width={600}
+  >
     <div class={FRAME}>
-      <Document at={Address.make(`shop/${MEMO}`)} building={SHOP} version={null} reading="versions" />
+      <Document
+        at={Address.make(`shop/${MEMO}`)}
+        building={SHOP}
+        version={null}
+        reading="versions"
+      />
     </div>
   </Case>
   <Case label="refrain · a city's PDF drawn from bytes fetched by its version" width={600}>

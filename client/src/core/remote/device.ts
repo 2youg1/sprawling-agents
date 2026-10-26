@@ -74,7 +74,9 @@ export async function kept(): Promise<Device | null> {
 export async function keep(device: Device): Promise<boolean> {
   const base = await opened();
   if (base === null) return false;
-  const written = await done(base.transaction(STORE, "readwrite").objectStore(STORE).put(device, ONLY));
+  const written = await done(
+    base.transaction(STORE, "readwrite").objectStore(STORE).put(device, ONLY),
+  );
   base.close();
   return written !== null;
 }

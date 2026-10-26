@@ -62,7 +62,9 @@ export function lookOf(answer: EndpointsAnswer, lang: Lang): EndpointListLook {
       baseUrl: endpoint.base_url,
       keyed: say(lang, endpoint.has_credential ? "setup_keyed" : "setup_unkeyed"),
       models: endpoint.models.map((model) => model.id),
-      accounts: fill(say(lang, "setup_accounts_toggle"), { n: String(endpoint.tuning.accounts?.length ?? 0) }),
+      accounts: fill(say(lang, "setup_accounts_toggle"), {
+        n: String(endpoint.tuning.accounts?.length ?? 0),
+      }),
     })),
   };
 }

@@ -67,7 +67,8 @@
         .then((pages) => {
           opening.close();
           if (pages === null) return null;
-          const mark = (n: number): string => `— ${fill(say($lang, "format_page_mark"), { n: String(n) })} —`;
+          const mark = (n: number): string =>
+            `— ${fill(say($lang, "format_page_mark"), { n: String(n) })} —`;
           return {
             text: pages.map((page, index) => `${mark(index + 1)}\n${page}`).join("\n"),
             silent: pages.flatMap((page, index) => (page.trim() === "" ? [index + 1] : [])),
@@ -97,7 +98,13 @@
     let opened: { readonly destroy: () => void } | null = null;
     let gone = false;
     void import("../editing").then(({ openComparison }) => {
-      if (!gone) opened = openComparison(parent, { from: shown.from.text, to: shown.to.text }, name, phrases);
+      if (!gone)
+        opened = openComparison(
+          parent,
+          { from: shown.from.text, to: shown.to.text },
+          name,
+          phrases,
+        );
     });
     return () => {
       gone = true;
@@ -106,13 +113,20 @@
   });
 
   const notes = $derived.by((): readonly string[] => {
-    const versions = fill(say($lang, "format_compared_versions"), { from: short(from.version), to: short(to.version) });
+    const versions = fill(say($lang, "format_compared_versions"), {
+      from: short(from.version),
+      to: short(to.version),
+    });
     if (texts === null || texts === "broken") return [versions];
     const silent = [...new Set([...texts.from.silent, ...texts.to.silent])].sort((a, b) => a - b);
-    return silent.length === 0 ? [versions] : [versions, fill(say($lang, "format_no_text"), { pages: silent.join(", ") })];
+    return silent.length === 0
+      ? [versions]
+      : [versions, fill(say($lang, "format_no_text"), { pages: silent.join(", ") })];
   });
 
-  const settings = $derived(say($lang, format === "pdf" ? "format_compare_pdf" : "format_compare_docx"));
+  const settings = $derived(
+    say($lang, format === "pdf" ? "format_compare_pdf" : "format_compare_docx"),
+  );
 
   function exportComparison(): void {
     if (texts === null || texts === "broken") return;
@@ -129,22 +143,22 @@
 </script>
 
 <div class="refrain flex min-h-0 flex-1 flex-col">
-  <Label
-    {format}
-    tool={TOOL[format]}
-    settings={[settings]}
-    version={null}
-    {notes}
-  />
+  <Label {format} tool={TOOL[format]} settings={[settings]} version={null} {notes} />
   {#if texts === null}
-    <p class="px-wide py-snug text-note text-text-faint">{fill(say($lang, "format_reading"), { format: NAME[format] })}</p>
+    <p class="px-wide py-snug text-note text-text-faint">
+      {fill(say($lang, "format_reading"), { format: NAME[format] })}
+    </p>
   {:else if texts === "broken"}
     <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_compare_broken")}</p>
   {:else if texts.from.text === texts.to.text}
     <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_compare_same")}</p>
   {:else}
     <div class="flex justify-end border-b border-edge px-wide py-tight">
-      <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
+      <Button
+        label={say($lang, "refrain_export_comparison")}
+        tone="quiet"
+        onPress={exportComparison}
+      />
     </div>
     <Editor {wire} />
   {/if}

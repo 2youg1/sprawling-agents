@@ -13,12 +13,23 @@ import { describe, expect, test } from "bun:test";
 import type { Effort, EndpointSummary, ModelFactsSummary } from "../../wire";
 import { Window } from "../../wire";
 import type { Entry, Section } from "./picker";
-import { SECTION, SHOWN, drawnRows, firstLevel, offersOf, orderOf, roomOf, usedLevel, windowed } from "./picker";
+import {
+  SECTION,
+  SHOWN,
+  drawnRows,
+  firstLevel,
+  offersOf,
+  orderOf,
+  roomOf,
+  usedLevel,
+  windowed,
+} from "./picker";
 import type { PickerHands } from "./picker_look";
 import type { PickerHeld } from "./picker_scene";
 import { pickerOf } from "./picker_look";
 
-const entries = (count: number): readonly Entry[] => Array.from({ length: count }, (_unused, at) => ({ id: `e${String(at)}`, offers: [] }));
+const entries = (count: number): readonly Entry[] =>
+  Array.from({ length: count }, (_unused, at) => ({ id: `e${String(at)}`, offers: [] }));
 
 describe("a list's window", () => {
   test("holds at most five entries and the pinned one (the_window_holds_five, the_pinned_entry_is_shown)", () => {
@@ -28,9 +39,16 @@ describe("a list's window", () => {
         const all = entries(count);
         const view = windowed(all, `e${String(pin)}`, false);
         const shown = view.entries.map((each) => each.id);
-        if (shown.length > SHOWN || (count > 0 && !shown.includes(`e${String(pin)}`)) || view.more !== Math.max(0, count - SHOWN))
-          wrong.push(`${String(count)} pinned ${String(pin)}: ${shown.join(",")} +${String(view.more)}`);
-        if (drawnRows(count) > SHOWN + 1) wrong.push(`${String(count)} draws ${String(drawnRows(count))}`);
+        if (
+          shown.length > SHOWN ||
+          (count > 0 && !shown.includes(`e${String(pin)}`)) ||
+          view.more !== Math.max(0, count - SHOWN)
+        )
+          wrong.push(
+            `${String(count)} pinned ${String(pin)}: ${shown.join(",")} +${String(view.more)}`,
+          );
+        if (drawnRows(count) > SHOWN + 1)
+          wrong.push(`${String(count)} draws ${String(drawnRows(count))}`);
       }
     expect(wrong).toEqual([]);
   });
@@ -71,7 +89,9 @@ function city(counts: readonly number[]): readonly EndpointSummary[] {
   return counts.map((count, at) =>
     endpoint(
       `p${String(at)}`,
-      Array.from({ length: count }, (_unused, j) => facts(`p${String(at)}/m${String(j)}`, `m${String(j)}`, j % 3 === 2 ? [] : ["low", "high"])),
+      Array.from({ length: count }, (_unused, j) =>
+        facts(`p${String(at)}/m${String(j)}`, `m${String(j)}`, j % 3 === 2 ? [] : ["low", "high"]),
+      ),
     ),
   );
 }
@@ -90,7 +110,11 @@ const HANDS: PickerHands = {
   holdFrame: nothing,
 };
 
-const held = (parent: string | null, pick: PickerHeld["pick"], whole: readonly Section[]): PickerHeld => ({
+const held = (
+  parent: string | null,
+  pick: PickerHeld["pick"],
+  whole: readonly Section[],
+): PickerHeld => ({
   open: true,
   segment: null,
   pick,
@@ -112,17 +136,41 @@ describe("the room an open picker keeps", () => {
       const offers = offersOf(endpoints);
       const order = orderOf(offers);
       const room = roomOf(order, offers);
-      const wholes: readonly (readonly Section[])[] = [[], [SECTION.first], [SECTION.second], [SECTION.first, SECTION.second]];
+      const wholes: readonly (readonly Section[])[] = [
+        [],
+        [SECTION.first],
+        [SECTION.second],
+        [SECTION.first, SECTION.second],
+      ];
       for (const parent of firstLevel(order, offers))
         for (const offer of parent.offers)
           for (const whole of wholes) {
-            const menu = pickerOf("en", { endpoints, chosen: undefined, stated: null, pick: { model: nothing(), level: nothing() } }, held(parent.id, offer, whole), HANDS)?.menu;
-            const rows = (section: Section): number => (menu?.columns.find((column) => column.id === section)?.rows.length ?? 0) + (menu?.sections[section]?.spare ?? 0);
-            const drawn = (section: Section, kept: number): number => (menu?.sections[section]?.scrolls === true ? kept : rows(section));
-            const band = menu?.columns.some((column) => column.id === SECTION.thinking) === true || menu?.bandRoom === true;
+            const menu = pickerOf(
+              "en",
+              {
+                endpoints,
+                chosen: undefined,
+                stated: null,
+                pick: { model: nothing(), level: nothing() },
+              },
+              held(parent.id, offer, whole),
+              HANDS,
+            )?.menu;
+            const rows = (section: Section): number =>
+              (menu?.columns.find((column) => column.id === section)?.rows.length ?? 0) +
+              (menu?.sections[section]?.spare ?? 0);
+            const drawn = (section: Section, kept: number): number =>
+              menu?.sections[section]?.scrolls === true ? kept : rows(section);
+            const band =
+              menu?.columns.some((column) => column.id === SECTION.thinking) === true ||
+              menu?.bandRoom === true;
             const state = `${JSON.stringify(counts)} ${parent.id} ${offer.model} ${whole.join("+")}`;
-            if (drawn(SECTION.first, room.first) !== room.first) wrong.push(`${state}: first ${String(rows(SECTION.first))} of ${String(room.first)}`);
-            if (drawn(SECTION.second, room.second) !== room.second) wrong.push(`${state}: second ${String(rows(SECTION.second))} of ${String(room.second)}`);
+            if (drawn(SECTION.first, room.first) !== room.first)
+              wrong.push(`${state}: first ${String(rows(SECTION.first))} of ${String(room.first)}`);
+            if (drawn(SECTION.second, room.second) !== room.second)
+              wrong.push(
+                `${state}: second ${String(rows(SECTION.second))} of ${String(room.second)}`,
+              );
             if (band !== room.band) wrong.push(`${state}: band ${String(band)}`);
           }
     }
@@ -136,12 +184,24 @@ describe("the room an open picker keeps", () => {
 });
 
 test("the level in use is the stated one when offered, else high, else the upstream's default, else none", () => {
-  const offer = (levels: readonly Effort[], stated: Effort | null = null) => ({ levels: [...levels], on: "unknown" as const, from: "upstream" as const, words: [], default: stated });
+  const offer = (levels: readonly Effort[], stated: Effort | null = null) => ({
+    levels: [...levels],
+    on: "unknown" as const,
+    from: "upstream" as const,
+    words: [],
+    default: stated,
+  });
   expect([
     usedLevel(offer(["low", "high"]), "low"),
     usedLevel(offer(["low", "high"]), "xhigh"),
     usedLevel(offer(["low", "medium"], "medium"), "xhigh"),
     usedLevel(offer(["low", "medium"]), null),
     usedLevel(offer([]), "high"),
-  ]).toEqual([{ level: "low", by: "stated" }, { level: "high", by: "default" }, { level: "medium", by: "default" }, null, null]);
+  ]).toEqual([
+    { level: "low", by: "stated" },
+    { level: "high", by: "default" },
+    { level: "medium", by: "default" },
+    null,
+    null,
+  ]);
 });

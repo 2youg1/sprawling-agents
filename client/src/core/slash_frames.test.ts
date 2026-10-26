@@ -27,10 +27,26 @@ const ROOM = Address.make("lab/room1");
 const MAYOR = Address.make("hall/mayor");
 const LIVE = RunId.make("00000000-0000-0000-0000-000000000001");
 const NEWEST = RunId.make("00000000-0000-0000-0000-000000000002");
-const IDLE: BuildingProgress["progress"] = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
+const IDLE: BuildingProgress["progress"] = {
+  planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 },
+};
 const BUILDINGS: readonly BuildingProgress[] = [
-  { addr: Address.make("lab"), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 },
-  { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: IDLE, ready: 0 },
+  {
+    addr: Address.make("lab"),
+    adoptable: false,
+    blocked: [],
+    problems: [],
+    progress: IDLE,
+    ready: 0,
+  },
+  {
+    addr: Address.make("notes"),
+    adoptable: true,
+    blocked: [],
+    problems: [],
+    progress: IDLE,
+    ready: 0,
+  },
 ];
 // Each frame is minted a fresh key; on the way back it is given this
 // one, so a whole frame can be compared.
@@ -66,7 +82,9 @@ function ran(line: string, buildings: SlashHands["buildings"]): Done {
   const efforts: (Effort | null)[] = [];
   const policies: RunPolicy[] = [];
   const command = (frame: Command): boolean => {
-    sent.push(readFrame(JSON.parse(encodeFrame({ command: frame }).replace(IDEM_RE, `"idem":"${IDEM}"`))));
+    sent.push(
+      readFrame(JSON.parse(encodeFrame({ command: frame }).replace(IDEM_RE, `"idem":"${IDEM}"`))),
+    );
     return true;
   };
   const hands: SlashHands = {
@@ -101,7 +119,11 @@ function ran(line: string, buildings: SlashHands["buildings"]): Done {
 const sending = (...sent: ClientFrame[]): Done => ({ ...NOTHING, sent, written: [""] });
 const going = (view: View): Done => ({ ...NOTHING, went: [view], written: [""] });
 const setting = (effort: Effort | null): Done => ({ ...NOTHING, efforts: [effort], written: [""] });
-const admitting = (admit: RunPolicy["admit"]): Done => ({ ...NOTHING, policies: [{ ...CHOSEN, admit }], written: [""] });
+const admitting = (admit: RunPolicy["admit"]): Done => ({
+  ...NOTHING,
+  policies: [{ ...CHOSEN, admit }],
+  written: [""],
+});
 // A new session here; main follows once the city has opened it.
 const opening = (carry: "nothing" | "handoff"): Done =>
   sending({ command: { open_session: { addr: ROOM, carry, from: null, idem: IDEM } } });
@@ -127,24 +149,60 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/dispatch", done: NOTHING },
   ],
   "/steer": [
-    { line: "/steer read the city first", done: sending({ command: { steer: { run: LIVE, text: "read the city first", idem: IDEM } } }) },
+    {
+      line: "/steer read the city first",
+      done: sending({ command: { steer: { run: LIVE, text: "read the city first", idem: IDEM } } }),
+    },
   ],
   "/stop": [{ line: "/stop", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) }],
   "/halt": [
-    { line: "/halt lab", done: sending({ command: { halt: { scope: { building: Address.make("lab") }, idem: IDEM } } }) },
+    {
+      line: "/halt lab",
+      done: sending({
+        command: { halt: { scope: { building: Address.make("lab") }, idem: IDEM } },
+      }),
+    },
     { line: "/halt --all", done: sending({ command: { halt: { scope: "city", idem: IDEM } } }) },
   ],
-  "/release": [{ line: "/release", done: sending({ command: { release: { scope: "city", idem: IDEM } } }) }],
+  "/release": [
+    { line: "/release", done: sending({ command: { release: { scope: "city", idem: IDEM } } }) },
+  ],
   "/raise": [
     { line: "/raise", done: going({ kind: "raise" }) },
-    { line: "/raise lab", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("minimal"), rules: null, idem: IDEM } } }) },
-    { line: "/raise lab hall", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("hall"), rules: null, idem: IDEM } } }) },
+    {
+      line: "/raise lab",
+      done: sending({
+        command: {
+          create_building: {
+            addr: Address.make("lab"),
+            template: TemplateName.make("minimal"),
+            rules: null,
+            idem: IDEM,
+          },
+        },
+      }),
+    },
+    {
+      line: "/raise lab hall",
+      done: sending({
+        command: {
+          create_building: {
+            addr: Address.make("lab"),
+            template: TemplateName.make("hall"),
+            rules: null,
+            idem: IDEM,
+          },
+        },
+      }),
+    },
     { line: "/raise lab palace", done: NOTHING },
   ],
   "/new": [{ line: "/new", done: opening("nothing") }],
   // The run in hand is stopped first; the session opens once it froze,
   // which `slash_session.test.ts` follows.
-  "/compact": [{ line: "/compact", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) }],
+  "/compact": [
+    { line: "/compact", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) },
+  ],
   // A tag is a preference, not a frame of its own; with no session in
   // main the line stays.
   "/tag": [{ line: "/tag later", done: NOTHING }],
@@ -153,7 +211,14 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     {
       line: "/fork hall/mayor",
       done: sending({
-        command: { open_session: { addr: MAYOR, carry: "nothing", from: { run: NEWEST, at_seq: Seq.make(9) }, idem: IDEM } },
+        command: {
+          open_session: {
+            addr: MAYOR,
+            carry: "nothing",
+            from: { run: NEWEST, at_seq: Seq.make(9) },
+            idem: IDEM,
+          },
+        },
       }),
     },
     { line: "/fork", done: { ...NOTHING, written: [""] } },
@@ -197,7 +262,10 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/cd", done: going({ kind: "city" }) },
     { line: "/cd lab", done: going({ kind: "building", address: Address.make("lab") }) },
     { line: "/cd notes", done: going({ kind: "raise", address: Address.make("notes") }) },
-    { line: "/cd new-project", done: going({ kind: "raise", address: Address.make("new-project") }) },
+    {
+      line: "/cd new-project",
+      done: going({ kind: "raise", address: Address.make("new-project") }),
+    },
     { line: "/cd lab/room1", done: NOTHING },
     { line: "/cd lab extra", done: NOTHING },
     { line: "/cd lab:", done: NOTHING },
@@ -222,9 +290,15 @@ describe("every / verb", () => {
     for (const line of ["/cd lab", "/cd notes", "/cd new-project"]) {
       expect(ran(line, undefined)).toEqual(NOTHING);
     }
-    expect(ran("/cd lab", BUILDINGS)).toEqual(going({ kind: "building", address: Address.make("lab") }));
-    expect(ran("/cd notes", BUILDINGS)).toEqual(going({ kind: "raise", address: Address.make("notes") }));
-    expect(ran("/cd new-project", [])).toEqual(going({ kind: "raise", address: Address.make("new-project") }));
+    expect(ran("/cd lab", BUILDINGS)).toEqual(
+      going({ kind: "building", address: Address.make("lab") }),
+    );
+    expect(ran("/cd notes", BUILDINGS)).toEqual(
+      going({ kind: "raise", address: Address.make("notes") }),
+    );
+    expect(ran("/cd new-project", [])).toEqual(
+      going({ kind: "raise", address: Address.make("new-project") }),
+    );
   });
 
   test("bare /cd opens the city before the city answers", () => {

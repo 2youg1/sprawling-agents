@@ -33,8 +33,18 @@
   // clock: a fixture whose rows change every time the page opens is a
   // fixture nobody can compare against yesterday's.
   const ASSETS: readonly RegistryLine[] = [
-    filed(1_764_500_400_000, "lab/east", "screenshot", "the settings page at 2560 px, forced colours"),
-    filed(1_764_412_800_000, "hall/mayor", "transcript", "what the mayor was asked on the first day"),
+    filed(
+      1_764_500_400_000,
+      "lab/east",
+      "screenshot",
+      "the settings page at 2560 px, forced colours",
+    ),
+    filed(
+      1_764_412_800_000,
+      "hall/mayor",
+      "transcript",
+      "what the mayor was asked on the first day",
+    ),
     filed(1_764_586_800_000, "lab/west", "release", "sprawling 0.0.6, windows-x86_64"),
   ];
 </script>

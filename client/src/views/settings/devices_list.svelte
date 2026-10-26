@@ -44,9 +44,15 @@
   // so a label two rows share carries when that browser paired: the
   // title and the forget key's name then tell the rows apart.
   const named = $derived.by(() => {
-    const shared = new Set(devices.filter((device, at) => devices.findIndex((other) => other.label === device.label) !== at).map((device) => device.label));
+    const shared = new Set(
+      devices
+        .filter((device, at) => devices.findIndex((other) => other.label === device.label) !== at)
+        .map((device) => device.label),
+    );
     return (device: DeviceLine): string =>
-      shared.has(device.label) ? `${device.label} · ${clock($lang, device.paired_at)}` : device.label;
+      shared.has(device.label)
+        ? `${device.label} · ${clock($lang, device.paired_at)}`
+        : device.label;
   });
 
   function seen(device: DeviceLine): string {

@@ -12,7 +12,14 @@ import { stoppedOf } from "./pending";
 
 function notice(code: AxCode, at: number): Notice {
   return {
-    error: { code, action: "edit", subject: "hall/notes.md", nearby: [], retry: "no", recovery: "" },
+    error: {
+      code,
+      action: "edit",
+      subject: "hall/notes.md",
+      nearby: [],
+      retry: "no",
+      recovery: "",
+    },
     seen: false,
     at: TimeMs.make(at),
     key: `${code} hall/notes.md`,
@@ -26,7 +33,13 @@ describe("what the deciding section holds", () => {
   // refused and the model went on, and the refusal waited in deciding.
   test("a tool refusal the run goes on from is not pending", () => {
     const recovered = (
-      ["E_PATH_NOT_FOUND", "E_INVALID_ARGS", "E_VERSION_CONFLICT", "E_TOOL_UNKNOWN", "E_GATE_DENIED"] as const
+      [
+        "E_PATH_NOT_FOUND",
+        "E_INVALID_ARGS",
+        "E_VERSION_CONFLICT",
+        "E_TOOL_UNKNOWN",
+        "E_GATE_DENIED",
+      ] as const
     ).map((code, at) => notice(code, at));
     expect(stoppedOf(recovered)).toEqual({ asks: [], failures: [] });
   });

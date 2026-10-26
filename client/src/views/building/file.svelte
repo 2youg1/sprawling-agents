@@ -90,11 +90,7 @@
     if (u.send(putSpine(to.building, to.which, held.text, draft))) editing = false;
   }
 
-  const lines = $derived(
-    doc === undefined
-      ? []
-      : doc.text.split("\n").map((text) => ({ text })),
-  );
+  const lines = $derived(doc === undefined ? [] : doc.text.split("\n").map((text) => ({ text })));
   // The gutter is as wide as the largest line number it holds plus one,
   // in the same face as the code it numbers.
   const gutter = $derived(`${String(String(lines.length).length + 1)}ch`);

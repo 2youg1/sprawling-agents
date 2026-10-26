@@ -17,7 +17,10 @@ cut. Every role, key and `aria-*` value comes in the bags. -->
 </script>
 
 <div class="flex min-w-0 items-center gap-snug border-b border-edge">
-  <button {...look.back} class="-ml-snug grid size-bar shrink-0 place-items-center rounded-control text-text-quiet hover:wash hover:text-text">
+  <button
+    {...look.back}
+    class="-ml-snug grid size-bar shrink-0 place-items-center rounded-control text-text-quiet hover:wash hover:text-text"
+  >
     <Glyph name="chevron" class="rotate-180" />
   </button>
   <div {...look.strip} class="flex min-w-0 items-stretch overflow-x-auto">
@@ -26,7 +29,9 @@ cut. Every role, key and `aria-*` value comes in the bags. -->
         {...tab.wire}
         class={[
           "flex h-bar min-w-0 items-center border-b-2 px-base text-label whitespace-nowrap transition-colors",
-          tab.shown ? "shrink-0 border-accent text-text ease-arrive" : "border-transparent text-text-quiet ease-leave hover:text-text hover:ease-arrive",
+          tab.shown
+            ? "shrink-0 border-accent text-text ease-arrive"
+            : "border-transparent text-text-quiet ease-leave hover:text-text hover:ease-arrive",
         ]}
       >
         <span class="truncate">{tab.label}</span>

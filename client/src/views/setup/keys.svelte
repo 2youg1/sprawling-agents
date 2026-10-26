@@ -61,11 +61,15 @@
   <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "keys_title")}</h2>
   <ul class="flex flex-col">
     {#each ACTIONS as action (action)}
-      <li class="flex items-center gap-base border-b border-edge py-snug text-label last:border-b-0">
+      <li
+        class="flex items-center gap-base border-b border-edge py-snug text-label last:border-b-0"
+      >
         <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS[action])}</span>
         {#if taken(action).length > 0}
           <span class="truncate text-note text-alert">
-            {fill(say($lang, "keys_conflict"), { name: say($lang, LABELS[taken(action)[0] ?? action]) })}
+            {fill(say($lang, "keys_conflict"), {
+              name: say($lang, LABELS[taken(action)[0] ?? action]),
+            })}
           </span>
         {/if}
         <ChordLook

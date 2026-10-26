@@ -46,7 +46,9 @@ export function landed(run: RunId, opened: Seq): void {
   const key = keyOf(run, opened);
   order.push(key);
   order.splice(0, Math.max(0, order.length - KEPT));
-  filed = Object.fromEntries(Object.entries({ ...filed, [key]: held }).filter(([each]) => order.includes(each)));
+  filed = Object.fromEntries(
+    Object.entries({ ...filed, [key]: held }).filter(([each]) => order.includes(each)),
+  );
 }
 
 // The reply stopped and the page never learned which turn it became.

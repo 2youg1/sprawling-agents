@@ -26,7 +26,12 @@ export type Carried =
 
 const EDITOR: ReadonlySet<Reading> = new Set(["source", "diff"]);
 
-export function carried(from: Reading, to: Reading, editor: EditorPlace, previewTop: number): Carried {
+export function carried(
+  from: Reading,
+  to: Reading,
+  editor: EditorPlace,
+  previewTop: number,
+): Carried {
   if (EDITOR.has(from) && to === "preview") return { kind: "preview_at", offset: editor.top };
   if (from === "preview" && EDITOR.has(to)) return { kind: "editor_at", byte: previewTop };
   return { kind: "nothing" };

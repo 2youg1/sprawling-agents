@@ -24,10 +24,25 @@ export type Standing =
   | { readonly kind: "unpaired" }
   | { readonly kind: "unreadable" }
   | { readonly kind: "lacking"; readonly lack: Lack }
-  | { readonly kind: "invited"; readonly invitation: Invitation; readonly told: Told | null; readonly busy: boolean }
+  | {
+      readonly kind: "invited";
+      readonly invitation: Invitation;
+      readonly told: Told | null;
+      readonly busy: boolean;
+    }
   // Paired a moment ago: the seed, once.
-  | { readonly kind: "seed"; readonly seed: string; readonly device: Device; readonly persisted: boolean }
-  | { readonly kind: "paired"; readonly device: Device; readonly told: Told | null; readonly busy: boolean };
+  | {
+      readonly kind: "seed";
+      readonly seed: string;
+      readonly device: Device;
+      readonly persisted: boolean;
+    }
+  | {
+      readonly kind: "paired";
+      readonly device: Device;
+      readonly told: Told | null;
+      readonly busy: boolean;
+    };
 
 // The last thing a press came back with, told in the group's status line.
 export type Told =

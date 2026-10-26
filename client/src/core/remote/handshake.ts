@@ -73,18 +73,27 @@ function sessionOf(keys: SessionKeys): Session {
 }
 
 // A fresh ephemeral pair behind `opening`; null when this browser lacks X25519.
-async function opened(opening: Uint8Array<ArrayBuffer>, nonce: Uint8Array<ArrayBuffer>): Promise<DevicePairing | null> {
+async function opened(
+  opening: Uint8Array<ArrayBuffer>,
+  nonce: Uint8Array<ArrayBuffer>,
+): Promise<DevicePairing | null> {
   const fresh = await ephemeral();
   return fresh === null
     ? null
-    : { hello: new Uint8Array([...opening, ...fresh.public, ...nonce]), ephemeral: fresh.ephemeral };
+    : {
+        hello: new Uint8Array([...opening, ...fresh.public, ...nonce]),
+        ephemeral: fresh.ephemeral,
+      };
 }
 
 export function pairHello(nonce: Uint8Array<ArrayBuffer>): Promise<DevicePairing | null> {
   return opened(new Uint8Array(), nonce);
 }
 
-export function sessionHello(device: Uint8Array<ArrayBuffer>, nonce: Uint8Array<ArrayBuffer>): Promise<DeviceWaiting | null> {
+export function sessionHello(
+  device: Uint8Array<ArrayBuffer>,
+  nonce: Uint8Array<ArrayBuffer>,
+): Promise<DeviceWaiting | null> {
   return device.length === DEVICE_ID_BYTES ? opened(device, nonce) : Promise.resolve(null);
 }
 
@@ -100,7 +109,11 @@ export async function claim(
   const fingerprint = new Uint8Array(await crypto.subtle.digest("SHA-256", presented));
   if (fingerprint.join() !== invitation.city.join()) return "fingerprint";
   const answer = reply.slice(PUBLIC_BYTES);
-  const transcript = await record(PAIRING, pairing.hello, reply.slice(0, UNSIGNED_PAIR_REPLY_BYTES));
+  const transcript = await record(
+    PAIRING,
+    pairing.hello,
+    reply.slice(0, UNSIGNED_PAIR_REPLY_BYTES),
+  );
   const agreement = await answered(pairing, PAIRING, transcript, answer, presented);
   if (typeof agreement === "string") return agreement;
   const proof = await sign(key, signed(PAIRING, "device", transcript));

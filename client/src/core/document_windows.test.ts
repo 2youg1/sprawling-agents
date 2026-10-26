@@ -24,13 +24,20 @@ function headOf(text: string, bytes: number): DocumentAnswer {
       version: V,
       format: "markdown",
       bytes,
-      body: { text: { encoding: "utf8", coverage: "head", head: { span: { start: 0, end: text.length }, text } } },
+      body: {
+        text: {
+          encoding: "utf8",
+          coverage: "head",
+          head: { span: { start: 0, end: text.length }, text },
+        },
+      },
     },
   });
 }
 
 function gathering(read: ReturnType<typeof opened>): Gathering {
-  if (read.kind !== "text") return { version: W, format: "plain", encoding: "utf8", bytes: -1, text: "", through: -1 };
+  if (read.kind !== "text")
+    return { version: W, format: "plain", encoding: "utf8", bytes: -1, text: "", through: -1 };
   return read.gathering;
 }
 
@@ -47,7 +54,14 @@ describe("opened", () => {
       { kind: "opaque", version: V, bytes: 9 },
       {
         kind: "text",
-        gathering: { version: V, format: "markdown", encoding: "utf8", bytes: 0, text: "", through: 0 },
+        gathering: {
+          version: V,
+          format: "markdown",
+          encoding: "utf8",
+          bytes: 0,
+          text: "",
+          through: 0,
+        },
       },
     ]);
   });
@@ -57,9 +71,16 @@ describe("gathering a version", () => {
   test("asks for the rest after the head, and stops once the windows meet the end", () => {
     const head = gathering(opened(headOf("# one\n\n", 12)));
     const first = nextSpan(head);
-    const after = joined(head, { version: V, window: { span: { start: 7, end: 12 }, text: "two\n\n" } });
+    const after = joined(head, {
+      version: V,
+      window: { span: { start: 7, end: 12 }, text: "two\n\n" },
+    });
     expect([whole(head), first, whole(after), after.text, nextSpan(after)]).toEqual([
-      false, { start: 7, end: 12 }, true, "# one\n\ntwo\n\n", null,
+      false,
+      { start: 7, end: 12 },
+      true,
+      "# one\n\ntwo\n\n",
+      null,
     ]);
   });
 
@@ -82,10 +103,25 @@ describe("gathering a version", () => {
 describe("a version known only by its digest", () => {
   test("is read from its first byte until an empty window says where it ends", () => {
     const start = recorded(V, "plain");
-    const first = joined(start, { version: V, window: { span: { start: 0, end: 4 }, text: "abc\n" } });
+    const first = joined(start, {
+      version: V,
+      window: { span: { start: 0, end: 4 }, text: "abc\n" },
+    });
     const end = joined(first, { version: V, window: { span: { start: 4, end: 4 }, text: "" } });
-    expect([nextSpan(start), whole(first), nextSpan(first), whole(end), end.bytes, end.text]).toEqual([
-      { start: 0, end: EDITABLE_BYTES_MAX }, false, { start: 4, end: EDITABLE_BYTES_MAX }, true, 4, "abc\n",
+    expect([
+      nextSpan(start),
+      whole(first),
+      nextSpan(first),
+      whole(end),
+      end.bytes,
+      end.text,
+    ]).toEqual([
+      { start: 0, end: EDITABLE_BYTES_MAX },
+      false,
+      { start: 4, end: EDITABLE_BYTES_MAX },
+      true,
+      4,
+      "abc\n",
     ]);
   });
 });

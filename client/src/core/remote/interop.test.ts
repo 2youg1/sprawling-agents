@@ -90,7 +90,10 @@ describe("the seal", () => {
     const vector = read("seal.txt");
     const key = field(vector, "key");
     const city = sealer(key, "city_to_device");
-    const sealed = [await city.seal(field(vector, "frame")), await city.seal(field(vector, "lock"))];
+    const sealed = [
+      await city.seal(field(vector, "frame")),
+      await city.seal(field(vector, "lock")),
+    ];
     const device = opener(key, "city_to_device");
     const opened = [
       await device.open(field(vector, "frame_sealed")),
@@ -173,7 +176,9 @@ describe("the one-way fixture", () => {
             device,
           );
     const opened =
-      typeof finished === "string" ? null : await finished.session.opener.open(field(fixture, "first_frame"));
+      typeof finished === "string"
+        ? null
+        : await finished.session.opener.open(field(fixture, "first_frame"));
     expect(hexOf(opened ?? new Uint8Array())).toBe(hexOf(field(fixture, "plaintext")));
   });
 });

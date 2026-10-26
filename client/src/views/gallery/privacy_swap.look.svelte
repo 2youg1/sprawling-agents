@@ -33,7 +33,9 @@
   <p class="swap-strong">{look.overlooked.label}: {look.overlooked.text}</p>
   <ul class="swap-facts">
     {#each look.facts as fact (fact.label)}
-      <li><span class="swap-quiet">{fact.label}</span> <span class="swap-break">{fact.value}</span></li>
+      <li>
+        <span class="swap-quiet">{fact.label}</span> <span class="swap-break">{fact.value}</span>
+      </li>
     {/each}
   </ul>
   <p class={look.fitWeight === "alert" ? "swap-alert" : "swap-quiet"}>{look.fit}</p>
@@ -49,7 +51,9 @@
     <p class="swap-quiet">{look.editionsNote}</p>
     <p class="swap-break">{look.target.label}: {look.target.text}</p>
   </details>
-  <p role="status" class={look.status?.weight === "alert" ? "swap-alert" : "swap-quiet"}>{look.status?.text ?? ""}</p>
+  <p role="status" class={look.status?.weight === "alert" ? "swap-alert" : "swap-quiet"}>
+    {look.status?.text ?? ""}
+  </p>
 </article>
 
 <style>

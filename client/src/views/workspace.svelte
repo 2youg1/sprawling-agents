@@ -52,7 +52,11 @@
   // With the right side open the panorama keeps the sessions and the
   // chosen session in the person's order, at two and five columns, and
   // the commits fold away: together they end on the right side's line.
-  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 2, session: RIGHT_FROM - 3, commits: 0 };
+  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = {
+    sessions: 2,
+    session: RIGHT_FROM - 3,
+    commits: 0,
+  };
 
   // The conversation keeps the middle part while the right side is
   // closed; opening the right side moves it left by the two columns the
@@ -77,7 +81,12 @@
               right: null,
             };
       case "panorama":
-        return workbenchOf(right === "open" ? bench.map((column) => ({ pane: column.pane, span: BESIDE_RIGHT[column.pane] })) : bench, right);
+        return workbenchOf(
+          right === "open"
+            ? bench.map((column) => ({ pane: column.pane, span: BESIDE_RIGHT[column.pane] }))
+            : bench,
+          right,
+        );
     }
   }
 
@@ -85,7 +94,10 @@
   // the conversation under the chosen session, the taller of the two by
   // the silver ratio. The conversation never starts on the first column,
   // which the edge keys stand at the foot of.
-  function workbenchOf(columns: readonly { readonly pane: Pane; readonly span: number }[], right: RightSide): Layout {
+  function workbenchOf(
+    columns: readonly { readonly pane: Pane; readonly span: number }[],
+    right: RightSide,
+  ): Layout {
     let from = 1;
     const panes = columns.flatMap((column): Placed[] => {
       if (column.span === 0) return [];
@@ -108,7 +120,12 @@
   // stands on a line of its own.
   export function oneColumnOf(tier: Tier, bench: Workbench): Layout {
     return tier === "panorama"
-      ? { world: "sheet", panes: bench.map((column) => ({ pane: column.pane, lines: [1, 13] })), talk: [1, 13], right: null }
+      ? {
+          world: "sheet",
+          panes: bench.map((column) => ({ pane: column.pane, lines: [1, 13] })),
+          talk: [1, 13],
+          right: null,
+        }
       : { world: "none", panes: [], talk: [1, 13], right: null };
   }
 
@@ -181,7 +198,10 @@
   // session, `null` one the city has not answered for.
   const stretches = $derived(u.conn.asking.ask({ sessions: { room: address } }));
   const roomStretches = $derived(
-    stretchesOf($stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [], (room) => heldIn($belief, room)),
+    stretchesOf(
+      $stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [],
+      (room) => heldIn($belief, room),
+    ),
   );
   const past = $derived.by(() => {
     if (session === undefined) return undefined;
@@ -191,18 +211,26 @@
   // The session the chosen-session pane is about, named the way the
   // sessions column's row names it (`world/sessions.ts`'s `titleOf`): one
   // column heads that pane with it, since the row is on another tab.
-  const chosenStretch = $derived(roomStretches.find((each) => (session === undefined ? each.current : each.line.began === session)));
+  const chosenStretch = $derived(
+    roomStretches.find((each) =>
+      session === undefined ? each.current : each.line.began === session,
+    ),
+  );
 
   // The run the right pane speaks for: the past session's last, else the
   // one going, or the last one this room finished; its rounds are the
   // same question the thread asks, merged by `asking`.
   const current = $derived(
-    past === undefined ? (newestWorking($belief, address) ?? heldIn($belief, address).at(-1)) : past?.runs.at(-1),
+    past === undefined
+      ? (newestWorking($belief, address) ?? heldIn($belief, address).at(-1))
+      : past?.runs.at(-1),
   );
   // The run the chosen session's pane speaks for, whose frozen facts its
   // gauge states, so the conversation under it leaves them off that run's
   // first head (`talk/seat.ts`).
-  const gauged = $derived(past === undefined ? sessionRun($belief, address) : (current?.run ?? null));
+  const gauged = $derived(
+    past === undefined ? sessionRun($belief, address) : (current?.run ?? null),
+  );
   let answer = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
     const run = current?.run;
@@ -235,10 +263,14 @@
   const item = $derived(rightItem());
   const open = $derived(item !== null || ((panel ?? (narrow ? false : $held.panel)) && produced));
 
-  const layout = $derived(narrow ? oneColumnOf(tier, $bench) : layoutOf(tier, open ? "open" : "closed", $bench));
+  const layout = $derived(
+    narrow ? oneColumnOf(tier, $bench) : layoutOf(tier, open ? "open" : "closed", $bench),
+  );
   const sheet = $derived(layout.world === "sheet");
   // Where the conversation stands (`talk/seat.ts`).
-  const column = $derived<Seat>(layout.world === "workbench" ? { kind: "workbench", gauged } : PAGE);
+  const column = $derived<Seat>(
+    layout.world === "workbench" ? { kind: "workbench", gauged } : PAGE,
+  );
   // A narrow window is one column, where every region spans it whole
   // through its `narrow:` classes and stands on no line of its own.
   const at = (lines: Lines): string | undefined => (narrow ? undefined : gridColumn(lines));
@@ -294,13 +326,17 @@ taller; on one column the second row is the band, as tall as it needs. -->
   {@attach (element: HTMLElement) => watchColumns(element, (next) => (columns = next))}
   class={[
     "workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid p-margin narrow:relative narrow:-mx-pane narrow:mt-0 narrow:-mb-pane narrow:px-pane narrow:pt-0 narrow:pb-pane",
-    layout.world === "workbench" ? "grid-rows-[minmax(0,calc(100%/(1+var(--silver))))_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)_auto]",
+    layout.world === "workbench"
+      ? "grid-rows-[minmax(0,calc(100%/(1+var(--silver))))_minmax(0,1fr)]"
+      : "grid-rows-[minmax(0,1fr)_auto]",
   ]}
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
   lands on it, and `theme/motion-state.css` hangs the view transition off `main h1`. -->
-  <svelte:element this={seat === "page" ? "h1" : "h2"} tabindex="-1" class="sr-only">{title}</svelte:element>
+  <svelte:element this={seat === "page" ? "h1" : "h2"} tabindex="-1" class="sr-only"
+    >{title}</svelte:element
+  >
   {#if layout.world !== "none"}
     <!-- The world layer, on the shell's own columns through `subgrid`, so
     a pane edge and a divider stand on a column line every other region
@@ -332,7 +368,12 @@ taller; on one column the second row is the band, as tall as it needs. -->
       {#each layout.panes as placed, index (placed.pane)}
         {#if layout.world === "workbench" && layout.right === null && (index === 1 || index === 2)}
           {@const before = layout.panes[index - 1]?.pane ?? "sessions"}
-          <Divider divider={index === 1 ? 0 : 1} label={label[before]} controls="{uid}-{before}" column={placed.lines[0]} />
+          <Divider
+            divider={index === 1 ? 0 : 1}
+            label={label[before]}
+            controls="{uid}-{before}"
+            column={placed.lines[0]}
+          />
         {/if}
         <div
           id="{uid}-{placed.pane}"
@@ -340,11 +381,17 @@ taller; on one column the second row is the band, as tall as it needs. -->
             "flex min-h-0 flex-col",
             sheet ? "row-[2] pt-snug" : placed.pane === "session" ? "row-[1]" : "row-[1/3]",
             // The pane on the first column stops above the edge keys at its foot.
-            !sheet && placed.lines[0] === 1 ? "mb-[calc(3*var(--spacing-key)+2*var(--spacing-snug)+var(--spacing-wide))]" : "",
-            layout.world === "beside" ? "rounded-panel border border-edge-panel px-pane pt-snug" : "",
+            !sheet && placed.lines[0] === 1
+              ? "mb-[calc(3*var(--spacing-key)+2*var(--spacing-snug)+var(--spacing-wide))]"
+              : "",
+            layout.world === "beside"
+              ? "rounded-panel border border-edge-panel px-pane pt-snug"
+              : "",
             // Beside the conversation the world is dimmed and takes no
             // input, but for the sessions, which move main to a session.
-            layout.world === "beside" && placed.pane !== "sessions" ? "pointer-events-none opacity-(--blend-opacity)" : "",
+            layout.world === "beside" && placed.pane !== "sessions"
+              ? "pointer-events-none opacity-(--blend-opacity)"
+              : "",
             // It comes up with the arriving curve and fades back with the
             // leaving one.
             layout.world === "beside" && placed.pane === "sessions"
@@ -358,9 +405,19 @@ taller; on one column the second row is the band, as tall as it needs. -->
           hidden={sheet && placed.pane !== shown}
         >
           {#if placed.pane === "sessions"}
-            <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
+            <Sessions
+              here={address}
+              {session}
+              narrow={open}
+              head={sheet ? unnamed : sessionsHead}
+            />
           {:else if placed.pane === "session"}
-            <Session here={address} shown={past === undefined ? undefined : gauged} title={sheet ? chosenTitle : undefined} head={sheet ? unnamed : sessionHead} />
+            <Session
+              here={address}
+              shown={past === undefined ? undefined : gauged}
+              title={sheet ? chosenTitle : undefined}
+              head={sheet ? unnamed : sessionHead}
+            />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}

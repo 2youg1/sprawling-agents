@@ -22,8 +22,18 @@ interface Grammar {
 // The grammars this build carries. The tsx and jsx variants share the
 // JavaScript grammar with TypeScript and differ in the flags it takes.
 type Family =
-  | "cpp" | "css" | "go" | "java" | "javascript" | "json" | "jsx"
-  | "python" | "rust" | "tsx" | "typescript" | "yaml";
+  | "cpp"
+  | "css"
+  | "go"
+  | "java"
+  | "javascript"
+  | "json"
+  | "jsx"
+  | "python"
+  | "rust"
+  | "tsx"
+  | "typescript"
+  | "yaml";
 
 const LOAD: Record<Family, () => Promise<Grammar>> = {
   cpp: () => import("@lezer/cpp").then((grammar) => grammar.parser),
@@ -32,11 +42,14 @@ const LOAD: Record<Family, () => Promise<Grammar>> = {
   java: () => import("@lezer/java").then((grammar) => grammar.parser),
   javascript: () => import("@lezer/javascript").then((grammar) => grammar.parser),
   json: () => import("@lezer/json").then((grammar) => grammar.parser),
-  jsx: () => import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "jsx" })),
+  jsx: () =>
+    import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "jsx" })),
   python: () => import("@lezer/python").then((grammar) => grammar.parser),
   rust: () => import("@lezer/rust").then((grammar) => grammar.parser),
-  tsx: () => import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "ts jsx" })),
-  typescript: () => import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "ts" })),
+  tsx: () =>
+    import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "ts jsx" })),
+  typescript: () =>
+    import("@lezer/javascript").then((grammar) => grammar.parser.configure({ dialect: "ts" })),
   yaml: () => import("@lezer/yaml").then((grammar) => grammar.parser),
 };
 
@@ -45,18 +58,29 @@ const LOAD: Record<Family, () => Promise<Grammar>> = {
 // never name two different grammars. A name the table does not hold is
 // drawn in one ink rather than guessed at.
 const FAMILY = new Map<string, Family>([
-  ["c", "cpp"], ["cc", "cpp"], ["cpp", "cpp"], ["h", "cpp"], ["hpp", "cpp"],
+  ["c", "cpp"],
+  ["cc", "cpp"],
+  ["cpp", "cpp"],
+  ["h", "cpp"],
+  ["hpp", "cpp"],
   ["css", "css"],
   ["go", "go"],
   ["java", "java"],
-  ["cjs", "javascript"], ["javascript", "javascript"], ["js", "javascript"], ["mjs", "javascript"],
+  ["cjs", "javascript"],
+  ["javascript", "javascript"],
+  ["js", "javascript"],
+  ["mjs", "javascript"],
   ["json", "json"],
   ["jsx", "jsx"],
-  ["py", "python"], ["python", "python"],
-  ["rs", "rust"], ["rust", "rust"],
+  ["py", "python"],
+  ["python", "python"],
+  ["rs", "rust"],
+  ["rust", "rust"],
   ["tsx", "tsx"],
-  ["ts", "typescript"], ["typescript", "typescript"],
-  ["yaml", "yaml"], ["yml", "yaml"],
+  ["ts", "typescript"],
+  ["typescript", "typescript"],
+  ["yaml", "yaml"],
+  ["yml", "yaml"],
 ]);
 
 // The four inks the theme can hold apart at note size, each claiming
@@ -108,7 +132,10 @@ export async function paint(text: string, source: string): Promise<readonly Piec
     grammar.parse(text),
     HIGHLIGHT,
     (run, classes) => {
-      const ink = classes.split(" ").map((name) => INK.get(name)).find((found) => found !== undefined);
+      const ink = classes
+        .split(" ")
+        .map((name) => INK.get(name))
+        .find((found) => found !== undefined);
       if (ink === undefined) {
         plain += run;
         return;

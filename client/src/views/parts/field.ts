@@ -113,8 +113,10 @@ export function describedOf(props: FieldProps, note: string): string | undefined
 }
 
 function noteOf(props: FieldProps, id: string): NoteLook | undefined {
-  if (props.error !== undefined) return { kind: "error", text: props.error, wire: { id, role: "alert" } };
-  if (props.help !== undefined) return { kind: "help", text: props.help, wire: { id, role: undefined } };
+  if (props.error !== undefined)
+    return { kind: "error", text: props.error, wire: { id, role: "alert" } };
+  if (props.help !== undefined)
+    return { kind: "help", text: props.help, wire: { id, role: undefined } };
   return undefined;
 }
 

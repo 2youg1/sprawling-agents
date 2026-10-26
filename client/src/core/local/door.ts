@@ -42,7 +42,12 @@ const SessionAnswer = Schema.Struct({ token: Schema.String });
 // not this method, or not built.
 const ABSENT: readonly number[] = [404, 405, 501];
 
-export async function pair(origin: string, proof: PairProof, publicKey: string, label: string): Promise<Knock<string>> {
+export async function pair(
+  origin: string,
+  proof: PairProof,
+  publicKey: string,
+  label: string,
+): Promise<Knock<string>> {
   const body = { ...proof, public_key: publicKey, label: label.slice(0, LABEL_CHARS) };
   const paired = await knock(`${origin}/pair`, body);
   if (paired.kind !== "answered") return paired;

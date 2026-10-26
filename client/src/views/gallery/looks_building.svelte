@@ -48,12 +48,60 @@
   // building's, a project file withheld, an identity absent, and a note
   // the building has no place of its own for yet.
   const LAYERS: readonly LayerDocument[] = [
-    { at: Address.make("City.md"), version: VERSION, slot: "city", kind: "city", layer: "city", state: { replaced: { by: Address.make("shop/.sprawling/City.md") } }, shipped: { version: VERSION, standing: "edited" } },
-    { at: Address.make("shop/.sprawling/City.md"), version: VERSION, slot: "city", kind: "city", layer: "building", state: { sent: { bytes: 2048 } }, shipped: null },
-    { at: Address.make("shop/AGENTS.md"), version: VERSION, slot: "building", kind: "conventions", layer: "building", state: { withheld: { why: "AGENTS.md is a directory, not a file" } }, shipped: null },
-    { at: Address.make("shop/checkout/URBANITE.md"), version: VERSION, slot: "resident", kind: "identity", layer: "room", state: "absent", shipped: null },
-    { at: Address.make(".sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "city", state: { sent: { bytes: 96 } }, shipped: null },
-    { at: Address.make("shop/.sprawling/models/local/m-1.md"), version: VERSION, slot: "run", kind: { model_note: { provider: "local", model: "m-1" } }, layer: "building", state: "absent", shipped: null },
+    {
+      at: Address.make("City.md"),
+      version: VERSION,
+      slot: "city",
+      kind: "city",
+      layer: "city",
+      state: { replaced: { by: Address.make("shop/.sprawling/City.md") } },
+      shipped: { version: VERSION, standing: "edited" },
+    },
+    {
+      at: Address.make("shop/.sprawling/City.md"),
+      version: VERSION,
+      slot: "city",
+      kind: "city",
+      layer: "building",
+      state: { sent: { bytes: 2048 } },
+      shipped: null,
+    },
+    {
+      at: Address.make("shop/AGENTS.md"),
+      version: VERSION,
+      slot: "building",
+      kind: "conventions",
+      layer: "building",
+      state: { withheld: { why: "AGENTS.md is a directory, not a file" } },
+      shipped: null,
+    },
+    {
+      at: Address.make("shop/checkout/URBANITE.md"),
+      version: VERSION,
+      slot: "resident",
+      kind: "identity",
+      layer: "room",
+      state: "absent",
+      shipped: null,
+    },
+    {
+      at: Address.make(".sprawling/models/local/m-1.md"),
+      version: VERSION,
+      slot: "run",
+      kind: { model_note: { provider: "local", model: "m-1" } },
+      layer: "city",
+      state: { sent: { bytes: 96 } },
+      shipped: null,
+    },
+    {
+      at: Address.make("shop/.sprawling/models/local/m-1.md"),
+      version: VERSION,
+      slot: "run",
+      kind: { model_note: { provider: "local", model: "m-1" } },
+      layer: "building",
+      state: "absent",
+      shipped: null,
+    },
   ];
   const PROMPTS = $derived.by((): PromptsLook => ({
     rooms: [
@@ -68,7 +116,10 @@
       { key: "resident", slot: say($lang, "slot_resident"), size: "4,120" },
       { key: "run", slot: say($lang, "slot_run"), size: "512" },
     ],
-    run: { label: say($lang, "prompts_open_run"), href: "#/run/00000000-0000-4000-8000-000000000001/prompt" },
+    run: {
+      label: say($lang, "prompts_open_run"),
+      href: "#/run/00000000-0000-4000-8000-000000000001/prompt",
+    },
     note: say($lang, "prompts_next_run"),
     documentsLabel: say($lang, "prompts_documents"),
     cards: cardsOf(LAYERS, SHOP, $lang),
@@ -87,32 +138,111 @@
     index_bytes: 412,
     runs_seen: 12,
     tools: [
-      { name: "edit", namespace: "sprawling", hint: "Replace text in a file you have read", bytes: 980, exposure: "core", from: "default", fallback: "core", runs_used: 11, last_used: null },
-      { name: "plan", namespace: "sprawling", hint: "Claim a node of the roadmap", bytes: 640, exposure: "dormant", from: "default", fallback: "dormant", runs_used: 0, last_used: null },
-      { name: "read", namespace: "sprawling", hint: "Open one file by its path", bytes: 860, exposure: "core", from: "fixed", fallback: "core", runs_used: 12, last_used: null },
-      { name: "github_create_issue", namespace: "github", hint: "create a issue on the forge", bytes: 310, exposure: "off", from: "building", fallback: "dormant", runs_used: 0, last_used: null },
-      { name: "github_list_issue", namespace: "github", hint: "list a issue on the forge", bytes: 290, exposure: "off", from: "building", fallback: "dormant", runs_used: 0, last_used: null },
+      {
+        name: "edit",
+        namespace: "sprawling",
+        hint: "Replace text in a file you have read",
+        bytes: 980,
+        exposure: "core",
+        from: "default",
+        fallback: "core",
+        runs_used: 11,
+        last_used: null,
+      },
+      {
+        name: "plan",
+        namespace: "sprawling",
+        hint: "Claim a node of the roadmap",
+        bytes: 640,
+        exposure: "dormant",
+        from: "default",
+        fallback: "dormant",
+        runs_used: 0,
+        last_used: null,
+      },
+      {
+        name: "read",
+        namespace: "sprawling",
+        hint: "Open one file by its path",
+        bytes: 860,
+        exposure: "core",
+        from: "fixed",
+        fallback: "core",
+        runs_used: 12,
+        last_used: null,
+      },
+      {
+        name: "github_create_issue",
+        namespace: "github",
+        hint: "create a issue on the forge",
+        bytes: 310,
+        exposure: "off",
+        from: "building",
+        fallback: "dormant",
+        runs_used: 0,
+        last_used: null,
+      },
+      {
+        name: "github_list_issue",
+        namespace: "github",
+        hint: "list a issue on the forge",
+        bytes: 290,
+        exposure: "off",
+        from: "building",
+        fallback: "dormant",
+        runs_used: 0,
+        last_used: null,
+      },
     ],
     city: {},
     stated: { namespaces: { github: "off" } },
   };
   const ROWS = rowsOf(ANSWER, "building");
-  const DRAFT = pressGroup(ROWS, { tools: { plan: "core" }, namespaces: draftOf(ANSWER, "building").namespaces }, "github", "dormant");
-  const CATALOG = $derived(
-    catalogLook({ answer: { ...ANSWER, run: RunId.make("00000000-0000-4000-8000-000000000001") }, scope: "building", draft: DRAFT, edited: true, now: 0 }, $lang, {
-      scope: still,
-      edit: still,
-      save: still,
-    }),
+  const DRAFT = pressGroup(
+    ROWS,
+    { tools: { plan: "core" }, namespaces: draftOf(ANSWER, "building").namespaces },
+    "github",
+    "dormant",
   );
-  const EMPTY = $derived(catalogLook({ answer: ANSWER, scope: "city", draft: draftOf(ANSWER, "city"), edited: false, now: 0 }, $lang, { scope: still, edit: still, save: still }));
+  const CATALOG = $derived(
+    catalogLook(
+      {
+        answer: { ...ANSWER, run: RunId.make("00000000-0000-4000-8000-000000000001") },
+        scope: "building",
+        draft: DRAFT,
+        edited: true,
+        now: 0,
+      },
+      $lang,
+      {
+        scope: still,
+        edit: still,
+        save: still,
+      },
+    ),
+  );
+  const EMPTY = $derived(
+    catalogLook(
+      { answer: ANSWER, scope: "city", draft: draftOf(ANSWER, "city"), edited: false, now: 0 },
+      $lang,
+      { scope: still, edit: still, save: still },
+    ),
+  );
   const TASK = "fix the checkout total";
 
-  const MARKS: readonly { readonly name: string; readonly mark: TreeMark; readonly size: string | undefined }[] = [
+  const MARKS: readonly {
+    readonly name: string;
+    readonly mark: TreeMark;
+    readonly size: string | undefined;
+  }[] = [
     { name: "crates", mark: { kind: "directory", open: true }, size: undefined },
     { name: "src", mark: { kind: "directory", open: false }, size: undefined },
     { name: "Cargo.toml", mark: { kind: "file" }, size: "1.2 KB" },
-    { name: "fix the checkout total", mark: { kind: "transcript", hint: "transcript" }, size: undefined },
+    {
+      name: "fix the checkout total",
+      mark: { kind: "transcript", hint: "transcript" },
+      size: undefined,
+    },
   ];
 </script>
 
@@ -217,11 +347,15 @@
   </div>
 </Case>
 
-<Case label="building prompts · the newest run's slots and one room's documents, each with its steps">
+<Case
+  label="building prompts · the newest run's slots and one room's documents, each with its steps"
+>
   <Prompts {...PROMPTS} />
 </Case>
 
-<Case label="building capabilities · a fixed row, a draft that moves one tool in and a server back on, and the meter">
+<Case
+  label="building capabilities · a fixed row, a draft that moves one tool in and a server back on, and the meter"
+>
   <Catalog {...CATALOG} />
 </Case>
 

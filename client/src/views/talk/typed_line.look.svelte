@@ -19,7 +19,12 @@
   const { typed, lit }: Props = $props();
 </script>
 
-<span class="typed-line" style:--typed="{String(typed)}px" data-lit={lit ? "" : undefined} aria-hidden="true"></span>
+<span
+  class="typed-line"
+  style:--typed="{String(typed)}px"
+  data-lit={lit ? "" : undefined}
+  aria-hidden="true"
+></span>
 
 <style>
   /* Registering `--typed` as a length is what lets the gradient move

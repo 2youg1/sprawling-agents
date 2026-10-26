@@ -40,11 +40,21 @@
   const lines = $derived(u.conn.asking.ask({ sessions: { room: address } }));
   const found = u.prefs.paletteFound;
   const keys = keymap();
-  const began = $derived(session ?? lineIn($lines !== undefined && "sessions" in $lines ? $lines.sessions : undefined, undefined)?.began ?? null);
+  const began = $derived(
+    session ??
+      lineIn($lines !== undefined && "sessions" in $lines ? $lines.sessions : undefined, undefined)
+        ?.began ??
+      null,
+  );
 </script>
 
 <Look
   {...addressLineOf($lang, address, began, onOpen)}
   seat={at === "box" ? { at, ...boxWords($lang) } : { at }}
-  lesson={$found ? undefined : { words: say($lang, "talk_address_hint"), chord: marks(keys.chord("palette"), keys.platform).join(" ") }}
+  lesson={$found
+    ? undefined
+    : {
+        words: say($lang, "talk_address_hint"),
+        chord: marks(keys.chord("palette"), keys.platform).join(" "),
+      }}
 />

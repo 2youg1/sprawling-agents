@@ -25,7 +25,10 @@ describe("base32", () => {
   });
 
   test("reads a code a person copied by hand", () => {
-    expect([canonical(" ABCDE-fghij klmno "), decode("mzxw6yt!")]).toEqual(["abcdefghijklmno", null]);
+    expect([canonical(" ABCDE-fghij klmno "), decode("mzxw6yt!")]).toEqual([
+      "abcdefghijklmno",
+      null,
+    ]);
   });
 });
 
@@ -55,6 +58,10 @@ describe("an invitation", () => {
   });
 
   test("is asked for only by a fragment that carries the pairing key", () => {
-    expect([isInvitation("#pair=x"), isInvitation("#/setup/remote"), isInvitation("")]).toEqual([true, false, false]);
+    expect([isInvitation("#pair=x"), isInvitation("#/setup/remote"), isInvitation("")]).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 });

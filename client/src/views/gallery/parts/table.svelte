@@ -43,9 +43,7 @@
       editable: {
         text: (row) => row.ceiling,
         onEdit: (row, text) => {
-          rows = rows.map((each) =>
-            each.id === row.id ? { ...each, ceiling: text } : each,
-          );
+          rows = rows.map((each) => (each.id === row.id ? { ...each, ceiling: text } : each));
         },
       },
     },
@@ -85,12 +83,7 @@
 </Case>
 
 <Case label="table · empty">
-  <Table
-    caption={say($lang, "setup_models")}
-    {columns}
-    rows={[]}
-    keyOf={(row: ModelRow) => row.id}
-  >
+  <Table caption={say($lang, "setup_models")} {columns} rows={[]} keyOf={(row: ModelRow) => row.id}>
     {#snippet empty()}
       <EmptyState missing="setup_no_models">
         {#snippet action()}

@@ -16,10 +16,7 @@ below is the seat's, like every gap between parts. -->
   const look: RuleLook = $props();
 </script>
 
-<div
-  {...look.wire}
-  class="flex items-center gap-base text-note text-text-faint"
->
+<div {...look.wire} class="flex items-center gap-base text-note text-text-faint">
   <span class="h-px flex-1 bg-raised"></span>
   <span class="flex min-w-0 flex-wrap items-center justify-center gap-x-tight">
     {#if look.mark === "branch"}

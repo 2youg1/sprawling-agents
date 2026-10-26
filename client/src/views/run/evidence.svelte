@@ -37,7 +37,9 @@
 
   const question = $derived<Query>({ evidence: { run } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (held) => ("evidence" in held ? held.evidence.items : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("evidence" in held ? held.evidence.items : undefined)),
+  );
   const items = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
@@ -49,10 +51,13 @@
   <ul class="text-note">
     {#each items as item (item.at)}
       <li class="flex items-center gap-base border-b border-edge py-snug">
-        <span class="w-figure shrink-0 text-text-faint">{say($lang, EVIDENCE_WORD[item.kind])}</span>
+        <span class="w-figure shrink-0 text-text-faint">{say($lang, EVIDENCE_WORD[item.kind])}</span
+        >
         <span class="flex-1 truncate font-mono text-text-quiet">{item.locator}</span>
         {#if item.picture !== null && item.picture !== undefined}
-          <span class="figure text-text-faint">{item.picture.width}×{item.picture.height} {item.picture.media_type}</span>
+          <span class="figure text-text-faint"
+            >{item.picture.width}×{item.picture.height} {item.picture.media_type}</span
+          >
         {/if}
         <span class="figure text-text-faint">#{item.at}</span>
       </li>

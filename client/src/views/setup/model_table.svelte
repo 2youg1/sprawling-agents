@@ -41,7 +41,9 @@
 
   // The city's answer for every row (client D103). A table about no
   // endpoint asks nothing, and its boxes stay blank.
-  const asked = $derived(about === null ? readable(undefined) : u.conn.asking.ask(figuresQuery(about, state, served)));
+  const asked = $derived(
+    about === null ? readable(undefined) : u.conn.asking.ask(figuresQuery(about, state, served)),
+  );
   const figures = $derived(
     readAnswer($asked, (held) => ("model_figures" in held ? held.model_figures.models : undefined)),
   );

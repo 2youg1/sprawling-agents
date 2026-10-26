@@ -23,11 +23,17 @@ const OTHERS: readonly DocumentVersion[] = [
   { version: V2, bytes: 12, kept: true, source: "on_disk" },
 ];
 
-function picker(against: B3Hash | null): { readonly picked: (B3Hash | null)[]; readonly look: ReturnType<typeof againstLookOf> } {
+function picker(against: B3Hash | null): {
+  readonly picked: (B3Hash | null)[];
+  readonly look: ReturnType<typeof againstLookOf>;
+} {
   const picked: (B3Hash | null)[] = [];
-  return { picked, look: againstLookOf(OTHERS, against, "en", (version) => {
-    picked.push(version);
-  }) };
+  return {
+    picked,
+    look: againstLookOf(OTHERS, against, "en", (version) => {
+      picked.push(version);
+    }),
+  };
 }
 
 function choose(look: ReturnType<typeof againstLookOf>, value: string): void {

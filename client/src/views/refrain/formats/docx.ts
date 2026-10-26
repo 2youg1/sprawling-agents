@@ -75,7 +75,9 @@ const FIT_STEP = 40;
 const FIT_MIN = 280;
 
 export function readDocx(bytes: Uint8Array): Promise<Read> {
-  return unpack(bytes).then((unpacked) => (unpacked.kind === "refused" ? unpacked : drawn(bytes, unpacked.parts)));
+  return unpack(bytes).then((unpacked) =>
+    unpacked.kind === "refused" ? unpacked : drawn(bytes, unpacked.parts),
+  );
 }
 
 function drawn(bytes: Uint8Array, parts: ReadonlyMap<string, Uint8Array>): Promise<Read> {
@@ -96,7 +98,10 @@ function drawn(bytes: Uint8Array, parts: ReadonlyMap<string, Uint8Array>): Promi
 // The first page's width in CSS pixels, as docx-preview set it in
 // points, or `null` when it set none.
 function widthOf(body: HTMLElement): number | null {
-  const stated = body.querySelector("section.docx")?.getAttribute("style")?.match(/(?:^|;)\s*width:\s*([\d.]+)pt/);
+  const stated = body
+    .querySelector("section.docx")
+    ?.getAttribute("style")
+    ?.match(/(?:^|;)\s*width:\s*([\d.]+)pt/);
   return stated?.[1] === undefined ? null : (Number(stated[1]) * 4) / 3;
 }
 
@@ -107,9 +112,15 @@ function fitted(width: number | null, gutter: number): string {
   if (width === null) return "";
   const board = 2 * gutter;
   const rules: string[] = [];
-  for (let frame = Math.ceil((width + board) / FIT_STEP) * FIT_STEP; frame > FIT_MIN; frame -= FIT_STEP) {
+  for (
+    let frame = Math.ceil((width + board) / FIT_STEP) * FIT_STEP;
+    frame > FIT_MIN;
+    frame -= FIT_STEP
+  ) {
     const zoom = Math.min(1, (frame - FIT_STEP - board) / width);
-    rules.push(`@media (max-width: ${String(frame)}px) { .docx-wrapper > section.docx { zoom: ${zoom.toFixed(3)}; } }`);
+    rules.push(
+      `@media (max-width: ${String(frame)}px) { .docx-wrapper > section.docx { zoom: ${zoom.toFixed(3)}; } }`,
+    );
   }
   return rules.join(" ");
 }
@@ -121,7 +132,8 @@ function coverageOf(parts: ReadonlyMap<string, Uint8Array>): Coverage {
     revisions: count(body, /<w:(ins|del|moveFrom|moveTo)\b/g),
     comments: count(textOf(parts, "word/comments.xml"), /<w:comment\b/g),
     objects:
-      count(body, /<w:(object|altChunk|control)\b/g) + [...parts.keys()].filter((name) => name.startsWith("word/embeddings/")).length,
+      count(body, /<w:(object|altChunk|control)\b/g) +
+      [...parts.keys()].filter((name) => name.startsWith("word/embeddings/")).length,
   };
 }
 
@@ -137,7 +149,10 @@ function textOf(parts: ReadonlyMap<string, Uint8Array>, name: string): string {
 export function docxLines(bytes: Uint8Array): Promise<readonly string[] | null> {
   return unpack(bytes).then((unpacked) => {
     if (unpacked.kind === "refused") return null;
-    const xml = new DOMParser().parseFromString(textOf(unpacked.parts, "word/document.xml"), "application/xml");
+    const xml = new DOMParser().parseFromString(
+      textOf(unpacked.parts, "word/document.xml"),
+      "application/xml",
+    );
     const lines: string[] = [];
     walk(xml.documentElement, null, lines);
     return lines;
@@ -151,7 +166,8 @@ function walk(element: Element, line: number | null, lines: string[]): void {
       lines.push("");
       walk(child, lines.length - 1, lines);
     } else if (line !== null && (own === "t" || own === "tab" || own === "br" || own === "cr")) {
-      lines[line] = (lines[line] ?? "") + (own === "t" ? child.textContent : own === "tab" ? "\t" : "\n");
+      lines[line] =
+        (lines[line] ?? "") + (own === "t" ? child.textContent : own === "tab" ? "\t" : "\n");
     } else {
       walk(child, line, lines);
     }

@@ -71,12 +71,16 @@ export function listeningOf(lang: Lang, heard: Heard): ListeningLook {
     listeners: listeners.flatMap((listener) => {
       const told = heard.segments.find((each) => each.slot === listener.slot);
       if (listener.who === "" && told === undefined) return [];
-      const cut = told === undefined ? 0 : told.sources.reduce((sum, source) => sum + source.dropped, 0);
+      const cut =
+        told === undefined ? 0 : told.sources.reduce((sum, source) => sum + source.dropped, 0);
       return {
         key: listener.slot,
         word: say(lang, listener.word),
         who: listener.who === "" ? undefined : listener.who,
-        size: told === undefined ? undefined : fill(say(lang, "run_prompt_bytes"), { n: count(told.bytes) }),
+        size:
+          told === undefined
+            ? undefined
+            : fill(say(lang, "run_prompt_bytes"), { n: count(told.bytes) }),
         cut: cut > 0 ? fill(say(lang, "run_prompt_dropped"), { n: count(cut) }) : undefined,
         sources:
           told === undefined || told.sources.length === 0

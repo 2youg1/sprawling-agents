@@ -11,7 +11,10 @@
 
 import type { Pressed } from "./parts/combobox";
 
-export type BoxKey = { readonly kind: "move"; readonly to: number } | { readonly kind: "pick" } | { readonly kind: "pass" };
+export type BoxKey =
+  | { readonly kind: "move"; readonly to: number }
+  | { readonly kind: "pick" }
+  | { readonly kind: "pass" };
 
 // What `key` does with the cursor at `cursor` over `count` options. An
 // empty list keeps the cursor at 0, so the first option to arrive is

@@ -7,7 +7,15 @@ import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { createBelief } from "./belief";
-import type { AxError, CityAnswer, EventKind, EventRecord, Mode, RunPolicy, RunSummary } from "../wire";
+import type {
+  AxError,
+  CityAnswer,
+  EventKind,
+  EventRecord,
+  Mode,
+  RunPolicy,
+  RunSummary,
+} from "../wire";
 import { Address, B3Hash, CITY_RUN, RunId, Seq, TimeMs } from "../wire";
 
 const ONE = RunId.make("11111111-1111-4111-8111-111111111111");
@@ -30,7 +38,12 @@ function city(runs: readonly RunSummary[]): CityAnswer {
   return { active: runs.length, buildings: [], frozen: 0, halted: [], pursuits: [], runs };
 }
 
-function event(run: RunId, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+function event(
+  run: RunId,
+  at: number,
+  kind: EventKind,
+  data: Record<string, unknown>,
+): EventRecord {
   return {
     run,
     seq: Seq.make(at),
@@ -372,7 +385,9 @@ describe("the model a session answers with", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 2));
     expect(get(store.belief).runs[ONE]?.model).toBeNull();
-    expect(store.apply(event(ONE, 3, "model_called", { segments: [], model: "fake-small" }))).toBeNull();
+    expect(
+      store.apply(event(ONE, 3, "model_called", { segments: [], model: "fake-small" })),
+    ).toBeNull();
     expect(get(store.belief).runs[ONE]?.model).toBe("fake-small");
   });
 });
@@ -386,8 +401,16 @@ describe("the run policy a room holds", () => {
   test("the newest readable change holds per room, in any arrival order", () => {
     const store = createBelief(() => 0);
     const room = Address.make("lab/policy");
-    const policy = (mode: Mode): RunPolicy => ({ admit: "standing", landing: "ordinary", mode, write: "create" });
-    const change = (at: number, data: Record<string, unknown>): EventRecord => ({ ...event(ONE, at, "run_policy_changed", data), addr: room });
+    const policy = (mode: Mode): RunPolicy => ({
+      admit: "standing",
+      landing: "ordinary",
+      mode,
+      write: "create",
+    });
+    const change = (at: number, data: Record<string, unknown>): EventRecord => ({
+      ...event(ONE, at, "run_policy_changed", data),
+      addr: room,
+    });
     store.apply(change(9, { policy: policy("work"), by: "person" }));
     store.apply(change(5, { policy: policy("chat"), by: "person" }));
     store.apply(change(12, { policy: { mode: 3 }, by: "person" }));

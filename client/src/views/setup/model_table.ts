@@ -17,7 +17,15 @@ import type { ModelFact } from "../../core/probed";
 import { InputKinds as InputKindsSchema } from "../../wire";
 import type { FigureFrom, FiguresLine, InputKinds } from "../../wire";
 import type { Min } from "../parts/table";
-import { ceilingOf, everyRow, isNamed, priceOf, shownRows, tickedRows, windowOf } from "./model_rows";
+import {
+  ceilingOf,
+  everyRow,
+  isNamed,
+  priceOf,
+  shownRows,
+  tickedRows,
+  windowOf,
+} from "./model_rows";
 import type { TableState } from "./model_rows";
 
 // The input kinds a person may state, in the wire's own order.
@@ -146,7 +154,11 @@ export interface TickLook {
 
 export interface ModelTableLook {
   readonly search: BoxLook;
-  readonly textOnly: { readonly label: string; readonly on: boolean; readonly toggle: (on: boolean) => void };
+  readonly textOnly: {
+    readonly label: string;
+    readonly on: boolean;
+    readonly toggle: (on: boolean) => void;
+  };
   readonly count: string;
   // Absent while there is no row at all, because an empty table under
   // an empty count says nothing the count did not.
@@ -177,18 +189,42 @@ export function lookOf(
   const facts = new Map(every.map((row) => [row.id, row]));
   const city = new Map(answered.map((line) => [line.id, line]));
   const ticked = tickedRows(state, served);
-  const figure = (pick: (row: ModelFact) => number | null) => (a: ModelRowLook, b: ModelRowLook) => {
-    const left = facts.get(a.id);
-    const right = facts.get(b.id);
-    return bySize(left === undefined ? null : pick(left), right === undefined ? null : pick(right));
-  };
+  const figure =
+    (pick: (row: ModelFact) => number | null) => (a: ModelRowLook, b: ModelRowLook) => {
+      const left = facts.get(a.id);
+      const right = facts.get(b.id);
+      return bySize(
+        left === undefined ? null : pick(left),
+        right === undefined ? null : pick(right),
+      );
+    };
   const window = (row: ModelFact) => windowOf(state, row) ?? cityWindow(city.get(row.id));
   const ceiling = (row: ModelFact) => ceilingOf(state, row) ?? cityCeiling(city.get(row.id));
   const columns: readonly ColumnLook[] = [
-    { key: "id", header: say(lang, "setup_model_id"), min: "24ch", compare: (a, b) => a.id.localeCompare(b.id) },
-    { key: "context", header: say(lang, "setup_model_context"), min: "figure", compare: figure(window) },
-    { key: "output", header: say(lang, "setup_model_output"), min: "figure", compare: figure(ceiling) },
-    { key: "modalities", header: say(lang, "setup_model_modalities"), min: "12ch", compare: undefined },
+    {
+      key: "id",
+      header: say(lang, "setup_model_id"),
+      min: "24ch",
+      compare: (a, b) => a.id.localeCompare(b.id),
+    },
+    {
+      key: "context",
+      header: say(lang, "setup_model_context"),
+      min: "figure",
+      compare: figure(window),
+    },
+    {
+      key: "output",
+      header: say(lang, "setup_model_output"),
+      min: "figure",
+      compare: figure(ceiling),
+    },
+    {
+      key: "modalities",
+      header: say(lang, "setup_model_modalities"),
+      min: "12ch",
+      compare: undefined,
+    },
     { key: "price", header: say(lang, "setup_model_price"), min: "12ch", compare: undefined },
     { key: "role", header: say(lang, "setup_model_role"), min: "figure", compare: undefined },
   ];
@@ -208,14 +244,19 @@ export function lookOf(
         state.textOnly = on;
       },
     },
-    count: fill(say(lang, "setup_ticked_count"), { ticked: String(ticked.length), total: String(every.length) }),
+    count: fill(say(lang, "setup_ticked_count"), {
+      ticked: String(ticked.length),
+      total: String(every.length),
+    }),
     table:
       every.length === 0
         ? undefined
         : {
             caption: say(lang, "setup_models"),
             columns,
-            rows: shown.map((row) => rowLook(state, { row, line: city.get(row.id), named: isNamed(served, row) }, lang)),
+            rows: shown.map((row) =>
+              rowLook(state, { row, line: city.get(row.id), named: isNamed(served, row) }, lang),
+            ),
             tick: {
               picked: (row) => state.ticked[row.id] === true,
               onPick: (row, on) => {
@@ -225,7 +266,8 @@ export function lookOf(
               onPickAll: (on) => {
                 for (const row of shown) state.ticked[row.id] = on;
               },
-              allPicked: () => shown.length > 0 && shown.every((row) => state.ticked[row.id] === true),
+              allPicked: () =>
+                shown.length > 0 && shown.every((row) => state.ticked[row.id] === true),
             },
             empty: say(lang, "setup_no_models"),
           },

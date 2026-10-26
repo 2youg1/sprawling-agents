@@ -115,7 +115,9 @@ describe("a line over a remote session", () => {
     const heard = listener();
     talk(door, device(), heard.hearing);
     const city = sealer(TO_DEVICE, "city_to_device");
-    const sealed = await Promise.all(texts.map((text) => city.seal(payloadBytes({ kind: "frame", text }))));
+    const sealed = await Promise.all(
+      texts.map((text) => city.seal(payloadBytes({ kind: "frame", text }))),
+    );
     for (const bytes of sealed) arrive(bytes);
     await settled(() => heard.said.length === FRAMES);
     expect({ said: heard.said, events: heard.events }).toEqual({ said: texts, events: ["opened"] });

@@ -19,9 +19,13 @@
   const { lang, send } = ui();
 
   const look = $derived(
-    lookOf(props, { reveal: say($lang, "path_reveal"), inert: say($lang, "path_reveal_inert") }, (address) => {
-      send(reveal(address));
-    }),
+    lookOf(
+      props,
+      { reveal: say($lang, "path_reveal"), inert: say($lang, "path_reveal_inert") },
+      (address) => {
+        send(reveal(address));
+      },
+    ),
   );
 </script>
 

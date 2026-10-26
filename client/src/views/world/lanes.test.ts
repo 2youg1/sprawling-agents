@@ -10,7 +10,10 @@ import { graphOf } from "./lanes";
 import type { Commit } from "./lanes";
 
 const oid = (name: string): GitOid => GitOid.make(name.padEnd(40, "0"));
-const commit = (name: string, ...parents: string[]): Commit => ({ oid: oid(name), parents: parents.map(oid) });
+const commit = (name: string, ...parents: string[]): Commit => ({
+  oid: oid(name),
+  parents: parents.map(oid),
+});
 
 describe("the swimlane a page of commits draws", () => {
   test("a straight history is one lane, each commit joined to the next", () => {
@@ -19,7 +22,13 @@ describe("the swimlane a page of commits draws", () => {
       lanes: 1,
       rows: [
         { lane: 0, lines: [{ from: 0, to: 0, part: "out", owner: 0 }] },
-        { lane: 0, lines: [{ from: 0, to: 0, part: "in", owner: 0 }, { from: 0, to: 0, part: "out", owner: 1 }] },
+        {
+          lane: 0,
+          lines: [
+            { from: 0, to: 0, part: "in", owner: 0 },
+            { from: 0, to: 0, part: "out", owner: 1 },
+          ],
+        },
         { lane: 0, lines: [{ from: 0, to: 0, part: "in", owner: 1 }] },
       ],
     });

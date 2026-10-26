@@ -17,7 +17,10 @@ interface Heard {
   readonly captured: number[];
 }
 
-function drawn(lines: number, grip: { from: Grip | null } = { from: null }): { readonly look: SplitLook; readonly heard: Heard } {
+function drawn(
+  lines: number,
+  grip: { from: Grip | null } = { from: null },
+): { readonly look: SplitLook; readonly heard: Heard } {
   const heard: Heard = { lines: [], resets: 0, captured: [] };
   const props: SplitProps = {
     lines,
@@ -52,7 +55,8 @@ function press(look: SplitLook, key: string): boolean {
 describe("the keys move the line a whole line at a time, inside its bounds", () => {
   test("arrows step, Home and End go to the bounds, Enter gives the proportions back", () => {
     const { look, heard } = drawn(10);
-    for (const key of ["ArrowUp", "ArrowDown", "Home", "End", "Enter"]) expect(press(look, key)).toBe(true);
+    for (const key of ["ArrowUp", "ArrowDown", "Home", "End", "Enter"])
+      expect(press(look, key)).toBe(true);
     expect(heard.lines).toEqual([9, 11, 6, 20]);
     expect(heard.resets).toBe(1);
   });
@@ -98,11 +102,11 @@ describe("the bag carries the splitter's values", () => {
       "horizontal",
       "inspector-editor",
     ]);
-    expect([wire["aria-valuemin"], wire["aria-valuenow"], wire["aria-valuemax"], wire["aria-label"]]).toEqual([
-      6,
-      10,
-      20,
-      "move the line",
-    ]);
+    expect([
+      wire["aria-valuemin"],
+      wire["aria-valuenow"],
+      wire["aria-valuemax"],
+      wire["aria-label"],
+    ]).toEqual([6, 10, 20, "move the line"]);
   });
 });

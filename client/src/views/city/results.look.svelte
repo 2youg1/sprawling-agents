@@ -24,47 +24,56 @@
 </script>
 
 <div class="flex flex-col gap-wide">
-{#if look.none !== null}
-  <p class="text-note text-text-faint">{look.none}</p>
-{/if}
-{#each look.bands as band (band.key)}
-  <section aria-label={band.heading}>
-    <h2 class="mb-tight border-b border-edge pb-tight text-note text-text-quiet">
-      {band.heading}
-      <span class="text-text-faint">{band.count}</span>
-    </h2>
-    <ul>
-      {#each band.rows as row (row.key)}
-        <li class="border-b border-l-2 border-b-edge {row.outcome === 'waiting' ? 'border-l-alert' : 'border-l-transparent'}">
-          <a
-            {...row.wire}
-            class="flex items-baseline gap-base px-tight py-snug text-note transition-colors ease-leave hover:wash hover:ease-arrive"
+  {#if look.none !== null}
+    <p class="text-note text-text-faint">{look.none}</p>
+  {/if}
+  {#each look.bands as band (band.key)}
+    <section aria-label={band.heading}>
+      <h2 class="mb-tight border-b border-edge pb-tight text-note text-text-quiet">
+        {band.heading}
+        <span class="text-text-faint">{band.count}</span>
+      </h2>
+      <ul>
+        {#each band.rows as row (row.key)}
+          <li
+            class="border-b border-l-2 border-b-edge {row.outcome === 'waiting'
+              ? 'border-l-alert'
+              : 'border-l-transparent'}"
           >
-            <span class="w-figure shrink-0 font-mono text-text-faint">{row.at}</span>
-            <!-- The mark's slot stands even where a run has no outcome
+            <a
+              {...row.wire}
+              class="flex items-baseline gap-base px-tight py-snug text-note transition-colors ease-leave hover:wash hover:ease-arrive"
+            >
+              <span class="w-figure shrink-0 font-mono text-text-faint">{row.at}</span>
+              <!-- The mark's slot stands even where a run has no outcome
             yet, so the room and task columns start at one edge down the
             list. -->
-            <span class={["inline-flex size-glyph-sm shrink-0 self-center", row.outcome === null ? "" : OUTCOME_INK[row.outcome]]}>
-              {#if row.outcome !== null}
-                <Glyph name={OUTCOME_GLYPH[row.outcome]} size="sm" />
+              <span
+                class={[
+                  "inline-flex size-glyph-sm shrink-0 self-center",
+                  row.outcome === null ? "" : OUTCOME_INK[row.outcome],
+                ]}
+              >
+                {#if row.outcome !== null}
+                  <Glyph name={OUTCOME_GLYPH[row.outcome]} size="sm" />
+                {/if}
+              </span>
+              <span class="w-output shrink-0 truncate font-mono text-text-quiet">{row.addr}</span>
+              <span class="min-w-0 flex-1 truncate text-body text-text">{row.title}</span>
+              {#if row.tail.kind === "produced"}
+                <Produced run={row.tail.run} />
+                {#if row.tail.pr !== null}
+                  <span class="shrink-0 text-text-quiet">{row.tail.pr}</span>
+                {/if}
+              {:else if row.tail.kind === "asks"}
+                <span class="min-w-0 shrink truncate text-text">{row.tail.text}</span>
+              {:else if row.tail.kind === "stopped"}
+                <span class="shrink-0 text-text-quiet">{row.tail.text}</span>
               {/if}
-            </span>
-            <span class="w-output shrink-0 truncate font-mono text-text-quiet">{row.addr}</span>
-            <span class="min-w-0 flex-1 truncate text-body text-text">{row.title}</span>
-            {#if row.tail.kind === "produced"}
-              <Produced run={row.tail.run} />
-              {#if row.tail.pr !== null}
-                <span class="shrink-0 text-text-quiet">{row.tail.pr}</span>
-              {/if}
-            {:else if row.tail.kind === "asks"}
-              <span class="min-w-0 shrink truncate text-text">{row.tail.text}</span>
-            {:else if row.tail.kind === "stopped"}
-              <span class="shrink-0 text-text-quiet">{row.tail.text}</span>
-            {/if}
-          </a>
-        </li>
-      {/each}
-    </ul>
-  </section>
-{/each}
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/each}
 </div>

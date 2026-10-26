@@ -39,7 +39,9 @@
   const { lang } = ui();
 
   const all = $derived(WORDS.map(([id, key]): Lens => ({ id, label: say($lang, key) })));
-  const three = $derived(all.filter((lens) => lens.id === "time" || lens.id === "turns" || lens.id === "changes"));
+  const three = $derived(
+    all.filter((lens) => lens.id === "time" || lens.id === "turns" || lens.id === "changes"),
+  );
 
   let held = $state("turns");
   let plain = $state("time");

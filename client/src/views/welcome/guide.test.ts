@@ -7,14 +7,31 @@ import { describe, expect, test } from "bun:test";
 
 import type { GuideProgress } from "../../wire";
 import type { Configured } from "./guide";
-import { advanced, currentOf, opened, opensGuide, putOff, putOffTheRest, skipAll, standingOf } from "./guide";
+import {
+  advanced,
+  currentOf,
+  opened,
+  opensGuide,
+  putOff,
+  putOffTheRest,
+  skipAll,
+  standingOf,
+} from "./guide";
 
-const NOTHING: Configured = { provider: false, dependencies: false, texts: false, skills: null, mcp: null };
+const NOTHING: Configured = {
+  provider: false,
+  dependencies: false,
+  texts: false,
+  skills: null,
+  mcp: null,
+};
 
 describe("the guide's standing", () => {
   test("a step put off and then done elsewhere is done, not skipped", () => {
     const progress: GuideProgress = { dependencies: "skipped" };
-    expect(standingOf("dependencies", progress, { ...NOTHING, dependencies: true })).toBe("configured");
+    expect(standingOf("dependencies", progress, { ...NOTHING, dependencies: true })).toBe(
+      "configured",
+    );
   });
 
   test("opening a step is not doing it", () => {
@@ -74,7 +91,9 @@ describe("the guide's standing", () => {
 
   test("an answer that only now arrived does not move the guide", () => {
     const unknown = { ...NOTHING, provider: null };
-    expect(advanced({ at: "provider" }, "provider", unknown, { ...NOTHING, provider: true })).toBeNull();
+    expect(
+      advanced({ at: "provider" }, "provider", unknown, { ...NOTHING, provider: true }),
+    ).toBeNull();
     expect(advanced({ at: "provider" }, "provider", NOTHING, NOTHING)).toBeNull();
   });
 });
@@ -82,7 +101,8 @@ describe("the guide's standing", () => {
 describe("the launch", () => {
   test("opens the guide whenever the city has no provider endpoint", () => {
     for (const main of [false, true])
-      for (const welcomed of [false, true]) expect(opensGuide({ endpoints: 0, main, welcomed })).toBe(true);
+      for (const welcomed of [false, true])
+        expect(opensGuide({ endpoints: 0, main, welcomed })).toBe(true);
   });
 
   test("with an endpoint, opens it only where nobody walked it and no main model is chosen", () => {

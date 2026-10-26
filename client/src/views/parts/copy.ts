@@ -33,7 +33,8 @@ export type Copied =
 // Why a write did not land: the page has no clipboard at all (the
 // browser offers one only to a secure context - https or localhost),
 // or the browser refused the write and said why in its own words.
-export type Refusal = { readonly kind: "absent" } | { readonly kind: "refused"; readonly said: string };
+export type Refusal =
+  { readonly kind: "absent" } | { readonly kind: "refused"; readonly said: string };
 
 export const REST: Copied = { kind: "rest" };
 

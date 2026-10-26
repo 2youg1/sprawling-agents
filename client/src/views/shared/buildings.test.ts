@@ -9,13 +9,22 @@ import type { Answer } from "../../wire";
 import { Address, Tokens, UsdMicros } from "../../wire";
 import { HALL, buildingsOf } from "./buildings";
 
-const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
+const IDLE = {
+  unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+};
 
 function cityOf(...addrs: readonly string[]): Answer {
   return {
     city: {
       active: 0,
-      buildings: addrs.map((addr) => ({ addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 })),
+      buildings: addrs.map((addr) => ({
+        addr: Address.make(addr),
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: IDLE,
+        ready: 0,
+      })),
       frozen: 0,
       halted: [],
       pursuits: [],
@@ -32,7 +41,11 @@ describe("buildingsOf", () => {
   });
 
   test("the hall comes first once, whether or not the city lists it", () => {
-    expect(buildingsOf(cityOf("lab", HALL, "atelier"))).toEqual([HALL, Address.make("atelier"), Address.make("lab")]);
+    expect(buildingsOf(cityOf("lab", HALL, "atelier"))).toEqual([
+      HALL,
+      Address.make("atelier"),
+      Address.make("lab"),
+    ]);
   });
 
   test("a city that has not answered is the hall alone, never an empty list", () => {

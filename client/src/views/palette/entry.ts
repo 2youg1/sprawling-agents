@@ -31,4 +31,5 @@ export interface Group {
 }
 
 // Places to go, or - once the line begins with `/` - the verbs.
-export type Listing = { readonly kind: "verbs"; readonly groups: readonly Group[] } | { readonly kind: "places" };
+export type Listing =
+  { readonly kind: "verbs"; readonly groups: readonly Group[] } | { readonly kind: "places" };

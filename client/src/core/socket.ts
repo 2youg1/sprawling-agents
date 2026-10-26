@@ -39,7 +39,15 @@ import { decodeFrame, encodeFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { createGapWalk } from "./gap_walk";
-import { advance, connect as start, isLive, isStopped, newLink, unreadableRecord, unsentCommand } from "./link";
+import {
+  advance,
+  connect as start,
+  isLive,
+  isStopped,
+  newLink,
+  unreadableRecord,
+  unsentCommand,
+} from "./link";
 import { closeCity } from "./access";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Dial, Line } from "./line";
@@ -191,7 +199,10 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
         return;
       case "writing": {
         const { piece } = action;
-        live.update((tails) => ({ ...tails, [piece.run]: appended(tails[piece.run] ?? NO_TAIL, piece) }));
+        live.update((tails) => ({
+          ...tails,
+          [piece.run]: appended(tails[piece.run] ?? NO_TAIL, piece),
+        }));
         return;
       }
       case "lagged":
@@ -313,7 +324,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     reconnect = null;
     return event;
   }
-  if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibilityChanged);
+  if (typeof document !== "undefined")
+    document.addEventListener("visibilitychange", visibilityChanged);
 
   const [begun, first] = start(link);
   link = begun;

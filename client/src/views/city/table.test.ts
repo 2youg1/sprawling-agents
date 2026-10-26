@@ -10,10 +10,19 @@ import type { BuildingProgress, CityAnswer } from "../../wire";
 import type { BoardRun } from "../runs/lineage";
 import { lookOf, tableOf } from "./table";
 
-const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
+const IDLE = {
+  unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+};
 
 function building(addr: string, adoptable = false): BuildingProgress {
-  return { addr: Address.make(addr), adoptable, blocked: [], problems: [], progress: IDLE, ready: 0 };
+  return {
+    addr: Address.make(addr),
+    adoptable,
+    blocked: [],
+    problems: [],
+    progress: IDLE,
+    ready: 0,
+  };
 }
 
 function run(id: string, addr: string, started: number, doing: BoardRun["doing"]): BoardRun {
@@ -63,17 +72,39 @@ describe("building table", () => {
           { run: "r4", at: 4_000, phase: "idle" },
         ],
       },
-      { addr: Address.make("hall"), guide: "└─", waiting: 0, working: 0, done: 0, latest: null, since: null, starts: [] },
+      {
+        addr: Address.make("hall"),
+        guide: "└─",
+        waiting: 0,
+        working: 0,
+        done: 0,
+        latest: null,
+        since: null,
+        starts: [],
+      },
     ]);
   });
 
   // A row is a toggle of the panel beside the table: pressed while its
   // building is the one picked, and a press picks it.
   test("a row's button picks its building and says whether it is the one picked", () => {
-    const city: CityAnswer = { active: 0, frozen: 0, halted: [], pursuits: [], runs: [], buildings: [building("hall"), building("docs")] };
+    const city: CityAnswer = {
+      active: 0,
+      frozen: 0,
+      halted: [],
+      pursuits: [],
+      runs: [],
+      buildings: [building("hall"), building("docs")],
+    };
     const picks: string[] = [];
     const look = lookOf(
-      { city, runs: [run("r1", "docs/zh", 1_000, { kind: "waiting" })], now: 1_000, picked: Address.make("docs"), lang: "en" },
+      {
+        city,
+        runs: [run("r1", "docs/zh", 1_000, { kind: "waiting" })],
+        now: 1_000,
+        picked: Address.make("docs"),
+        lang: "en",
+      },
       (addr) => picks.push(addr),
     );
     expect(look.rows.map((row) => [row.name, row.wire["aria-pressed"]])).toEqual([
@@ -85,7 +116,14 @@ describe("building table", () => {
   });
 
   test("a folder waiting to be adopted says so where a building says when it last ran", () => {
-    const city: CityAnswer = { active: 0, frozen: 0, halted: [], pursuits: [], runs: [], buildings: [building("docs"), building("notes", true)] };
+    const city: CityAnswer = {
+      active: 0,
+      frozen: 0,
+      halted: [],
+      pursuits: [],
+      runs: [],
+      buildings: [building("docs"), building("notes", true)],
+    };
     const look = lookOf({ city, runs: [], now: 1_000, picked: null, lang: "en" }, () => undefined);
     expect(look.rows.map((row) => [row.name, row.latest])).toEqual([
       ["docs", "no runs"],

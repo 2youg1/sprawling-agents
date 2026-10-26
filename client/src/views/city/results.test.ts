@@ -35,7 +35,11 @@ describe("the results city's rows", () => {
   // acts on: a finished run's produce and pull request, a waiting run's
   // question, a failed run's reason - and nothing where there is none.
   test("each row ends in what its outcome has to say, and links to its run", () => {
-    const done = run(1, { kind: "frozen", completion: "done" }, { pr: "fix/totals", started: TimeMs.make(0) });
+    const done = run(
+      1,
+      { kind: "frozen", completion: "done" },
+      { pr: "fix/totals", started: TimeMs.make(0) },
+    );
     const asks = run(2, { kind: "waiting" }, { ask: "write to docs/zh" });
     const silent = run(3, { kind: "waiting" });
     const failed = run(4, { kind: "frozen", completion: "limit" });

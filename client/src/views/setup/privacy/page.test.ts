@@ -25,11 +25,17 @@ describe("the privacy page", () => {
   test("keeps the host's page order and groups it by category", () => {
     const sections = sectionsOf(HOME);
     expect(sections.map((section) => section.category)).toEqual([
-      "diagnostics", "speech_input", "location_sensors", "content", "activity_sync", "app_permissions", "windows_ai",
+      "diagnostics",
+      "speech_input",
+      "location_sensors",
+      "content",
+      "activity_sync",
+      "app_permissions",
+      "windows_ai",
     ]);
-    expect(sections.flatMap((section) => section.entries.map((entry) => entry.row.control))).toEqual(
-      HOME.controls.map((row) => row.control),
-    );
+    expect(
+      sections.flatMap((section) => section.entries.map((entry) => entry.row.control)),
+    ).toEqual(HOME.controls.map((row) => row.control));
   });
 
   test("offers apply only where the value read differs from the value written", () => {
@@ -45,7 +51,9 @@ describe("the privacy page", () => {
     const moved: PrivacyAnswer = {
       ...HOME,
       controls: HOME.controls.map((row) =>
-        row.control === "recall_snapshots" ? { ...row, current: { read: { value: { value: "dword", number: 7 } } } } : row,
+        row.control === "recall_snapshots"
+          ? { ...row, current: { read: { value: { value: "dword", number: 7 } } } }
+          : row,
       ),
     };
     expect(actions(moved, "recall_snapshots")).toEqual(["apply"]);
@@ -59,8 +67,12 @@ describe("the privacy page", () => {
 
   test("offers nothing while the history is withheld, or on another system", () => {
     const withheld: PrivacyAnswer = { ...HOME, history: { withheld: { error: REFUSAL } } };
-    expect(sectionsOf(withheld).flatMap((section) => section.entries.flatMap((entry) => entry.offers))).toEqual([]);
-    expect(sectionsOf(ELSEWHERE).flatMap((section) => section.entries.flatMap((entry) => entry.offers))).toEqual([]);
+    expect(
+      sectionsOf(withheld).flatMap((section) => section.entries.flatMap((entry) => entry.offers)),
+    ).toEqual([]);
+    expect(
+      sectionsOf(ELSEWHERE).flatMap((section) => section.entries.flatMap((entry) => entry.offers)),
+    ).toEqual([]);
   });
 
   test("sends the value it shows as the expected one", () => {
@@ -68,8 +80,12 @@ describe("the privacy page", () => {
     const [offer] = entry.offers;
     if (offer === undefined) return expect.unreachable("apply is offered");
     expect(entry.row.current).toEqual({ read: { value: offer.expected } });
-    expect(actionOf("device_census_task", offer)).toEqual({ apply: { control: "device_census_task", expected: offer.expected } });
-    expect(actionOf("tailored_experiences", { action: "reconcile", expected: { value: "absent" } })).toEqual({
+    expect(actionOf("device_census_task", offer)).toEqual({
+      apply: { control: "device_census_task", expected: offer.expected },
+    });
+    expect(
+      actionOf("tailored_experiences", { action: "reconcile", expected: { value: "absent" } }),
+    ).toEqual({
       reconcile: { expected: { value: "absent" } },
     });
   });
@@ -77,7 +93,13 @@ describe("the privacy page", () => {
   test("reads only the result kept under its own idem", () => {
     const kept: PrivacyAnswer = {
       ...HOME,
-      outcomes: [{ idem: IDEM, action: { apply: { control: "diagnostic_data", expected: { value: "absent" } } }, result: "already_written" }],
+      outcomes: [
+        {
+          idem: IDEM,
+          action: { apply: { control: "diagnostic_data", expected: { value: "absent" } } },
+          result: "already_written",
+        },
+      ],
     };
     expect(outcomeOf(kept, IDEM)).toBe("already_written");
     expect(outcomeOf(HOME, IDEM)).toBeNull();

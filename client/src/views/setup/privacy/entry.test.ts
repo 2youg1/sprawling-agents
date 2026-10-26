@@ -23,20 +23,37 @@ interface Vector {
 const press = (action: Action): Event<number> => ({ kind: "press", action });
 const confirm = (idem: number): Event<number> => ({ kind: "confirm", idem });
 const lost = (idem: number): Event<number> => ({ kind: "lost", idem });
-const outcome = (idem: number, result: "running" | "done" | "refused"): Event<number> => ({ kind: "outcome", idem, result });
+const outcome = (idem: number, result: "running" | "done" | "refused"): Event<number> => ({
+  kind: "outcome",
+  idem,
+  result,
+});
 const cancel: Event<number> = { kind: "cancel" };
 
 const VECTORS: readonly Vector[] = [
   { start: IDLE, events: [press("apply"), cancel], last: IDLE, sends: [] },
   {
     start: IDLE,
-    events: [press("apply"), confirm(1), outcome(2, "done"), outcome(1, "running"), outcome(1, "done")],
+    events: [
+      press("apply"),
+      confirm(1),
+      outcome(2, "done"),
+      outcome(1, "running"),
+      outcome(1, "done"),
+    ],
     last: { kind: "settled", idem: 1 },
     sends: [{ action: "apply", idem: 1 }],
   },
   {
     start: IDLE,
-    events: [press("restore"), confirm(3), lost(3), press("restore"), confirm(4), outcome(4, "refused")],
+    events: [
+      press("restore"),
+      confirm(3),
+      lost(3),
+      press("restore"),
+      confirm(4),
+      outcome(4, "refused"),
+    ],
     last: { kind: "refused", idem: 4 },
     sends: [
       { action: "restore", idem: 3 },
@@ -53,7 +70,10 @@ const VECTORS: readonly Vector[] = [
   { start: IDLE, events: [confirm(8), outcome(8, "done"), lost(8)], last: IDLE, sends: [] },
 ];
 
-function run(start: Stage<number>, events: readonly Event<number>[]): { last: Stage<number>; sends: Send<number>[] } {
+function run(
+  start: Stage<number>,
+  events: readonly Event<number>[],
+): { last: Stage<number>; sends: Send<number>[] } {
   let stage = start;
   const sends: Send<number>[] = [];
   for (const event of events) {
@@ -67,7 +87,10 @@ function run(start: Stage<number>, events: readonly Event<number>[]): { last: St
 describe("a privacy entry", () => {
   test("follows the model on every trace vector it prints", () => {
     for (const vector of VECTORS) {
-      expect(run(vector.start, vector.events)).toEqual({ last: vector.last, sends: [...vector.sends] });
+      expect(run(vector.start, vector.events)).toEqual({
+        last: vector.last,
+        sends: [...vector.sends],
+      });
     }
   });
 });

@@ -175,7 +175,10 @@ function quantile(sorted: readonly number[], q: number): number {
 }
 
 function median(values: readonly number[]): number {
-  return quantile([...values].sort((a, b) => a - b), 0.5);
+  return quantile(
+    [...values].sort((a, b) => a - b),
+    0.5,
+  );
 }
 
 function summary(shape: string, rounds: readonly Reading[]): string {

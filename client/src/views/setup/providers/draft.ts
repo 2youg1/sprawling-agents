@@ -84,8 +84,7 @@ export function hostOf(baseUrl: string): string | null {
 // who empties the box is asking for the derivation back, which is what
 // the placeholder in front of them is already showing.
 export type Naming =
-  | { readonly kind: "derived" }
-  | { readonly kind: "typed"; readonly value: string };
+  { readonly kind: "derived" } | { readonly kind: "typed"; readonly value: string };
 
 // What a box holding this text means. Trimming happens where the value
 // is read rather than here: a name is edited a character at a time, and
@@ -154,7 +153,10 @@ export function idFrom(host: string | null): string {
   const labels = lower.split(".");
   const second = labels.at(-2);
   const named = labels.every((label) => /^[0-9]+$/.test(label)) ? lower : (second ?? lower);
-  return named.replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
+  return named
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
 }
 
 // The id this draft is filed under: the one somebody typed, or the one

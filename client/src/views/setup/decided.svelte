@@ -49,7 +49,9 @@
         <li class="flex items-baseline gap-base border-b border-edge py-tight">
           <span class="shrink-0 text-text-faint">{clock($lang, decision.at)}</span>
           <span class="min-w-0 flex-1 truncate text-text-quiet">{decision.cluster.detail}</span>
-          <span class={decision.verdict === "allow" ? "shrink-0 text-accent" : "shrink-0 text-alert"}>
+          <span
+            class={decision.verdict === "allow" ? "shrink-0 text-accent" : "shrink-0 text-alert"}
+          >
             {say($lang, decision.verdict === "allow" ? "decided_allow" : "decided_deny")}
           </span>
         </li>

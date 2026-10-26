@@ -90,7 +90,9 @@
   const readRun: RunId = run.run;
   const question: Query = { rounds: { run: readRun } };
   const rounds = u.conn.asking.ask(question);
-  const read = $derived(readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)));
+  const read = $derived(
+    readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)),
+  );
   const answer = $derived(read.kind === "held" ? read.value : undefined);
   const turns = $derived(answer?.turns ?? []);
   const drawn = $derived(turnsAround(turns, around));
@@ -115,8 +117,7 @@
   const phase = $derived<Phase>(frozen ? "frozen" : "live");
   const completion = $derived.by((): string => {
     const word =
-      answer?.closing?.completion ??
-      (run.doing.kind === "frozen" ? run.doing.completion : null);
+      answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null);
     switch (word) {
       case "done":
         return say($lang, "outcome_done");
@@ -144,13 +145,16 @@
   // A call still running is already a line of its own, with its timer and
   // what it waits for; the posture line under it would say it twice.
   const lineSaysIt = $derived(
-    whole && (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
+    whole &&
+      (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
       (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
   );
   // Who speaks in this run: the name its session froze, which a rename
   // after the session began does not reach (refrain §3-13).
   const who = $derived(
-    run.addr === null ? say($lang, "talk_resident") : called(run.addr, answer?.opening?.names?.mayor, $lang),
+    run.addr === null
+      ? say($lang, "talk_resident")
+      : called(run.addr, answer?.opening?.names?.mayor, $lang),
   );
   // Who the opening task came from (`Opening.dispatched_by`): the User's
   // own words are "you", a task a resident handed down names that
@@ -169,8 +173,12 @@
         return { label: say($lang, "talk_dispatched_city"), href: undefined };
       case "resident":
         return {
-          label: fill(say($lang, "talk_dispatched_by"), { who: called(by.address, answer?.opening?.names?.mayor, $lang) }),
-          href: toFragment(parent === null ? { kind: "talk", address: by.address } : { kind: "run", run: parent }),
+          label: fill(say($lang, "talk_dispatched_by"), {
+            who: called(by.address, answer?.opening?.names?.mayor, $lang),
+          }),
+          href: toFragment(
+            parent === null ? { kind: "talk", address: by.address } : { kind: "run", run: parent },
+          ),
         };
     }
   });
@@ -180,10 +188,18 @@
   // the model again only where a round answered with a different one.
   // A fact that is not known is left out, never written as "none".
   const firstModel = $derived(turns.at(0)?.model ?? null);
-  const building = $derived(facts === "head" && run.addr !== null ? u.conn.asking.ask(sandboxQuery(run.addr)) : readable(undefined));
+  const building = $derived(
+    facts === "head" && run.addr !== null
+      ? u.conn.asking.ask(sandboxQuery(run.addr))
+      : readable(undefined),
+  );
   const bounded = $derived(restriction($building));
   const firstStated = $derived.by(() => {
-    const facts = [firstModel ?? "", firstHeadSaid(answer?.opening, $lang), bounded === null ? "" : sandboxSaid(bounded, $lang)]
+    const facts = [
+      firstModel ?? "",
+      firstHeadSaid(answer?.opening, $lang),
+      bounded === null ? "" : sandboxSaid(bounded, $lang),
+    ]
       .filter((part) => part !== "")
       .join(" · ");
     return facts === "" ? null : facts;
@@ -272,7 +288,6 @@
     event.preventDefault();
     onFork(planFork(run.run, entry));
   }
-
 </script>
 
 <svelte:window onkeydown={forkKey} />
@@ -311,7 +326,10 @@
   {/each}
   {#if drawn.cut}
     <p class="my-snug text-note text-text-faint">
-      <AsideLink text={say($lang, "letter_whole_talk")} href={toFragment({ kind: "run", run: run.run })} />
+      <AsideLink
+        text={say($lang, "letter_whole_talk")}
+        href={toFragment({ kind: "run", run: run.run })}
+      />
     </p>
   {/if}
   <!-- No `aria-live` on the growing text: a screen reader told every
@@ -338,7 +356,9 @@
          been, and one way out, the verb spelled as the command it sends
          (client/Spec.lean §4-10). A run the person stopped says so rather
          than blaming the model. -->
-    {@const stopped = (answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null)) === "cancelled"}
+    {@const stopped =
+      (answer?.closing?.completion ??
+        (run.doing.kind === "frozen" ? run.doing.completion : null)) === "cancelled"}
     <Failed
       what={stopped
         ? say($lang, "talk_failed_cancelled")
@@ -346,9 +366,11 @@
           ? say($lang, "talk_said_nothing")
           : fill(say($lang, "talk_said_nothing_capped"), { n: count(ceiling) })}
       settings={stopped ? "absent" : "offered"}
-      onRetry={onRetry === undefined ? undefined : () => {
-        onRetry(task);
-      }}
+      onRetry={onRetry === undefined
+        ? undefined
+        : () => {
+            onRetry(task);
+          }}
     />
     {#if why !== null}
       <div class="text-note text-text-faint">{fill(say($lang, "talk_cut_off"), { why })}</div>

@@ -22,9 +22,10 @@ describe("slash", () => {
     for (const known of SLASH) {
       expect(known.spelling, "a verb begins with a slash").toMatch(/^\/[a-z]+$/);
       expect(seen.has(known.spelling), `${known.spelling} is spelled twice`).toBe(false);
-      expect(["actions", "navigation", "sessions"], `${known.spelling} names its palette section`).toContain(
-        known.section,
-      );
+      expect(
+        ["actions", "navigation", "sessions"],
+        `${known.spelling} names its palette section`,
+      ).toContain(known.section);
       seen.add(known.spelling);
     }
   });
@@ -171,9 +172,14 @@ describe("new and fork", () => {
 
   test("/dispatch runs in the mode the person chose, not a fixed one", () => {
     const held = hands(Address.make("lab/room1"), () => null);
-    verb("/dispatch").run({ ...held.filled, policy: { ...held.filled.policy, mode: "chat" } }, called("/dispatch add the parser"));
+    verb("/dispatch").run(
+      { ...held.filled, policy: { ...held.filled.policy, mode: "chat" } },
+      called("/dispatch add the parser"),
+    );
     const frame = held.sent[0];
-    expect(frame !== undefined && "dispatch" in frame ? frame.dispatch.policy.mode : null).toBe("chat");
+    expect(frame !== undefined && "dispatch" in frame ? frame.dispatch.policy.mode : null).toBe(
+      "chat",
+    );
   });
 
   // A plain "hello" sent with the page's goal became a job whose goal
@@ -181,7 +187,10 @@ describe("new and fork", () => {
   test("a chat states no goal, and every job mode states the one it was given", () => {
     const sentGoal = (mode: "chat" | "work"): string | null => {
       const held = hands(Address.make("hall/mayor"), () => null);
-      verb("/dispatch").run({ ...held.filled, policy: { ...held.filled.policy, mode } }, called("/dispatch hello"));
+      verb("/dispatch").run(
+        { ...held.filled, policy: { ...held.filled.policy, mode } },
+        called("/dispatch hello"),
+      );
       const frame = held.sent[0];
       return frame !== undefined && "dispatch" in frame ? frame.dispatch.goal : null;
     };
@@ -243,7 +252,9 @@ describe("new and fork", () => {
   test("/stop cancels the run in front of the person and never halts", () => {
     const held = hands(Address.make("hall/mayor"), () => null, { run: MOTHER, at: Seq.make(3) });
     verb("/stop").run(held.filled, called("/stop --all"));
-    expect(held.sent.map((frame) => ("cancel" in frame ? frame.cancel.run : null))).toEqual([MOTHER]);
+    expect(held.sent.map((frame) => ("cancel" in frame ? frame.cancel.run : null))).toEqual([
+      MOTHER,
+    ]);
   });
 
   test("/halt pairs with /release over a building and the city", () => {

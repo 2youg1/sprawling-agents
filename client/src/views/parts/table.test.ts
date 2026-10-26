@@ -11,7 +11,16 @@
 import { describe, expect, test } from "bun:test";
 import { createRawSnippet } from "svelte";
 
-import { UNSORTED, lookOf, mixed, ordered, turned, type Column, type Selection, type Sorted } from "./table";
+import {
+  UNSORTED,
+  lookOf,
+  mixed,
+  ordered,
+  turned,
+  type Column,
+  type Selection,
+  type Sorted,
+} from "./table";
 
 interface Model {
   readonly id: string;
@@ -20,11 +29,7 @@ interface Model {
 
 const FIRST: Model = { id: "b", context: 200 };
 
-const MODELS: readonly Model[] = [
-  FIRST,
-  { id: "a", context: 8 },
-  { id: "c", context: 32 },
-];
+const MODELS: readonly Model[] = [FIRST, { id: "a", context: 8 }, { id: "c", context: 32 }];
 
 // A cell's drawing is never called here: what the look does with it is
 // measured in the gallery.
@@ -39,7 +44,11 @@ const CONTEXT: Column<Model> = {
   editable: { text: (row) => String(row.context), onEdit: () => undefined },
 };
 
-function choosing(picked: readonly string[], all: boolean, record: string[] = []): Selection<Model> {
+function choosing(
+  picked: readonly string[],
+  all: boolean,
+  record: string[] = [],
+): Selection<Model> {
   return {
     picked: (row) => picked.includes(row.id),
     onPick: (row, on) => record.push(`${row.id}:${String(on)}`),
@@ -106,7 +115,10 @@ describe("the headers", () => {
       (key) => pressed.push(key),
     );
     look.heads.forEach((head) => head.sort?.onclick());
-    expect([look.heads.map((head) => head.sort?.type), pressed]).toEqual([[undefined, "button"], ["context"]]);
+    expect([look.heads.map((head) => head.sort?.type), pressed]).toEqual([
+      [undefined, "button"],
+      ["context"],
+    ]);
   });
 });
 
@@ -125,16 +137,19 @@ describe("the boxes", () => {
     const look = lookAt(UNSORTED, choosing(["a"], false, record));
     look.all?.onchange({ currentTarget: { checked: true } });
     look.lines[1]?.tick?.onchange({ currentTarget: { checked: false } });
-    expect([look.all?.["aria-label"], look.lines.map((line) => line.tick?.["aria-label"]), record]).toEqual([
-      "All models",
-      ["b", "a", "c"],
-      ["all:true", "a:false"],
-    ]);
+    expect([
+      look.all?.["aria-label"],
+      look.lines.map((line) => line.tick?.["aria-label"]),
+      record,
+    ]).toEqual(["All models", ["b", "a", "c"], ["all:true", "a:false"]]);
   });
 
   test("a table without a selection draws no boxes", () => {
     const look = lookAt(UNSORTED);
-    expect([look.all, look.lines.map((line) => line.tick)]).toEqual([undefined, [undefined, undefined, undefined]]);
+    expect([look.all, look.lines.map((line) => line.tick)]).toEqual([
+      undefined,
+      [undefined, undefined, undefined],
+    ]);
   });
 });
 
@@ -143,7 +158,10 @@ describe("the cells", () => {
     const edits: string[] = [];
     const column: Column<Model> = {
       ...CONTEXT,
-      editable: { text: (row) => String(row.context), onEdit: (row, text) => edits.push(`${row.id}=${text}`) },
+      editable: {
+        text: (row) => String(row.context),
+        onEdit: (row, text) => edits.push(`${row.id}=${text}`),
+      },
     };
     const look = lookOf(
       { caption: "Models", columns: [ID, column], rows: MODELS, keyOf: (row) => row.id },
@@ -154,10 +172,18 @@ describe("the cells", () => {
     expect(held?.kind).toBe("field");
     if (held?.kind !== "field") return;
     held.field.onchange({ currentTarget: { value: "256" } });
-    expect([held.field["aria-label"], held.field.value, edits]).toEqual(["Context b", "200", ["b=256"]]);
+    expect([held.field["aria-label"], held.field.value, edits]).toEqual([
+      "Context b",
+      "200",
+      ["b=256"],
+    ]);
   });
 
   test("any other cell hands the column's drawing its row", () => {
-    expect(lookAt(UNSORTED).lines[0]?.cells[0]?.held).toEqual({ kind: "drawn", render: drawn, row: FIRST });
+    expect(lookAt(UNSORTED).lines[0]?.cells[0]?.held).toEqual({
+      kind: "drawn",
+      render: drawn,
+      row: FIRST,
+    });
   });
 });

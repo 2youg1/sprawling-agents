@@ -23,7 +23,10 @@ import { branchClaims, keepBranches } from "./branching";
 import type { Branching, Opening } from "./branching";
 
 const ROOM = Address.make("lab/a");
-const ORIGIN: Origin = { run: RunId.make("00000000-0000-4000-8000-000000000001"), at_seq: Seq.make(7) };
+const ORIGIN: Origin = {
+  run: RunId.make("00000000-0000-4000-8000-000000000001"),
+  at_seq: Seq.make(7),
+};
 const BRANCH: Opening = { kind: "branch", origin: ORIGIN };
 const EMPTY: Belief = get(createBelief(() => 0).belief);
 
@@ -100,12 +103,20 @@ describe("branching, then going", () => {
     const at = page(seen(3, 0));
     at.press(true);
     // The idem is minted afresh per frame, so the frame is read without it.
-    expect(at.sent.map((command) => ("open_session" in command ? { ...command.open_session, idem: null } : command))).toEqual([
-      { addr: ROOM, carry: "nothing", from: ORIGIN, idem: null },
-    ]);
+    expect(
+      at.sent.map((command) =>
+        "open_session" in command ? { ...command.open_session, idem: null } : command,
+      ),
+    ).toEqual([{ addr: ROOM, carry: "nothing", from: ORIGIN, idem: null }]);
     expect(at.views).toEqual([]);
     expect(at.went()).toBe(0);
-    expect(get(at.branches.held)).toEqual({ kind: "opening", room: ROOM, opening: BRANCH, session: Seq.make(3), refusal: null });
+    expect(get(at.branches.held)).toEqual({
+      kind: "opening",
+      room: ROOM,
+      opening: BRANCH,
+      session: Seq.make(3),
+      refusal: null,
+    });
     at.belief.set(seen(9, 0));
     expect(at.views).toEqual([{ kind: "talk", address: ROOM }]);
     expect(at.went()).toBe(1);
@@ -119,7 +130,12 @@ describe("branching, then going", () => {
     expect(at.views).toEqual([]);
     expect(at.went()).toBe(0);
     const held: Branching = get(at.branches.held);
-    expect(held).toEqual({ kind: "refused", room: ROOM, opening: BRANCH, error: refusalNumbered(1) });
+    expect(held).toEqual({
+      kind: "refused",
+      room: ROOM,
+      opening: BRANCH,
+      error: refusalNumbered(1),
+    });
     expect(branchClaims(held, refusalNumbered(1))).toBe(true);
     expect(branchClaims(held, refusalNumbered(2))).toBe(false);
   });
@@ -148,18 +164,61 @@ describe("branching, then going", () => {
 
   // Each vector: the events, the phase the model ends in, and what it
   // did on the way, as `#eval vectors.map …` printed them.
-  type Event = { readonly press: readonly [number, number, boolean] } | { readonly arrive: readonly [number, number] };
-  const VECTORS: readonly { readonly events: readonly Event[]; readonly last: Branching["kind"]; readonly acts: readonly Act[] }[] = [
-    { events: [{ press: [3, 0, true] }, { arrive: [3, 0] }, { arrive: [9, 0] }], last: "idle", acts: ["send", "go"] },
-    { events: [{ press: [3, 0, true] }, { arrive: [3, 1] }, { arrive: [9, 1] }], last: "refused", acts: ["send"] },
+  type Event =
+    | { readonly press: readonly [number, number, boolean] }
+    | { readonly arrive: readonly [number, number] };
+  const VECTORS: readonly {
+    readonly events: readonly Event[];
+    readonly last: Branching["kind"];
+    readonly acts: readonly Act[];
+  }[] = [
     {
-      events: [{ press: [3, 1, true] }, { arrive: [3, 1] }, { arrive: [3, 0] }, { arrive: [3, 2] }, { press: [3, 2, true] }, { arrive: [9, 2] }],
+      events: [{ press: [3, 0, true] }, { arrive: [3, 0] }, { arrive: [9, 0] }],
+      last: "idle",
+      acts: ["send", "go"],
+    },
+    {
+      events: [{ press: [3, 0, true] }, { arrive: [3, 1] }, { arrive: [9, 1] }],
+      last: "refused",
+      acts: ["send"],
+    },
+    {
+      events: [
+        { press: [3, 1, true] },
+        { arrive: [3, 1] },
+        { arrive: [3, 0] },
+        { arrive: [3, 2] },
+        { press: [3, 2, true] },
+        { arrive: [9, 2] },
+      ],
       last: "idle",
       acts: ["send", "send", "go"],
     },
-    { events: [{ press: [3, 0, true] }, { press: [3, 0, true] }, { arrive: [9, 1] }], last: "idle", acts: ["send", "go"] },
-    { events: [{ press: [0, 0, false] }, { arrive: [4, 0] }, { press: [4, 0, true] }, { arrive: [4, 0] }], last: "opening", acts: ["send"] },
-    { events: [{ arrive: [2, 1] }, { press: [2, 1, true] }, { press: [2, 1, false] }, { arrive: [5, 3] }], last: "idle", acts: ["send", "go"] },
+    {
+      events: [{ press: [3, 0, true] }, { press: [3, 0, true] }, { arrive: [9, 1] }],
+      last: "idle",
+      acts: ["send", "go"],
+    },
+    {
+      events: [
+        { press: [0, 0, false] },
+        { arrive: [4, 0] },
+        { press: [4, 0, true] },
+        { arrive: [4, 0] },
+      ],
+      last: "opening",
+      acts: ["send"],
+    },
+    {
+      events: [
+        { arrive: [2, 1] },
+        { press: [2, 1, true] },
+        { press: [2, 1, false] },
+        { arrive: [5, 3] },
+      ],
+      last: "idle",
+      acts: ["send", "go"],
+    },
   ];
 
   test("follows the model on every trace vector it prints", () => {
@@ -174,7 +233,10 @@ describe("branching, then going", () => {
           at.belief.set(seen(...event.arrive));
         }
       }
-      expect({ last: get(at.branches.held).kind, acts: at.acts }).toEqual({ last: vector.last, acts: [...vector.acts] });
+      expect({ last: get(at.branches.held).kind, acts: at.acts }).toEqual({
+        last: vector.last,
+        acts: [...vector.acts],
+      });
     }
   });
 });

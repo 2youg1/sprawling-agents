@@ -27,7 +27,11 @@ const file: Touched = { path: "src/main.rs", how: "modified", at: Seq.make(7), h
 
 const NONE = { editor: "none", folder: "" } as const;
 
-function sent(): { readonly drafts: string[]; readonly steers: string[]; readonly hands: { draft: (text: string) => void; steer: (text: string) => void } } {
+function sent(): {
+  readonly drafts: string[];
+  readonly steers: string[];
+  readonly hands: { draft: (text: string) => void; steer: (text: string) => void };
+} {
   const drafts: string[] = [];
   const steers: string[] = [];
   return {
@@ -44,8 +48,15 @@ describe("the actions a hunk offers", () => {
   test("a live run offers comment and revert, and opening only where an editor answers a link", () => {
     const { hands } = sent();
     const bare = lookOf({ files: [file], live: true, editor: NONE }, "en", hands);
-    expect(bare.files[0]?.hunks[0]?.actions.map((action) => action.key)).toEqual(["comment", "revert"]);
-    const opened = lookOf({ files: [file], live: true, editor: { editor: "vscode", folder: "C:/city" } }, "en", hands);
+    expect(bare.files[0]?.hunks[0]?.actions.map((action) => action.key)).toEqual([
+      "comment",
+      "revert",
+    ]);
+    const opened = lookOf(
+      { files: [file], live: true, editor: { editor: "vscode", folder: "C:/city" } },
+      "en",
+      hands,
+    );
     const open = opened.files[0]?.hunks[0]?.actions.at(-1);
     expect(open?.kind).toBe("open");
     expect(open?.kind === "open" ? open.wire.href : "").toContain("src/main.rs:4");
@@ -59,7 +70,9 @@ describe("the actions a hunk offers", () => {
 
   test("comment drafts and revert steers, each about the hunk's path and line", () => {
     const { drafts, steers, hands } = sent();
-    const actions = lookOf({ files: [file], live: true, editor: NONE }, "en", hands).files[0]?.hunks[0]?.actions ?? [];
+    const actions =
+      lookOf({ files: [file], live: true, editor: NONE }, "en", hands).files[0]?.hunks[0]
+        ?.actions ?? [];
     for (const action of actions) if (action.kind === "press") action.wire.onclick();
     expect(drafts).toEqual(["About src/main.rs, line 4: "]);
     expect(steers).toHaveLength(1);
@@ -68,7 +81,9 @@ describe("the actions a hunk offers", () => {
 
   test("an empty run says so in place of the column", () => {
     const { hands } = sent();
-    expect(lookOf({ files: [], live: true, editor: NONE }, "en", hands).empty).toBe("No file changed yet.");
+    expect(lookOf({ files: [], live: true, editor: NONE }, "en", hands).empty).toBe(
+      "No file changed yet.",
+    );
   });
 });
 
@@ -83,7 +98,9 @@ describe("the revert steer", () => {
   });
 
   test("a hunk's own text is never read as a slot or a replacement pattern", () => {
-    const tricky: Hunk = { lines: [{ sign: "added", old: null, new: 1, text: "{path} $& {fence}" }] };
+    const tricky: Hunk = {
+      lines: [{ sign: "added", old: null, new: 1, text: "{path} $& {fence}" }],
+    };
     expect(steerOf("mon_revert_steer", "en", "a.rs", tricky)).toContain("{path} $& {fence}");
   });
 });

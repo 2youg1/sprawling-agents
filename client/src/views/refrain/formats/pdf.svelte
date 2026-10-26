@@ -99,28 +99,43 @@
   }
 
   const pdf = $derived(opened?.kind === "open" ? opened.pdf : null);
-  const notes = $derived(pdf === null ? [] : [fill(say($lang, "format_pages"), { n: String(pdf.numPages) })]);
+  const notes = $derived(
+    pdf === null ? [] : [fill(say($lang, "format_pages"), { n: String(pdf.numPages) })],
+  );
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
   <Label
     format="pdf"
     tool={TOOL.pdf}
-    settings={[say($lang, "format_pdf_settings"), fill(say($lang, "format_width"), { width: String(width) })]}
+    settings={[
+      say($lang, "format_pdf_settings"),
+      fill(say($lang, "format_width"), { width: String(width) }),
+    ]}
     {version}
     {notes}
   />
   {#if opened === null}
-    <p class="px-wide py-snug text-note text-text-faint">{fill(say($lang, "format_reading"), { format: NAME.pdf })}</p>
+    <p class="px-wide py-snug text-note text-text-faint">
+      {fill(say($lang, "format_reading"), { format: NAME.pdf })}
+    </p>
   {:else if opened.kind === "locked"}
     <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_locked")}</p>
   {:else if opened.kind === "broken"}
-    <p class="px-wide py-snug text-note text-text-quiet">{fill(say($lang, "format_broken"), { format: NAME.pdf, reason: opened.reason })}</p>
+    <p class="px-wide py-snug text-note text-text-quiet">
+      {fill(say($lang, "format_broken"), { format: NAME.pdf, reason: opened.reason })}
+    </p>
   {:else if pdf !== null}
     <!-- The pages scroll inside the pane; the column inside measures
          the width a page may take. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex (the pane takes focus so the keyboard can scroll it) -->
-    <div class="min-h-0 flex-1 overflow-auto bg-raised p-pane" bind:this={scroller} tabindex="0" role="group" aria-label={name}>
+    <div
+      class="min-h-0 flex-1 overflow-auto bg-raised p-pane"
+      bind:this={scroller}
+      tabindex="0"
+      role="group"
+      aria-label={name}
+    >
       <div class="flex flex-col items-center gap-pane" bind:clientWidth={measured}>
         {#each { length: pdf.numPages }, index (index)}
           {@const size = sizes[index + 1] ?? standIn}
@@ -129,9 +144,13 @@
             style:width="{width}px"
             style:aspect-ratio="{size.width} / {size.height}"
             role="img"
-            aria-label={fill(say($lang, "format_page"), { n: String(index + 1), total: String(pdf.numPages) })}
+            aria-label={fill(say($lang, "format_page"), {
+              n: String(index + 1),
+              total: String(pdf.numPages),
+            })}
           >
-            <canvas class="block size-full" aria-hidden="true" {@attach page(pdf, index + 1)}></canvas>
+            <canvas class="block size-full" aria-hidden="true" {@attach page(pdf, index + 1)}
+            ></canvas>
           </div>
         {/each}
       </div>

@@ -97,8 +97,7 @@
       bind:value={draft}
       oninput={() => {
         saving = edited(draft !== onDisk);
-      }}
-    ></textarea>
+      }}></textarea>
     <code class="truncate font-mono text-note text-text-faint">{rulesAt(chosen)}</code>
   </Card>
 </div>

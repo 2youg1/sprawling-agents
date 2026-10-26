@@ -72,11 +72,27 @@ describe("the preferences the city keeps", () => {
   test("a city that never heard of the tier, the reading face or the glass leaves this browser's, and an opacity outside the slider is no opacity", () => {
     const door = loadPreferences(memory(), "en");
     door.setTier("zen");
-    door.setAppearance({ ...get(door.held).appearance, reading: "libron", glass: "off", blend: 60 });
+    door.setAppearance({
+      ...get(door.held).appearance,
+      reading: "libron",
+      glass: "off",
+      blend: 60,
+    });
     const held = get(door.held);
-    const answer = { tier: null, appearance: { ...appearanceOnWire(held.appearance), reading: null, glass: null, blend_percent: 7 } };
+    const answer = {
+      tier: null,
+      appearance: {
+        ...appearanceOnWire(held.appearance),
+        reading: null,
+        glass: null,
+        blend_percent: 7,
+      },
+    };
 
-    expect(adopted(held, answer)).toEqual({ ...held, appearance: { ...held.appearance, blend: null } });
+    expect(adopted(held, answer)).toEqual({
+      ...held,
+      appearance: { ...held.appearance, blend: null },
+    });
   });
 
   test("each named change but the tier is told to the city as its own patch", () => {

@@ -31,7 +31,9 @@ import type { Address, AxError, Carry, Command, Origin, Seq } from "../../wire";
 // Where the new session begins: the conversation up to one line of an
 // earlier session, or a fresh start that carries the room's handoff or
 // nothing.
-export type Opening = { readonly kind: "branch"; readonly origin: Origin } | { readonly kind: "fresh"; readonly carry: Carry };
+export type Opening =
+  | { readonly kind: "branch"; readonly origin: Origin }
+  | { readonly kind: "fresh"; readonly carry: Carry };
 
 export type Branching =
   | { readonly kind: "idle" }
@@ -46,7 +48,12 @@ export type Branching =
     }
   // Held until the next press, so the place that started it keeps saying
   // why.
-  | { readonly kind: "refused"; readonly room: Address; readonly opening: Opening; readonly error: AxError };
+  | {
+      readonly kind: "refused";
+      readonly room: Address;
+      readonly opening: Opening;
+      readonly error: AxError;
+    };
 
 export const NOT_BRANCHING: Branching = { kind: "idle" };
 
@@ -86,7 +93,9 @@ export function keepBranches(doors: BranchDoors): Branches {
       const next = pressed(get(held), get(doors.belief), room, opening);
       if (next === null) return false;
       const sent =
-        opening.kind === "branch" ? openSession(room, "nothing", opening.origin) : openSession(room, opening.carry, null);
+        opening.kind === "branch"
+          ? openSession(room, "nothing", opening.origin)
+          : openSession(room, opening.carry, null);
       if (!doors.send(sent)) {
         held.set(NOT_BRANCHING);
         return false;
@@ -101,9 +110,20 @@ export function keepBranches(doors: BranchDoors): Branches {
 // The opening a press starts, or `null` while another one is opening:
 // one at a time, because an answer is read by its room and its order,
 // and two sessions waiting at once could each take the other's.
-function pressed(held: Branching, belief: Belief, room: Address, opening: Opening): Branching | null {
+function pressed(
+  held: Branching,
+  belief: Belief,
+  room: Address,
+  opening: Opening,
+): Branching | null {
   if (held.kind === "opening") return null;
-  return { kind: "opening", room, opening, session: belief.sessions[room] ?? null, refusal: belief.refusal };
+  return {
+    kind: "opening",
+    room,
+    opening,
+    session: belief.sessions[room] ?? null,
+    refusal: belief.refusal,
+  };
 }
 
 // The branch after the belief moved; the same value when nothing
@@ -155,7 +175,9 @@ function here(branching: Branching, mine: boolean): BranchHere {
     case "opening":
       return mine ? { kind: "opening", of: branching.opening.kind } : { kind: "elsewhere" };
     case "refused":
-      return mine ? { kind: "refused", of: branching.opening.kind, error: branching.error } : { kind: "none" };
+      return mine
+        ? { kind: "refused", of: branching.opening.kind, error: branching.error }
+        : { kind: "none" };
   }
 }
 

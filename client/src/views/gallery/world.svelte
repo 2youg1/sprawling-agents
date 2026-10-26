@@ -37,7 +37,12 @@
   <!-- The shell's frame, so the divider snaps to the lines it reads. -->
   <div class="frame grid h-[160px] grid-rows-[minmax(0,1fr)_auto]">
     <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="1 / 4"></div>
-    <Divider divider={0} label={say($lang, "world_sessions")} controls="gallery-sessions" column={4} />
+    <Divider
+      divider={0}
+      label={say($lang, "world_sessions")}
+      controls="gallery-sessions"
+      column={4}
+    />
     <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="4 / 10"></div>
   </div>
 </Case>

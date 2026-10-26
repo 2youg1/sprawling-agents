@@ -17,7 +17,17 @@
   // D42). Each case is one room with one run, so each thread shows only
   // its own case.
 
-  import type { Answer, Call, EventKind, EventRecord, Landing, Note, Query, SignalLine, Turn } from "../../wire";
+  import type {
+    Answer,
+    Call,
+    EventKind,
+    EventRecord,
+    Landing,
+    Note,
+    Query,
+    SignalLine,
+    Turn,
+  } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens } from "../../wire";
 
   const MODEL = "anthropic/claude-sonnet-5";
@@ -54,13 +64,35 @@
     readonly calls: (seq: number, t: number) => readonly Call[];
   }
 
-  function arrived(at: number, t: number, by: "user" | "resident", from: string, said: string, sent: Sent | null = null): Note {
+  function arrived(
+    at: number,
+    t: number,
+    by: "user" | "resident",
+    from: string,
+    said: string,
+    sent: Sent | null = null,
+  ): Note {
     return {
-      arrived: { at: Seq.make(at), by, from, said, t: TimeMs.make(t), handback: null, kind: sent?.kind ?? null, session: sent?.session ?? null },
+      arrived: {
+        at: Seq.make(at),
+        by,
+        from,
+        said,
+        t: TimeMs.make(t),
+        handback: null,
+        kind: sent?.kind ?? null,
+        session: sent?.session ?? null,
+      },
     };
   }
 
-  function awaiting(at: number, t: number, on: Address, until: number, ended: Note | null): readonly Note[] {
+  function awaiting(
+    at: number,
+    t: number,
+    on: Address,
+    until: number,
+    ended: Note | null,
+  ): readonly Note[] {
     const end = ended === null || !("arrived" in ended) ? null : ended.arrived;
     return [
       {
@@ -76,8 +108,23 @@
     ];
   }
 
-  function ending(at: number, t: number, on: Address, until: number, by: "timeout" | "left", endedAt: number): Note {
-    return { awaiting_reply: { at: Seq.make(at), on, t: TimeMs.make(t), until: TimeMs.make(until), ended: { by, t: TimeMs.make(endedAt) } } };
+  function ending(
+    at: number,
+    t: number,
+    on: Address,
+    until: number,
+    by: "timeout" | "left",
+    endedAt: number,
+  ): Note {
+    return {
+      awaiting_reply: {
+        at: Seq.make(at),
+        on,
+        t: TimeMs.make(t),
+        until: TimeMs.make(until),
+        ended: { by, t: TimeMs.make(endedAt) },
+      },
+    };
   }
 
   function handback(at: number, t: number, from: Address, outcome: "finished" | "stopped"): Note {
@@ -93,21 +140,34 @@
         handback:
           outcome === "finished"
             ? { finished: { verified_by: "cargo nextest run -p parser" } }
-            : { stopped: { because: "the grammar's Span type changed under it; the offsets need a decision" } },
+            : {
+                stopped: {
+                  because: "the grammar's Span type changed under it; the offsets need a decision",
+                },
+              },
       },
     };
   }
 
   // A sent letter as the tool line draws a `signal` call, with where it
   // landed when the Ledger recorded it (wire D42).
-  function sent(at: number, called: number, to: Address, text: string, landing: Landing | null): Call {
+  function sent(
+    at: number,
+    called: number,
+    to: Address,
+    text: string,
+    landing: Landing | null,
+  ): Call {
     return {
       tool: "signal",
       subject: "send",
       arguments: { head: JSON.stringify({ action: "send", to, text }), cut: 0 },
       outcome: "answered",
       at: Seq.make(at),
-      output: { head: JSON.stringify({ id: `sends-s${String(at)}`, to, kind: "mention", delivered: true }), cut: 0 },
+      output: {
+        head: JSON.stringify({ id: `sends-s${String(at)}`, to, kind: "mention", delivered: true }),
+        cut: 0,
+      },
       called: TimeMs.make(called),
       answered: TimeMs.make(called + 12),
       timing: "measured",
@@ -126,7 +186,17 @@
       arguments: { head: JSON.stringify({ action: "pull" }), cut: 0 },
       outcome: "answered",
       at: Seq.make(at),
-      output: { head: JSON.stringify([{ from: PLANNER, kind: "thread", text: "Build the error positions on `Span`.", sender: "running" }]), cut: 0 },
+      output: {
+        head: JSON.stringify([
+          {
+            from: PLANNER,
+            kind: "thread",
+            text: "Build the error positions on `Span`.",
+            sender: "running",
+          },
+        ]),
+        cut: 0,
+      },
       called: TimeMs.make(called),
       answered: TimeMs.make(called + 40),
       timing: "measured",
@@ -143,7 +213,13 @@
       said: "Offsets are on `Span` now; the planner's letter and your note agree, so I kept the grammar as it is.",
       running: false,
       notes: (seq, t) => [
-        arrived(seq + 3, t + 4_000, "user", "user", "Keep the grammar file as it is; only the errors change."),
+        arrived(
+          seq + 3,
+          t + 4_000,
+          "user",
+          "user",
+          "Keep the grammar file as it is; only the errors change.",
+        ),
         arrived(
           seq + 4,
           t + 6_000,
@@ -174,7 +250,10 @@
           t + 3_000,
           PARSER,
           t + 5 * 60_000,
-          arrived(seq + 4, t + 45_000, "resident", PARSER, "Byte offsets, counted from zero.", { kind: "mention", session: PARSER_SESSION }),
+          arrived(seq + 4, t + 45_000, "resident", PARSER, "Byte offsets, counted from zero.", {
+            kind: "mention",
+            session: PARSER_SESSION,
+          }),
         ),
       calls: () => [],
     },
@@ -183,7 +262,9 @@
       task: "Write the error-format section of the docs.",
       said: "lab/parser did not answer in time, so the section says the offset base is still to be confirmed.",
       running: false,
-      notes: (seq, t) => [ending(seq + 3, t + 3_000, PARSER, t + 2 * 60_000, "timeout", t + 2 * 60_000)],
+      notes: (seq, t) => [
+        ending(seq + 3, t + 3_000, PARSER, t + 2 * 60_000, "timeout", t + 2 * 60_000),
+      ],
       calls: () => [],
     },
     {
@@ -215,7 +296,15 @@
       task: "Read what the planner sent before the city recorded a letter's kind.",
       said: "The planner's old letter asks for byte offsets; nothing in it says which session sent it.",
       running: false,
-      notes: (seq, t) => [arrived(seq + 3, t + 4_000, "resident", PLANNER, "Use byte offsets for every error position.")],
+      notes: (seq, t) => [
+        arrived(
+          seq + 3,
+          t + 4_000,
+          "resident",
+          PLANNER,
+          "Use byte offsets for every error position.",
+        ),
+      ],
       calls: () => [],
     },
     {
@@ -225,9 +314,27 @@
       running: false,
       notes: () => [],
       calls: (seq, t) => [
-        sent(seq + 3, t + 2_000, PARSER, "The error format is settled: byte offsets from zero.", "delivered"),
-        sent(seq + 4, t + 2_100, Address.make("lab/docs"), "Error positions are byte offsets now; the section can say so.", "queued"),
-        sent(seq + 5, t + 2_200, Address.make("lab/review"), "Please check the new error offsets against the checklist.", "knocked"),
+        sent(
+          seq + 3,
+          t + 2_000,
+          PARSER,
+          "The error format is settled: byte offsets from zero.",
+          "delivered",
+        ),
+        sent(
+          seq + 4,
+          t + 2_100,
+          Address.make("lab/docs"),
+          "Error positions are byte offsets now; the section can say so.",
+          "queued",
+        ),
+        sent(
+          seq + 5,
+          t + 2_200,
+          Address.make("lab/review"),
+          "Please check the new error offsets against the checklist.",
+          "knocked",
+        ),
         sent(seq + 6, t + 2_300, PLANNER, "Settled, as you asked.", null),
       ],
     },
@@ -253,8 +360,25 @@
     return (index + 1) * 10;
   }
 
-  function record(run: RunId, room: Address, seq: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
-    return { run, seq: Seq.make(seq), kind, t: TimeMs.make(at), who: "city", addr: room, prev: B3Hash.make("0".repeat(64)), v: 1, data };
+  function record(
+    run: RunId,
+    room: Address,
+    seq: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
+    return {
+      run,
+      seq: Seq.make(seq),
+      kind,
+      t: TimeMs.make(at),
+      who: "city",
+      addr: room,
+      prev: B3Hash.make("0".repeat(64)),
+      v: 1,
+      data,
+    };
   }
 
   export function recordsAt(now: number): readonly EventRecord[] {
@@ -265,12 +389,22 @@
       return [
         record(run, one.room, seq, at, "run_started", { task: one.task, dispatched_by: "person" }),
         record(run, one.room, seq + 1, at + 1_000, "model_called", { model: MODEL }),
-        ...(one.running ? [] : [record(run, one.room, seq + 9, at + 4 * 60_000, "run_frozen", { completion: "done" })]),
+        ...(one.running
+          ? []
+          : [
+              record(run, one.room, seq + 9, at + 4 * 60_000, "run_frozen", { completion: "done" }),
+            ]),
       ];
     });
   }
 
-  function turn(seq: number, t: number, said: string, notes: readonly Note[], calls: readonly Call[]): Turn {
+  function turn(
+    seq: number,
+    t: number,
+    said: string,
+    notes: readonly Note[],
+    calls: readonly Call[],
+  ): Turn {
     return {
       calls,
       notes,
@@ -311,8 +445,20 @@
 
   function queued(now: number): readonly SignalLine[] {
     return [
-      { id: "sig-7", from: PLANNER, kind: "thread", first_line: "The parser work landed; the messages can use the byte offsets now.", at: TimeMs.make(now - 180_000) },
-      { id: "sig-8", from: "hall/mayor", kind: "mention", first_line: "Keep the old wording for the two errors the docs quote.", at: TimeMs.make(now - 30_000) },
+      {
+        id: "sig-7",
+        from: PLANNER,
+        kind: "thread",
+        first_line: "The parser work landed; the messages can use the byte offsets now.",
+        at: TimeMs.make(now - 180_000),
+      },
+      {
+        id: "sig-8",
+        from: "hall/mayor",
+        kind: "mention",
+        first_line: "Keep the old wording for the two errors the docs quote.",
+        at: TimeMs.make(now - 30_000),
+      },
     ];
   }
 
@@ -322,7 +468,12 @@
       if (typeof query !== "object") return undefined;
       if ("rounds" in query) return rounds(query.rounds.run, now);
       if ("inbox_view" in query) {
-        return { inbox: { addr: query.inbox_view.addr, waiting: query.inbox_view.addr === QUEUED ? queued(now) : [] } };
+        return {
+          inbox: {
+            addr: query.inbox_view.addr,
+            waiting: query.inbox_view.addr === QUEUED ? queued(now) : [],
+          },
+        };
       }
       return undefined;
     };

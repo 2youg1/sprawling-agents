@@ -48,9 +48,16 @@
           verdict: "behind",
           registries: [
             { registry: "npm", reading: { read: { newest: NEWEST } } },
-            { registry: "crates_io", reading: { read: { newest: { version: "1.0.0", released: "" } } } },
+            {
+              registry: "crates_io",
+              reading: { read: { newest: { version: "1.0.0", released: "" } } },
+            },
           ],
-          update: { alternatives: ["cargo install sprawling --locked", "cargo binstall sprawling --locked"], channel: "cargo_or_binstall", command: null },
+          update: {
+            alternatives: ["cargo install sprawling --locked", "cargo binstall sprawling --locked"],
+            channel: "cargo_or_binstall",
+            command: null,
+          },
         },
       },
     ],
@@ -65,7 +72,11 @@
             { registry: "npm", reading: { read: { newest: NEWEST } } },
             { registry: "crates_io", reading: { read: { newest: NEWEST } } },
           ],
-          update: { alternatives: [], channel: "cargo", command: "cargo install sprawling --locked" },
+          update: {
+            alternatives: [],
+            channel: "cargo",
+            command: "cargo install sprawling --locked",
+          },
         },
       },
     ],
@@ -90,7 +101,13 @@
     ],
     [
       "Windows · not a Dev Drive, inside an exclusion",
-      { read: { city: "C:/city", drive: { not: { volume: "C:", file_system: "NTFS" } }, exclusion: { inside: { under: "C:/city" } } } },
+      {
+        read: {
+          city: "C:/city",
+          drive: { not: { volume: "C:", file_system: "NTFS" } },
+          exclusion: { inside: { under: "C:/city" } },
+        },
+      },
     ],
     [
       "Windows · neither could be read",
@@ -110,7 +127,10 @@
   // User runs, and an object name too long to read aloud. Its note
   // appears on hover and on keyboard focus; the resting face is the
   // icon and the name.
-  const COPIED: readonly string[] = ["sprawling doctor --install", "9f2c4e1a7b3d5f60812e4a9c0b7d6e5f43a2b1c0"];
+  const COPIED: readonly string[] = [
+    "sprawling doctor --install",
+    "9f2c4e1a7b3d5f60812e4a9c0b7d6e5f43a2b1c0",
+  ];
 
   const WIDTHS = [1040, 390] as const;
 </script>
@@ -141,7 +161,10 @@
     <div class="flex flex-col gap-snug">
       {#each COPIED as text (text)}
         <div class="flex min-w-0 items-start gap-tight">
-          <code class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">{text}</code>
+          <code
+            class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+            >{text}</code
+          >
           <Copy {text} />
         </div>
       {/each}

@@ -30,7 +30,11 @@ export type Fold =
 export function foldsOf(drawn: SetupGroup, beneath: View): Folds {
   const standing = standingOf(drawn, beneath);
   const nest = nestOf(beneath);
-  return { branch: standing.branch, more: standing.more, nests: { buildings: nest === "buildings", record: nest === "record" } };
+  return {
+    branch: standing.branch,
+    more: standing.more,
+    nests: { buildings: nest === "buildings", record: nest === "record" },
+  };
 }
 
 // The folds after a press. Opening another branch folds the one that

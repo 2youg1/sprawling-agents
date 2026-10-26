@@ -36,14 +36,26 @@ characters do, and the whole of it is in the hint. -->
     >
       <span class="truncate text-text-faint">{look.kind}</span>
       <span class="flex min-w-0 items-center gap-base">
-        <span class={["min-w-[min(8ch,100%)] flex-1 truncate narrow:min-w-[min(6ch,100%)]", look.running ? "text-text" : ""]}>{look.subject}</span>
+        <span
+          class={[
+            "min-w-[min(8ch,100%)] flex-1 truncate narrow:min-w-[min(6ch,100%)]",
+            look.running ? "text-text" : "",
+          ]}>{look.subject}</span
+        >
         {#if look.failure !== null}
-          <span class="min-w-0 max-w-[24ch] truncate text-alert narrow:max-w-[12ch]">{look.failure}</span>
+          <span class="min-w-0 max-w-[24ch] truncate text-alert narrow:max-w-[12ch]"
+            >{look.failure}</span
+          >
         {/if}
       </span>
-      <span class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint">
+      <span
+        class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint"
+      >
         {#if look.running}
-          <span class="inline-block size-dot shrink-0 pulse rounded-pill bg-accent" aria-hidden="true"></span>
+          <span
+            class="inline-block size-dot shrink-0 pulse rounded-pill bg-accent"
+            aria-hidden="true"
+          ></span>
         {/if}
         {#if look.time.kind === "landed"}
           {look.time.text}
@@ -53,11 +65,17 @@ characters do, and the whole of it is in the hint. -->
       </span>
       <span class="flex min-w-0 items-center gap-tight">
         {#if look.verdict !== null}
-          <span class={["truncate", look.verdict.tone === "alert" ? "text-alert" : "text-text-faint"]}>{look.verdict.text}</span>
+          <span
+            class={["truncate", look.verdict.tone === "alert" ? "text-alert" : "text-text-faint"]}
+            >{look.verdict.text}</span
+          >
         {/if}
         <span
           data-line-keys
-          class={["items-center gap-hair narrow:hidden", look.opened ? "inline-flex" : "hidden group-focus-visible:inline-flex"]}
+          class={[
+            "items-center gap-hair narrow:hidden",
+            look.opened ? "inline-flex" : "hidden group-focus-visible:inline-flex",
+          ]}
           aria-hidden="true"
         >
           {#each look.moves as move (move)}

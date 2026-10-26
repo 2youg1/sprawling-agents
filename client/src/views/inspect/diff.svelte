@@ -50,24 +50,35 @@
   // or the path it was called on.
   const path = $derived.by((): string => {
     const render = call.render;
-    const located = render !== null && render !== undefined && typeof render === "object" ? render.diff.locations[0] : undefined;
+    const located =
+      render !== null && render !== undefined && typeof render === "object"
+        ? render.diff.locations[0]
+        : undefined;
     return located ?? call.subject ?? "";
   });
   const bracket = $derived(bracketOf(rounds, call.at));
 
   const question = $derived.by((): Query | null => {
     const { base, head } = bracket;
-    return base === null || head === null || path === "" ? null : { hunks: { oid_a: base, oid_b: head, path } };
+    return base === null || head === null || path === ""
+      ? null
+      : { hunks: { oid_a: base, oid_b: head, path } };
   });
   const asked = $derived(question === null ? NOTHING : u.conn.asking.ask(question));
   const read = $derived(readAnswer($asked, (held) => ("hunks" in held ? held.hunks : undefined)));
 
   // What has moved since the later checkpoint, the worktree being the
   // other end.
-  const sinceQuestion = $derived.by((): Query | null => (bracket.head === null ? null : { changes: { base: bracket.head, head: null } }));
+  const sinceQuestion = $derived.by((): Query | null =>
+    bracket.head === null ? null : { changes: { base: bracket.head, head: null } },
+  );
   const since = $derived(sinceQuestion === null ? NOTHING : u.conn.asking.ask(sinceQuestion));
-  const moved = $derived(readAnswer($since, (held) => ("changes" in held ? held.changes.files : undefined)));
-  const shown = $derived(moved.kind === "held" && !moved.value.some((file) => file.path === path) ? "current" : "past");
+  const moved = $derived(
+    readAnswer($since, (held) => ("changes" in held ? held.changes.files : undefined)),
+  );
+  const shown = $derived(
+    moved.kind === "held" && !moved.value.some((file) => file.path === path) ? "current" : "past",
+  );
 
   let cursor = $state<CodeLine | null>(null);
   const line = $derived.by((): number => {
@@ -85,7 +96,9 @@
   </Crumb>
   <div class="min-h-0 flex-1 overflow-auto bg-page">
     {#if question === null}
-      <p class="px-wide py-snug text-note text-text-faint">{say($lang, "run_patch_needs_checkpoint")}</p>
+      <p class="px-wide py-snug text-note text-text-faint">
+        {say($lang, "run_patch_needs_checkpoint")}
+      </p>
     {:else if read.kind === "unavailable"}
       <div class="px-wide py-snug"><Unanswered query={read.query} asked={question} /></div>
     {:else if read.kind === "held"}

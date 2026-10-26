@@ -49,7 +49,11 @@
 
 <Case label="refrain looks · a conflict bar, two lines, a version pair and the editor's box">
   <div class="flex flex-col gap-base">
-    <Conflict text="Somebody else saved Plan.md while you were editing it." wire={{ role: "alert" }} actions={compare} />
+    <Conflict
+      text="Somebody else saved Plan.md while you were editing it."
+      wire={{ role: "alert" }}
+      actions={compare}
+    />
     <Line tone="faint" children={held} />
     <Line tone="alert" children={held} />
     <Pair
@@ -105,10 +109,20 @@
         title={say($lang, "colours_tokens")}
         note={say($lang, "colours_tokens_note")}
         standing={{ word: say($lang, "saving_sent"), weight: "quiet", saved: false, detail: null }}
-        press={{ label: say($lang, "colours_css_apply"), loading: true, why: undefined, onPress: still }}
+        press={{
+          label: say($lang, "colours_css_apply"),
+          loading: true,
+          why: undefined,
+          onPress: still,
+        }}
         children={held}
       />
-      <DoorKey glyph="check" label="open the door" note="for 12 hours" wire={{ type: "button", "aria-disabled": false, onclick: still }} />
+      <DoorKey
+        glyph="check"
+        label="open the door"
+        note="for 12 hours"
+        wire={{ type: "button", "aria-disabled": false, onclick: still }}
+      />
     </div>
   </div>
   <Panel dialog={dialogOf("fixture-panel-title", still, kept)} children={nothing} />
@@ -125,7 +139,12 @@
           hunks: [
             {
               actions: [
-                { key: "comment", label: "comment", kind: "press", wire: { type: "button", onclick: still } },
+                {
+                  key: "comment",
+                  label: "comment",
+                  kind: "press",
+                  wire: { type: "button", onclick: still },
+                },
                 { key: "open", label: "open", kind: "open", wire: { href: "#/building/shop" } },
               ],
               lines: [

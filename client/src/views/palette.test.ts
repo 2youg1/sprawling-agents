@@ -43,7 +43,12 @@ type Typing = "settled" | "composing";
 function press(
   key: string,
   typing: Typing = "settled",
-): { readonly key: string; readonly isComposing: boolean; prevented: boolean; readonly preventDefault: () => void } {
+): {
+  readonly key: string;
+  readonly isComposing: boolean;
+  prevented: boolean;
+  readonly preventDefault: () => void;
+} {
   const event = {
     key,
     isComposing: typing === "composing",
@@ -55,7 +60,14 @@ function press(
   return event;
 }
 
-const AT: BoxState = { asking: "places", query: "", cursor: 1, count: 3, list: "p-list", lang: "en" };
+const AT: BoxState = {
+  asking: "places",
+  query: "",
+  cursor: 1,
+  count: 3,
+  list: "p-list",
+  lang: "en",
+};
 
 describe("the palette's box", () => {
   test("↓ and ↑ move the cursor, stop at the ends, and keep the key from the caret", () => {
@@ -87,7 +99,11 @@ describe("the palette's box", () => {
 
   test("a key pressed while an input method composes is the input method's: Enter picks no row, Tab completes no verb", () => {
     const composing = hands();
-    const keys = [press("Enter", "composing"), press("ArrowDown", "composing"), press("Tab", "composing")];
+    const keys = [
+      press("Enter", "composing"),
+      press("ArrowDown", "composing"),
+      press("Tab", "composing"),
+    ];
     for (const each of keys) boxOf({ ...AT, query: "/hal" }, composing.hands).onkeydown(each);
     expect(composing.asked).toEqual({ wrote: [], pointed: [], picked: 0 });
     expect(keys.map((each) => each.prevented)).toEqual([false, false, false]);
@@ -118,13 +134,19 @@ describe("the palette's box", () => {
   });
 
   test("the box names the row the list draws under the cursor", () => {
-    const entries: Entry[] = ["a", "b", "c"].map((label) => ({ label, hint: "", act: () => undefined }));
+    const entries: Entry[] = ["a", "b", "c"].map((label) => ({
+      label,
+      hint: "",
+      act: () => undefined,
+    }));
     const box = boxOf(AT, hands().hands);
     const rows = rowsLookOf(
       { listing: { kind: "places" }, shown: entries, cursor: AT.cursor, id: AT.list, lang: "en" },
       { hover: () => undefined, pick: () => undefined },
     );
-    const active = rows.sections.flatMap((section) => section.rows).filter((row) => row.wire["aria-selected"]);
+    const active = rows.sections
+      .flatMap((section) => section.rows)
+      .filter((row) => row.wire["aria-selected"]);
     expect(active.map((row) => row.wire.id)).toEqual([box["aria-activedescendant"] ?? ""]);
     expect(box["aria-controls"]).toBe(rows.list.id);
     expect(box["aria-activedescendant"]).toBe(rowId(AT.list, 1));
@@ -137,7 +159,10 @@ describe("why a verb cannot run from the palette", () => {
 
   test("each capability a verb misses is named, and a verb that needs none is free", () => {
     expect(
-      ["/new", "/diff", "/stop", "/steer", "/model", "/halt"].map((verb) => [verb, whyFor(verb, nowhere)]),
+      ["/new", "/diff", "/stop", "/steer", "/model", "/halt"].map((verb) => [
+        verb,
+        whyFor(verb, nowhere),
+      ]),
     ).toEqual([
       ["/new", "palette_needs_room"],
       ["/diff", "palette_needs_room"],
@@ -149,7 +174,10 @@ describe("why a verb cannot run from the palette", () => {
   });
 
   test("a room or a run in front of the person is enough for /diff", () => {
-    expect([whyFor("/diff", room), whyFor("/diff", { ...nowhere, live: true })]).toEqual([undefined, undefined]);
+    expect([whyFor("/diff", room), whyFor("/diff", { ...nowhere, live: true })]).toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 });
 
@@ -166,11 +194,24 @@ describe("the sessions of the room main stands in", () => {
   });
 
   test("the current session goes to the room and an earlier one to its read-only view, each led by its number, the one shown saying so", () => {
-    const places = sessionPlaces({ room: ROOM, viewing: Seq.make(23) }, [line(40, "reconcile", null), line(23, null, "the ledger is short"), line(9, null, null)], "en", 61_000);
+    const places = sessionPlaces(
+      { room: ROOM, viewing: Seq.make(23) },
+      [line(40, "reconcile", null), line(23, null, "the ledger is short"), line(9, null, null)],
+      "en",
+      61_000,
+    );
     expect(places).toEqual([
       { label: "#40 · reconcile", hint: "current session", to: { kind: "talk", address: ROOM } },
-      { label: "#23 · the ledger is short", hint: "shown now · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(23) } },
-      { label: "#9", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(9) } },
+      {
+        label: "#23 · the ledger is short",
+        hint: "shown now · 1 min ago",
+        to: { kind: "talk", address: ROOM, session: Seq.make(23) },
+      },
+      {
+        label: "#9",
+        hint: "session · 1 min ago",
+        to: { kind: "talk", address: ROOM, session: Seq.make(9) },
+      },
     ]);
   });
 });
@@ -195,7 +236,12 @@ describe("carrying this conversation to another room", () => {
   });
 
   test("a typed address the city already knows is not offered twice", () => {
-    const places = carryPlaces({ here: at("lab/parser"), rooms: [at("docs/notes")], typed: at("docs/notes"), working: () => false });
+    const places = carryPlaces({
+      here: at("lab/parser"),
+      rooms: [at("docs/notes")],
+      typed: at("docs/notes"),
+      working: () => false,
+    });
     expect(places).toEqual([{ to: at("docs/notes"), why: undefined }]);
   });
 });

@@ -51,9 +51,14 @@
   const first = $derived.by(() => {
     const held = $city;
     if (held === undefined || !("city" in held)) return null;
-    return [...held.city.buildings].map((each) => each.addr).sort((a, b) => a.localeCompare(b))[0] ?? null;
+    return (
+      [...held.city.buildings].map((each) => each.addr).sort((a, b) => a.localeCompare(b))[0] ??
+      null
+    );
   });
-  const config = $derived(first === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: first } }));
+  const config = $derived(
+    first === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: first } }),
+  );
 
   const standing = $derived.by((): string | null => {
     const answer = $config;
@@ -71,7 +76,9 @@
 
 <div class="flex flex-col gap-base">
   <p class="text-note text-text-quiet">{say($lang, "setup_effort")}</p>
-  <p class="max-w-measure text-note leading-relaxed text-text-faint">{say($lang, "setup_effort_essay")}</p>
+  <p class="max-w-measure text-note leading-relaxed text-text-faint">
+    {say($lang, "setup_effort_essay")}
+  </p>
   {#if standing !== null}
     <p class="max-w-measure text-note text-text">{standing}</p>
   {/if}

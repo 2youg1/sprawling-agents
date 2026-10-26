@@ -20,5 +20,8 @@ export interface AskMayorLook {
 }
 
 export function lookOf(lang: Lang): AskMayorLook {
-  return { label: say(lang, "city_ask_mayor"), wire: { href: toFragment({ kind: "talk", address: MAYOR }) } };
+  return {
+    label: say(lang, "city_ask_mayor"),
+    wire: { href: toFragment({ kind: "talk", address: MAYOR }) },
+  };
 }

@@ -53,7 +53,9 @@ export type Rhythm = "line" | "shape";
 // A name that leads where there is somewhere to lead, and stands in
 // the quieter ink where there is not.
 export function named(text: string, href: string | null): Piece {
-  return href === null ? { kind: "words", text, ink: "quiet" } : { kind: "link", text, href, face: "text" };
+  return href === null
+    ? { kind: "words", text, ink: "quiet" }
+    : { kind: "link", text, href, face: "text" };
 }
 
 // The time a note was written, after the separator every note uses.
@@ -70,7 +72,12 @@ const ENDING: Readonly<Record<ReplyEnd, { readonly key: Key; readonly ink: Ink }
 // A wait on another room's reply: the room, then the time left before
 // the deadline while the wait is open (due once it has passed), or which
 // of the three endings closed it, each in its own ink.
-export function replyWaitLook(lang: Lang, room: Piece, left: number, ended: ReplyEnded | null | undefined): NoteLook {
+export function replyWaitLook(
+  lang: Lang,
+  room: Piece,
+  left: number,
+  ended: ReplyEnded | null | undefined,
+): NoteLook {
   if (ended === undefined || ended === null) {
     const due = left <= 0;
     return {
@@ -100,15 +107,28 @@ export function replyWaitLook(lang: Lang, room: Piece, left: number, ended: Repl
 // A child session handing its work back: the child, then how it ended,
 // finished in the accent ink with who verified it, or stopped in the
 // alert ink with the reason.
-export function handbackLook(lang: Lang, child: Piece, handback: HandbackNote, at: string): NoteLook {
+export function handbackLook(
+  lang: Lang,
+  child: Piece,
+  handback: HandbackNote,
+  at: string,
+): NoteLook {
   return {
     role: "note",
     pieces: [
       child,
       { kind: "words", text: say(lang, "talk_handback"), ink: "faint" },
       "finished" in handback
-        ? { kind: "words", text: fill(say(lang, "talk_handback_finished"), { by: handback.finished.verified_by }), ink: "accent" }
-        : { kind: "words", text: fill(say(lang, "talk_handback_stopped"), { because: handback.stopped.because }), ink: "alert" },
+        ? {
+            kind: "words",
+            text: fill(say(lang, "talk_handback_finished"), { by: handback.finished.verified_by }),
+            ink: "accent",
+          }
+        : {
+            kind: "words",
+            text: fill(say(lang, "talk_handback_stopped"), { because: handback.stopped.because }),
+            ink: "alert",
+          },
       stamped(at),
     ],
   };

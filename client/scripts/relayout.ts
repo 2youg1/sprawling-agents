@@ -30,7 +30,13 @@ const page = join(mkdtempSync(join(tmpdir(), "relayout-")), "page.html");
 writeFileSync(page, `<!doctype html><html><body><script>${script}</script></body></html>`);
 
 const browser = process.argv[2] ?? EDGE;
-const run = Bun.spawnSync([browser, "--headless=new", "--disable-gpu", "--dump-dom", pathToFileURL(page).href]);
+const run = Bun.spawnSync([
+  browser,
+  "--headless=new",
+  "--disable-gpu",
+  "--dump-dom",
+  pathToFileURL(page).href,
+]);
 const dumped = /<pre id="relayout">([^<]*)<\/pre>/.exec(run.stdout.toString());
 if (dumped === null || script === "") {
   console.error(`no reading came back from ${browser}:\n${run.stderr.toString()}`);

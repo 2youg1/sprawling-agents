@@ -89,7 +89,10 @@
   <Bar />
   <div class="grid grid-cols-11 items-start gap-x-gutter gap-y-wide narrow:grid-cols-1">
     <section
-      class={["flex min-w-0 flex-col gap-base narrow:col-span-full", pickedOpen ? "col-[1/9]" : "col-[1/12]"]}
+      class={[
+        "flex min-w-0 flex-col gap-base narrow:col-span-full",
+        pickedOpen ? "col-[1/9]" : "col-[1/12]",
+      ]}
       aria-label={say($lang, "city_buildings")}
     >
       <div class="flex flex-wrap items-center justify-between gap-base">
@@ -143,7 +146,10 @@
       {/if}
     </section>
     {#if picked !== null && city !== undefined}
-      <aside class="col-[9/12] flex min-w-0 flex-col narrow:col-span-full" aria-label={say($lang, "city_panel")}>
+      <aside
+        class="col-[9/12] flex min-w-0 flex-col narrow:col-span-full"
+        aria-label={say($lang, "city_panel")}
+      >
         <Panel
           addr={picked}
           {city}

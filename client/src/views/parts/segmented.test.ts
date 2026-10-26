@@ -137,11 +137,9 @@ describe("a key lands where the APG Radio Group table says", () => {
   });
 
   test("space selects the focused cell, and enter is left to the button's own click", () => {
-    expect([landing(PLAIN, 1, " "), landing(PLAIN, 1, "Enter"), landing(PLAIN, 1, "Home")]).toEqual([
-      1,
-      undefined,
-      undefined,
-    ]);
+    expect([landing(PLAIN, 1, " "), landing(PLAIN, 1, "Enter"), landing(PLAIN, 1, "Home")]).toEqual(
+      [1, undefined, undefined],
+    );
   });
 });
 
@@ -175,7 +173,11 @@ function seat(): Seat {
   };
 }
 
-function drawn(at: Seat, held: Api | null, options: readonly Choice<Api>[] = DIALECTS): SegmentedLook {
+function drawn(
+  at: Seat,
+  held: Api | null,
+  options: readonly Choice<Api>[] = DIALECTS,
+): SegmentedLook {
   const props: SegmentedProps<Api> = {
     label: "dialect",
     options,
@@ -193,7 +195,10 @@ function cells(look: SegmentedLook): readonly CellLook[] {
 
 // A key press the handler can be given, with a record of whether the
 // handler took the key from the platform.
-function press(key: string): { readonly event: { key: string; preventDefault: () => void }; taken: () => boolean } {
+function press(key: string): {
+  readonly event: { key: string; preventDefault: () => void };
+  taken: () => boolean;
+} {
   let prevented = false;
   return {
     event: {
@@ -272,14 +277,25 @@ describe("the wire bags carry the key table to any look", () => {
       })),
     ).toEqual([
       { state: "free", checked: false, disabled: false, described: undefined, why: undefined },
-      { state: "refused", checked: false, disabled: true, described: "s1-why-1", why: { id: "s1-why-1", text: "next version" } },
+      {
+        state: "refused",
+        checked: false,
+        disabled: true,
+        described: "s1-why-1",
+        why: { id: "s1-why-1", text: "next version" },
+      },
       { state: "held", checked: true, disabled: false, described: undefined, why: undefined },
     ]);
   });
 
   test("each band says where its slider stands and which tone paints it", () => {
     expect(
-      drawn(seat(), "messages").bands.map((band) => ({ key: band.key, heading: band.heading, tone: band.tone, held: band.held })),
+      drawn(seat(), "messages").bands.map((band) => ({
+        key: band.key,
+        heading: band.heading,
+        tone: band.tone,
+        held: band.held,
+      })),
     ).toEqual([
       { key: 0, heading: "OpenAI", tone: "plain", held: -1 },
       { key: 2, heading: "Anthropic", tone: "alert", held: 0 },
@@ -289,7 +305,9 @@ describe("the wire bags carry the key table to any look", () => {
   test("every cell carries the same attachment on every draw, so a redraw keeps its element", () => {
     const at = seat();
     const symbols = (look: SegmentedLook): readonly unknown[] =>
-      cells(look).flatMap((cell) => Object.getOwnPropertySymbols(cell.wire).map((key) => cell.wire[key]));
+      cells(look).flatMap((cell) =>
+        Object.getOwnPropertySymbols(cell.wire).map((key) => cell.wire[key]),
+      );
     const first = symbols(drawn(at, "chat"));
     expect(first.length).toBe(3);
     expect(symbols(drawn(at, "messages"))).toEqual(first);

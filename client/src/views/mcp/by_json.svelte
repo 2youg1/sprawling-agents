@@ -80,8 +80,7 @@
     value={text}
     oninput={(event) => {
       text = event.currentTarget.value;
-    }}
-  ></textarea>
+    }}></textarea>
   {#if text.trim() !== "" && fragment.kind === "unreadable"}
     <p class="text-note text-alert" role="alert">
       {say($lang, "mcp_json_unreadable")}
@@ -89,7 +88,9 @@
   {/if}
   <ul class="flex flex-col gap-tight">
     {#each rows as row (row.draft.label + row.draft.url + row.draft.command)}
-      <li class="flex min-w-0 items-center gap-base rounded-card bg-chrome px-base py-snug text-note">
+      <li
+        class="flex min-w-0 items-center gap-base rounded-card bg-chrome px-base py-snug text-note"
+      >
         <span class="w-figure shrink-0 truncate font-mono text-text">{row.draft.label}</span>
         <Badge text={say($lang, SPELLED[row.draft.transport])} />
         {#if row.encoded.kind === "blocked"}

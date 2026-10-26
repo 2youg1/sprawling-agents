@@ -22,7 +22,9 @@
   // The figure's paint, said once: a run waiting for a person is the
   // one posture worth interrupting for, and every other posture is the
   // drawing's ordinary ink.
-  const tone = $derived(placed.kind === "figure" && placed.posture === "waiting" ? "fill-alert" : "fill-drawn-figure");
+  const tone = $derived(
+    placed.kind === "figure" && placed.posture === "waiting" ? "fill-alert" : "fill-drawn-figure",
+  );
 </script>
 
 {#if placed.kind === "figure"}
@@ -41,10 +43,23 @@
       </g>
     {/if}
     {#if placed.posture === "calling"}
-      <rect x={placed.x + 5.5} y={placed.y - 11} width="6" height="6" rx="1.2" class="fill-accent" />
+      <rect
+        x={placed.x + 5.5}
+        y={placed.y - 11}
+        width="6"
+        height="6"
+        rx="1.2"
+        class="fill-accent"
+      />
     {/if}
     {#if placed.posture === "waiting"}
-      <circle cx={placed.x} cy={placed.y - 16} r="8" class="fill-none stroke-alert" stroke-width="1.4" />
+      <circle
+        cx={placed.x}
+        cy={placed.y - 16}
+        r="8"
+        class="fill-none stroke-alert"
+        stroke-width="1.4"
+      />
     {/if}
   </g>
 {:else if placed.kind === "flag"}

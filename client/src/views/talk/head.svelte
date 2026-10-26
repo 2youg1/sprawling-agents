@@ -43,8 +43,12 @@ it lives. -->
   const { who, at, model, ttft, tps, rhythm }: Props = $props();
 
   const { lang } = ui();
-  const first = $derived(ttft === null ? undefined : `${say($lang, "talk_ttft")} ${tookWords(ttft, $lang)}`);
-  const rate = $derived(tps === null ? undefined : fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) }));
+  const first = $derived(
+    ttft === null ? undefined : `${say($lang, "talk_ttft")} ${tookWords(ttft, $lang)}`,
+  );
+  const rate = $derived(
+    tps === null ? undefined : fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) }),
+  );
 </script>
 
 {#snippet arrived()}
@@ -53,4 +57,11 @@ it lives. -->
   {/if}
 {/snippet}
 
-<Look {who} {model} time={{ text: hhmmss(at), iso: isoInstant(at) }} ttft={first} tps={rate} rhythm={rhythm === null ? undefined : arrived} />
+<Look
+  {who}
+  {model}
+  time={{ text: hhmmss(at), iso: isoInstant(at) }}
+  ttft={first}
+  tps={rate}
+  rhythm={rhythm === null ? undefined : arrived}
+/>

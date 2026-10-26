@@ -18,7 +18,9 @@ action as a button. -->
 <div class="rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet" {role}>
   <p><span class="text-alert">{head}</span>{after === undefined ? "" : ` · ${after}`}</p>
   {#each lines as line, at (at)}
-    <p class={["mt-tight", line.ink === "faint" ? "text-text-faint" : "text-text-quiet"]}>{line.text}</p>
+    <p class={["mt-tight", line.ink === "faint" ? "text-text-faint" : "text-text-quiet"]}>
+      {line.text}
+    </p>
   {/each}
   {#if fold !== undefined}
     <details class="mt-tight min-w-0">

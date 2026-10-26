@@ -29,7 +29,9 @@ function sheetsIn(state: unknown): readonly Sheet[] {
   if (typeof state !== "object" || state === null || !(KEY in state)) return [];
   const listed: unknown = state[KEY];
   if (!Array.isArray(listed)) return [];
-  return listed.flatMap((each: unknown): Sheet[] => (each === "world" || each === "right" ? [each] : []));
+  return listed.flatMap((each: unknown): Sheet[] =>
+    each === "world" || each === "right" ? [each] : [],
+  );
 }
 
 // The sheets the current history entry holds open, bottom first.
@@ -41,7 +43,8 @@ export function sheetsOpen(): readonly Sheet[] {
 // already on top is left as it is.
 export function openSheet(sheet: Sheet): void {
   if (open.at(-1) === sheet) return;
-  if (sheet === "world") opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  if (sheet === "world")
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const next = [...open.filter((each) => each !== sheet), sheet];
   history.pushState({ [KEY]: next }, "");
   open = next;
@@ -70,7 +73,8 @@ export function keepSheets(): () => void {
     if (open.length !== held.length) history.replaceState({ [KEY]: open }, "");
     if (was.includes("world") && !open.includes("world")) {
       queueMicrotask(() => {
-        if (document.activeElement === document.body && opener?.isConnected === true) opener.focus();
+        if (document.activeElement === document.body && opener?.isConnected === true)
+          opener.focus();
         opener = null;
       });
     }

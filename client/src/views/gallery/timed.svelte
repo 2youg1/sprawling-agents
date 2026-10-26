@@ -15,7 +15,16 @@
   // **The turns are derived, not typed out.** Their lengths come from a
   // fixed generator, so every screenshot draws the same river.
 
-  import { Address, Seq, TimeMs, Tokens, UsdMicros, type Call, type Note, type Turn } from "../../wire";
+  import {
+    Address,
+    Seq,
+    TimeMs,
+    Tokens,
+    UsdMicros,
+    type Call,
+    type Note,
+    type Turn,
+  } from "../../wire";
 
   const START = 1_790_000_000_000;
 
@@ -43,7 +52,18 @@
         answered: TimeMs.make(at + 1_400 + c * 600),
         timing: "measured",
       }));
-      const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99), t: TimeMs.make(at + 4_000), answered: TimeMs.make(at + 9_000) } }] : [];
+      const notes: Note[] =
+        n === 17
+          ? [
+              {
+                waiting: {
+                  at: Seq.make(n * 100 + 99),
+                  t: TimeMs.make(at + 4_000),
+                  answered: TimeMs.make(at + 9_000),
+                },
+              },
+            ]
+          : [];
       const turn: Turn = {
         calls,
         notes,
@@ -52,7 +72,11 @@
         t: TimeMs.make(at),
         timing: "measured",
         model: n < 30 ? "large-1" : "small-2",
-        used: { input: Tokens.make(12_000 + n * 400), output: Tokens.make(900 + n * 20), cached: Tokens.make(n * 300) },
+        used: {
+          input: Tokens.make(12_000 + n * 400),
+          output: Tokens.make(900 + n * 20),
+          cached: Tokens.make(n * 300),
+        },
         spent: UsdMicros.make(40_000 + n * 1_000),
       };
       at += span;

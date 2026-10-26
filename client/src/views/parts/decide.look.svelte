@@ -19,7 +19,10 @@
   const { card, glyph, asker, at, body, answers }: DecideLook = $props();
 </script>
 
-<div class="asks flex min-w-0 flex-col gap-snug rounded-card py-base pr-pane focus-visible:wash" {...card}>
+<div
+  class="asks flex min-w-0 flex-col gap-snug rounded-card py-base pr-pane focus-visible:wash"
+  {...card}
+>
   <div class="flex min-w-0 items-center gap-snug text-note">
     <Glyph name={glyph} size="sm" class="shrink-0 text-alert" />
     <span id={asker.id} class="min-w-0 flex-1 truncate text-text-quiet">{asker.text}</span>

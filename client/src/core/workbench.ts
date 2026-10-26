@@ -105,10 +105,15 @@ export function readWorkbench(raw: string | null): Workbench {
     const [name, width] = word.split(":");
     const pane = PANES.find((each) => each === name);
     const span = Number(width);
-    return pane === undefined || !Number.isInteger(span) || span < NARROWEST ? [] : [{ pane, span }];
+    return pane === undefined || !Number.isInteger(span) || span < NARROWEST
+      ? []
+      : [{ pane, span }];
   });
   const [first, second, third] = read;
-  if (words.length !== 3 || first === undefined || second === undefined || third === undefined) return WORKBENCH;
+  if (words.length !== 3 || first === undefined || second === undefined || third === undefined)
+    return WORKBENCH;
   const whole = new Set(read.map((column) => column.pane)).size === 3;
-  return whole && first.span + second.span + third.span === COLUMNS ? [first, second, third] : WORKBENCH;
+  return whole && first.span + second.span + third.span === COLUMNS
+    ? [first, second, third]
+    : WORKBENCH;
 }

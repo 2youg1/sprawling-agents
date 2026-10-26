@@ -10,7 +10,12 @@ import { meanOf, rankOf } from "./speed";
 describe("the speed cell's ranks", () => {
   test("a percentile is a value some turn measured, by nearest rank", () => {
     const rates = [40, 10, 30, 20];
-    expect([rankOf(rates, 50), rankOf(rates, 99), rankOf([7], 99), rankOf([], 50)]).toEqual([20, 40, 7, null]);
+    expect([rankOf(rates, 50), rankOf(rates, 99), rankOf([7], 99), rankOf([], 50)]).toEqual([
+      20,
+      40,
+      7,
+      null,
+    ]);
   });
 
   test("the rate's tail is its slowest turn, not its fastest", () => {

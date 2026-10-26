@@ -55,7 +55,9 @@
   {#each folders as folder (folder.name)}
     <p>{say($lang, folder.name)}</p>
     <div class="flex min-w-0 items-center gap-snug">
-      <code class="min-w-0 truncate rounded-control bg-raised px-base py-snug font-mono text-text">{folder.path}</code>
+      <code class="min-w-0 truncate rounded-control bg-raised px-base py-snug font-mono text-text"
+        >{folder.path}</code
+      >
       <Button
         label={say($lang, "setup_copy")}
         tone="quiet"

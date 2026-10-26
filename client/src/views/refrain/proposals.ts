@@ -15,7 +15,15 @@
 
 import type { Snippet } from "svelte";
 
-import type { Address, AxError, B3Hash, Command, ProposalCard, ProposalDecision, SliceVerdict } from "../../wire";
+import type {
+  Address,
+  AxError,
+  B3Hash,
+  Command,
+  ProposalCard,
+  ProposalDecision,
+  SliceVerdict,
+} from "../../wire";
 
 // ------------------------------------------------------------ standing
 
@@ -50,7 +58,9 @@ export type Edit = ReadonlyMap<number, Take>;
 // The edit a person starts from: every change taken as it was proposed.
 export function editOf(card: ProposalCard): Edit {
   return new Map(
-    card.slices.flatMap((slice, place) => (slice.kind === "same" ? [] : [[place, { taken: true, text: slice.text }]])),
+    card.slices.flatMap((slice, place) =>
+      slice.kind === "same" ? [] : [[place, { taken: true, text: slice.text }]],
+    ),
   );
 }
 

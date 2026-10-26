@@ -91,17 +91,15 @@
   }
 
   const shown = $derived(
-    tabs.map(
-      (tab): StripTab => ({
-        key: itemKey(tab.item),
-        label: tab.label,
-        terminal: tab.region === "terminal",
-        unsaved: tab.item.kind === "document" && holdsDraft(tab.item),
-        front: sameItem(front, tab.item),
-        href: linkOf(tab.item),
-        controls: panels[tab.region],
-      }),
-    ),
+    tabs.map((tab): StripTab => ({
+      key: itemKey(tab.item),
+      label: tab.label,
+      terminal: tab.region === "terminal",
+      unsaved: tab.item.kind === "document" && holdsDraft(tab.item),
+      front: sameItem(front, tab.item),
+      href: linkOf(tab.item),
+      controls: panels[tab.region],
+    })),
   );
 
   const look: StripLook = $derived(

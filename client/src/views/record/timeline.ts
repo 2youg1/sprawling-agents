@@ -40,8 +40,20 @@ export const LEVEL_NAMES: Record<LogLevel, Key> = {
 };
 
 export type Entry =
-  | { readonly kind: "record"; readonly key: string; readonly seq: Seq; readonly t: number; readonly record: EventRecord }
-  | { readonly kind: "log"; readonly key: string; readonly seq: Seq; readonly t: number | null; readonly line: LogLine };
+  | {
+      readonly kind: "record";
+      readonly key: string;
+      readonly seq: Seq;
+      readonly t: number;
+      readonly record: EventRecord;
+    }
+  | {
+      readonly kind: "log";
+      readonly key: string;
+      readonly seq: Seq;
+      readonly t: number | null;
+      readonly line: LogLine;
+    };
 
 // What narrows the column besides the source: one run, one log level,
 // one module. `null` is every one of them. A level or a module names a
@@ -61,12 +73,33 @@ export interface Page {
   readonly head: boolean;
 }
 
-export function entriesOf(page: Page, lines: readonly LogLine[], source: Source, narrowing: Narrowing): readonly Entry[] {
-  const records = source === "log" ? [] : page.records.filter((record) => recordKept(record, narrowing));
-  const shown = source === "ledger" ? [] : lines.filter((line) => lineKept(line, narrowing) && within(page, source, line.seq));
+export function entriesOf(
+  page: Page,
+  lines: readonly LogLine[],
+  source: Source,
+  narrowing: Narrowing,
+): readonly Entry[] {
+  const records =
+    source === "log" ? [] : page.records.filter((record) => recordKept(record, narrowing));
+  const shown =
+    source === "ledger"
+      ? []
+      : lines.filter((line) => lineKept(line, narrowing) && within(page, source, line.seq));
   const entries: Entry[] = [
-    ...records.map((record): Entry => ({ kind: "record", key: `r${String(record.seq)}`, seq: record.seq, t: record.t, record })),
-    ...shown.map((line, at): Entry => ({ kind: "log", key: `l${String(line.seq)}-${String(at)}`, seq: line.seq, t: line.t ?? null, line })),
+    ...records.map((record): Entry => ({
+      kind: "record",
+      key: `r${String(record.seq)}`,
+      seq: record.seq,
+      t: record.t,
+      record,
+    })),
+    ...shown.map((line, at): Entry => ({
+      kind: "log",
+      key: `l${String(line.seq)}-${String(at)}`,
+      seq: line.seq,
+      t: line.t ?? null,
+      line,
+    })),
   ];
   // Newest first. A line written at ledger position n was written after
   // record n, so at one position the line stands above the record.
@@ -94,7 +127,11 @@ function order(entry: Entry): number {
 }
 
 function recordKept(record: EventRecord, narrowing: Narrowing): boolean {
-  return narrowing.level === null && narrowing.module === null && (narrowing.run === null || record.run === narrowing.run);
+  return (
+    narrowing.level === null &&
+    narrowing.module === null &&
+    (narrowing.run === null || record.run === narrowing.run)
+  );
 }
 
 function lineKept(line: LogLine, narrowing: Narrowing): boolean {

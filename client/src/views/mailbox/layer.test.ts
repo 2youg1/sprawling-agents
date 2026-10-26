@@ -55,7 +55,9 @@ describe("the mailbox layer", () => {
   });
 
   test("a press outside closes", () => {
-    const open = STARTS.flatMap((start) => ALL.filter((trace) => run(start, [...trace, "outside"]).shown));
+    const open = STARTS.flatMap((start) =>
+      ALL.filter((trace) => run(start, [...trace, "outside"]).shown),
+    );
     expect(open).toEqual([]);
   });
 

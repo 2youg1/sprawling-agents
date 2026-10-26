@@ -40,6 +40,10 @@ it; the third cannot be used and its hint says why. -->
   <div class="flex flex-wrap items-center gap-snug">
     <IconButton glyph="copy" label={say($lang, "setup_copy")} />
     <IconButton glyph="cross" label={say($lang, "panel_close")} />
-    <IconButton glyph="reveal" label={say($lang, "path_reveal")} why={say($lang, "part_why_halted")} />
+    <IconButton
+      glyph="reveal"
+      label={say($lang, "path_reveal")}
+      why={say($lang, "part_why_halted")}
+    />
   </div>
 </Case>

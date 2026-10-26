@@ -44,9 +44,11 @@ export function shelfOf(): Shelf {
   const u = ui();
   let answer = $state<Answered<ToolkitsAnswer>>({ kind: "asking" });
 
-  $effect(() => u.conn.asking.ask(QUERIES.toolkits).subscribe((held) => {
-    answer = readAnswer(held, (each) => ("toolkits" in each ? each.toolkits : undefined));
-  }));
+  $effect(() =>
+    u.conn.asking.ask(QUERIES.toolkits).subscribe((held) => {
+      answer = readAnswer(held, (each) => ("toolkits" in each ? each.toolkits : undefined));
+    }),
+  );
 
   const recheck = (): void => {
     u.conn.asking.refresh(QUERIES.toolkits);

@@ -65,7 +65,12 @@ function rowOf(row: DiscardLine, lang: Lang, restore: Restore): BinRowLook {
 // are carried out outside the browser, and their words say how.
 function restoreOf(row: DiscardLine, lang: Lang, restore: Restore): RestoreLook | undefined {
   const restoration = row.restoration;
-  if (row.restored || restoration === null || restoration === undefined || !("tracked" in restoration)) {
+  if (
+    row.restored ||
+    restoration === null ||
+    restoration === undefined ||
+    !("tracked" in restoration)
+  ) {
     return undefined;
   }
   return {

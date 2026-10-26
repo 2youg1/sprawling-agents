@@ -90,7 +90,12 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
     case "call":
       return b.kind === "call" && a.run === b.run && a.at === b.at;
     case "document":
-      return b.kind === "document" && a.building === b.building && a.path === b.path && a.version === b.version;
+      return (
+        b.kind === "document" &&
+        a.building === b.building &&
+        a.path === b.path &&
+        a.version === b.version
+      );
     case "changes":
       return b.kind === "changes" && a.base === b.base && a.head === b.head;
     case "letter":
@@ -120,7 +125,13 @@ export function rightItem(): RightItem | null {
 // The item touched last among those `pick` accepts: what one region of
 // the inspector shows.
 export function frontWhere(pick: (item: RightItem) => boolean): RightItem | null {
-  return held.reduce<Held | null>((front, each) => (pick(each.item) && (front === null || each.touched > front.touched) ? each : front), null)?.item ?? null;
+  return (
+    held.reduce<Held | null>(
+      (front, each) =>
+        pick(each.item) && (front === null || each.touched > front.touched) ? each : front,
+      null,
+    )?.item ?? null
+  );
 }
 
 // Every open item, in the order it was opened: the order of the tabs.
@@ -135,7 +146,12 @@ export function openCall(call: CallItem): void {
 
 export function openDocument(document: DocumentItem): void {
   rememberOpener();
-  showItem({ kind: "document", building: document.building, path: document.path, version: document.version });
+  showItem({
+    kind: "document",
+    building: document.building,
+    path: document.path,
+    version: document.version,
+  });
 }
 
 export function openChanges(changes: ChangesItem): void {
@@ -182,7 +198,8 @@ function rememberOpener(): void {
 function giveFocusBack(): void {
   if (typeof document === "undefined") return;
   const active = document.activeElement;
-  const ours = active === null || active === document.body || active.closest(`[${INSPECTOR}]`) !== null;
+  const ours =
+    active === null || active === document.body || active.closest(`[${INSPECTOR}]`) !== null;
   const returning = back;
   if (ours && returning !== null) returning();
   else if (ours && opener?.isConnected === true) opener.focus();

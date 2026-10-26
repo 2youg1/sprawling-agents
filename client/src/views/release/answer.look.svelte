@@ -15,7 +15,12 @@
 
   const look: AnswerLook = $props();
 
-  const INK: Record<Ink, string> = { text: "text-text", quiet: "text-text-quiet", accent: "text-accent", alert: "text-alert" };
+  const INK: Record<Ink, string> = {
+    text: "text-text",
+    quiet: "text-text-quiet",
+    accent: "text-accent",
+    alert: "text-alert",
+  };
 </script>
 
 <div class="flex min-w-0 flex-col gap-snug">
@@ -60,12 +65,17 @@
           {...update.choice.wire}
         >
           <option value="">{update.choice.unchosen}</option>
-          {#each update.choice.commands as command (command)}<option value={command}>{command}</option>{/each}
+          {#each update.choice.commands as command (command)}<option value={command}
+              >{command}</option
+            >{/each}
         </select>
       {/if}
       {#if update.command !== undefined}
         <div class="flex min-w-0 items-start gap-tight">
-          <code class="min-w-0 flex-1 break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text">{update.command}</code>
+          <code
+            class="min-w-0 flex-1 break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text"
+            >{update.command}</code
+          >
           <Copy text={update.command} />
         </div>
       {/if}

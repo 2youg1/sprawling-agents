@@ -25,7 +25,8 @@ describe("reveal", () => {
           for (const height of range(SPAN)) {
             if (bottom < top || bottom > top + height) continue;
             const at = reveal(top, bottom, scroll, height);
-            if (!(at <= top && bottom <= at + height)) missed.push(`${String([top, bottom, scroll, height])} -> ${String(at)}`);
+            if (!(at <= top && bottom <= at + height))
+              missed.push(`${String([top, bottom, scroll, height])} -> ${String(at)}`);
           }
     expect(missed).toEqual([]);
   });
@@ -38,7 +39,8 @@ describe("reveal", () => {
           for (const height of range(SPAN)) {
             if (!(top < bottom) || height === 0) continue;
             const at = reveal(top, bottom, scroll, height);
-            if (!(at < bottom && top < at + height)) missed.push(`${String([top, bottom, scroll, height])} -> ${String(at)}`);
+            if (!(at < bottom && top < at + height))
+              missed.push(`${String([top, bottom, scroll, height])} -> ${String(at)}`);
           }
     expect(missed).toEqual([]);
   });
@@ -56,7 +58,8 @@ describe("opensOn", () => {
         for (const there of range(SPAN))
           for (const height of range(SPAN)) {
             if (height > here) continue;
-            if (opensOn(seen, here, there, height) !== "preferred") moved.push(String([seen, here, there, height]));
+            if (opensOn(seen, here, there, height) !== "preferred")
+              moved.push(String([seen, here, there, height]));
           }
     expect(moved).toEqual([]);
   });

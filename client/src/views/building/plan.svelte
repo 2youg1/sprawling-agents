@@ -116,7 +116,9 @@
     </p>
   {/if}
   {#if answer.problems.length > 0}
-    <ul class="mb-base rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
+    <ul
+      class="mb-base rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet"
+    >
       {#each answer.problems as problem (problem)}
         <li>{problem}</li>
       {/each}
@@ -127,7 +129,10 @@
       {#each answer.plan as row (row.node)}
         <li class="border-b border-edge">
           {#snippet cells()}
-            <span class="flex min-w-0 items-baseline gap-base" style:padding-left={indentOf(row.node)}>
+            <span
+              class="flex min-w-0 items-baseline gap-base"
+              style:padding-left={indentOf(row.node)}
+            >
               <span class="w-figure shrink-0 figure text-text-faint">{row.node}</span>
               <span class={row.status === "done" ? "text-text-faint" : "text-text"}>
                 {row.item}
@@ -147,7 +152,9 @@
             {cells}
           />
           {#if open === row.node}
-            <div class="pb-base pl-[calc(var(--spacing-glyph-sm)+var(--spacing-snug)+var(--spacing-figure)+var(--spacing-base))]">
+            <div
+              class="pb-base pl-[calc(var(--spacing-glyph-sm)+var(--spacing-snug)+var(--spacing-figure)+var(--spacing-base))]"
+            >
               <NodeCost building={answer.addr} node={row.node} />
             </div>
           {/if}

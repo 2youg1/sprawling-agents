@@ -1,52 +1,52 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one history in three readings: the timeline, where the ledger and
-// the process log stand on one axis; the archive as the buildings filed
-// it; and the recycle bin, where every row states its own way back.
-// Nothing here is folded: the record is shown as the record.
-//
-// Which reading is shown is what the address bar says. The address
-// grammar still has four record lenses (`core/route`): `ledger` and
-// `log` both open the timeline, `log` with only the process log showing,
-// so a link somebody kept to `#/record/log` reads what it always did.
-// `parts/tabs` owns both halves of the tab-and-panel association
-// (client/Spec.lean §7-8 item 6).
+  // The one history in three readings: the timeline, where the ledger and
+  // the process log stand on one axis; the archive as the buildings filed
+  // it; and the recycle bin, where every row states its own way back.
+  // Nothing here is folded: the record is shown as the record.
+  //
+  // Which reading is shown is what the address bar says. The address
+  // grammar still has four record lenses (`core/route`): `ledger` and
+  // `log` both open the timeline, `log` with only the process log showing,
+  // so a link somebody kept to `#/record/log` reads what it always did.
+  // `parts/tabs` owns both halves of the tab-and-panel association
+  // (client/Spec.lean §7-8 item 6).
 
-import type { Key } from "../core/lang";
-import type { Lens } from "../core/route";
-import type { Source } from "./record/timeline";
+  import type { Key } from "../core/lang";
+  import type { Lens } from "../core/route";
+  import type { Source } from "./record/timeline";
 
-type Reading = "timeline" | "archive" | "bin";
+  type Reading = "timeline" | "archive" | "bin";
 
-const READINGS: readonly Reading[] = ["timeline", "archive", "bin"];
+  const READINGS: readonly Reading[] = ["timeline", "archive", "bin"];
 
-const READING_NAMES: Record<Reading, Key> = {
-  timeline: "rec_timeline",
-  archive: "rec_archive",
-  bin: "rec_bin",
-};
+  const READING_NAMES: Record<Reading, Key> = {
+    timeline: "rec_timeline",
+    archive: "rec_archive",
+    bin: "rec_bin",
+  };
 
-function readingOf(lens: Lens): Reading {
-  switch (lens) {
-    case "ledger":
-    case "log":
-      return "timeline";
-    case "archive":
-      return "archive";
-    case "bin":
-      return "bin";
+  function readingOf(lens: Lens): Reading {
+    switch (lens) {
+      case "ledger":
+      case "log":
+        return "timeline";
+      case "archive":
+        return "archive";
+      case "bin":
+        return "bin";
+    }
   }
-}
 
-// The address a source of the timeline is kept under: the log alone has
-// the old lens's address, and both other sources are the record's own.
-function lensOf(source: Source): Lens {
-  return source === "log" ? "log" : "ledger";
-}
+  // The address a source of the timeline is kept under: the log alone has
+  // the old lens's address, and both other sources are the record's own.
+  function lensOf(source: Source): Lens {
+    return source === "log" ? "log" : "ledger";
+  }
 </script>
 
 <script lang="ts">
@@ -77,7 +77,9 @@ function lensOf(source: Source): Lens {
   let picked = $state<Source>("every");
   const source = $derived<Source>(lens === "log" ? "log" : picked === "log" ? "every" : picked);
 
-  const tabs = $derived(READINGS.map((each) => ({ id: each, label: say($lang, READING_NAMES[each]) })));
+  const tabs = $derived(
+    READINGS.map((each) => ({ id: each, label: say($lang, READING_NAMES[each]) })),
+  );
 
   function pick(id: string): void {
     const found = READINGS.find((each) => each === id);

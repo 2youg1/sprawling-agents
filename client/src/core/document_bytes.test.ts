@@ -7,12 +7,24 @@ import { describe, expect, test } from "bun:test";
 
 import { B3Hash, Locator } from "../wire";
 import type { BytesAnswer } from "../wire";
-import { DRAWN_BYTES_MAX, fetchedOf, fetching, joinedBytes, nextBytes, storedObject } from "./document_bytes";
+import {
+  DRAWN_BYTES_MAX,
+  fetchedOf,
+  fetching,
+  joinedBytes,
+  nextBytes,
+  storedObject,
+} from "./document_bytes";
 
 const V = B3Hash.make("a".repeat(64));
 const W = B3Hash.make("b".repeat(64));
 
-function window(version: B3Hash, start: number, bytes: readonly number[], size: number): BytesAnswer {
+function window(
+  version: B3Hash,
+  start: number,
+  bytes: readonly number[],
+  size: number,
+): BytesAnswer {
   return {
     version,
     span: { start, end: start + bytes.length },
@@ -43,7 +55,9 @@ describe("fetching a stored object", () => {
     const first = joinedBytes(fetching(V), window(V, 0, [1, 2], 4));
     expect(joinedBytes(first, window(W, 2, [3, 4], 4))).toEqual(first);
     expect(joinedBytes(first, window(V, 0, [1, 2], 4))).toEqual(first);
-    expect(joinedBytes(first, { version: V, span: { start: 2, end: 4 }, size: 4, base64: "%%" })).toEqual(first);
+    expect(
+      joinedBytes(first, { version: V, span: { start: 2, end: 4 }, size: 4, base64: "%%" }),
+    ).toEqual(first);
   });
 
   test("an object past what the page draws is not fetched past its first answer", () => {
@@ -55,7 +69,9 @@ describe("fetching a stored object", () => {
 
 describe("storedObject", () => {
   test("reads the whole object a cas locator names, and nothing else", () => {
-    expect(storedObject(Locator.make(`cas:b3-${"c3".repeat(32)}`))).toBe(B3Hash.make("c3".repeat(32)));
+    expect(storedObject(Locator.make(`cas:b3-${"c3".repeat(32)}`))).toBe(
+      B3Hash.make("c3".repeat(32)),
+    );
     expect(storedObject(Locator.make(`cas:b3-${"c3".repeat(32)}#bytes=0-9`))).toBeNull();
     expect(storedObject(Locator.make(`file:shop/a.md@${"0".repeat(40)}`))).toBeNull();
   });

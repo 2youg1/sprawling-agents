@@ -28,14 +28,24 @@
   }
 
   function rows(uses: readonly McpUse[]): UseRow[] {
-    return uses.map((one) => ({ run: one.run, resident: one.resident ?? null, at: one.at, part: null, outcome: one.outcome }));
+    return uses.map((one) => ({
+      run: one.run,
+      resident: one.resident ?? null,
+      at: one.at,
+      part: null,
+      outcome: one.outcome,
+    }));
   }
 
   function lineOf(server: McpServerUsage): ServerLine {
     return {
       server: server.server ?? null,
       configured: server.configured,
-      tools: server.tools.map((tool) => ({ tool: tool.tool, uses: rows(tool.uses), days: tool.per_day })),
+      tools: server.tools.map((tool) => ({
+        tool: tool.tool,
+        uses: rows(tool.uses),
+        days: tool.per_day,
+      })),
     };
   }
 </script>
@@ -54,7 +64,11 @@
   const lang = u.lang;
   const question: Query = { mcp_usage: { server: null } };
   const asked = u.conn.asking.ask(question);
-  const read = $derived(readAnswer($asked, (held) => ("mcp_usage" in held ? held.mcp_usage.servers.map(lineOf) : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) =>
+      "mcp_usage" in held ? held.mcp_usage.servers.map(lineOf) : undefined,
+    ),
+  );
 </script>
 
 <section class="flex min-w-0 flex-col gap-base">
@@ -73,7 +87,9 @@
       {#each read.value as server (server.server ?? "")}
         <li class="flex min-w-0 flex-col gap-tight border-b border-edge py-snug">
           <span class="flex items-baseline gap-base text-note">
-            <span class="font-mono text-text-quiet">{server.server ?? say($lang, "usage_removed")}</span>
+            <span class="font-mono text-text-quiet"
+              >{server.server ?? say($lang, "usage_removed")}</span
+            >
             {#if server.server !== null && !server.configured}
               <span class="text-text-faint">{say($lang, "usage_unconfigured")}</span>
             {/if}

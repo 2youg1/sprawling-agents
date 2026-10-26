@@ -57,7 +57,14 @@
   const MOTHER_TASK = EARLIER_SEGMENT.find((line) => line.speaker === "person")?.text ?? "";
   // The turn a person's words in these fixtures arrived in: a fork from
   // a message cuts before the turn it landed in.
-  const LANDED: Turn = { calls: [], notes: [], number: 1, opened: Seq.make(1), t: TimeMs.make(1), timing: "measured" };
+  const LANDED: Turn = {
+    calls: [],
+    notes: [],
+    number: 1,
+    opened: Seq.make(1),
+    t: TimeMs.make(1),
+    timing: "measured",
+  };
 </script>
 
 <script lang="ts">
@@ -101,7 +108,11 @@
 {#snippet utterance(line: Utterance)}
   {#if line.speaker === "person"}
     <div class="my-base flex flex-col items-end">
-      <div class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap">{line.text}</div>
+      <div
+        class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap"
+      >
+        {line.text}
+      </div>
       <div class="mt-tight text-note text-text-faint">{say($lang, "talk_you")}</div>
     </div>
   {:else if line.speaker === "resident"}
@@ -157,7 +168,13 @@ like the thread's own. -->
 <Case label="waiting · what the question is about, on the card">
   <Asked
     locator={ONE_QUESTION.artifact}
-    content={{ binary: false, bytes: 96, locator: ONE_QUESTION.artifact, text: "rm -rf target\n# frees 4.2 GiB; the next build starts cold", truncated: false }}
+    content={{
+      binary: false,
+      bytes: 96,
+      locator: ONE_QUESTION.artifact,
+      text: "rm -rf target\n# frees 4.2 GiB; the next build starts cold",
+      truncated: false,
+    }}
   />
 </Case>
 
@@ -165,11 +182,17 @@ like the thread's own. -->
 centring it: two thousand pixels of white under a composer in a room
 with one round in it reads as a page that broke. -->
 {#snippet inBox()}
-  <AddressLine {...addressLineOf($lang, "hall/mayor", null, () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
+  <AddressLine
+    {...addressLineOf($lang, "hall/mayor", null, () => undefined)}
+    seat={{ at: "box", ...boxWords($lang) }}
+  />
 {/snippet}
 
 {#snippet inBoxSession()}
-  <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
+  <AddressLine
+    {...addressLineOf($lang, "hall/mayor", Seq.make(23), () => undefined)}
+    seat={{ at: "box", ...boxWords($lang) }}
+  />
 {/snippet}
 
 {#snippet composerKeys()}
@@ -206,9 +229,12 @@ with one round in it reads as a page that broke. -->
   </div>
 </Case>
 
-<Case label="composer · docked once the room has a thread, the address and session in its placeholder">
+<Case
+  label="composer · docked once the room has a thread, the address and session in its placeholder"
+>
   <div class="px-pane pb-pane">
-    <Composer started
+    <Composer
+      started
       placeholder={say($lang, "talk_placeholder_mayor")}
       sending="dispatch"
       door={inBoxSession}
@@ -262,7 +288,8 @@ time somebody sends, so both landings are on this page. -->
       {/each}
     </div>
     <div class="px-pane pb-pane">
-      <Composer started
+      <Composer
+        started
         placeholder={say($lang, "talk_placeholder_mayor")}
         sending="dispatch"
         onSend={() => false}
@@ -300,7 +327,11 @@ history, and five of them is not what the person came back for. -->
       mark="none"
       wire={{}}
     />
-    <Rule parts={[{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: "12:04" }) }]} mark="none" wire={{}} />
+    <Rule
+      parts={[{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: "12:04" }) }]}
+      mark="none"
+      wire={{}}
+    />
   </div>
   {#each ROUND as line (line.text)}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
@@ -314,9 +345,19 @@ conversation, which stays as it was. -->
 <Case label="talk · forked from turn 3, with the mother run linked">
   <Rule
     parts={[
-      { kind: "text", text: fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) ?? say($lang, "fork_mother") }) },
+      {
+        kind: "text",
+        text: fill(say($lang, "session_forked_divider"), {
+          turn: "3",
+          at: motherName(MOTHER_TASK) ?? say($lang, "fork_mother"),
+        }),
+      },
       { kind: "text", text: "11:47" },
-      { kind: "link", text: say($lang, "fork_back"), href: toFragment({ kind: "run", run: MOTHER }) },
+      {
+        kind: "link",
+        text: say($lang, "fork_back"),
+        href: toFragment({ kind: "run", run: MOTHER }),
+      },
     ]}
     mark="branch"
     wire={{}}

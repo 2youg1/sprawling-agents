@@ -67,7 +67,13 @@ describe("results-only mode", () => {
     // The shape production takes after a reload: the page never streamed
     // the run, so the answer's `last_kind` is all it knows of the ending.
     const run = adopted(
-      { frozen: true, last_kind: "run_frozen", last_seq: Seq.make(9), run: RunId.make(runAt(1).run), who: "a" },
+      {
+        frozen: true,
+        last_kind: "run_frozen",
+        last_seq: Seq.make(9),
+        run: RunId.make(runAt(1).run),
+        who: "a",
+      },
       undefined,
     );
     expect(outcomeOf(run)).toBe("ended");
@@ -96,7 +102,9 @@ describe("results-only mode", () => {
     const start = performance.now();
     for (let each = 0; each < rounds; each += 1) resultsOf(CITY, FIRST);
     const perCityUs = ((performance.now() - start) * 1000) / rounds;
-    console.log(`city_results runs=${String(RUNS)} first=${String(FIRST)} per_city_us=${perCityUs.toFixed(1)}`);
+    console.log(
+      `city_results runs=${String(RUNS)} first=${String(FIRST)} per_city_us=${perCityUs.toFixed(1)}`,
+    );
     expect(perCityUs).toBeLessThanOrEqual(BUDGET_US);
   });
 });

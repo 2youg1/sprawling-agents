@@ -74,7 +74,11 @@ export interface Sent {
 }
 
 export function saveOf(doc: Address, positions: Positions, changes: readonly EditorChange[]): Sent {
-  return { doc, baseline: positions.version, command: putRange(doc, positions.version, textEdits(positions, changes)) };
+  return {
+    doc,
+    baseline: positions.version,
+    command: putRange(doc, positions.version, textEdits(positions, changes)),
+  };
 }
 
 // How many of the newest ledger lines the page reads for a receipt
@@ -89,8 +93,12 @@ export const RECEIPT_QUERY: Query = { history: { before: null, limit: RECEIPT_PA
 // The version a save left, read from the one line that carries its key.
 export function receiptIn(records: readonly EventRecord[], sent: Sent): B3Hash | null {
   const idem = "put_range" in sent.command ? sent.command.put_range.idem : null;
-  const line = records.find((record) => record.kind === "document_written" && record.data.idem === idem);
-  return line === undefined ? null : Option.getOrNull(Schema.decodeUnknownOption(B3Hash)(line.data.version));
+  const line = records.find(
+    (record) => record.kind === "document_written" && record.data.idem === idem,
+  );
+  return line === undefined
+    ? null
+    : Option.getOrNull(Schema.decodeUnknownOption(B3Hash)(line.data.version));
 }
 
 // ------------------------------------------------------------ the receipt
@@ -175,7 +183,10 @@ function atRest(receipt: Receipt, happened: Happened): Receipt {
 // A save in flight waits for its own receipt or its own refusal. The
 // version the city answers meanwhile may be this save landing, so it
 // decides nothing; the receipt does.
-function inFlight(receipt: Receipt & { readonly kind: "saving" | "pending" }, happened: Happened): Receipt {
+function inFlight(
+  receipt: Receipt & { readonly kind: "saving" | "pending" },
+  happened: Happened,
+): Receipt {
   switch (happened.kind) {
     case "edited":
       return { ...receipt, edited: !happened.empty };

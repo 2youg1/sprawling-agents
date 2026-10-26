@@ -24,12 +24,20 @@ export interface PanelLook {
   readonly close: { readonly label: string; readonly onPress: () => void };
   // The plan's progress, what is ready and what is stuck, each a badge
   // at its tier.
-  readonly badges: readonly { readonly key: string; readonly text: string; readonly weight: Weight }[];
+  readonly badges: readonly {
+    readonly key: string;
+    readonly text: string;
+    readonly weight: Weight;
+  }[];
   // Spread on the link into the building's page.
   readonly enter: { readonly label: string; readonly wire: { readonly href: string } };
   readonly pursuit: { readonly goal: string; readonly running: boolean } | null;
   readonly problems: readonly string[];
-  readonly blocked: readonly { readonly key: string; readonly source: string; readonly line: string }[];
+  readonly blocked: readonly {
+    readonly key: string;
+    readonly source: string;
+    readonly line: string;
+  }[];
   readonly runs: {
     readonly heading: string;
     readonly none: string;
@@ -64,11 +72,22 @@ export function panelLookOf(seat: PanelSeat, onClose: () => void): PanelLook {
     // link goes to the page that adopts it, its address filled in.
     enter:
       building?.adoptable === true
-        ? { label: say(lang, "city_adopt"), wire: { href: toFragment({ kind: "raise", address: addr }) } }
-        : { label: say(lang, "city_enter"), wire: { href: toFragment({ kind: "building", address: addr }) } },
-    pursuit: pursuit === undefined ? null : { goal: pursuit.goal, running: pursuit.state === "running" },
+        ? {
+            label: say(lang, "city_adopt"),
+            wire: { href: toFragment({ kind: "raise", address: addr }) },
+          }
+        : {
+            label: say(lang, "city_enter"),
+            wire: { href: toFragment({ kind: "building", address: addr }) },
+          },
+    pursuit:
+      pursuit === undefined ? null : { goal: pursuit.goal, running: pursuit.state === "running" },
     problems: building?.problems ?? [],
-    blocked: (building?.blocked ?? []).map((line) => ({ key: `${line.source}\u0000${line.line}`, source: line.source, line: line.line })),
+    blocked: (building?.blocked ?? []).map((line) => ({
+      key: `${line.source}\u0000${line.line}`,
+      source: line.source,
+      line: line.line,
+    })),
     runs: {
       heading: say(lang, "city_runs"),
       none: say(lang, "tree_no_runs"),
@@ -94,15 +113,38 @@ function badgesOf(building: CityAnswer["buildings"][number], lang: Lang): PanelL
   const progress =
     planned === null
       ? []
-      : [{ key: "progress", text: fill(say(lang, "bld_progress"), { done: String(planned.done), total: String(planned.total) }), weight: "quiet" as const }];
+      : [
+          {
+            key: "progress",
+            text: fill(say(lang, "bld_progress"), {
+              done: String(planned.done),
+              total: String(planned.total),
+            }),
+            weight: "quiet" as const,
+          },
+        ];
   const ready =
     planned !== null && building.ready > 0
-      ? [{ key: "ready", text: fill(say(lang, "city_ready"), { n: String(building.ready) }), weight: "live" as const }]
+      ? [
+          {
+            key: "ready",
+            text: fill(say(lang, "city_ready"), { n: String(building.ready) }),
+            weight: "live" as const,
+          },
+        ]
       : [];
   const stuck =
     building.blocked.length > 0
-      ? [{ key: "stuck", text: fill(say(lang, "city_stuck"), { n: String(building.blocked.length) }), weight: "alert" as const }]
+      ? [
+          {
+            key: "stuck",
+            text: fill(say(lang, "city_stuck"), { n: String(building.blocked.length) }),
+            weight: "alert" as const,
+          },
+        ]
       : [];
-  const adoptable = building.adoptable ? [{ key: "adoptable", text: say(lang, "city_adoptable"), weight: "quiet" as const }] : [];
+  const adoptable = building.adoptable
+    ? [{ key: "adoptable", text: say(lang, "city_adoptable"), weight: "quiet" as const }]
+    : [];
   return [...adoptable, ...progress, ...ready, ...stuck];
 }

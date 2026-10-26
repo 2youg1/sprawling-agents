@@ -27,7 +27,8 @@ import { Address } from "../wire";
 
 // `none` is the posture a browser starts in: no link is drawn until the
 // person names the editor this machine has.
-export type Editor = "none" | "vscode" | "vscode-insiders" | "vscodium" | "cursor" | "windsurf" | "zed";
+export type Editor =
+  "none" | "vscode" | "vscode-insiders" | "vscodium" | "cursor" | "windsurf" | "zed";
 
 // Every value the settings selector offers, in the order it is drawn,
 // and the list a stored word is read back through.
@@ -113,7 +114,9 @@ export type Shown = "current" | "past";
 
 // What the page offers for one line: a link the editor opens, or the
 // location written out for the person to copy.
-export type Reach = { readonly kind: "link"; readonly href: string } | { readonly kind: "copy"; readonly text: string };
+export type Reach =
+  | { readonly kind: "link"; readonly href: string }
+  | { readonly kind: "copy"; readonly text: string };
 
 //
 // An editor opens the worktree's file as it is now, so a line read from
@@ -124,5 +127,7 @@ export type Reach = { readonly kind: "link"; readonly href: string } | { readonl
 // opened something.
 export function reachOf(at: Opening, shown: Shown): Reach {
   const href = shown === "current" ? editorLink(at) : null;
-  return href === null ? { kind: "copy", text: `${at.path}:${String(at.line)}` } : { kind: "link", href };
+  return href === null
+    ? { kind: "copy", text: `${at.path}:${String(at.line)}` }
+    : { kind: "link", href };
 }

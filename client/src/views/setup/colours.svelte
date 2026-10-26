@@ -27,7 +27,14 @@
   import Card from "./card.look.svelte";
   import { tokenOf } from "./token";
   import Token from "./token.look.svelte";
-  import { colourTokens, declaredNames, drawnRgb, shortfalls, textClaims, type Rgb } from "./colours";
+  import {
+    colourTokens,
+    declaredNames,
+    drawnRgb,
+    shortfalls,
+    textClaims,
+    type Rgb,
+  } from "./colours";
 
   const u = ui();
   const lang = u.lang;
@@ -71,10 +78,12 @@
   // subscribes first), so the computed style already answers for it.
   $effect(() => {
     const resolve = drawnRgb(document.documentElement);
-    drawn = Object.fromEntries(tokens.flatMap((token) => {
-      const rgb = resolve(token);
-      return rgb === null ? [] : [[token, hexOf(rgb)]];
-    }));
+    drawn = Object.fromEntries(
+      tokens.flatMap((token) => {
+        const rgb = resolve(token);
+        return rgb === null ? [] : [[token, hexOf(rgb)]];
+      }),
+    );
     const computed = window.getComputedStyle(document.documentElement);
     const judged = textClaims(tokens, (name) => computed.getPropertyValue(name));
     warnings = [
@@ -103,7 +112,10 @@
   }
 
   function unpick(token: string): void {
-    u.prefs.setTheme({ ...theme, tokens: Object.fromEntries(Object.entries(theme.tokens).filter(([name]) => name !== token)) });
+    u.prefs.setTheme({
+      ...theme,
+      tokens: Object.fromEntries(Object.entries(theme.tokens).filter(([name]) => name !== token)),
+    });
   }
 
   function applyCss(): void {

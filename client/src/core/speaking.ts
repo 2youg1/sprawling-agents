@@ -33,10 +33,7 @@ export interface Recording {
 // plain http to something other than localhost has no microphone, and a
 // control that cannot work is a control that should not be drawn.
 export function canRecord(): boolean {
-  return (
-    typeof MediaRecorder !== "undefined" &&
-    typeof navigator.mediaDevices !== "undefined"
-  );
+  return typeof MediaRecorder !== "undefined" && typeof navigator.mediaDevices !== "undefined";
 }
 
 async function ask(origin: string, token: string | null, blob: Blob): Promise<Heard> {
@@ -55,9 +52,7 @@ async function ask(origin: string, token: string | null, blob: Blob): Promise<He
 // Opens the microphone and starts recording. The caller holds the
 // handle; nothing here touches the page.
 export async function record(origin: string, token: string | null): Promise<Recording | null> {
-  const media = await navigator.mediaDevices
-    .getUserMedia({ audio: true })
-    .catch(() => null);
+  const media = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
   if (media === null) {
     return null;
   }

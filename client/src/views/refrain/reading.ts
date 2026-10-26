@@ -38,5 +38,7 @@ const PHRASES: Readonly<Record<string, Key>> = {
 };
 
 export function phrasesIn(lang: Lang): Readonly<Record<string, string>> {
-  return Object.fromEntries(Object.entries(PHRASES).map(([phrase, key]) => [phrase, say(lang, key)]));
+  return Object.fromEntries(
+    Object.entries(PHRASES).map(([phrase, key]) => [phrase, say(lang, key)]),
+  );
 }

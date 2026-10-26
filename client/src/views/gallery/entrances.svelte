@@ -23,7 +23,12 @@
   const LAB = Address.make("lab");
   const HALL = Address.make("hall/mayor");
   // Fixture data: three sessions of the Mayor's room, newest first.
-  const line = (began: number, name: string | null, preview: string | null, at: number): SessionLine => ({
+  const line = (
+    began: number,
+    name: string | null,
+    preview: string | null,
+    at: number,
+  ): SessionLine => ({
     at: TimeMs.make(at),
     began: Seq.make(began),
     last: Seq.make(began + 9),
@@ -35,22 +40,40 @@
   const NOW = Date.now();
   const LINES: readonly SessionLine[] = [
     line(4182, "release notes", null, NOW),
-    line(3990, null, "The ledger closes short by one entry on the first of the month.", NOW - 3_600_000),
+    line(
+      3990,
+      null,
+      "The ledger closes short by one entry on the first of the month.",
+      NOW - 3_600_000,
+    ),
     line(23, null, null, NOW - 86_400_000),
   ];
 
-  const FOUND: readonly Address[] = ["Roadmap.md", "notes/roadmap-review.md", "docs/archive/old-roadmap.txt"].map(
-    (path) => Address.make(path),
-  );
+  const FOUND: readonly Address[] = [
+    "Roadmap.md",
+    "notes/roadmap-review.md",
+    "docs/archive/old-roadmap.txt",
+  ].map((path) => Address.make(path));
 
   function answering(query: Query): Answer | undefined {
     if (query === QUERIES.endpoints) return { endpoints: ENDPOINTS };
     if (typeof query === "object" && "find" in query) {
-      const find: FindAnswer = { under: LAB, text: query.find.text, paths: [...FOUND], walked: "whole" };
+      const find: FindAnswer = {
+        under: LAB,
+        text: query.find.text,
+        paths: [...FOUND],
+        walked: "whole",
+      };
       return { find };
     }
     if (typeof query === "object" && "sessions" in query) {
-      return { sessions: { room: query.sessions.room, sessions: query.sessions.room === HALL ? [...LINES] : [], earlier: 0 } };
+      return {
+        sessions: {
+          room: query.sessions.room,
+          sessions: query.sessions.room === HALL ? [...LINES] : [],
+          earlier: 0,
+        },
+      };
     }
     return undefined;
   }
@@ -79,7 +102,13 @@
 
   const ignore = (): void => undefined;
   const specimen = (label: string) =>
-    modalWire({ seat: "specimen", named: { "aria-label": label }, backdrop: "stays", hold: modalHold("specimen"), onClose: ignore });
+    modalWire({
+      seat: "specimen",
+      named: { "aria-label": label },
+      backdrop: "stays",
+      hold: modalHold("specimen"),
+      onClose: ignore,
+    });
 
   // A verb list as the palette groups it, on a page with no run in
   // front of the person: `/stop` is kept, greyed, with its reason.
@@ -109,9 +138,7 @@
       rooms: ["lab/parser", "lab", "lab/review", "docs/notes"].map((room) => Address.make(room)),
       typed: Address.make("lab/lexer"),
       working: (room) => room === WORKING,
-    }).map(
-      (place): Entry => ({ label: place.to, hint: "", why: place.why, act: ignore }),
-    ),
+    }).map((place): Entry => ({ label: place.to, hint: "", why: place.why, act: ignore })),
   );
 </script>
 
@@ -131,7 +158,14 @@
   <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
     <PaletteLook
       box={boxOf(
-        { asking: "places", query: "/", cursor: 1, count: VERBS.length, list: "entrances-verbs", lang: $lang },
+        {
+          asking: "places",
+          query: "/",
+          cursor: 1,
+          count: VERBS.length,
+          list: "entrances-verbs",
+          lang: $lang,
+        },
         { write: ignore, point: ignore, pick: ignore },
       )}
       nothing={undefined}
@@ -160,13 +194,27 @@
   <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
     <PaletteLook
       box={boxOf(
-        { asking: "carry", query: "lab/lexer", cursor: 3, count: CARRIED.length, list: "entrances-carry", lang: $lang },
+        {
+          asking: "carry",
+          query: "lab/lexer",
+          cursor: 3,
+          count: CARRIED.length,
+          list: "entrances-carry",
+          lang: $lang,
+        },
         { write: ignore, point: ignore, pick: ignore },
       )}
       nothing={undefined}
     >
       {#snippet list()}
-        <Rows id="entrances-carry" listing={{ kind: "places" }} shown={CARRIED} cursor={3} onHover={ignore} onPick={ignore} />
+        <Rows
+          id="entrances-carry"
+          listing={{ kind: "places" }}
+          shown={CARRIED}
+          cursor={3}
+          onHover={ignore}
+          onPick={ignore}
+        />
       {/snippet}
     </PaletteLook>
   </Modal>

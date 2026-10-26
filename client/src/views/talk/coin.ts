@@ -29,7 +29,10 @@ export interface CoinLook {
   readonly wire: CoinWire;
 }
 
-export type CoinWire = Pick<HTMLButtonAttributes, "type" | "aria-label" | "aria-disabled" | "onclick">;
+export type CoinWire = Pick<
+  HTMLButtonAttributes,
+  "type" | "aria-label" | "aria-disabled" | "onclick"
+>;
 
 // The send face submits the form the key stands in, so Enter in the box
 // and a press here are one path: `pressCoin` answers `words` and the

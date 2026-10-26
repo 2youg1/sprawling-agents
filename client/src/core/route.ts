@@ -31,15 +31,39 @@ export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 // The order the settings tree offers them in is the tree's own
 // (`views/settings/tree.ts`); this is only the set the address bar reads.
 export const SETUP_GROUPS = [
-  "you", "accounts", "agents", "network", "remote", "devices", "run", "rules", "automation",
-  "skills", "tools", "performance", "appearance", "colours", "keys", "advanced", "privacy", "about",
+  "you",
+  "accounts",
+  "agents",
+  "network",
+  "remote",
+  "devices",
+  "run",
+  "rules",
+  "automation",
+  "skills",
+  "tools",
+  "performance",
+  "appearance",
+  "colours",
+  "keys",
+  "advanced",
+  "privacy",
+  "about",
 ] as const;
 
 export type SetupGroup = (typeof SETUP_GROUPS)[number];
 
 // The lenses of the run page, in the order its tabs offer them; a
 // `#/run/<id>/<lens>` link opens the page at one (client D28).
-export const RUN_LENSES = ["time", "turns", "monitor", "prompt", "context", "changes", "evidence"] as const;
+export const RUN_LENSES = [
+  "time",
+  "turns",
+  "monitor",
+  "prompt",
+  "context",
+  "changes",
+  "evidence",
+] as const;
 
 export type RunLens = (typeof RUN_LENSES)[number];
 
@@ -49,7 +73,12 @@ export type RunLens = (typeof RUN_LENSES)[number];
 // (`views/inspect/open.svelte.ts`), so opening one hands it over whole.
 export type ItemLink =
   | { readonly kind: "call"; readonly run: RunId; readonly at: Seq }
-  | { readonly kind: "document"; readonly building: Address; readonly path: string; readonly version: B3Hash | null };
+  | {
+      readonly kind: "document";
+      readonly building: Address;
+      readonly path: string;
+      readonly version: B3Hash | null;
+    };
 
 // The room a person talks to when they have named none: the Mayor.
 export const MAYOR: Address = Address.make("hall/mayor");
@@ -65,7 +94,12 @@ export type View =
   // beside it on arrival; the right side's state itself is not here
   // (client/Spec.lean §4-27). With `session`, the stretch that began at
   // that line (`SessionLine::began`) rather than the room's current one.
-  | { readonly kind: "talk"; readonly address: Address; readonly item?: ItemLink; readonly session?: Seq }
+  | {
+      readonly kind: "talk";
+      readonly address: Address;
+      readonly item?: ItemLink;
+      readonly session?: Seq;
+    }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address }
   // The page a building is raised on; with an address, that address is
@@ -164,7 +198,9 @@ function readItem(query: string): Option.Option<ItemLink> {
     case "building path":
     case "building path version": {
       const path = value("path");
-      const version: Option.Option<B3Hash | null> = keys.endsWith("version") ? readB3(value("version")) : Option.some(null);
+      const version: Option.Option<B3Hash | null> = keys.endsWith("version")
+        ? readB3(value("version"))
+        : Option.some(null);
       if (path === "") return Option.none();
       return Option.map(
         Option.all([readAddress(value("building")), version]),
@@ -177,9 +213,12 @@ function readItem(query: string): Option.Option<ItemLink> {
 }
 
 const readB3 = Schema.decodeOption(B3Hash);
-const readSeq = (raw: string): Option.Option<Seq> => (/^\d+$/.test(raw) ? Schema.decodeOption(Seq)(Number(raw)) : Option.none());
-const readLens = (raw: string): Option.Option<RunLens> => Option.fromNullishOr(RUN_LENSES.find((lens) => lens === raw));
-const readStep = (raw: string): Option.Option<GuideStep> => Option.fromNullishOr(GuideStep.literals.find((step) => step === raw));
+const readSeq = (raw: string): Option.Option<Seq> =>
+  /^\d+$/.test(raw) ? Schema.decodeOption(Seq)(Number(raw)) : Option.none();
+const readLens = (raw: string): Option.Option<RunLens> =>
+  Option.fromNullishOr(RUN_LENSES.find((lens) => lens === raw));
+const readStep = (raw: string): Option.Option<GuideStep> =>
+  Option.fromNullishOr(GuideStep.literals.find((step) => step === raw));
 
 function recordFragment(lens: Lens): string {
   switch (lens) {
@@ -266,7 +305,9 @@ function talkIn(tail: string): Option.Option<View> {
   if (cut < 0) return Option.map(room, (address) => ({ kind: "talk", address }));
   const digits = tail.slice(cut + 1);
   const session = readSeq(digits);
-  return Option.flatMap(room, (address) => Option.map(session, (began) => ({ kind: "talk", address, session: began })));
+  return Option.flatMap(room, (address) =>
+    Option.map(session, (began) => ({ kind: "talk", address, session: began })),
+  );
 }
 
 function named(raw: string): string {
@@ -316,7 +357,10 @@ export function fromFragment(raw: string): Option.Option<View> {
     case "live": {
       const cut = tail.indexOf("/");
       if (cut < 0) return Option.map(readRunId(tail), (run) => ({ kind: "run", run }));
-      return Option.map(Option.all([readRunId(tail.slice(0, cut)), readLens(tail.slice(cut + 1))]), ([run, lens]) => ({ kind: "run", run, lens }));
+      return Option.map(
+        Option.all([readRunId(tail.slice(0, cut)), readLens(tail.slice(cut + 1))]),
+        ([run, lens]) => ({ kind: "run", run, lens }),
+      );
     }
     case "welcome":
       return Option.map(readStep(tail), (step) => ({ kind: "welcome", step }));
@@ -332,7 +376,9 @@ function talkWith(path: string, query: string): Option.Option<View> {
   const head = ["talk/", "s/"].find((prefix) => path.startsWith(prefix));
   if (head === undefined) return Option.none();
   return Option.flatMap(talkIn(path.slice(head.length)), (view) =>
-    view.kind === "talk" ? Option.map(readItem(query), (item): View => ({ ...view, item })) : Option.none(),
+    view.kind === "talk"
+      ? Option.map(readItem(query), (item): View => ({ ...view, item }))
+      : Option.none(),
   );
 }
 
@@ -371,14 +417,23 @@ export function buildingOf(address: Address): Address {
 }
 
 export type BuildingDestination =
-  | { readonly kind: "building"; readonly view: { readonly kind: "building"; readonly address: Address } }
-  | { readonly kind: "adopt" | "build"; readonly view: { readonly kind: "raise"; readonly address: Address } };
+  | {
+      readonly kind: "building";
+      readonly view: { readonly kind: "building"; readonly address: Address };
+    }
+  | {
+      readonly kind: "adopt" | "build";
+      readonly view: { readonly kind: "raise"; readonly address: Address };
+    };
 
 // Where a top-level address goes, read against the city's own building
 // list. Navigation and the raise form share this classification (client
 // D104): an established building has a page, while an adoptable folder or
 // an unknown name is confirmed on the prefilled raise page.
-export function buildingDestination(addr: Address, buildings: readonly BuildingProgress[]): BuildingDestination {
+export function buildingDestination(
+  addr: Address,
+  buildings: readonly BuildingProgress[],
+): BuildingDestination {
   const held = buildings.find((each) => each.addr === addr);
   if (held === undefined) return { kind: "build", view: { kind: "raise", address: addr } };
   if (held.adoptable) return { kind: "adopt", view: { kind: "raise", address: addr } };
@@ -396,5 +451,7 @@ export function roomOf(address: Address): string {
 // name it. None when the name is one the city would refuse as a session.
 export function roomIn(building: Address, name: string): Option.Option<Address> {
   const named = name.trim();
-  return Schema.is(SessionName)(named) ? Option.some(Address.make(`${building}/${named}`)) : Option.none();
+  return Schema.is(SessionName)(named)
+    ? Option.some(Address.make(`${building}/${named}`))
+    : Option.none();
 }

@@ -74,7 +74,9 @@
 
   const question = $derived<Query>({ listing: { at } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (held) => ("listing" in held ? held.listing.entries : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("listing" in held ? held.listing.entries : undefined)),
+  );
   const entries = $derived(read.kind === "held" ? read.value : undefined);
 
   const cost = u.conn.asking.ask(QUERIES.cost);
@@ -157,7 +159,10 @@
       <span class="text-note text-text-faint">{say($lang, KIND_WORD[kind])}</span>
       <span class="flex-1"></span>
       {#if kind === "room"}
-        <TalkLink label={say($lang, "bld_open_talk")} wire={{ href: toFragment({ kind: "talk", address: at }) }} />
+        <TalkLink
+          label={say($lang, "bld_open_talk")}
+          wire={{ href: toFragment({ kind: "talk", address: at }) }}
+        />
       {/if}
     </div>
     {#if kind === "governance"}
@@ -183,7 +188,10 @@
       {:else if earlier.length === 0}
         <EmptyState missing="dir_room_empty">
           {#snippet action()}
-            <TalkLink label={say($lang, "bld_open_talk")} wire={{ href: toFragment({ kind: "talk", address: at }) }} />
+            <TalkLink
+              label={say($lang, "bld_open_talk")}
+              wire={{ href: toFragment({ kind: "talk", address: at }) }}
+            />
           {/snippet}
         </EmptyState>
       {/if}

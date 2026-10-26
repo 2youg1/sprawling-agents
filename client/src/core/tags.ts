@@ -49,9 +49,18 @@ const readCity = Schema.decodeOption(Address);
 
 // A session of the city the handshake named, as its tags name it; `null`
 // when the city stated no name, which leaves nowhere to keep a tag.
-export function namedIn(city: string | null, room: Address, began: Seq, workspace: string | null): Named | null {
+export function namedIn(
+  city: string | null,
+  room: Address,
+  began: Seq,
+  workspace: string | null,
+): Named | null {
   const usual = workspace === null ? null : readTag(workspace);
-  return city === null ? null : Option.getOrNull(Option.map(readCity(city), (named) => ({ city: named, room, began, usual })));
+  return city === null
+    ? null
+    : Option.getOrNull(
+        Option.map(readCity(city), (named) => ({ city: named, room, began, usual })),
+      );
 }
 
 // What a person typed, as the tag it means. Folded to lower case here and
@@ -62,7 +71,9 @@ export function readTag(raw: string): Tag | null {
 }
 
 function same(entry: Named, session: Named): boolean {
-  return entry.city === session.city && entry.room === session.room && entry.began === session.began;
+  return (
+    entry.city === session.city && entry.room === session.room && entry.began === session.began
+  );
 }
 
 export function tagsOf(held: readonly SessionTags[], session: Named): readonly Tag[] {
@@ -86,7 +97,10 @@ export function given(held: readonly SessionTags[], session: Named, tag: Tag): S
 
 // The session's whole new set with `tag` taken off; empty removes it.
 export function stripped(held: readonly SessionTags[], session: Named, tag: Tag): SessionTags {
-  return named(session, tagsOf(held, session).filter((each) => each !== tag));
+  return named(
+    session,
+    tagsOf(held, session).filter((each) => each !== tag),
+  );
 }
 
 function named(session: Named, tags: readonly Tag[]): SessionTags {

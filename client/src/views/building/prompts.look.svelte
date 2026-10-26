@@ -25,7 +25,11 @@
   {#if look.rooms.length > 1}
     <div class="flex flex-wrap items-center gap-snug" role="group" aria-label={look.roomsLabel}>
       {#each look.rooms as room (room.label)}
-        <Button label={room.label} tone={room.current ? "secondary" : "quiet"} onPress={room.onPress} />
+        <Button
+          label={room.label}
+          tone={room.current ? "secondary" : "quiet"}
+          onPress={room.onPress}
+        />
       {/each}
     </div>
   {/if}
@@ -42,7 +46,9 @@
       </ol>
     {/if}
     {#if look.run !== undefined}
-      <a class="w-fit text-note text-accent underline-offset-2 hover:underline" href={look.run.href}>{look.run.label}</a>
+      <a class="w-fit text-note text-accent underline-offset-2 hover:underline" href={look.run.href}
+        >{look.run.label}</a
+      >
     {/if}
     <p class="text-note text-text-faint">{look.note}</p>
   </div>
@@ -50,7 +56,9 @@
     {#each look.cards as card (card.key)}
       <li class="flex min-w-0 flex-col gap-tight rounded-panel bg-raised p-snug text-note">
         <span class="flex min-w-0 items-baseline gap-base">
-          <span class={["shrink-0 font-mono", card.sent ? "text-text" : "text-text-faint"]}>{card.title}</span>
+          <span class={["shrink-0 font-mono", card.sent ? "text-text" : "text-text-faint"]}
+            >{card.title}</span
+          >
           <span class="min-w-0 flex-1 truncate text-text-faint">{card.about}</span>
           <span class="shrink-0 text-text-faint">{card.layer}</span>
         </span>

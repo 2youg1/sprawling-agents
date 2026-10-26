@@ -9,7 +9,10 @@ import { afterWait, sendingInto, type Doing } from "./doing";
 import { Address, TimeMs } from "../wire";
 import type { ReplyEnd } from "../wire";
 
-const AWAITING: Doing = { kind: "awaiting_reply", wait: { on: Address.make("lab/west"), until: TimeMs.make(60_000) } };
+const AWAITING: Doing = {
+  kind: "awaiting_reply",
+  wait: { on: Address.make("lab/west"), until: TimeMs.make(60_000) },
+};
 
 describe("sending", () => {
   // The defect this pins is one of wording, and it is the one a
@@ -62,6 +65,10 @@ describe("the end of a reply wait", () => {
   test("an ending leaves a run that is no longer waiting where it is", () => {
     const frozen: Doing = { kind: "frozen", completion: "cancelled" };
     expect(afterWait(frozen, "left")).toEqual(frozen);
-    expect(afterWait({ kind: "calling", tool: "read", subject: null }, "reply")).toEqual({ kind: "calling", tool: "read", subject: null });
+    expect(afterWait({ kind: "calling", tool: "read", subject: null }, "reply")).toEqual({
+      kind: "calling",
+      tool: "read",
+      subject: null,
+    });
   });
 });

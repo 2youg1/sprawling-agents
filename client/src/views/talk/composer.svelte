@@ -32,7 +32,18 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, sessionModel, slashHands, startedIn } from "./composer";
+  import {
+    boxKey,
+    completedAt,
+    configLevel,
+    menuColumns,
+    offeredBy,
+    pickSlash,
+    picksFor,
+    sessionModel,
+    slashHands,
+    startedIn,
+  } from "./composer";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -72,7 +83,18 @@
     readonly door?: Snippet | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, door, started = false }: ComposerProps = $props();
+  const {
+    placeholder,
+    sending,
+    draft,
+    onSend,
+    onStop,
+    hearing,
+    band,
+    room,
+    door,
+    started = false,
+  }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -178,7 +200,11 @@
   // back in the box (`handing.ts`).
   let handing: Handing = IDLE;
   $effect(() => {
-    const next = settle(handing, $belief, untrack(() => text));
+    const next = settle(
+      handing,
+      $belief,
+      untrack(() => text),
+    );
     handing = next.handing;
     if (next.box !== null) write(next.box);
   });
@@ -187,22 +213,34 @@
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const city = u.conn.asking.ask(QUERIES.city);
-  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : undefined);
+  const buildings = $derived(
+    $city !== undefined && "city" in $city ? $city.city.buildings : undefined,
+  );
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
   // The room this box speaks to: the page's word for it, or the address bar's.
-  const shown = $derived(room === undefined ? Option.getOrNull(current(u.bar)) : { kind: "talk" as const, address: room });
+  const shown = $derived(
+    room === undefined
+      ? Option.getOrNull(current(u.bar))
+      : { kind: "talk" as const, address: room },
+  );
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
-  const startedHere = $derived(here !== null && startedIn(heldIn($belief, here), $belief.sessions[here]));
-  const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
+  const startedHere = $derived(
+    here !== null && startedIn(heldIn($belief, here), $belief.sessions[here]),
+  );
+  const session = $derived(
+    here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
+  );
   const picks = $derived(picksFor(u, session));
   // The level this room inherits when the page states none, and what
   // the picker and the `/` menu offer from the endpoints answer.
-  const roomConfig = $derived(here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }));
+  const roomConfig = $derived(
+    here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }),
+  );
   const offered = $derived(offeredBy(answer, $effort ?? configLevel($roomConfig), picks));
 
   // ------------------------------------------------------- the `/` menu
@@ -357,7 +395,9 @@
       pick(chosen);
     }}
     onClose={closeMenu}
-    bind={(binding: PopoverBinding) => { menuBinding = binding; }}
+    bind={(binding: PopoverBinding) => {
+      menuBinding = binding;
+    }}
     onCursorChange={(rowId) => {
       activeId = rowId;
     }}
@@ -370,7 +410,11 @@
 {#snippet drawKeys()}
   {#if hearing === true && canRecord()}
     <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
-    <Record onWords={(words: string) => { write(text === "" ? words : `${text} ${words}`); }} />
+    <Record
+      onWords={(words: string) => {
+        write(text === "" ? words : `${text} ${words}`);
+      }}
+    />
   {/if}
   <Gauge room={here}>
     <Coin
@@ -393,7 +437,12 @@
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow picker={offered.picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
+  <SettingsRow
+    picker={offered.picker}
+    room={here}
+    draws={band !== undefined || started || startedHere ? "notice" : "everything"}
+    {kept}
+  />
 {/snippet}
 
 <Look {...look} />

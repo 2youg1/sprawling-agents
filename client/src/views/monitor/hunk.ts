@@ -27,7 +27,10 @@ export interface Reverse {
 export function reverseOf(hunk: Hunk): Reverse {
   const now = sideOf(hunk, "added");
   const was = sideOf(hunk, "removed");
-  const longest = Math.max(0, ...[now, was].flatMap((side) => (side.match(/`+/g) ?? []).map((run) => run.length)));
+  const longest = Math.max(
+    0,
+    ...[now, was].flatMap((side) => (side.match(/`+/g) ?? []).map((run) => run.length)),
+  );
   return { now, was, fence: "`".repeat(Math.max(3, longest + 1)) };
 }
 

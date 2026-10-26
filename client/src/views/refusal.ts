@@ -19,7 +19,12 @@ import type { Snippet } from "svelte";
 // column; centred at the foot of a page with no composer; or, in
 // `#/gallery`, in the flow of the fold that shows it.
 export type Stand =
-  | { readonly kind: "composer"; readonly left: number; readonly width: number; readonly bottom: number }
+  | {
+      readonly kind: "composer";
+      readonly left: number;
+      readonly width: number;
+      readonly bottom: number;
+    }
   | { readonly kind: "foot" }
   | { readonly kind: "specimen" };
 
@@ -37,13 +42,18 @@ export interface Clock {
 // and banks the stretch that ran.
 export function held(clock: Clock, by: Holder, now: number): Clock {
   if (clock.holders.includes(by)) return clock;
-  const left = clock.holders.length === 0 ? Math.max(0, clock.left - (now - clock.since)) : clock.left;
+  const left =
+    clock.holders.length === 0 ? Math.max(0, clock.left - (now - clock.since)) : clock.left;
   return { left, since: now, holders: [...clock.holders, by] };
 }
 
 // The clock once `by` lets go at `now`, and whether it runs again: only
 // when nothing holds it any more.
-export function released(clock: Clock, by: Holder, now: number): { readonly clock: Clock; readonly runs: boolean } {
+export function released(
+  clock: Clock,
+  by: Holder,
+  now: number,
+): { readonly clock: Clock; readonly runs: boolean } {
   if (!clock.holders.includes(by)) return { clock, runs: false };
   const holders = clock.holders.filter((each) => each !== by);
   return { clock: { left: clock.left, since: now, holders }, runs: holders.length === 0 };
@@ -55,7 +65,11 @@ export type FocusOut = Pick<FocusEvent, "currentTarget" | "relatedTarget">;
 
 export function within(event: FocusOut): boolean {
   const { currentTarget, relatedTarget } = event;
-  return currentTarget instanceof Element && relatedTarget instanceof Node && currentTarget.contains(relatedTarget);
+  return (
+    currentTarget instanceof Element &&
+    relatedTarget instanceof Node &&
+    currentTarget.contains(relatedTarget)
+  );
 }
 
 export interface ToastWire {

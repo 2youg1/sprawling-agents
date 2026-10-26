@@ -131,9 +131,13 @@ describe("asking", () => {
     const doctor = driver.ask.ask(QUERIES.doctor);
     const city = driver.ask.ask(QUERIES.city);
 
-    driver.ask.answered(nth(driver, 1), Seq.make(1), answer({
-      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
-    }));
+    driver.ask.answered(
+      nth(driver, 1),
+      Seq.make(1),
+      answer({
+        city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+      }),
+    );
     expect(get(doctor)).toBeUndefined();
     expect(get(city)).toBeDefined();
   });
@@ -167,11 +171,17 @@ describe("asking", () => {
     driver.ask.ask(QUERIES.doctor);
 
     driver.pass(16_000);
-    expect(driver.reports.map(([, error]) => error.subject), "only the fast question is late").toEqual([keyOf(QUERIES.doctor)]);
+    expect(
+      driver.reports.map(([, error]) => error.subject),
+      "only the fast question is late",
+    ).toEqual([keyOf(QUERIES.doctor)]);
     expect(driver.sent, "the host is not asked to read again").toHaveLength(2);
 
     driver.pass(110_000);
-    expect(driver.reports.map(([, error]) => error.subject)).toEqual([keyOf(QUERIES.doctor), keyOf(QUERIES.privacy)]);
+    expect(driver.reports.map(([, error]) => error.subject)).toEqual([
+      keyOf(QUERIES.doctor),
+      keyOf(QUERIES.privacy),
+    ]);
   });
 
   // The late answer is still the answer: a question whose patience ran
@@ -197,11 +207,17 @@ describe("asking", () => {
     const driver = driven();
     driver.ask.ask(QUERIES.doctor);
 
-    driver.ask.answered(AskId.make(99), Seq.make(1), answer({ mcp_health: { addr: Address.make("hall/mayor"), servers: [] } }));
+    driver.ask.answered(
+      AskId.make(99),
+      Seq.make(1),
+      answer({ mcp_health: { addr: Address.make("hall/mayor"), servers: [] } }),
+    );
     expect(driver.reports).toEqual([]);
 
     driver.pass(16_000);
-    expect(driver.reports.map(([phrase, error]) => [phrase, error.code])).toEqual([["ask_late", "E_TIMEOUT"]]);
+    expect(driver.reports.map(([phrase, error]) => [phrase, error.code])).toEqual([
+      ["ask_late", "E_TIMEOUT"],
+    ]);
   });
 
   // A page somebody is looking at asks again after the patience runs
@@ -241,15 +257,25 @@ describe("asking", () => {
   // recently and watched by nobody goes, and asking it again goes out.
   test("past the cap the least recently used unwatched answer is dropped", () => {
     const driver = driven();
-    const health = (at: number): Query => ({ mcp_health: { addr: Address.make(`hall/a${String(at)}`) } });
+    const health = (at: number): Query => ({
+      mcp_health: { addr: Address.make(`hall/a${String(at)}`) },
+    });
     const fill = (from: number): void => {
       for (let at = from; at <= HELD_CAP; at += 1) {
         driver.ask.ask(health(at));
-        driver.ask.answered(nth(driver, at), Seq.make(1), answer({ mcp_health: { addr: Address.make(`hall/a${String(at)}`), servers: [] } }));
+        driver.ask.answered(
+          nth(driver, at),
+          Seq.make(1),
+          answer({ mcp_health: { addr: Address.make(`hall/a${String(at)}`), servers: [] } }),
+        );
       }
     };
     const watching = driver.ask.ask(health(0)).subscribe(() => undefined);
-    driver.ask.answered(nth(driver, 0), Seq.make(1), answer({ mcp_health: { addr: Address.make("hall/a0"), servers: [] } }));
+    driver.ask.answered(
+      nth(driver, 0),
+      Seq.make(1),
+      answer({ mcp_health: { addr: Address.make("hall/a0"), servers: [] } }),
+    );
     fill(1);
     const sent = driver.sent.length;
 
@@ -267,9 +293,13 @@ describe("asking", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
     driver.ask.invalidate(record(5));
-    driver.ask.answered(nth(driver, 0), Seq.make(7), answer({
-      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
-    }));
+    driver.ask.answered(
+      nth(driver, 0),
+      Seq.make(7),
+      answer({
+        city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+      }),
+    );
     driver.ask.invalidate(record(6));
     driver.pass(300);
     expect(driver.sent, "records 5 and 6 are inside the answer").toHaveLength(1);
@@ -286,9 +316,13 @@ describe("asking", () => {
   test("an answer read before genesis is stale once genesis lands", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
-    driver.ask.answered(nth(driver, 0), Seq.make(0), answer({
-      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
-    }));
+    driver.ask.answered(
+      nth(driver, 0),
+      Seq.make(0),
+      answer({
+        city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+      }),
+    );
     driver.ask.invalidate(record(0));
     driver.pass(300);
     expect(driver.sent, "the genesis record is news").toHaveLength(2);

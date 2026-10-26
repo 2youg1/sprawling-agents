@@ -16,6 +16,9 @@
 
 <span class={["inline-flex items-center gap-tight", placed]}>
   {#each marks as mark (mark)}
-    <kbd class="rounded-control px-tight font-mono text-note leading-none text-text-quiet no-underline">{mark}</kbd>
+    <kbd
+      class="rounded-control px-tight font-mono text-note leading-none text-text-quiet no-underline"
+      >{mark}</kbd
+    >
   {/each}
 </span>

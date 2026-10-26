@@ -35,13 +35,17 @@
 
   const question = $derived<Query>({ cost_of: { node } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (held) => ("cost_of" in held ? held.cost_of : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("cost_of" in held ? held.cost_of : undefined)),
+  );
 
   const placed = $derived.by(() => {
     if (read.kind !== "held") return null;
     const here = read.value.runs.flatMap(([run, spent]) => {
       const known = $belief.runs[run];
-      return known !== undefined && within(known, building) ? [{ run, spent, room: known.addr ?? building }] : [];
+      return known !== undefined && within(known, building)
+        ? [{ run, spent, room: known.addr ?? building }]
+        : [];
     });
     return {
       here,
@@ -83,7 +87,9 @@
       <p class="text-text-faint">{say($lang, "plan_node_unclaimed")}</p>
     {/if}
     {#if placed.elsewhere > 0}
-      <p class="text-text-faint">{fill(say($lang, "plan_node_elsewhere"), { n: String(placed.elsewhere) })}</p>
+      <p class="text-text-faint">
+        {fill(say($lang, "plan_node_elsewhere"), { n: String(placed.elsewhere) })}
+      </p>
     {/if}
   </div>
 {/if}

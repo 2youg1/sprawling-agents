@@ -23,7 +23,15 @@ function rows(total: number): readonly number[] {
 
 describe("which keys the list takes", () => {
   test("the four walking keys on a row, and nothing else", () => {
-    expect(KEYS.map((key) => taken("row", key))).toEqual(["next", "previous", "first", "last", null, null, null]);
+    expect(KEYS.map((key) => taken("row", key))).toEqual([
+      "next",
+      "previous",
+      "first",
+      "last",
+      null,
+      null,
+      null,
+    ]);
   });
 
   test("a field keeps every key", () => {

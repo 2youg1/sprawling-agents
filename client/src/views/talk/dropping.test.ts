@@ -20,11 +20,11 @@ describe("dropping", () => {
   });
 
   test("paths land at the caret with one space on each side", () => {
-    expect([insertAt("read and fix", 4, ["/a.txt"]), insertAt("", 0, ["/a.txt"]), insertAt("see ", 4, ["/a"])]).toEqual([
-      "read /a.txt and fix",
-      "/a.txt",
-      "see /a",
-    ]);
+    expect([
+      insertAt("read and fix", 4, ["/a.txt"]),
+      insertAt("", 0, ["/a.txt"]),
+      insertAt("see ", 4, ["/a"]),
+    ]).toEqual(["read /a.txt and fix", "/a.txt", "see /a"]);
   });
 
   test("a path with a space in it stays one path in the box", () => {

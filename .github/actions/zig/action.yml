@@ -27,7 +27,7 @@ inputs:
     description: >-
       Restore and save Zig's global cache; 'true' only in a job that runs
       `zig test`.
-    default: 'false'
+    default: "false"
 runs:
   using: composite
   steps:

@@ -10,13 +10,24 @@ import type { Turn } from "../../wire";
 import { forkLookOf } from "./fork_button";
 import type { ForkEntry } from "./forking";
 
-const TURN: Turn = { calls: [], notes: [], number: 2, opened: Seq.make(7), t: TimeMs.make(1), timing: "measured" };
+const TURN: Turn = {
+  calls: [],
+  notes: [],
+  number: 2,
+  opened: Seq.make(7),
+  t: TimeMs.make(1),
+  timing: "measured",
+};
 const ENTRY: ForkEntry = { kind: "turn", turn: TURN };
 const WORDS = { label: "branch from here", hint: "the original stays as it is" };
 
 // Every report the bag makes, in order: what the hand rests on, and
 // what was picked.
-function recorded(): { readonly heard: (ForkEntry | null)[]; readonly picked: ForkEntry[]; readonly look: ReturnType<typeof forkLookOf> } {
+function recorded(): {
+  readonly heard: (ForkEntry | null)[];
+  readonly picked: ForkEntry[];
+  readonly look: ReturnType<typeof forkLookOf>;
+} {
   const heard: (ForkEntry | null)[] = [];
   const picked: ForkEntry[] = [];
   const look = forkLookOf(ENTRY, WORDS, {
@@ -44,6 +55,9 @@ describe("the branch action's wiring", () => {
 
   test("the look gets the words as given and a button to spread them on", () => {
     const { look } = recorded();
-    expect({ label: look.label, hint: look.hint, type: look.wire.type }).toEqual({ ...WORDS, type: "button" });
+    expect({ label: look.label, hint: look.hint, type: look.wire.type }).toEqual({
+      ...WORDS,
+      type: "button",
+    });
   });
 });

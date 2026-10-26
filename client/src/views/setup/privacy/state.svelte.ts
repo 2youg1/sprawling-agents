@@ -18,7 +18,13 @@
 import { untrack } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
 
-import type { IdemKey, PrivacyAction, PrivacyAnswer, PrivacyControl, PrivacyResult } from "../../../wire";
+import type {
+  IdemKey,
+  PrivacyAction,
+  PrivacyAnswer,
+  PrivacyControl,
+  PrivacyResult,
+} from "../../../wire";
 import { IDLE, step, type Action, type Event, type Stage } from "./entry";
 import { actionOf, outcomeOf, resultOf, type EntryModel } from "./page";
 
@@ -92,7 +98,11 @@ export function privacyPage(source: Source): PrivacyPage {
       if (each.stage.kind !== "sending") continue;
       const shown = outcomeOf(answer, each.stage.idem);
       const result = shown === null ? "running" : resultOf(shown);
-      const moved = step(() => false, each.stage, { kind: "outcome", idem: each.stage.idem, result });
+      const moved = step(() => false, each.stage, {
+        kind: "outcome",
+        idem: each.stage.idem,
+        result,
+      });
       held.set(control, { stage: moved.stage, shown: shown ?? each.shown });
       open ||= moved.stage.kind === "sending";
     }

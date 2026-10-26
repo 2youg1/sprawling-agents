@@ -30,9 +30,19 @@ value comes in the bags. -->
         ]}
       >
         <span class="relative h-bar" style:width="{look.width}px" aria-hidden="true">
-          <svg class="absolute inset-0 overflow-visible" width={look.width} height={look.height} viewBox="0 0 {look.width} {look.height}">
+          <svg
+            class="absolute inset-0 overflow-visible"
+            width={look.width}
+            height={look.height}
+            viewBox="0 0 {look.width} {look.height}"
+          >
             {#each row.lines as line, at (at)}
-              <path d={line.d} fill="none" stroke-width="2" class={line.mine ? "stroke-accent" : "stroke-edge-input"} />
+              <path
+                d={line.d}
+                fill="none"
+                stroke-width="2"
+                class={line.mine ? "stroke-accent" : "stroke-edge-input"}
+              />
             {/each}
           </svg>
           <span
@@ -51,7 +61,9 @@ value comes in the bags. -->
         </span>
       </button>
       {#if row.facts !== undefined}
-        <div class="mb-base ml-[calc(var(--spacing-base)+8ch)] border-l border-edge-panel pl-base text-note">
+        <div
+          class="mb-base ml-[calc(var(--spacing-base)+8ch)] border-l border-edge-panel pl-base text-note"
+        >
           <dl class="grid grid-cols-[8ch_minmax(0,1fr)] gap-x-base text-text-quiet">
             <dt class="text-text-faint">{look.labels.oid}</dt>
             <dd class="figure truncate">{row.facts.oid}</dd>
@@ -62,7 +74,9 @@ value comes in the bags. -->
             <dt class="text-text-faint">{look.labels.parents}</dt>
             <dd class="figure truncate">{row.facts.parents}</dd>
             <dt class="text-text-faint">{look.labels.at}</dt>
-            <dd class="figure truncate"><time datetime={row.facts.at.iso}>{row.facts.at.text}</time></dd>
+            <dd class="figure truncate">
+              <time datetime={row.facts.at.iso}>{row.facts.at.text}</time>
+            </dd>
           </dl>
         </div>
       {/if}
@@ -70,5 +84,7 @@ value comes in the bags. -->
   {/each}
 </ol>
 {#if look.more !== undefined}
-  <a class="block py-snug text-note text-accent hover:text-accent-hover" href={look.more.href}>{look.more.word}</a>
+  <a class="block py-snug text-note text-accent hover:text-accent-hover" href={look.more.href}
+    >{look.more.word}</a
+  >
 {/if}

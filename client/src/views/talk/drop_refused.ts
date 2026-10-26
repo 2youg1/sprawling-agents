@@ -23,7 +23,10 @@ export interface DropRefusedLook {
 export function lookOf(refused: readonly Refused[], lang: Lang): DropRefusedLook {
   return {
     lines: refused.map((each) =>
-      fill(say(lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say(lang, "talk_not_live") : each.said }),
+      fill(say(lang, "talk_drop_refused"), {
+        name: each.name,
+        why: each.said === "" ? say(lang, "talk_not_live") : each.said,
+      }),
     ),
     wire: { role: "alert" },
   };

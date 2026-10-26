@@ -39,18 +39,26 @@
   const REGISTERED: Readonly<Record<string, Pick<Call, "effect" | "render">>> = {
     read: { effect: "read", render: "generic" },
     search: { effect: "read", render: "generic" },
-    edit: { effect: { write: { domain: Address.make("release") } }, render: { diff: { locations: [] } } },
+    edit: {
+      effect: { write: { domain: Address.make("release") } },
+      render: { diff: { locations: [] } },
+    },
     exec: { effect: "egress", render: "terminal" },
   };
 
-  function call(
-    at: number,
-    tool: string,
-    subject: string | null,
-    output: Output | null,
-  ): Call {
+  function call(at: number, tool: string, subject: string | null, output: Output | null): Call {
     const t = TimeMs.make(at);
-    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t, timing: "measured", ...REGISTERED[tool] };
+    return {
+      at: Seq.make(at),
+      outcome: "answered",
+      output,
+      subject,
+      tool,
+      called: t,
+      answered: t,
+      timing: "measured",
+      ...REGISTERED[tool],
+    };
   }
 
   // The turn one fixture's calls live in, carrying those same calls:
@@ -58,7 +66,14 @@
   // a turn describing different work would be a second answer to what
   // this run did.
   function turnOf(number: number, calls: readonly Call[]): Turn {
-    return { calls, notes: [], number, opened: Seq.make(number), t: TimeMs.make(number), timing: "measured" };
+    return {
+      calls,
+      notes: [],
+      number,
+      opened: Seq.make(number),
+      t: TimeMs.make(number),
+      timing: "measured",
+    };
   }
 
   // One command and nothing else, which is the shortest sentence the
@@ -72,7 +87,10 @@
   const GIVEN: readonly Call[] = [
     {
       ...call(1, "edit", "city/hall/PLAN.md", said("1 file changed\n", 0)),
-      arguments: said('{"file_path": "city/hall/PLAN.md", "old_string": "- [ ] gate", "new_string": "- [x] gate"', 212),
+      arguments: said(
+        '{"file_path": "city/hall/PLAN.md", "old_string": "- [ ] gate", "new_string": "- [x] gate"',
+        212,
+      ),
     },
   ];
 
@@ -158,19 +176,43 @@ const HIDDEN: usize = 0;
 {/snippet}
 
 <Case label="calls · one command">
-  <Calls calls={ONE_COMMAND} run={RUN} turn={turnOf(3, ONE_COMMAND)} onFork={() => undefined} onHover={() => undefined} />
+  <Calls
+    calls={ONE_COMMAND}
+    run={RUN}
+    turn={turnOf(3, ONE_COMMAND)}
+    onFork={() => undefined}
+    onHover={() => undefined}
+  />
 </Case>
 
 <Case label="calls · a write and what it was given">
-  <Calls calls={GIVEN} run={RUN} turn={turnOf(3, GIVEN)} onFork={() => undefined} onHover={() => undefined} />
+  <Calls
+    calls={GIVEN}
+    run={RUN}
+    turn={turnOf(3, GIVEN)}
+    onFork={() => undefined}
+    onHover={() => undefined}
+  />
 </Case>
 
 <Case label="calls · explored, wrote and ran">
-  <Calls calls={A_WAVE} run={RUN} turn={turnOf(3, A_WAVE)} onFork={() => undefined} onHover={() => undefined} />
+  <Calls
+    calls={A_WAVE}
+    run={RUN}
+    turn={turnOf(3, A_WAVE)}
+    onFork={() => undefined}
+    onHover={() => undefined}
+  />
 </Case>
 
 <Case label="calls · a class of work the fold has no verb for">
-  <Calls calls={NO_VERB} run={RUN} turn={turnOf(3, NO_VERB)} onFork={() => undefined} onHover={() => undefined} />
+  <Calls
+    calls={NO_VERB}
+    run={RUN}
+    turn={turnOf(3, NO_VERB)}
+    onFork={() => undefined}
+    onHover={() => undefined}
+  />
 </Case>
 
 <Case label="code · line numbers and a trail that wraps">

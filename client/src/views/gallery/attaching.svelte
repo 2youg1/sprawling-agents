@@ -39,7 +39,10 @@
     chosen: [],
     endpoints: ENDPOINTS.endpoints.map((endpoint, at) =>
       at === 0
-        ? { ...endpoint, base_url: "https://gateway.example.invalid/tenants/house-of-many-models/openai/v1" }
+        ? {
+            ...endpoint,
+            base_url: "https://gateway.example.invalid/tenants/house-of-many-models/openai/v1",
+          }
         : { ...endpoint, models: [] },
     ),
   };
@@ -99,6 +102,8 @@
   <TableLook {...typedLook} />
 </Case>
 
-<Case label="models · what the city will register: a figure and its rung, the provider's default, unknown, and an id named by hand">
+<Case
+  label="models · what the city will register: a figure and its rung, the provider's default, unknown, and an id named by hand"
+>
   <TableLook {...answeredLook} />
 </Case>

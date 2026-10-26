@@ -36,9 +36,12 @@
   const power = cornerPower(document.documentElement);
 
   const look = $derived(
-    lookOf({ city, picked, runsIn: (addr) => heldWithin($belief, addr), lang: $lang, power }, (addr) => {
-      onPick(addr);
-    }),
+    lookOf(
+      { city, picked, runsIn: (addr) => heldWithin($belief, addr), lang: $lang, power },
+      (addr) => {
+        onPick(addr);
+      },
+    ),
   );
 </script>
 

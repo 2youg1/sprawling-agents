@@ -35,9 +35,14 @@ describe("positionsOf", () => {
   // the character's start rather than splitting it.
   test("falls back to a character's start from inside it", () => {
     const at = positionsOf(V, "utf8", "a😀b");
-    expect([at.bytes(1), at.bytes(2), at.bytes(3), at.editorAt(3), at.editorAt(5), at.place(3)]).toEqual([
-      1, 1, 5, 1, 3, { line: 1, column: 3 },
-    ]);
+    expect([
+      at.bytes(1),
+      at.bytes(2),
+      at.bytes(3),
+      at.editorAt(3),
+      at.editorAt(5),
+      at.place(3),
+    ]).toEqual([1, 1, 5, 1, 3, { line: 1, column: 3 }]);
   });
 
   test("folds the mark and every line break the way the editor reads them, and unfolds them in bytes", () => {
@@ -57,9 +62,15 @@ describe("positionsOf", () => {
 
   test("counts two bytes for each UTF-16 code unit", () => {
     const at = positionsOf(V, "utf16_le", "\uFEFFab\n😀");
-    expect([at.editor, at.bytes(0), at.bytes(2), at.bytes(3), at.bytes(5), at.editorAt(12), at.editorAt(9)]).toEqual([
-      "ab\n😀", 2, 6, 8, 12, 5, 3,
-    ]);
+    expect([
+      at.editor,
+      at.bytes(0),
+      at.bytes(2),
+      at.bytes(3),
+      at.bytes(5),
+      at.editorAt(12),
+      at.editorAt(9),
+    ]).toEqual(["ab\n😀", 2, 6, 8, 12, 5, 3]);
   });
 
   // The checkpoints are a shortcut and must answer what a walk from the

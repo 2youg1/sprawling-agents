@@ -38,14 +38,20 @@ test("a lagged range pending at a reconnect invalidates what its records touch",
       return AskId.make(asked.length);
     },
     { apply: () => null, refused: () => undefined, forget: () => undefined },
-    { invalidate: (each) => invalidated.push(each), reconnected: () => undefined, resumed: () => undefined },
+    {
+      invalidate: (each) => invalidated.push(each),
+      reconnected: () => undefined,
+      resumed: () => undefined,
+    },
     "en",
   );
   walk.welcomed("epoch", null);
   walk.fold(record(10));
   walk.lagged(Seq.make(11), Seq.make(20));
   walk.welcomed("epoch", Seq.make(30));
-  const page = Schema.decodeUnknownSync(AskOutcome)({ answer: { history_range: { from: 11, to: 20, records: [record(12)] } } });
+  const page = Schema.decodeUnknownSync(AskOutcome)({
+    answer: { history_range: { from: 11, to: 20, records: [record(12)] } },
+  });
 
   expect(walk.answered(AskId.make(asked.length), page)).toBe(true);
   expect(invalidated).toEqual([record(12)]);

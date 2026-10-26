@@ -44,7 +44,16 @@
   import Unanswered from "./parts/unanswered.svelte";
   import { outstanding } from "./setup/dependencies";
   import type { Configured } from "./welcome/guide";
-  import { STEPS, advanced, currentOf, left, opened, putOff, skipAll, standingOf } from "./welcome/guide";
+  import {
+    STEPS,
+    advanced,
+    currentOf,
+    left,
+    opened,
+    putOff,
+    skipAll,
+    standingOf,
+  } from "./welcome/guide";
   import Body from "./welcome/body.svelte";
   import { ABOUT, bodyId, stepLookOf } from "./welcome/step";
   import Step from "./welcome/step.look.svelte";
@@ -73,11 +82,14 @@
   const guide = u.conn.asking.ask(QUERIES.guide);
 
   const configured = $derived.by((): Configured => {
-    const chosen = $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.chosen : null;
-    const missing = $doctor !== undefined && "doctor" in $doctor ? outstanding($doctor.doctor, "use") : null;
-    const stated = $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
-      ? $identity.identity.stated
-      : null;
+    const chosen =
+      $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.chosen : null;
+    const missing =
+      $doctor !== undefined && "doctor" in $doctor ? outstanding($doctor.doctor, "use") : null;
+    const stated =
+      $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
+        ? $identity.identity.stated
+        : null;
     return {
       provider: chosen === null ? null : chosen.some((each) => each.tag === "main"),
       dependencies: missing === null ? null : missing.length === 0,

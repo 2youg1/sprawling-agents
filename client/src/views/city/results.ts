@@ -77,9 +77,15 @@ function rowOf(run: RunBelief, lang: Lang): ResultRowLook {
 function tailOf(run: RunBelief, outcome: Outcome | null, lang: Lang): Tail {
   switch (outcome) {
     case "done":
-      return { kind: "produced", run: run.run, pr: run.pr === null ? null : fill(say(lang, "results_row_pr"), { pr: run.pr }) };
+      return {
+        kind: "produced",
+        run: run.run,
+        pr: run.pr === null ? null : fill(say(lang, "results_row_pr"), { pr: run.pr }),
+      };
     case "waiting":
-      return run.ask === null ? { kind: "none" } : { kind: "asks", text: fill(say(lang, "results_row_ask"), { ask: run.ask }) };
+      return run.ask === null
+        ? { kind: "none" }
+        : { kind: "asks", text: fill(say(lang, "results_row_ask"), { ask: run.ask }) };
     case "failed":
       return run.doing.kind === "frozen" && run.doing.completion !== null
         ? { kind: "stopped", text: run.doing.completion }

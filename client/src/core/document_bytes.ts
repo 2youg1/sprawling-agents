@@ -49,12 +49,18 @@ export function joinedBytes(at: Fetching, answer: BytesAnswer): Fetching {
   if (answer.version !== at.version || answer.span.start !== at.through) return at;
   const bytes = decoded(answer.base64);
   if (bytes?.length !== answer.span.end - answer.span.start) return at;
-  return { version: at.version, size: answer.size, through: answer.span.end, parts: [...at.parts, bytes] };
+  return {
+    version: at.version,
+    size: answer.size,
+    through: answer.span.end,
+    parts: [...at.parts, bytes],
+  };
 }
 
 export function fetchedOf(at: Fetching): Fetched {
   if (at.size !== null && at.size > DRAWN_BYTES_MAX) return { kind: "too_large", size: at.size };
-  if (at.size === null || at.through < at.size) return { kind: "fetching", through: at.through, size: at.size };
+  if (at.size === null || at.through < at.size)
+    return { kind: "fetching", through: at.through, size: at.size };
   const whole = new Uint8Array(at.through);
   let offset = 0;
   for (const part of at.parts) {

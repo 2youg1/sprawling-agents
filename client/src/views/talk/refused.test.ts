@@ -33,7 +33,11 @@ const BUSY: AxError = {
   subject: "shop/main",
 };
 
-const SETTINGS: Way = { kind: "link", text: "open model settings", href: toFragment({ kind: "setup" }) };
+const SETTINGS: Way = {
+  kind: "link",
+  text: "open model settings",
+  href: toFragment({ kind: "setup" }),
+};
 
 describe("a refusal a turn came to", () => {
   test("a failed model call says its kind and folds the city's sentence, with the settings as the way out", () => {
@@ -74,7 +78,10 @@ describe("a message that got no reply", () => {
       after: undefined,
       lines: [
         { text: "E_WORKTREE_BUSY · shop/main", ink: "quiet" },
-        { text: "Wait for the other run working in this tree to finish, then try again.", ink: "faint" },
+        {
+          text: "Wait for the other run working in this tree to finish, then try again.",
+          ink: "faint",
+        },
       ],
       fold: { summary: "the city's own words", text: "another run holds this worktree" },
       ways: [{ kind: "press", label: "send again", onPress: retry }],
@@ -82,14 +89,21 @@ describe("a message that got no reply", () => {
   });
 
   test("folds nothing when the city's sentence is the next step, and a caller's settings answer wins", () => {
-    const said: AxError = { ...BUSY, recovery: "Wait for the other run working in this tree to finish, then try again." };
+    const said: AxError = {
+      ...BUSY,
+      recovery: "Wait for the other run working in this tree to finish, then try again.",
+    };
     const look = failedLook("en", "no reply", said, { settings: "offered", onRetry: undefined });
     expect([look.fold, look.ways]).toEqual([undefined, [SETTINGS]]);
-    expect(failedLook("en", "no reply", OVERFLOW, { settings: "absent", onRetry: undefined }).ways).toEqual([]);
+    expect(
+      failedLook("en", "no reply", OVERFLOW, { settings: "absent", onRetry: undefined }).ways,
+    ).toEqual([]);
   });
 
   test("with no refusal says only what happened", () => {
-    expect(failedLook("en", "no reply", undefined, { settings: "decided", onRetry: undefined })).toEqual({
+    expect(
+      failedLook("en", "no reply", undefined, { settings: "decided", onRetry: undefined }),
+    ).toEqual({
       role: "alert",
       head: "no reply",
       after: undefined,
@@ -107,6 +121,12 @@ test("a record that did not read back leads to the Ledger", () => {
     after: "an unknown frame",
     lines: [],
     fold: undefined,
-    ways: [{ kind: "link", text: "read it in the Ledger", href: toFragment({ kind: "record", lens: "ledger" }) }],
+    ways: [
+      {
+        kind: "link",
+        text: "read it in the Ledger",
+        href: toFragment({ kind: "record", lens: "ledger" }),
+      },
+    ],
   });
 });

@@ -89,38 +89,74 @@ export function positionsOf(version: B3Hash, encoding: Encoding, text: string): 
   const width = (code: number): number => (wide ? (code > 0xffff ? 4 : 2) : utf8Width(code));
   const step = (offset: number): Step => {
     const code = text.codePointAt(offset) ?? 0;
-    if (code === CR && text.charCodeAt(offset + 1) === LF) return { units: 2, editor: 1, bytes: width(CR) * 2 };
+    if (code === CR && text.charCodeAt(offset + 1) === LF)
+      return { units: 2, editor: 1, bytes: width(CR) * 2 };
     const units = code > 0xffff ? 2 : 1;
     return { units, editor: units, bytes: width(code) };
   };
-  const first: Checkpoint = { position: 0, offset: marked ? 1 : 0, byte: marked ? width(MARK) : 0, line: 1 };
+  const first: Checkpoint = {
+    position: 0,
+    offset: marked ? 1 : 0,
+    byte: marked ? width(MARK) : 0,
+    line: 1,
+  };
   const walk = checkpoints(text, first, step);
   const editor = text.slice(first.offset).replace(/\r\n?/gu, "\n");
   // Walks on from a checkpoint until the next character would pass what
   // `passes` asks for. The walk stops on a character's start, which is
   // what puts a position or a byte inside a character at its start.
-  const walked = (from: Checkpoint, passes: (at: Checkpoint, next: Step) => boolean): Checkpoint => {
+  const walked = (
+    from: Checkpoint,
+    passes: (at: Checkpoint, next: Step) => boolean,
+  ): Checkpoint => {
     let at = from;
-    for (let next = step(at.offset); at.offset < text.length && !passes(at, next); next = step(at.offset)) {
-      at = { position: at.position + next.editor, offset: at.offset + next.units, byte: at.byte + next.bytes, line: at.line };
+    for (
+      let next = step(at.offset);
+      at.offset < text.length && !passes(at, next);
+      next = step(at.offset)
+    ) {
+      at = {
+        position: at.position + next.editor,
+        offset: at.offset + next.units,
+        byte: at.byte + next.bytes,
+        line: at.line,
+      };
     }
     return at;
   };
   const bytes = (target: number): number =>
-    walked(nearest(walk, (each) => each.position <= target), (at, next) => at.position + next.editor > target).byte;
+    walked(
+      nearest(walk, (each) => each.position <= target),
+      (at, next) => at.position + next.editor > target,
+    ).byte;
   const editorAt = (byte: number): number =>
-    walked(nearest(walk, (each) => each.byte <= byte), (at, next) => at.byte + next.bytes > byte).position;
+    walked(
+      nearest(walk, (each) => each.byte <= byte),
+      (at, next) => at.byte + next.bytes > byte,
+    ).position;
   const place = (target: number): Place => {
     const at = Math.min(Math.max(target, 0), editor.length);
     const from = nearest(walk, (each) => each.position <= at);
     let line = from.line;
-    for (let index = editor.indexOf("\n", from.position); index >= 0 && index < at; index = editor.indexOf("\n", index + 1)) {
+    for (
+      let index = editor.indexOf("\n", from.position);
+      index >= 0 && index < at;
+      index = editor.indexOf("\n", index + 1)
+    ) {
       line += 1;
     }
     const head = editor.slice(editor.lastIndexOf("\n", at - 1) + 1, at);
     return { line, column: head.length - (head.match(ASTRAL)?.length ?? 0) + 1 };
   };
-  return { version, encoding, editor, lineBreak: /\r\n?|\n/u.exec(text)?.[0] ?? "\n", bytes, editorAt, place };
+  return {
+    version,
+    encoding,
+    editor,
+    lineBreak: /\r\n?|\n/u.exec(text)?.[0] ?? "\n",
+    bytes,
+    editorAt,
+    place,
+  };
 }
 
 // Each change written as the baseline's bytes and the text that takes
@@ -130,7 +166,10 @@ export function positionsOf(version: B3Hash, encoding: Encoding, text: string): 
 export function textEdits(positions: Positions, changes: readonly EditorChange[]): TextEdit[] {
   return changes.map((change) => ({
     span: { start: positions.bytes(change.from), end: positions.bytes(change.to) },
-    text: positions.lineBreak === "\n" ? change.insert : change.insert.replaceAll("\n", positions.lineBreak),
+    text:
+      positions.lineBreak === "\n"
+        ? change.insert
+        : change.insert.replaceAll("\n", positions.lineBreak),
   }));
 }
 
@@ -150,13 +189,23 @@ export function utf16At(text: string, byte: number): number {
   return at;
 }
 
-function checkpoints(text: string, first: Checkpoint, step: (offset: number) => Step): readonly Checkpoint[] {
+function checkpoints(
+  text: string,
+  first: Checkpoint,
+  step: (offset: number) => Step,
+): readonly Checkpoint[] {
   const kept = [first];
   let at = first;
   while (at.offset < text.length) {
     const next = step(at.offset);
-    const line = at.line + (text.charCodeAt(at.offset) === CR || text.charCodeAt(at.offset) === LF ? 1 : 0);
-    const moved = { position: at.position + next.editor, offset: at.offset + next.units, byte: at.byte + next.bytes, line };
+    const line =
+      at.line + (text.charCodeAt(at.offset) === CR || text.charCodeAt(at.offset) === LF ? 1 : 0);
+    const moved = {
+      position: at.position + next.editor,
+      offset: at.offset + next.units,
+      byte: at.byte + next.bytes,
+      line,
+    };
     if (Math.floor(moved.position / STRIDE) > Math.floor(at.position / STRIDE)) kept.push(moved);
     at = moved;
   }

@@ -32,7 +32,11 @@ function record(): { readonly hands: ChordHands; readonly heard: Heard } {
   };
 }
 
-function press(heard: Heard, key: string, held: Partial<Omit<ChordPress, "key" | "preventDefault">> = {}): ChordPress {
+function press(
+  heard: Heard,
+  key: string,
+  held: Partial<Omit<ChordPress, "key" | "preventDefault">> = {},
+): ChordPress {
   return {
     key,
     ctrlKey: held.ctrlKey ?? false,
@@ -44,7 +48,13 @@ function press(heard: Heard, key: string, held: Partial<Omit<ChordPress, "key" |
   };
 }
 
-const PROPS = { action: ACTION, spelled: "accel+k", prompt: "press a chord", unbound: "no shortcut", tip: "change" } as const;
+const PROPS = {
+  action: ACTION,
+  spelled: "accel+k",
+  prompt: "press a chord",
+  unbound: "no shortcut",
+  tip: "change",
+} as const;
 
 describe("chordOf", () => {
   test("a click starts listening and a blur stops it", () => {
@@ -57,13 +67,17 @@ describe("chordOf", () => {
 
   test("while it does not listen, every key is the page's", () => {
     const { hands, heard } = record();
-    chordOf({ ...PROPS, listening: false }, hands).wire.onkeydown(press(heard, "k", { ctrlKey: true }));
+    chordOf({ ...PROPS, listening: false }, hands).wire.onkeydown(
+      press(heard, "k", { ctrlKey: true }),
+    );
     expect(heard).toEqual({ listen: [], bound: [], prevented: 0 });
   });
 
   test("a modifier alone keeps it listening and is not taken from the page", () => {
     const { hands, heard } = record();
-    chordOf({ ...PROPS, listening: true }, hands).wire.onkeydown(press(heard, "Shift", { shiftKey: true }));
+    chordOf({ ...PROPS, listening: true }, hands).wire.onkeydown(
+      press(heard, "Shift", { shiftKey: true }),
+    );
     expect(heard).toEqual({ listen: [], bound: [], prevented: 0 });
   });
 
@@ -86,7 +100,9 @@ describe("chordOf", () => {
 
   test("a chord without the accelerator drops Shift, which the character already says", () => {
     const { hands, heard } = record();
-    chordOf({ ...PROPS, listening: true }, hands).wire.onkeydown(press(heard, "?", { shiftKey: true }));
+    chordOf({ ...PROPS, listening: true }, hands).wire.onkeydown(
+      press(heard, "?", { shiftKey: true }),
+    );
     expect(heard.bound).toEqual([[ACTION, { accel: false, shift: false, key: "?" }]]);
   });
 

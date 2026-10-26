@@ -32,14 +32,19 @@
 <Case label="badge · counts on a key's corner: a few, past the cap, and new without a number">
   <div class="flex flex-wrap items-center gap-wide">
     {#each [3, 120] as count (count)}
-      <span class="relative inline-flex size-key items-center justify-center rounded-key bg-raised text-text-quiet">
+      <span
+        class="relative inline-flex size-key items-center justify-center rounded-key bg-raised text-text-quiet"
+      >
         <Glyph name="inbox" size="key" />
         <span class="absolute -top-tight -right-tight"><Badge {count} /></span>
       </span>
     {/each}
-    <span class="relative inline-flex size-key items-center justify-center rounded-key bg-raised text-text-quiet">
+    <span
+      class="relative inline-flex size-key items-center justify-center rounded-key bg-raised text-text-quiet"
+    >
       <Glyph name="inbox" size="key" />
-      <span class="absolute top-tight right-tight flex"><Badge count="fresh" weight="quiet" /></span>
+      <span class="absolute top-tight right-tight flex"><Badge count="fresh" weight="quiet" /></span
+      >
     </span>
   </div>
 </Case>

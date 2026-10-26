@@ -39,12 +39,23 @@
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
-  import { closePalette, paletteArrival, paletteShown, togglePalette } from "./views/palette_door.svelte";
+  import {
+    closePalette,
+    paletteArrival,
+    paletteShown,
+    togglePalette,
+  } from "./views/palette_door.svelte";
   import Quit from "./views/quit.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
   import SettingsPanel from "./views/settings/panel.svelte";
-  import { closePanel, hostSettled, panelBeneath, panelGroup, pickGroup } from "./views/settings/hosted.svelte";
+  import {
+    closePanel,
+    hostSettled,
+    panelBeneath,
+    panelGroup,
+    pickGroup,
+  } from "./views/settings/hosted.svelte";
   import { followViewport, watchColumns, type Columns } from "./views/shared/frame";
   import { motionOff } from "./views/shared/motion";
   import { launchOf, opensGuide } from "./views/welcome/guide";
@@ -92,7 +103,11 @@
   const waiting = $derived($approvals?.length ?? 0);
   const working = $derived($belief.live.length > 0);
   // What a launch reads to decide whether it opens the guide (client D54).
-  const launch = $derived($endpoints !== undefined && "endpoints" in $endpoints ? launchOf($endpoints.endpoints, $held.welcomed) : undefined);
+  const launch = $derived(
+    $endpoints !== undefined && "endpoints" in $endpoints
+      ? launchOf($endpoints.endpoints, $held.welcomed)
+      : undefined,
+  );
 
   // The box a person writes in, wherever the page put it. Reached by the
   // element it is rather than by a name this file would have to keep in
@@ -121,7 +136,11 @@
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
     const back = hostSettled(was, view, arrived);
-    if (was.kind === "talk" && view.kind === "talk" && (was.address !== view.address || was.session !== view.session)) {
+    if (
+      was.kind === "talk" &&
+      view.kind === "talk" &&
+      (was.address !== view.address || was.session !== view.session)
+    ) {
       markStart("session_switch");
       markEndAtFrame("session_switch");
     }
@@ -130,7 +149,11 @@
       tierOnLanding = null;
       markEndAtFrame("layer_drawn");
       void tick().then(focusComposer);
-    } else if (arrived && view.kind !== "setup") void tick().then(() => { if (back === null) focusTitle(); else back.focus(); });
+    } else if (arrived && view.kind !== "setup")
+      void tick().then(() => {
+        if (back === null) focusTitle();
+        else back.focus();
+      });
     arrived = true;
   }
 
@@ -142,8 +165,12 @@
   function follow(): void {
     // The panel has its own CSS arrival; a document transition would
     // delay its close and can overlap the next group navigation.
-    if (view.kind === "setup" || Option.getOrElse(current(u.bar), () => DEFAULT_VIEW).kind === "setup"
-      || !("startViewTransition" in document) || motionOff(document.documentElement)) {
+    if (
+      view.kind === "setup" ||
+      Option.getOrElse(current(u.bar), () => DEFAULT_VIEW).kind === "setup" ||
+      !("startViewTransition" in document) ||
+      motionOff(document.documentElement)
+    ) {
       settle();
       return;
     }
@@ -180,10 +207,22 @@
       return;
     }
     tierOnLanding = next;
-    (view.kind === "setup" && panelBeneath().kind === "talk" ? closePanel : () => { u.go(DEFAULT_VIEW); })();
+    (view.kind === "setup" && panelBeneath().kind === "talk"
+      ? closePanel
+      : () => {
+          u.go(DEFAULT_VIEW);
+        })();
   }
   let peeking = $state(false);
-  const tier = $derived(columns === "one" ? (peeking || sheetsOpen().includes("world") ? "panorama" : "zen") : peeking ? "blend" : $held.tier);
+  const tier = $derived(
+    columns === "one"
+      ? peeking || sheetsOpen().includes("world")
+        ? "panorama"
+        : "zen"
+      : peeking
+        ? "blend"
+        : $held.tier,
+  );
 
   // How many times the mailbox chord asked; the mailbox answers each one.
   let mailboxAsked = $state(0);
@@ -293,7 +332,9 @@
     const accel = event.ctrlKey || event.metaKey;
     // The accelerator alone, held, draws every key's name; any other key
     // with it, or an input method's composition, is a chord and not a look.
-    expose((event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat);
+    expose(
+      (event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat,
+    );
     if (event.key === "Escape") {
       if (paletteShown()) closePalette();
       else if (sheetOpen) closeSheet();
@@ -347,8 +388,10 @@
 <Notifier {view} />
 <div
   {@attach (frame: HTMLElement) => watchColumns(frame, (next) => (columns = next))}
-  {@attach (frame: HTMLElement) => (window.visualViewport === null ? undefined : followViewport(frame, window.visualViewport))}
-  class="frame visual-viewport relative overflow-x-clip bg-page font-sans text-body text-text">
+  {@attach (frame: HTMLElement) =>
+    window.visualViewport === null ? undefined : followViewport(frame, window.visualViewport)}
+  class="frame visual-viewport relative overflow-x-clip bg-page font-sans text-body text-text"
+>
   <a
     href="#main"
     class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-(--layer-skip-link) focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"

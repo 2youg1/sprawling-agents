@@ -15,8 +15,31 @@
   //
   // The moments are fixed rather than read off the clock, so a picture
   // of this route compares with yesterday's.
-  import type { Answer, BuildingAnswer, CityAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits, SkillsAnswer } from "../../wire";
-  import { Address, B3Hash, ContainerImage, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
+  import type {
+    Answer,
+    BuildingAnswer,
+    CityAnswer,
+    CommitAnswer,
+    Entry,
+    GitStatusAnswer,
+    Query,
+    SandboxLimits,
+    SkillsAnswer,
+  } from "../../wire";
+  import {
+    Address,
+    B3Hash,
+    ContainerImage,
+    EnvVarName,
+    GitOid,
+    NodeId,
+    RunId,
+    Seq,
+    ServerLabel,
+    SessionName,
+    TimeMs,
+    UsdMicros,
+  } from "../../wire";
 
   const LAB = Address.make("lab");
   const HALL = Address.make("hall");
@@ -34,7 +57,12 @@
     return RunId.make(`${seed.repeat(8).slice(0, 8)}-0000-4000-8000-000000000000`);
   }
 
-  function commit(n: number, message: string | null, actor: string, parents: readonly GitOid[]): CommitAnswer {
+  function commit(
+    n: number,
+    message: string | null,
+    actor: string,
+    parents: readonly GitOid[],
+  ): CommitAnswer {
     return {
       actor: Address.make(actor),
       at: TimeMs.make(AT - n * 3_600_000),
@@ -52,7 +80,12 @@
   }
 
   // The newest commit, which the opened-row case opens.
-  const NEWEST = commit(1, "parser: read unicode escapes in string literals\n\nThe lexer took \\u as two characters.", "lab/parser", [oid("2")]);
+  const NEWEST = commit(
+    1,
+    "parser: read unicode escapes in string literals\n\nThe lexer took \\u as two characters.",
+    "lab/parser",
+    [oid("2")],
+  );
 
   export const COMMITS: readonly CommitAnswer[] = [
     NEWEST,
@@ -69,7 +102,11 @@
     files: [
       { how: "modified", lines: { counted: { added: 14, removed: 3 } }, path: "src/lexer.rs" },
       { how: "added", lines: { counted: { added: 41, removed: 0 } }, path: "tests/escapes.rs" },
-      { how: { renamed: { from: "docs/old.md" } }, lines: { counted: { added: 0, removed: 0 } }, path: "docs/escapes.md" },
+      {
+        how: { renamed: { from: "docs/old.md" } },
+        lines: { counted: { added: 0, removed: 0 } },
+        path: "docs/escapes.md",
+      },
       { how: "deleted", lines: "binary", path: "assets/logo.png" },
     ],
   };
@@ -97,14 +134,52 @@
   const BUILDING: BuildingAnswer = {
     addr: LAB,
     archive: [],
-    blocked: [{ line: "waiting on a reviewer for the escape table", source: NodeId.make("2.1"), waiting: 1 }],
+    blocked: [
+      {
+        line: "waiting on a reviewer for the escape table",
+        source: NodeId.make("2.1"),
+        waiting: 1,
+      },
+    ],
     docs: [],
     mcp: [],
     plan: [
-      { item: "Read unicode escapes", leaf: false, needs: [], node: NodeId.make("1"), ready: false, share_ppb: 500_000_000, status: "in_progress" },
-      { item: "Lexer takes \\u{...}", leaf: true, needs: [], node: NodeId.make("1.1"), ready: false, share_ppb: 250_000_000, status: "done" },
-      { item: "Table of escapes in the docs", leaf: true, needs: [NodeId.make("1.1")], node: NodeId.make("1.2"), ready: true, share_ppb: 250_000_000, status: "not_started" },
-      { item: "Review the escape table", leaf: true, needs: [NodeId.make("1")], node: NodeId.make("2.1"), ready: false, share_ppb: 0, status: "blocked" },
+      {
+        item: "Read unicode escapes",
+        leaf: false,
+        needs: [],
+        node: NodeId.make("1"),
+        ready: false,
+        share_ppb: 500_000_000,
+        status: "in_progress",
+      },
+      {
+        item: "Lexer takes \\u{...}",
+        leaf: true,
+        needs: [],
+        node: NodeId.make("1.1"),
+        ready: false,
+        share_ppb: 250_000_000,
+        status: "done",
+      },
+      {
+        item: "Table of escapes in the docs",
+        leaf: true,
+        needs: [NodeId.make("1.1")],
+        node: NodeId.make("1.2"),
+        ready: true,
+        share_ppb: 250_000_000,
+        status: "not_started",
+      },
+      {
+        item: "Review the escape table",
+        leaf: true,
+        needs: [NodeId.make("1")],
+        node: NodeId.make("2.1"),
+        ready: false,
+        share_ppb: 0,
+        status: "blocked",
+      },
     ],
     problems: [],
     progress: { planned: { blocked: 1, blocked_ppb: 0, done: 1, done_ppb: 250_000_000, total: 3 } },
@@ -119,9 +194,30 @@
     pursuits: [],
     runs: [],
     buildings: [
-      { addr: Address.make("hall"), adoptable: false, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
-      { addr: LAB, adoptable: false, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
-      { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
+      {
+        addr: Address.make("hall"),
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: BUILDING.progress,
+        ready: 0,
+      },
+      {
+        addr: LAB,
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: BUILDING.progress,
+        ready: 0,
+      },
+      {
+        addr: Address.make("notes"),
+        adoptable: true,
+        blocked: [],
+        problems: [],
+        progress: BUILDING.progress,
+        ready: 0,
+      },
     ],
   };
 
@@ -149,8 +245,24 @@
     building: LAB,
     missing: [],
     skills: [
-      { admitted: true, disclosure: "Read a Rust lexer's escape table", hash: B3Hash.make("1".repeat(64)), name: "escapes", pinned_by: [run("a")], section: "", shelf: { building: Address.make("lab/skills/escapes/SKILL.md") } },
-      { admitted: false, disclosure: "Format a release note", hash: B3Hash.make("2".repeat(64)), name: "notes", pinned_by: [], section: "", shelf: { external: { index: 1, path: "notes/SKILL.md" } } },
+      {
+        admitted: true,
+        disclosure: "Read a Rust lexer's escape table",
+        hash: B3Hash.make("1".repeat(64)),
+        name: "escapes",
+        pinned_by: [run("a")],
+        section: "",
+        shelf: { building: Address.make("lab/skills/escapes/SKILL.md") },
+      },
+      {
+        admitted: false,
+        disclosure: "Format a release note",
+        hash: B3Hash.make("2".repeat(64)),
+        name: "notes",
+        pinned_by: [],
+        section: "",
+        shelf: { external: { index: 1, path: "notes/SKILL.md" } },
+      },
     ],
   };
 
@@ -168,20 +280,57 @@
   export function answers(query: Query): Answer | undefined {
     if (query === "city_view") return { city: WORKSPACES };
     if (typeof query === "string") return undefined;
-    if ("building_view" in query) return { building: { ...BUILDING, addr: query.building_view.addr } };
-    if ("commits" in query) return { commits: { building: LAB, before: null, commits: [...COMMITS], more: false } };
+    if ("building_view" in query)
+      return { building: { ...BUILDING, addr: query.building_view.addr } };
+    if ("commits" in query)
+      return { commits: { building: LAB, before: null, commits: [...COMMITS], more: false } };
     if ("git_status" in query) return { git_status: STATUS };
-    if ("changes" in query) return { changes: { base: query.changes.base, head: query.changes.head ?? null, files: STATUS.files.slice(0, 2) } };
+    if ("changes" in query)
+      return {
+        changes: {
+          base: query.changes.base,
+          head: query.changes.head ?? null,
+          files: STATUS.files.slice(0, 2),
+        },
+      };
     if ("commit" in query) {
       const held = COMMITS.find((each) => each.oid === query.commit.oid);
       return held === undefined ? { unavailable: { query: "commit" } } : { commit: held };
     }
-    if ("cost_of" in query) return { cost_of: { node: query.cost_of.node, spent: UsdMicros.make(312_000), runs: [[run("9"), UsdMicros.make(312_000)]] } };
+    if ("cost_of" in query)
+      return {
+        cost_of: {
+          node: query.cost_of.node,
+          spent: UsdMicros.make(312_000),
+          runs: [[run("9"), UsdMicros.make(312_000)]],
+        },
+      };
     if ("skills" in query) return { skills: SKILLS };
     if ("document" in query) {
-      return { document: { at: query.document.at, state: { held: { body: { text: { coverage: "whole", encoding: "utf8", head: { span: { start: 0, end: ROADMAP.length }, text: ROADMAP } } }, bytes: ROADMAP.length, format: "markdown", version: B3Hash.make("3".repeat(64)) } } } };
+      return {
+        document: {
+          at: query.document.at,
+          state: {
+            held: {
+              body: {
+                text: {
+                  coverage: "whole",
+                  encoding: "utf8",
+                  head: { span: { start: 0, end: ROADMAP.length }, text: ROADMAP },
+                },
+              },
+              bytes: ROADMAP.length,
+              format: "markdown",
+              version: B3Hash.make("3".repeat(64)),
+            },
+          },
+        },
+      };
     }
-    if ("listing" in query) return { listing: { at: query.listing.at ?? null, entries: [...listingOf(query.listing.at)] } };
+    if ("listing" in query)
+      return {
+        listing: { at: query.listing.at ?? null, entries: [...listingOf(query.listing.at)] },
+      };
     return undefined;
   }
 
@@ -230,7 +379,11 @@
     </ul>
   </Case>
   <Case label="building · the tree with a file picked" width={360}>
-    <Tree root={LAB} picked={{ at: Address.make("lab/Roadmap.md"), kind: "file" }} onPick={() => undefined} />
+    <Tree
+      root={LAB}
+      picked={{ at: Address.make("lab/Roadmap.md"), kind: "file" }}
+      onPick={() => undefined}
+    />
   </Case>
   <Case label="building · a spine file, its source key and its edit key" width={MIDDLE_WIDTH}>
     <FileView at={Address.make("lab/Roadmap.md")} root={LAB} />
@@ -242,7 +395,11 @@
     <Status building={LAB} />
   </Case>
   <Case label="building · the page with a changed file open on the right" width={PAGE_WIDTH}>
-    <Building address={LAB} rank="section" beside={[{ kind: "document", building: LAB, path: "Roadmap.md", version: null }]} />
+    <Building
+      address={LAB}
+      rank="section"
+      beside={[{ kind: "document", building: LAB, path: "Roadmap.md", version: null }]}
+    />
   </Case>
   <Case label="building · a commit asked for by its oid" width={MIDDLE_WIDTH}>
     <Whose oid={KNOWN_OID} />

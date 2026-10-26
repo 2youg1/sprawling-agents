@@ -28,8 +28,22 @@
   const V3 = B3Hash.make("1e9a54c7".repeat(8));
 
   // wording-ok: fixture text is a file's contents, not a page's words
-  const BRIEF = { latin: ["Quarterly brief", "Revenue rose in every region but one.", "The north fell behind its plan by six weeks."], chinese: [] };
-  const BRIEF_NEXT = { ...BRIEF, latin: ["Quarterly brief", "Revenue rose in every region.", "The north fell behind its plan by six weeks."] };
+  const BRIEF = {
+    latin: [
+      "Quarterly brief",
+      "Revenue rose in every region but one.",
+      "The north fell behind its plan by six weeks.",
+    ],
+    chinese: [],
+  };
+  const BRIEF_NEXT = {
+    ...BRIEF,
+    latin: [
+      "Quarterly brief",
+      "Revenue rose in every region.",
+      "The north fell behind its plan by six weeks.",
+    ],
+  };
   const NOTES = { latin: ["Notes"], chinese: ["中文排版：标点挤压与行首禁则。"] };
   const PDF_V1 = pdfOf([BRIEF, NOTES]);
   const PDF_V2 = pdfOf([BRIEF_NEXT, NOTES]);
@@ -44,7 +58,9 @@
     { text: "The client ships with the city", inserted: " and its fonts." },
     { text: "Every preview names its tool, its settings and its version." },
   ]);
-  const DOCX_LARGE = zipOf([{ name: "word/document.xml", bytes: utf8("<w:document/>"), stated: UNPACKED_MAX + 1 }]);
+  const DOCX_LARGE = zipOf([
+    { name: "word/document.xml", bytes: utf8("<w:document/>"), stated: UNPACKED_MAX + 1 },
+  ]);
 
   const HTML = [
     "<!doctype html>",
@@ -67,10 +83,18 @@
         version: V1,
         format: "plain",
         bytes: utf8(HTML).length,
-        body: { text: { encoding: "utf8", coverage: "whole", head: { span: { start: 0, end: utf8(HTML).length }, text: HTML } } },
+        body: {
+          text: {
+            encoding: "utf8",
+            coverage: "whole",
+            head: { span: { start: 0, end: utf8(HTML).length }, text: HTML },
+          },
+        },
       },
     },
-    [`shop/${REPORT}`]: { held: { version: V3, format: "plain", bytes: PDF_V2.length, body: "opaque" } },
+    [`shop/${REPORT}`]: {
+      held: { version: V3, format: "plain", bytes: PDF_V2.length, body: "opaque" },
+    },
   };
 
   function answering(query: Query): Answer | undefined {
@@ -106,28 +130,52 @@
   <Case label="formats · a PDF, its pages drawn by pdf.js, Chinese through a CMap" width={600}>
     <div class={FRAME}><Pdf bytes={PDF_V2} version={V2} name="brief.pdf" /></div>
   </Case>
-  <Case label="formats · a DOCX laid out as pages, its tracked change and comment counted" width={600}>
+  <Case
+    label="formats · a DOCX laid out as pages, its tracked change and comment counted"
+    width={600}
+  >
     <div class={FRAME}><Docx bytes={DOCX_V2} version={V2} name="plan.docx" /></div>
   </Case>
-  <Case label="formats · an HTML page in RefRain's preview, its script and outside picture held back" width={600}>
+  <Case
+    label="formats · an HTML page in RefRain's preview, its script and outside picture held back"
+    width={600}
+  >
     <div class={FRAME}>
-      <Document at={Address.make(`shop/${PAGE}`)} building={SHOP} version={null} reading="preview" />
+      <Document
+        at={Address.make(`shop/${PAGE}`)}
+        building={SHOP}
+        version={null}
+        reading="preview"
+      />
     </div>
   </Case>
   <Case label="formats · two versions of a PDF compared by the text of their pages" width={600}>
     <div class={FRAME}>
-      <Compare format="pdf" from={{ version: V1, bytes: PDF_V1 }} to={{ version: V2, bytes: PDF_V2 }} name="brief.pdf" />
+      <Compare
+        format="pdf"
+        from={{ version: V1, bytes: PDF_V1 }}
+        to={{ version: V2, bytes: PDF_V2 }}
+        name="brief.pdf"
+      />
     </div>
   </Case>
   <Case label="formats · two versions of a DOCX compared by their paragraphs" width={600}>
     <div class={FRAME}>
-      <Compare format="docx" from={{ version: V1, bytes: DOCX_V1 }} to={{ version: V2, bytes: DOCX_V2 }} name="plan.docx" />
+      <Compare
+        format="docx"
+        from={{ version: V1, bytes: DOCX_V1 }}
+        to={{ version: V2, bytes: DOCX_V2 }}
+        name="plan.docx"
+      />
     </div>
   </Case>
   <Case label="formats · the version picker above a PDF, compared with nothing" width={600}>
     <Against {...againstLookOf(EARLIER, null, $lang, ignore)} />
   </Case>
-  <Case label="formats · the version picker above a PDF, compared with an earlier version" width={600}>
+  <Case
+    label="formats · the version picker above a PDF, compared with an earlier version"
+    width={600}
+  >
     <Against {...againstLookOf(EARLIER, V1, $lang, ignore)} />
   </Case>
   <Case label="formats · a DOCX that unpacks past the bound, refused unopened" width={600}>

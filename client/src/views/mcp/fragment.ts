@@ -47,8 +47,7 @@ const readKeys = Schema.decodeUnknownResult(
 );
 
 export type Fragment =
-  | { readonly kind: "servers"; readonly drafts: readonly Draft[] }
-  | { readonly kind: "unreadable" };
+  { readonly kind: "servers"; readonly drafts: readonly Draft[] } | { readonly kind: "unreadable" };
 
 // Both shapes people paste: the whole settings file with its
 // `mcpServers` key, and the block alone.
@@ -97,7 +96,6 @@ function transportOf(entry: Entry): Transport {
     default:
       return entry.url === undefined ? "stdio" : "http";
   }
-
 }
 
 function paired(table: Readonly<Record<string, string>> | undefined): readonly Pair[] {

@@ -75,9 +75,15 @@
 
 <svelte:element
   this={seat === "page" ? "main" : "div"}
-  class={["flex items-center justify-center bg-page px-wide font-sans text-body text-text", seat === "page" ? "min-h-dvh" : "py-wide"]}
+  class={[
+    "flex items-center justify-center bg-page px-wide font-sans text-body text-text",
+    seat === "page" ? "min-h-dvh" : "py-wide",
+  ]}
 >
-  <form class="flex w-full max-w-measure flex-col gap-wide" onsubmit={(event) => void submit(event)}>
+  <form
+    class="flex w-full max-w-measure flex-col gap-wide"
+    onsubmit={(event) => void submit(event)}
+  >
     <div class="flex flex-col gap-snug">
       <svelte:element this={seat === "page" ? "h1" : "h2"} class="text-title font-title text-text">
         {say($lang, "pair_title")}

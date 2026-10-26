@@ -17,7 +17,13 @@
   import type { UseRow } from "../parts/usage_uses";
 
   function rows(uses: readonly SkillUse[]): UseRow[] {
-    return uses.map((one) => ({ run: one.run, resident: one.resident ?? null, at: one.at, part: one.part, outcome: one.outcome }));
+    return uses.map((one) => ({
+      run: one.run,
+      resident: one.resident ?? null,
+      at: one.at,
+      part: one.part,
+      outcome: one.outcome,
+    }));
   }
 
   export function auditWord(audit: SkillAudit): Key {
@@ -60,9 +66,15 @@
   const lang = u.lang;
   const question: Query = { skill_usage: { skill: null } };
   const asked = u.conn.asking.ask(question);
-  const read = $derived(readAnswer($asked, (held) => ("skill_usage" in held ? held.skill_usage : undefined)));
-  const used = $derived(read.kind === "held" ? read.value.skills.filter((skill) => skill.uses.length > 0) : []);
-  const unused = $derived(read.kind === "held" ? read.value.skills.filter((skill) => skill.uses.length === 0) : []);
+  const read = $derived(
+    readAnswer($asked, (held) => ("skill_usage" in held ? held.skill_usage : undefined)),
+  );
+  const used = $derived(
+    read.kind === "held" ? read.value.skills.filter((skill) => skill.uses.length > 0) : [],
+  );
+  const unused = $derived(
+    read.kind === "held" ? read.value.skills.filter((skill) => skill.uses.length === 0) : [],
+  );
 </script>
 
 <section class="flex min-w-0 flex-col gap-base">
@@ -91,13 +103,14 @@
           {/if}
           {#each skill.versions as version (version.digest)}
             <span class="truncate font-mono text-note text-text-faint">
-              {fill(say($lang, "usage_version"), { digest: version.digest.slice(0, 12), when: clock($lang, version.at), run: version.run })}
+              {fill(say($lang, "usage_version"), {
+                digest: version.digest.slice(0, 12),
+                when: clock($lang, version.at),
+                run: version.run,
+              })}
             </span>
           {/each}
-          <UsageUses
-            uses={rows(skill.uses)}
-            days={skill.per_day}
-          />
+          <UsageUses uses={rows(skill.uses)} days={skill.per_day} />
         </li>
       {/each}
     </ul>

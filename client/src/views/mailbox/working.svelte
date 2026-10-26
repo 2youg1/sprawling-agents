@@ -53,7 +53,12 @@
 <Section title="mailbox_working" empty="mailbox_working_none" count={rows.length}>
   <ul>
     {#each rows as { room, run } (run.run)}
-      <Row {...rowOf(run, room, $lang, $tick, { href: toFragment({ kind: "talk", address: room }), onclick: onLeave })} />
+      <Row
+        {...rowOf(run, room, $lang, $tick, {
+          href: toFragment({ kind: "talk", address: room }),
+          onclick: onLeave,
+        })}
+      />
     {/each}
   </ul>
 </Section>

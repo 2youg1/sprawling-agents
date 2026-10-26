@@ -21,8 +21,18 @@ export function forgetDevice(device: DeviceId): Command {
 
 // Consent to one agent entry the city offered, named by the digest of
 // the launch spec the card showed; `seatHere` also seats it in that room.
-export function addAgent(offer: Pick<AgentOffer, "spec_digest" | "source">, seatHere: Address | null): Command {
-  return { add_agent: { spec_digest: offer.spec_digest, source: offer.source, seat_here: seatHere, idem: mintIdem() } };
+export function addAgent(
+  offer: Pick<AgentOffer, "spec_digest" | "source">,
+  seatHere: Address | null,
+): Command {
+  return {
+    add_agent: {
+      spec_digest: offer.spec_digest,
+      source: offer.source,
+      seat_here: seatHere,
+      idem: mintIdem(),
+    },
+  };
 }
 
 // Close the whole city: wait for the runs under way, or stop them now.

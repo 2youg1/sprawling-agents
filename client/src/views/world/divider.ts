@@ -16,7 +16,10 @@ import type { KeyPress } from "./drawn";
 
 // What a key on the divider asks for: the pane before it at `span`
 // columns, the workbench as it ships, or nothing.
-export type Step = { readonly kind: "span"; readonly span: number } | { readonly kind: "reset" } | { readonly kind: "none" };
+export type Step =
+  | { readonly kind: "span"; readonly span: number }
+  | { readonly kind: "reset" }
+  | { readonly kind: "none" };
 
 export function stepOf(key: string, span: number, widest: number): Step {
   switch (key) {
@@ -48,7 +51,9 @@ export interface SplitterWire {
   readonly "aria-valuemax": number;
   readonly onkeydown: (event: KeyPress) => void;
   readonly ondblclick: () => void;
-  readonly onpointerdown: (event: PointerEvent & { readonly currentTarget: EventTarget & HTMLElement }) => void;
+  readonly onpointerdown: (
+    event: PointerEvent & { readonly currentTarget: EventTarget & HTMLElement },
+  ) => void;
   readonly onpointermove: (event: PointerEvent) => void;
   readonly onpointerup: () => void;
   readonly onpointercancel: () => void;

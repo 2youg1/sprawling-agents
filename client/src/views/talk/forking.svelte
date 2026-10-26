@@ -159,12 +159,6 @@
 <svelte:window onkeydown={keys} />
 
 <div class="relative w-full">
-  <Popover
-    label="fork_pick_title"
-    {columns}
-    onApply={apply}
-    onCursorChange={cursorAt}
-    {onClose}
-  />
+  <Popover label="fork_pick_title" {columns} onApply={apply} onCursorChange={cursorAt} {onClose} />
   <div class="py-tight text-note text-text-faint" role="status">{footer}</div>
 </div>

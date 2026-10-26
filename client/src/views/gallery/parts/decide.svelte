@@ -71,7 +71,9 @@
     ]}
   >
     {#snippet body()}
-      <p class="text-note text-text-faint">{fill(say($lang, "proposal_stale"), { was: "v3", now: "v5" })}</p>
+      <p class="text-note text-text-faint">
+        {fill(say($lang, "proposal_stale"), { was: "v3", now: "v5" })}
+      </p>
     {/snippet}
   </Decide>
 </Case>

@@ -30,7 +30,9 @@ pointer, the way every row does; a control's lift is for controls. -->
 
 <button
   {...look.wire}
-  class="grid w-full items-center rounded-control text-left text-note hover:wash {COLUMNS[look.layout]}"
+  class="grid w-full items-center rounded-control text-left text-note hover:wash {COLUMNS[
+    look.layout
+  ]}"
 >
   <Glyph
     name="chevron"

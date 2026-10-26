@@ -24,7 +24,10 @@ describe("momentOf", () => {
 
   test("a box emptied by hand becomes a moment only once it has stayed empty for IDLE_MS", () => {
     const cleared = seen({ kind: "emptied", at: AT, by: "hand" });
-    expect([momentOf(cleared, AT + IDLE_MS - 1), momentOf(cleared, AT + IDLE_MS)]).toEqual([null, "idle"]);
+    expect([momentOf(cleared, AT + IDLE_MS - 1), momentOf(cleared, AT + IDLE_MS)]).toEqual([
+      null,
+      "idle",
+    ]);
   });
 
   test("words in the box are no moment, unless the person has just come back to the tab", () => {
@@ -37,7 +40,10 @@ describe("momentOf", () => {
 
   test("a page with no box is always a moment, and a hidden tab never is", () => {
     const absent = seen({ kind: "absent" });
-    expect([momentOf(absent, AT), momentOf({ ...absent, visible: false }, AT)]).toEqual(["idle", null]);
+    expect([momentOf(absent, AT), momentOf({ ...absent, visible: false }, AT)]).toEqual([
+      "idle",
+      null,
+    ]);
   });
 });
 
@@ -59,7 +65,10 @@ describe("wakeAt", () => {
       wakeAt(seen({ kind: "emptied", at: AT, by: "hand" }), AT + 1_000),
       wakeAt(seen({ kind: "emptied", at: AT, by: "hand" }), AT + IDLE_MS),
       wakeAt(WRITING, AT),
-      wakeAt({ box: { kind: "emptied", at: AT, by: "hand" }, visible: false, returnedAt: null }, AT),
+      wakeAt(
+        { box: { kind: "emptied", at: AT, by: "hand" }, visible: false, returnedAt: null },
+        AT,
+      ),
     ]).toEqual([AT + IDLE_MS, null, null, null]);
   });
 });

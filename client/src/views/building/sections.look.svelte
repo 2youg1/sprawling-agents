@@ -28,7 +28,10 @@ under the pointer. -->
         ]}
       >
         {#if entry.current}
-          <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
+          <span
+            class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent"
+            aria-hidden="true"
+          ></span>
         {/if}
         {entry.label}
       </button>

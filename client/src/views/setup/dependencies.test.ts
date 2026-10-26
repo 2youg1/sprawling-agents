@@ -21,12 +21,19 @@ const drivers = [card("gecko", true), card("webkit", false), card("chromedriver"
 
 describe("absenceOf", () => {
   test("a driver the tier did without is a spare once the verdict names no group", () => {
-    expect(drivers.map((each) => absenceOf(each, [], drivers))).toEqual(["wanted", "spare", "spare"]);
+    expect(drivers.map((each) => absenceOf(each, [], drivers))).toEqual([
+      "wanted",
+      "spare",
+      "spare",
+    ]);
   });
 
   test("a card the verdict names, and every card of a group still short, are wanted", () => {
     const none = [card("webkit", false), card("git", false)];
-    expect(none.map((each) => absenceOf(each, ["git", "browser"], none))).toEqual(["wanted", "wanted"]);
+    expect(none.map((each) => absenceOf(each, ["git", "browser"], none))).toEqual([
+      "wanted",
+      "wanted",
+    ]);
     expect(absenceOf(card("webkit", false), null, drivers)).toEqual("wanted");
   });
 });
@@ -43,7 +50,19 @@ const winget = { command: { spelled: "winget install Git.Git" } } as const;
 
 describe("rowOf", () => {
   test("a present item gives its version and offers nothing to install", () => {
-    expect(rowOf(item({ present: { at: "C:/git.exe", version: { said: { text: "git version 2.55.0.windows.1" } } } }, winget))).toEqual({
+    expect(
+      rowOf(
+        item(
+          {
+            present: {
+              at: "C:/git.exe",
+              version: { said: { text: "git version 2.55.0.windows.1" } },
+            },
+          },
+          winget,
+        ),
+      ),
+    ).toEqual({
       state: "machine_present",
       reason: null,
       version: "2.55.0",
@@ -70,9 +89,24 @@ describe("rowOf", () => {
       { unreadable: { said: "denied" } },
     ].map((fault) => rowOf(item({ broken: { at: "git", fault } }, winget)));
     expect(rows.map((row) => [row.state, row.reason, row.install, row.offer])).toEqual([
-      ["machine_broken", { key: "machine_fault_will_not_start", said: "exit 3" }, "winget install Git.Git", "press"],
-      ["machine_broken", { key: "machine_fault_half_written", said: null }, "winget install Git.Git", "press"],
-      ["machine_broken", { key: "machine_fault_unreadable", said: "denied" }, "winget install Git.Git", "press"],
+      [
+        "machine_broken",
+        { key: "machine_fault_will_not_start", said: "exit 3" },
+        "winget install Git.Git",
+        "press",
+      ],
+      [
+        "machine_broken",
+        { key: "machine_fault_half_written", said: null },
+        "winget install Git.Git",
+        "press",
+      ],
+      [
+        "machine_broken",
+        { key: "machine_fault_unreadable", said: "denied" },
+        "winget install Git.Git",
+        "press",
+      ],
     ]);
   });
 
@@ -84,16 +118,52 @@ describe("rowOf", () => {
       { variable_names_nothing: { variable: "JAVA_HOME", path: "D:/jdk" } },
       { no_component: { dir: "D:/rust" } },
     ];
-    expect(absences.map((absence) => rowOf(item({ absent: { absence } }, { manual: { how: "see the site" } })))).toEqual([
-      { state: "machine_absent", reason: { key: "machine_absence_search_path", said: null }, version: null, install: "see the site", offer: "by_hand" },
-      { state: "machine_absent", reason: { key: "machine_absence_no_home", said: null }, version: null, install: "see the site", offer: "by_hand" },
-      { state: "machine_absent", reason: { key: "machine_absence_build", said: null }, version: null, install: "see the site", offer: "by_hand" },
-      { state: "machine_absent", reason: { key: "machine_absence_variable", said: "JAVA_HOME=D:/jdk" }, version: null, install: "see the site", offer: "by_hand" },
-      { state: "machine_absent", reason: { key: "machine_absence_component", said: "D:/rust" }, version: null, install: "see the site", offer: "by_hand" },
+    expect(
+      absences.map((absence) =>
+        rowOf(item({ absent: { absence } }, { manual: { how: "see the site" } })),
+      ),
+    ).toEqual([
+      {
+        state: "machine_absent",
+        reason: { key: "machine_absence_search_path", said: null },
+        version: null,
+        install: "see the site",
+        offer: "by_hand",
+      },
+      {
+        state: "machine_absent",
+        reason: { key: "machine_absence_no_home", said: null },
+        version: null,
+        install: "see the site",
+        offer: "by_hand",
+      },
+      {
+        state: "machine_absent",
+        reason: { key: "machine_absence_build", said: null },
+        version: null,
+        install: "see the site",
+        offer: "by_hand",
+      },
+      {
+        state: "machine_absent",
+        reason: { key: "machine_absence_variable", said: "JAVA_HOME=D:/jdk" },
+        version: null,
+        install: "see the site",
+        offer: "by_hand",
+      },
+      {
+        state: "machine_absent",
+        reason: { key: "machine_absence_component", said: "D:/rust" },
+        version: null,
+        install: "see the site",
+        offer: "by_hand",
+      },
     ]);
   });
 
   test("an item with no recipe on this platform has no command", () => {
-    expect(rowOf(item({ absent: { absence: "not_on_search_path" } }, "unknown_platform")).install).toBeNull();
+    expect(
+      rowOf(item({ absent: { absence: "not_on_search_path" } }, "unknown_platform")).install,
+    ).toBeNull();
   });
 });

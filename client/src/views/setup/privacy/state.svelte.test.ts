@@ -41,7 +41,16 @@ function harness(carries: boolean) {
     return found;
   };
   const answerWith = (idem: IdemKey, result: PrivacyResult): void => {
-    answer = { ...HOME, outcomes: [{ idem, action: { restore: { control: "recall_snapshots", expected: { value: "absent" } } }, result }] };
+    answer = {
+      ...HOME,
+      outcomes: [
+        {
+          idem,
+          action: { restore: { control: "recall_snapshots", expected: { value: "absent" } } },
+          result,
+        },
+      ],
+    };
     flushSync();
   };
   if (page === undefined) return expect.unreachable("the page was built");
@@ -52,7 +61,10 @@ describe("the privacy page's wiring", () => {
   test("sends nothing for a press that is cancelled", () => {
     const { page, sent, recall, stop } = harness(true);
     page.press(recall(), "restore");
-    expect(page.heldOf("recall_snapshots").stage).toEqual({ kind: "confirming", action: "restore" });
+    expect(page.heldOf("recall_snapshots").stage).toEqual({
+      kind: "confirming",
+      action: "restore",
+    });
     page.cancel(recall());
     stop();
     expect(page.heldOf("recall_snapshots").stage).toEqual({ kind: "idle" });
@@ -63,13 +75,34 @@ describe("the privacy page's wiring", () => {
     const { page, sent, asked, recall, answerWith, stop } = harness(true);
     page.press(recall(), "restore");
     page.confirm(recall());
-    expect(sent).toEqual([{ restore: { control: "recall_snapshots", expected: { value: "dword", number: 1 } } }]);
+    expect(sent).toEqual([
+      { restore: { control: "recall_snapshots", expected: { value: "dword", number: 1 } } },
+    ]);
     expect(asked()).toBe(1);
-    answerWith(IdemKey.make("idem1-ffffffffffffffffffffffffffffffff"), { refused: { code: "conflict", error: { action: "", code: "E_INVALID_ARGS", nearby: [], recovery: "", retry: "no", subject: "" } } });
-    expect(page.heldOf("recall_snapshots").stage).toEqual({ kind: "sending", action: "restore", idem: IDEM });
+    answerWith(IdemKey.make("idem1-ffffffffffffffffffffffffffffffff"), {
+      refused: {
+        code: "conflict",
+        error: {
+          action: "",
+          code: "E_INVALID_ARGS",
+          nearby: [],
+          recovery: "",
+          retry: "no",
+          subject: "",
+        },
+      },
+    });
+    expect(page.heldOf("recall_snapshots").stage).toEqual({
+      kind: "sending",
+      action: "restore",
+      idem: IDEM,
+    });
     answerWith(IDEM, { restored: { operation: 2 } });
     stop();
-    expect(page.heldOf("recall_snapshots")).toEqual({ stage: { kind: "settled", idem: IDEM }, shown: { restored: { operation: 2 } } });
+    expect(page.heldOf("recall_snapshots")).toEqual({
+      stage: { kind: "settled", idem: IDEM },
+      shown: { restored: { operation: 2 } },
+    });
   });
 
   test("leaves an action the link could not carry ready to press again", () => {
@@ -85,6 +118,8 @@ describe("the privacy page's wiring", () => {
     const { page, sent, stop } = harness(true);
     page.restoreAll(sectionsOf(HOME).flatMap((section) => section.entries));
     stop();
-    expect(sent).toEqual([{ restore: { control: "recall_snapshots", expected: { value: "dword", number: 1 } } }]);
+    expect(sent).toEqual([
+      { restore: { control: "recall_snapshots", expected: { value: "dword", number: 1 } } },
+    ]);
   });
 });

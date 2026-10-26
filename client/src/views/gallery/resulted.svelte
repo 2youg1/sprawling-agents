@@ -17,9 +17,21 @@
   import type { Answer, EventKind, EventRecord, Query } from "../../wire";
   import { Address, B3Hash, GitOid, RunId, Seq, TimeMs } from "../../wire";
 
-  const ROOMS = ["release/ledger", "memory/gate", "memory/tidy", "docs/tidy", "runtime/fix", "shop/gate"];
+  const ROOMS = [
+    "release/ledger",
+    "memory/gate",
+    "memory/tidy",
+    "docs/tidy",
+    "runtime/fix",
+    "shop/gate",
+  ];
 
-  function record(index: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+  function record(
+    index: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       run: RunId.make(`0199c0de-0000-4000-8000-${index.toString(16).padStart(12, "0")}`),
       seq: Seq.make(index * 3 + (kind === "run_started" ? 1 : kind === "pr_opened" ? 2 : 3)),
@@ -40,11 +52,13 @@
     [52, "approval_requested", { action_desc: "send a request to api.github.com" }],
     [3, "run_frozen", { completion: "limit" }],
     [70, "run_frozen", { completion: null }],
-    ...[2, 8, 14, 33, 47, 95, 130, 180].map((ago): readonly [number, EventKind, Record<string, unknown>] => [
-      ago,
-      "run_frozen",
-      { completion: "done" },
-    ]),
+    ...[2, 8, 14, 33, 47, 95, 130, 180].map(
+      (ago): readonly [number, EventKind, Record<string, unknown>] => [
+        ago,
+        "run_frozen",
+        { completion: "done" },
+      ],
+    ),
     null,
   ];
 
@@ -72,15 +86,24 @@
 
   export function finished(query: Query): Answer | undefined {
     if (typeof query !== "object") return undefined;
-    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: [], opened_at: OPENED } };
+    if ("rounds" in query)
+      return { rounds: { run: query.rounds.run, turns: [], opened_at: OPENED } };
     if (!("changes" in query)) return undefined;
     return {
       changes: {
         base: OPENED,
         head: null,
         files: [
-          { path: "crates/kernel/src/ledger.rs", how: "modified", lines: { counted: { added: 90, removed: 36 } } },
-          { path: "crates/kernel/src/ledger/tests.rs", how: "added", lines: { counted: { added: 37, removed: 0 } } },
+          {
+            path: "crates/kernel/src/ledger.rs",
+            how: "modified",
+            lines: { counted: { added: 90, removed: 36 } },
+          },
+          {
+            path: "crates/kernel/src/ledger/tests.rs",
+            how: "added",
+            lines: { counted: { added: 37, removed: 0 } },
+          },
         ],
       },
     };
@@ -97,7 +120,13 @@
 </script>
 
 <Case label="city · results only, waiting, failed and just finished">
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={finished} {records}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={finished}
+    {records}
+  >
     <Results />
   </Stand>
 </Case>

@@ -1,30 +1,30 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The three documents that govern the city - who the mayor is, who the
-// clerk is, and how this person wants the city run - each edited whole
-// in one box and saved once, the way the city writes them
-// (`city::governed`). The page reads the file where the city keeps it,
-// in the reserved subtree at the city's root, and saves through
-// `PutDocument`, which names the document rather than the path.
+  // The three documents that govern the city - who the mayor is, who the
+  // clerk is, and how this person wants the city run - each edited whole
+  // in one box and saved once, the way the city writes them
+  // (`city::governed`). The page reads the file where the city keeps it,
+  // in the reserved subtree at the city's root, and saves through
+  // `PutDocument`, which names the document rather than the path.
 
-import type { GovernedDocument } from "../../wire";
-import { Address } from "../../wire";
+  import type { GovernedDocument } from "../../wire";
+  import { Address } from "../../wire";
 
-const FILES: Record<GovernedDocument, string> = {
-  mayor: "MAYOR.md",
-  clerk: "CLERK.md",
-  preferences: "PREFERENCES.md",
-};
+  const FILES: Record<GovernedDocument, string> = {
+    mayor: "MAYOR.md",
+    clerk: "CLERK.md",
+    preferences: "PREFERENCES.md",
+  };
 
-export const GOVERNED: readonly GovernedDocument[] = ["mayor", "clerk", "preferences"];
+  export const GOVERNED: readonly GovernedDocument[] = ["mayor", "clerk", "preferences"];
 
-export function governedAt(which: GovernedDocument): Address {
-  return Address.make(`.sprawling/${FILES[which]}`);
-}
+  export function governedAt(which: GovernedDocument): Address {
+    return Address.make(`.sprawling/${FILES[which]}`);
+  }
 </script>
 
 <script lang="ts">
@@ -99,7 +99,7 @@ export function governedAt(which: GovernedDocument): Address {
     <Button
       label={say($lang, "setup_governed_save")}
       tone="primary"
-      {...(edited ? {} : { why: say($lang, "setup_governed_unchanged") })}
+      {...edited ? {} : { why: say($lang, "setup_governed_unchanged") }}
       onPress={save}
     />
     <span class="flex-1"></span>

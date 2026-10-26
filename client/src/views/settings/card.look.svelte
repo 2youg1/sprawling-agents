@@ -26,7 +26,12 @@
   <div class="mt-tight flex items-center gap-base">
     <span class="flex min-w-0 flex-1 flex-col gap-hair text-note" role="status">
       {#if standing.word !== null}
-        <span class={["inline-flex items-center gap-tight", standing.weight === "alert" ? "text-alert" : "text-text-quiet"]}>
+        <span
+          class={[
+            "inline-flex items-center gap-tight",
+            standing.weight === "alert" ? "text-alert" : "text-text-quiet",
+          ]}
+        >
           {#if standing.saved}
             <Glyph name="check" size="sm" class="shrink-0" />
           {/if}
@@ -42,7 +47,7 @@
         label={press.label}
         tone="primary"
         loading={press.loading}
-        {...(press.why === undefined ? {} : { why: press.why })}
+        {...press.why === undefined ? {} : { why: press.why }}
         onPress={press.onPress}
       />
     {/if}

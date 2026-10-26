@@ -1,47 +1,47 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Cost in five cuts of one authoritative total. Shares are drawn
-// against `total`, never against the sum of the rows, so an
-// unattributed remainder stays visible. A provider that reported no
-// price leaves the total at zero; the server counts those calls and
-// their tokens, and the page states that count rather than printing
-// $0.00 as if it were a measurement or calling the city idle.
-//
-// **The total and the by-run cut are two questions and stay apart**
-// (docs/frontend-method.md §7D): one is what this city has spent, the other is who
-// spent it. The figure beside the title is the total and never a sum of
-// the rows below it.
-//
-// Keep-warm renewals are spend the total already holds, under their
-// room and the `keep_warm` bucket of the cuts; the line under the header
-// names that share of the total and how many renewals came too late, and
-// never adds it to the total again (storage D36).
-//
-// The bar under a row is that row's summary: it restates the figure
-// beside the name, so a compact page draws the name and the figure and
-// stops there. Which pages are compact is `theme/preference.css`'s one density
-// attribute, not a switch of this page's own.
+  // Cost in five cuts of one authoritative total. Shares are drawn
+  // against `total`, never against the sum of the rows, so an
+  // unattributed remainder stays visible. A provider that reported no
+  // price leaves the total at zero; the server counts those calls and
+  // their tokens, and the page states that count rather than printing
+  // $0.00 as if it were a measurement or calling the city idle.
+  //
+  // **The total and the by-run cut are two questions and stay apart**
+  // (docs/frontend-method.md §7D): one is what this city has spent, the other is who
+  // spent it. The figure beside the title is the total and never a sum of
+  // the rows below it.
+  //
+  // Keep-warm renewals are spend the total already holds, under their
+  // room and the `keep_warm` bucket of the cuts; the line under the header
+  // names that share of the total and how many renewals came too late, and
+  // never adds it to the total again (storage D36).
+  //
+  // The bar under a row is that row's summary: it restates the figure
+  // beside the name, so a compact page draws the name and the figure and
+  // stops there. Which pages are compact is `theme/preference.css`'s one density
+  // attribute, not a switch of this page's own.
 
-import type { Key } from "../core/lang";
-import type { Renewals, UnpricedCalls, UsdMicros } from "../wire";
+  import type { Key } from "../core/lang";
+  import type { Renewals, UnpricedCalls, UsdMicros } from "../wire";
 
-type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
-const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
+  type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
+  const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
 
-// Each cut's heading, one phrase-table key per cut. A table rather than
-// a spelled-out name so a key that `lang.json` drops fails to compile
-// instead of failing to render.
-const TITLES: Record<Cut, Key> = {
-  by_run: "cost_by_run",
-  by_actor: "cost_by_actor",
-  by_segment: "cost_by_segment",
-  by_tool: "cost_by_tool",
-  by_skill: "cost_by_skill",
-};
+  // Each cut's heading, one phrase-table key per cut. A table rather than
+  // a spelled-out name so a key that `lang.json` drops fails to compile
+  // instead of failing to render.
+  const TITLES: Record<Cut, Key> = {
+    by_run: "cost_by_run",
+    by_actor: "cost_by_actor",
+    by_segment: "cost_by_segment",
+    by_tool: "cost_by_tool",
+    by_skill: "cost_by_skill",
+  };
 </script>
 
 <script lang="ts">
@@ -75,7 +75,10 @@ const TITLES: Record<Cut, Key> = {
 
 {#snippet unpriced(unpaid: UnpricedCalls)}
   <p class="text-note text-text-quiet">
-    {fill(say($lang, "cost_unpriced"), { calls: count(unpaid.calls), tokens: count(unpaid.tokens) })}
+    {fill(say($lang, "cost_unpriced"), {
+      calls: count(unpaid.calls),
+      tokens: count(unpaid.tokens),
+    })}
   </p>
 {/snippet}
 
@@ -98,7 +101,10 @@ const TITLES: Record<Cut, Key> = {
           <span class="shrink-0 figure text-text">{usd(amount)}</span>
         </div>
         <div class="summary mt-tight h-hair overflow-hidden rounded-pill bg-track">
-          <div class="h-full bg-accent" style:width="{total > 0 ? (amount / total) * 100 : 0}%"></div>
+          <div
+            class="h-full bg-accent"
+            style:width="{total > 0 ? (amount / total) * 100 : 0}%"
+          ></div>
         </div>
       </li>
     {/each}
@@ -152,7 +158,10 @@ width in as many columns as it holds. -->
     than lifted onto cards (docs/frontend-method.md §7A-4, client/Spec.lean §4-50). -->
     <div class="grid grid-fit gap-x-gutter gap-y-wide">
       {#each CUTS as each (each)}
-        <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-base" aria-label={say($lang, TITLES[each])}>
+        <section
+          class="flex min-w-0 flex-col gap-snug border-t border-edge pt-base"
+          aria-label={say($lang, TITLES[each])}
+        >
           <h2 class="text-note text-text-faint">{say($lang, TITLES[each])}</h2>
           {#if answer[each].length > 0}
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->

@@ -11,7 +11,13 @@
 // (`settings_row.svelte`) holds what is open and typed; `picker_look.ts`
 // turns this into the value `picker.look.svelte` draws.
 
-import { DEFAULT_EFFORT, type Effort, type EndpointSummary, type ModelFactsSummary, type ThinkingOffer } from "../../wire";
+import {
+  DEFAULT_EFFORT,
+  type Effort,
+  type EndpointSummary,
+  type ModelFactsSummary,
+  type ThinkingOffer,
+} from "../../wire";
 import type { Names } from "./composer";
 
 // One model one provider serves: the pair a selection names, and what
@@ -103,7 +109,11 @@ export interface Windowed {
   readonly more: number;
 }
 
-export function windowed(entries: readonly Entry[], pinned: string | undefined, whole: boolean): Windowed {
+export function windowed(
+  entries: readonly Entry[],
+  pinned: string | undefined,
+  whole: boolean,
+): Windowed {
   if (whole || entries.length <= SHOWN) return { entries, more: 0 };
   const head = entries.slice(0, SHOWN);
   const late = entries.slice(SHOWN).find((each) => each.id === pinned);
@@ -146,7 +156,9 @@ export function roomOf(order: Order, offers: readonly Offer[]): Room {
 export function matches(entry: Entry, query: string): boolean {
   const needle = query.trim().toLowerCase();
   return entry.offers.some((offer) =>
-    [offer.model, offer.canonical, offer.provider].some((said) => said.toLowerCase().includes(needle)),
+    [offer.model, offer.canonical, offer.provider].some((said) =>
+      said.toLowerCase().includes(needle),
+    ),
   );
 }
 
@@ -180,7 +192,12 @@ export type Segment = "model" | "provider" | "level";
 
 // The sections of the open picker, in drawing order: the popover's
 // lists carry these ids, so a key moves between them in this order.
-export const SECTION = { recent: "recent", first: "first", second: "second", thinking: "thinking" } as const;
+export const SECTION = {
+  recent: "recent",
+  first: "first",
+  second: "second",
+  thinking: "thinking",
+} as const;
 export type Section = (typeof SECTION)[keyof typeof SECTION];
 
 // The section a segment opens on. Activating the token by key, with no
@@ -226,10 +243,17 @@ export const sameCombination = (a: Combination, b: Combination): boolean =>
 
 // The recent combinations a picker lists: the one in force first, then
 // the ones before it that the city still serves, at most `RECENT`.
-export function recentOf(now: Combination | null, kept: readonly Combination[], offers: readonly Offer[]): readonly Combination[] {
+export function recentOf(
+  now: Combination | null,
+  kept: readonly Combination[],
+  offers: readonly Offer[],
+): readonly Combination[] {
   const served = (each: Combination): boolean =>
     offers.some((offer) => offer.endpoint === each.endpoint && offer.model === each.model);
-  return [...(now === null ? [] : [now]), ...kept.filter((each) => now === null || !sameCombination(each, now))]
+  return [
+    ...(now === null ? [] : [now]),
+    ...kept.filter((each) => now === null || !sameCombination(each, now)),
+  ]
     .filter(served)
     .slice(0, RECENT);
 }

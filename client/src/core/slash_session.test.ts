@@ -21,7 +21,12 @@ import type { SlashHands } from "./slash_hands";
 describe("the session in main", () => {
   const ROOM = Address.make("lab/room1");
   const GOING = RunId.make("00000000-0000-4000-8000-000000000007");
-  const SESSION: SessionTags = { city: Address.make("harbour"), room: ROOM, began: Seq.make(5), tags: [Tag.make("bug")] };
+  const SESSION: SessionTags = {
+    city: Address.make("harbour"),
+    room: ROOM,
+    began: Seq.make(5),
+    tags: [Tag.make("bug")],
+  };
   const EMPTY: Belief = get(createBelief(() => 0).belief);
   const BUSY: AxError = {
     code: "E_BUSY",
@@ -63,7 +68,12 @@ describe("the session in main", () => {
     };
     const branches = keepBranches({ belief, send: command, go });
     return {
-      belief, sent, went, written, retagged, waiting,
+      belief,
+      sent,
+      went,
+      written,
+      retagged,
+      waiting,
       hands: {
         command,
         go,
@@ -84,7 +94,8 @@ describe("the session in main", () => {
           return true;
         },
         whenFrozen: (run, then) => waiting.push([run, then]),
-        openSession: (room, carry) => branches.open(room, { kind: "fresh", carry }, () => undefined),
+        openSession: (room, carry) =>
+          branches.open(room, { kind: "fresh", carry }, () => undefined),
         opening: () => get(branches.held).kind === "opening",
       },
     };
@@ -102,7 +113,11 @@ describe("the session in main", () => {
   test("/new from an earlier session brings main to the room once the city opened the new one", () => {
     const at = held(false);
     run(at.hands, "/new");
-    const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry, frame.open_session.from]] : []));
+    const opened = at.sent.flatMap((frame) =>
+      "open_session" in frame
+        ? [[frame.open_session.addr, frame.open_session.carry, frame.open_session.from]]
+        : [],
+    );
     expect([opened, at.went]).toEqual([[[ROOM, "nothing", null]], []]);
     at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
     expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
@@ -118,7 +133,9 @@ describe("the session in main", () => {
   test("/compact with nothing running opens a session carrying the handoff, and main follows once it is open", () => {
     const at = held(false);
     run(at.hands, "/compact");
-    const opened = at.sent.flatMap((frame) => ("open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry]] : []));
+    const opened = at.sent.flatMap((frame) =>
+      "open_session" in frame ? [[frame.open_session.addr, frame.open_session.carry]] : [],
+    );
     expect([opened, at.went]).toEqual([[[ROOM, "handoff"]], []]);
     at.belief.update((belief) => ({ ...belief, sessions: { [ROOM]: Seq.make(9) } }));
     expect(at.went).toEqual([{ kind: "talk", address: ROOM }]);
@@ -132,7 +149,9 @@ describe("the session in main", () => {
     at.waiting[0]?.[1]();
     expect(kinds(at.sent)).toEqual(["cancel", "open_session"]);
     const opened = at.sent[1];
-    expect(opened !== undefined && "open_session" in opened ? opened.open_session.carry : null).toBe("handoff");
+    expect(
+      opened !== undefined && "open_session" in opened ? opened.open_session.carry : null,
+    ).toBe("handoff");
   });
 
   test("/compact while another session is opening stops nothing and keeps the line", () => {

@@ -71,7 +71,11 @@ describe("the base_url shape", () => {
 
   test("names the same host with a hyphen, a port and a path", () => {
     expect(
-      ["my-host.example:8080/v1", "http://127.0.0.1:8811/v1", "https://api.deepseek.com/anthropic/v1"].map(hostOf),
+      [
+        "my-host.example:8080/v1",
+        "http://127.0.0.1:8811/v1",
+        "https://api.deepseek.com/anthropic/v1",
+      ].map(hostOf),
     ).toEqual(["my-host.example", "127.0.0.1", "api.deepseek.com"]);
   });
 });

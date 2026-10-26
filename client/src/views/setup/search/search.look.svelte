@@ -21,12 +21,21 @@
   const look: SearchLook = $props();
 </script>
 
-<section class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug" aria-label={look.heading}>
+<section
+  class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug"
+  aria-label={look.heading}
+>
   <div class="flex flex-col gap-hair">
     <h3 class="text-label font-label text-text">{look.heading}</h3>
     <p class="text-note text-text-faint">{look.intro}</p>
   </div>
-  <Segmented label={look.choice.label} tone="accent" options={look.choice.options} held={look.choice.held} onPick={look.choice.pick} />
+  <Segmented
+    label={look.choice.label}
+    tone="accent"
+    options={look.choice.options}
+    held={look.choice.held}
+    onPick={look.choice.pick}
+  />
   <p class="text-note text-text-faint">{look.defaultAt}</p>
   {#if look.override !== undefined}
     <p class="text-note text-text-quiet">{look.override}</p>
@@ -39,7 +48,9 @@
     <h4 class="font-label text-text-quiet">{look.suppliersHeading}</h4>
     <ul class="flex flex-col gap-snug">
       {#each look.suppliers as row (row.id)}
-        <li class="flex min-w-0 flex-col gap-tight rounded-card bg-chrome px-base py-snug text-note">
+        <li
+          class="flex min-w-0 flex-col gap-tight rounded-card bg-chrome px-base py-snug text-note"
+        >
           <div class="flex min-w-0 flex-wrap items-center gap-snug">
             <span class={["font-mono", row.selected ? "text-accent" : "text-text"]}>{row.id}</span>
             <span class="min-w-0 flex-1 truncate font-mono text-text-faint">{row.url}</span>
@@ -50,7 +61,7 @@
                   label={control.label}
                   tone="quiet"
                   onPress={control.press}
-                  {...(control.why === undefined ? {} : { why: control.why })}
+                  {...control.why === undefined ? {} : { why: control.why }}
                 />
               {/each}
             </span>
@@ -77,10 +88,21 @@
         }}
       >
         {#each form.fields as field (field.name)}
-          <Field label={field.label} value={field.value} onInput={field.input} mono disabled={field.disabled} />
+          <Field
+            label={field.label}
+            value={field.value}
+            onInput={field.input}
+            mono
+            disabled={field.disabled}
+          />
         {/each}
         <span class="flex flex-wrap gap-snug">
-          <Button type="submit" tone="secondary" label={form.save.label} {...(form.save.why === undefined ? {} : { why: form.save.why })} />
+          <Button
+            type="submit"
+            tone="secondary"
+            label={form.save.label}
+            {...form.save.why === undefined ? {} : { why: form.save.why }}
+          />
           {#if form.cancel !== undefined}
             <Button tone="quiet" label={form.cancel.label} onPress={form.cancel.press} />
           {/if}

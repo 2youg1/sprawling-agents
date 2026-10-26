@@ -65,7 +65,8 @@
     const frame = grid.closest<HTMLElement>(".frame") ?? grid;
     const style = getComputedStyle(frame);
     const gap = Number.parseFloat(style.columnGap) || 0;
-    let edge = frame.getBoundingClientRect().left + (Number.parseFloat(style.paddingLeft) || 0) - gap / 2;
+    let edge =
+      frame.getBoundingClientRect().left + (Number.parseFloat(style.paddingLeft) || 0) - gap / 2;
     const lines = style.gridTemplateColumns.split(" ").map((track) => {
       const at = edge;
       edge += Number.parseFloat(track) + gap;
@@ -106,6 +107,10 @@
 <!-- The gutter the divider stands in: the grid's column on the left of
 the pane after it, the full height of the workbench. Where it stands is
 this seat's; how the line in it is drawn is the look's. -->
-<div bind:this={gutter} class="row-[1/3] -ml-gutter flex w-gutter justify-self-start" style:grid-column="{column} / span 1">
+<div
+  bind:this={gutter}
+  class="row-[1/3] -ml-gutter flex w-gutter justify-self-start"
+  style:grid-column="{column} / span 1"
+>
   <Look {...look} />
 </div>

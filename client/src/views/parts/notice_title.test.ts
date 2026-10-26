@@ -40,7 +40,9 @@ describe("the next step under a refusal", () => {
   });
 
   test("has a word for every code the wire can carry", () => {
-    const missing = AxCode.literals.filter((code) => !Object.hasOwn(table, `recover_${code.toLowerCase()}`));
+    const missing = AxCode.literals.filter(
+      (code) => !Object.hasOwn(table, `recover_${code.toLowerCase()}`),
+    );
     expect(missing).toEqual([]);
   });
 });

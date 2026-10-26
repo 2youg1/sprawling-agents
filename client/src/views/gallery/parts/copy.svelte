@@ -44,7 +44,14 @@
     {#each STATES as copied, at (at)}
       <div class="flex min-w-0 items-center gap-snug">
         <CopyLook {...lookOf({ text: COMMAND }, copied, $lang, idle)} />
-        <CopyLook {...lookOf({ text: COMMAND, note: say($lang, "code_copy_note"), form: "bare" }, copied, $lang, idle)} />
+        <CopyLook
+          {...lookOf(
+            { text: COMMAND, note: say($lang, "code_copy_note"), form: "bare" },
+            copied,
+            $lang,
+            idle,
+          )}
+        />
       </div>
     {/each}
   </div>
@@ -56,6 +63,9 @@
       { format: "jsonl", label: say($lang, "usage_export_jsonl"), loading: false, press: idle },
       { format: "csv", label: say($lang, "usage_export_csv"), loading: false, press: idle },
     ]}
-    unavailable={{ said: fill(say($lang, "answer_unavailable"), { query: "usage_export" }), reason: UNREAD }}
+    unavailable={{
+      said: fill(say($lang, "answer_unavailable"), { query: "usage_export" }),
+      reason: UNREAD,
+    }}
   />
 </Case>

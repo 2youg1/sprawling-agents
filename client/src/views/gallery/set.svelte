@@ -30,7 +30,13 @@
       at,
       state: {
         held: {
-          body: { text: { coverage: "whole", encoding: "utf8", head: { span: { start: 0, end: body.length }, text: body } } },
+          body: {
+            text: {
+              coverage: "whole",
+              encoding: "utf8",
+              head: { span: { start: 0, end: body.length }, text: body },
+            },
+          },
           bytes: body.length,
           format: "plain",
           version: VERSION,
@@ -44,8 +50,9 @@
       about: "Works in Rust and Lean; prefers a short answer with the evidence first.",
       imported_from: "github.com",
       mayor: "Cat",
-      mayor_text: "+++\nname = \"Cat\"\n+++\nPlans the city.\n",
-      preferences_text: "+++\nuser_id = \"river-ops\"\nimported_from = \"github.com\"\n+++\nWorks in Rust and Lean.\n",
+      mayor_text: '+++\nname = "Cat"\n+++\nPlans the city.\n',
+      preferences_text:
+        '+++\nuser_id = "river-ops"\nimported_from = "github.com"\n+++\nWorks in Rust and Lean.\n',
       user_id: "river-ops",
       version: "b3:5d1e",
     },
@@ -55,28 +62,72 @@
     unreadable: { document: "mayor", line: 2, why: "name must be one line of text" },
   };
 
-  const RULES = '[write]\nallow = ["src/**", "tests/**"]\n\n[gate.exec]\nask = ["cargo publish", "git push"]\n';
+  const RULES =
+    '[write]\nallow = ["src/**", "tests/**"]\n\n[gate.exec]\nask = ["cargo publish", "git push"]\n';
   const CONFIG = '[model]\neffort = "high"\n\n[cache]\nkeep_warm = "five_minute"\n';
 
   function city(identity: IdentityAnswer) {
     return (query: Query): Answer | undefined => {
       if (query === "identity") return { identity };
-      if (query === "preferences") return { preferences: { core: { placement: "soft_shares", priority: "normal", memory_bytes: null } } };
+      if (query === "preferences")
+        return {
+          preferences: {
+            core: { placement: "soft_shares", priority: "normal", memory_bytes: null },
+          },
+        };
       if (query === "automation") {
         return {
           automation: {
             jobs: [
-              { addr: HALL, cadence: { daily_at: { minute: 540 } }, goal: "", name: "morning-digest", task: "Summarise what landed overnight." },
-              { addr: Address.make("lab"), cadence: { every_minutes: { minutes: 30 } }, goal: "", name: "flaky-watch", task: "Rerun the tests that failed once." },
-              { addr: Address.make("lab"), cadence: { weekly_at: { minute: 4 * 1440 + 960 } }, goal: "", name: "friday-release", task: "Draft the release notes." },
+              {
+                addr: HALL,
+                cadence: { daily_at: { minute: 540 } },
+                goal: "",
+                name: "morning-digest",
+                task: "Summarise what landed overnight.",
+              },
+              {
+                addr: Address.make("lab"),
+                cadence: { every_minutes: { minutes: 30 } },
+                goal: "",
+                name: "flaky-watch",
+                task: "Rerun the tests that failed once.",
+              },
+              {
+                addr: Address.make("lab"),
+                cadence: { weekly_at: { minute: 4 * 1440 + 960 } },
+                goal: "",
+                name: "friday-release",
+                task: "Draft the release notes.",
+              },
             ],
-            sources: [{ addr: Address.make("lab"), matches: "ci/failed/**", name: "ci-failures", starts_work: true }],
+            sources: [
+              {
+                addr: Address.make("lab"),
+                matches: "ci/failed/**",
+                name: "ci-failures",
+                starts_work: true,
+              },
+            ],
             unreadable: [],
           },
         };
       }
       if (typeof query === "object" && "config" in query) {
-        return { config: { addr: HALL, effort: { effort: "high", from: "city" }, second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 }, tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" }, search: SEARCH } };
+        return {
+          config: {
+            addr: HALL,
+            effort: { effort: "high", from: "city" },
+            second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 },
+            tuning: {
+              from: "default",
+              proxying: "except_local",
+              timeout_ms: 600_000,
+              account_retries: "two",
+            },
+            search: SEARCH,
+          },
+        };
       }
       if (typeof query === "object" && "document" in query) {
         if (query.document.at === CITY_CONFIG) return { document: text(CITY_CONFIG, CONFIG) };
@@ -114,8 +165,19 @@
     label={`settings panel · ${group}${identity === UNREADABLE ? " · unreadable" : ""}${beneath === MONITOR ? " · over the monitor" : ""} at ${String(width)}`}
     {width}
   >
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={city(identity)}>
-      <Sheet {group} {beneath} onPick={() => undefined} onClose={() => undefined} titleId={`set-fixture-${String(index)}`} />
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={city(identity)}
+    >
+      <Sheet
+        {group}
+        {beneath}
+        onPick={() => undefined}
+        onClose={() => undefined}
+        titleId={`set-fixture-${String(index)}`}
+      />
     </Stand>
   </Case>
 {/each}

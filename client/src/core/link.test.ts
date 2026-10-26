@@ -5,15 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import {
-  advance,
-  backoffMs,
-  connect,
-  isStopped,
-  newLink,
-  type Link,
-  type LinkEvent,
-} from "./link";
+import { advance, backoffMs, connect, isStopped, newLink, type Link, type LinkEvent } from "./link";
 import { B3Hash, WIRE_HASH, WIRE_V, type AxError } from "../wire";
 
 // A link that has been greeted, which is where every frame below
@@ -60,8 +52,7 @@ describe("a frame this build cannot read", () => {
         code: "E_WIRE_MISMATCH",
         action: "read a frame from this city",
         subject: `this page speaks wire v${String(WIRE_V)} and the server sent a frame it cannot read`,
-        recovery:
-          "reload the page to fetch the client this server was built with",
+        recovery: "reload the page to fetch the client this server was built with",
         nearby: [],
         retry: "no",
       },
@@ -72,14 +63,8 @@ describe("a frame this build cannot read", () => {
   // booked before the refusal fires into a machine that ignores it.
   test("a wait that was already booked reopens nothing", () => {
     const [stopped] = advance(live(), { kind: "undecodable" });
-    expect(advance(stopped, { kind: "wait_elapsed" })).toEqual([
-      stopped,
-      { kind: "nothing" },
-    ]);
-    expect(advance(stopped, { kind: "closed" })).toEqual([
-      stopped,
-      { kind: "nothing" },
-    ]);
+    expect(advance(stopped, { kind: "wait_elapsed" })).toEqual([stopped, { kind: "nothing" }]);
+    expect(advance(stopped, { kind: "closed" })).toEqual([stopped, { kind: "nothing" }]);
   });
 
   test("the person's retry is what starts it again", () => {
@@ -187,7 +172,10 @@ describe("a city the person closed", () => {
       const [asked, quiet] = advance(live(), { kind: "closing", mode });
       expect(quiet).toEqual({ kind: "nothing" });
       const [ended, action] = advance(asked, { kind: "closed" });
-      expect({ state: ended.state, action }).toEqual({ state: { kind: "closed" }, action: { kind: "nothing" } });
+      expect({ state: ended.state, action }).toEqual({
+        state: { kind: "closed" },
+        action: { kind: "nothing" },
+      });
       for (const event of EVENTS) {
         const [after, done] = advance(ended, event);
         expect({ state: after.state, done, stopped: isStopped(after) }).toEqual({

@@ -67,6 +67,8 @@ describe("the city's row of figures", () => {
 
   test("before the city answers either question there is no bar", () => {
     expect(barLookOf(null, null, "en")).toBeNull();
-    expect(barLookOf(null, 0, "en")?.readings.map((reading) => reading.key)).toEqual(["cost_total"]);
+    expect(barLookOf(null, 0, "en")?.readings.map((reading) => reading.key)).toEqual([
+      "cost_total",
+    ]);
   });
 });

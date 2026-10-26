@@ -29,12 +29,27 @@ describe("lineage", () => {
       run("r3", "zeta/z", 200, THINKING),
       run("r4", "zeta/z", 100, WAITING),
     ];
-    expect(rowsOf(runs, new Set()).map((row) => row.key)).toEqual(["zeta", "zeta/z", "r4", "r3", "zeta/b", "r2", "alpha", "alpha/a", "r1"]);
+    expect(rowsOf(runs, new Set()).map((row) => row.key)).toEqual([
+      "zeta",
+      "zeta/z",
+      "r4",
+      "r3",
+      "zeta/b",
+      "r2",
+      "alpha",
+      "alpha/a",
+      "r1",
+    ]);
   });
 
   test("a folded building keeps its row and hides what is under it", () => {
     const runs = [run("r1", "alpha/a", 1, THINKING), run("r2", "beta/b", 1, THINKING)];
-    expect(rowsOf(runs, new Set(["alpha"])).map((row) => row.key)).toEqual(["alpha", "beta", "beta/b", "r2"]);
+    expect(rowsOf(runs, new Set(["alpha"])).map((row) => row.key)).toEqual([
+      "alpha",
+      "beta",
+      "beta/b",
+      "r2",
+    ]);
   });
 
   test("a thousand rows draw only the viewport and its margin", () => {
@@ -46,7 +61,9 @@ describe("lineage", () => {
   // opens its page, on a room its conversation, on a building its page.
   test("each row opens the page of what it names", () => {
     const id = "3f2a9c4e-0d1b-4e7a-9a55-1c2b3d4e5f60";
-    const views = rowsOf([run(id, "shop/notes", 1, THINKING)], new Set()).map((row) => Option.getOrNull(viewOf(row)));
+    const views = rowsOf([run(id, "shop/notes", 1, THINKING)], new Set()).map((row) =>
+      Option.getOrNull(viewOf(row)),
+    );
     expect(views).toEqual([
       { kind: "building", address: Address.make("shop") },
       { kind: "talk", address: Address.make("shop/notes") },

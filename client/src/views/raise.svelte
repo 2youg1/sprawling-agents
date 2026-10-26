@@ -67,7 +67,9 @@
 
   const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
   const raising = $derived(raisingOf(typed, buildings));
-  const target = $derived(raising.kind === "build" || raising.kind === "adopt" ? raising.addr : null);
+  const target = $derived(
+    raising.kind === "build" || raising.kind === "adopt" ? raising.addr : null,
+  );
 
   // The rules the template would write here, asked of the city, and
   // whether the city has answered at all: an address it will not lay a
@@ -83,10 +85,12 @@
     edited = false;
     rules = "";
     if (at === null) return;
-    return u.conn.asking.ask({ template: { template: TemplateName.make(picked), addr: at } }).subscribe((answer) => {
-      offered = answer !== undefined && "template" in answer ? answer.template.rules : null;
-      answered = answer !== undefined;
-    });
+    return u.conn.asking
+      .ask({ template: { template: TemplateName.make(picked), addr: at } })
+      .subscribe((answer) => {
+        offered = answer !== undefined && "template" in answer ? answer.template.rules : null;
+        answered = answer !== undefined;
+      });
   });
   // Whether the press sends rules the person has seen: their own, or the
   // template's once the city has said what those are.
@@ -158,7 +162,11 @@
         }}
       />
       {#if fills.length > 0}
-        <div class="flex flex-wrap items-center gap-snug" role="group" aria-label={say($lang, "raise_waiting")}>
+        <div
+          class="flex flex-wrap items-center gap-snug"
+          role="group"
+          aria-label={say($lang, "raise_waiting")}
+        >
           <span class="text-note text-text-quiet">{say($lang, "raise_waiting")}</span>
           {#each fills as folder (folder)}
             <Button
@@ -176,7 +184,10 @@
       <span class="text-note text-text-quiet">{say($lang, "raise_template")}</span>
       <Segmented
         label={say($lang, "raise_template")}
-        options={OFFERED.map((each) => ({ value: each, label: say($lang, `raise_template_${each}`) }))}
+        options={OFFERED.map((each) => ({
+          value: each,
+          label: say($lang, `raise_template_${each}`),
+        }))}
         held={template}
         onPick={(value) => {
           template = value;
@@ -194,12 +205,17 @@
             edited = true;
           })}
         />
-        <span class="text-note text-text-faint">{say($lang, edited ? "raise_rules_edited" : "raise_rules_note")}</span>
+        <span class="text-note text-text-faint"
+          >{say($lang, edited ? "raise_rules_edited" : "raise_rules_note")}</span
+        >
       </label>
     {/if}
     {#if refusal !== null}
       <p class="text-note text-alert" role="alert">
-        {fill(say($lang, "raise_refused"), { why: noticeTitle($lang, refusal.code, refusal.subject), fix: refusal.recovery })}
+        {fill(say($lang, "raise_refused"), {
+          why: noticeTitle($lang, refusal.code, refusal.subject),
+          fix: refusal.recovery,
+        })}
       </p>
     {/if}
     <div>

@@ -19,7 +19,10 @@ function typed(value: string): Typed {
   return { currentTarget: { value } };
 }
 
-function recorded(props: Omit<FieldProps, "onInput">): { readonly props: FieldProps; readonly seen: string[] } {
+function recorded(props: Omit<FieldProps, "onInput">): {
+  readonly props: FieldProps;
+  readonly seen: string[];
+} {
   const seen: string[] = [];
   return {
     props: {
@@ -41,11 +44,20 @@ describe("field wiring", () => {
       invalid: look.box["aria-invalid"],
       described: look.box["aria-describedby"],
       note: look.note,
-    }).toEqual({ for: "f1-box", id: "f1-box", invalid: false, described: undefined, note: undefined });
+    }).toEqual({
+      for: "f1-box",
+      id: "f1-box",
+      invalid: false,
+      described: undefined,
+      note: undefined,
+    });
   });
 
   test("help is the one line, read after the page's own description", () => {
-    const look = lookOf(recorded({ label: "Base URL", value: "", help: "the host", describedBy: "page-7" }).props, "f1");
+    const look = lookOf(
+      recorded({ label: "Base URL", value: "", help: "the host", describedBy: "page-7" }).props,
+      "f1",
+    );
     expect([look.box["aria-describedby"], look.note]).toEqual([
       "page-7 f1-note",
       { kind: "help", text: "the host", wire: { id: "f1-note", role: undefined } },
@@ -53,8 +65,16 @@ describe("field wiring", () => {
   });
 
   test("an error replaces the help, is an alert, and marks the box invalid", () => {
-    const look = lookOf(recorded({ label: "Base URL", value: "x", help: "the host", error: "no such host" }).props, "f1");
-    expect({ refused: look.refused, invalid: look.box["aria-invalid"], described: look.box["aria-describedby"], note: look.note }).toEqual({
+    const look = lookOf(
+      recorded({ label: "Base URL", value: "x", help: "the host", error: "no such host" }).props,
+      "f1",
+    );
+    expect({
+      refused: look.refused,
+      invalid: look.box["aria-invalid"],
+      described: look.box["aria-describedby"],
+      note: look.note,
+    }).toEqual({
       refused: true,
       invalid: true,
       described: "f1-note",
@@ -72,12 +92,25 @@ describe("field wiring", () => {
     const refused = typed("new");
     const look = lookOf(shut.props, "f2");
     look.box.oninput(refused);
-    expect([shut.seen, refused.currentTarget.value, look.box["aria-disabled"]]).toEqual([[], "old", true]);
+    expect([shut.seen, refused.currentTarget.value, look.box["aria-disabled"]]).toEqual([
+      [],
+      "old",
+      true,
+    ]);
   });
 
   test("a number asks for digits, and the other kinds ask for nothing", () => {
-    const number = lookOf(recorded({ label: "Window", value: "1", kind: "number", step: 1024 }).props, "f1").box;
+    const number = lookOf(
+      recorded({ label: "Window", value: "1", kind: "number", step: 1024 }).props,
+      "f1",
+    ).box;
     const key = lookOf(recorded({ label: "Key", value: "", kind: "password" }).props, "f1").box;
-    expect([number.type, number.inputmode, number.step, key.type, key.inputmode]).toEqual(["number", "numeric", 1024, "password", undefined]);
+    expect([number.type, number.inputmode, number.step, key.type, key.inputmode]).toEqual([
+      "number",
+      "numeric",
+      1024,
+      "password",
+      undefined,
+    ]);
   });
 });

@@ -51,7 +51,8 @@ export function footOf(box: Element): Foot {
 }
 
 // What moved the viewport: the room opening, or a scroll measured after it.
-export type Moment = { readonly kind: "opened" } | { readonly kind: "scrolled"; readonly foot: Foot };
+export type Moment =
+  { readonly kind: "opened" } | { readonly kind: "scrolled"; readonly foot: Foot };
 
 // Decide whether the growing edge keeps the viewport where it is. A
 // viewport past the foot - rubber-band scrolling on its way back -

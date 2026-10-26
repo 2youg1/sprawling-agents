@@ -36,7 +36,10 @@
   const LONG = "atlas-payments-reconciliation-service/ledger-close-and-settlement";
   // The lesson as a browser that never opened the palette draws it, on a
   // machine that writes the accelerator `Ctrl`.
-  const lesson = $derived({ words: say($lang, "talk_address_hint"), chord: marks(accel("/"), "other").join(" ") });
+  const lesson = $derived({
+    words: say($lang, "talk_address_hint"),
+    chord: marks(accel("/"), "other").join(" "),
+  });
   const fork: ForkWire = {
     type: "button",
     onmouseenter: still,
@@ -57,20 +60,44 @@
   </div>
 </Case>
 
-<Case label="address line · a session, the lesson before the palette was ever opened, a long address cut in its building, a room with no session yet">
+<Case
+  label="address line · a session, the lesson before the palette was ever opened, a long address cut in its building, a room with no session yet"
+>
   <div class="flex flex-col gap-snug">
-    <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), still)} seat={{ at: "head" }} />
-    <AddressLine {...addressLineOf($lang, "hall/mayor", null, still)} seat={{ at: "head" }} {lesson} />
+    <AddressLine
+      {...addressLineOf($lang, "hall/mayor", Seq.make(23), still)}
+      seat={{ at: "head" }}
+    />
+    <AddressLine
+      {...addressLineOf($lang, "hall/mayor", null, still)}
+      seat={{ at: "head" }}
+      {lesson}
+    />
     <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} />
     <AddressLine {...addressLineOf($lang, "atlas/api", null, still)} seat={{ at: "head" }} />
   </div>
 </Case>
 
-<Case label="address line · at a phone's width, the room kept whole, a room too long for the column cut last, and the lesson giving way first" width={320}>
+<Case
+  label="address line · at a phone's width, the room kept whole, a room too long for the column cut last, and the lesson giving way first"
+  width={320}
+>
   <div class="flex flex-col gap-snug">
     <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} />
-    <AddressLine {...addressLineOf($lang, "atlas/payments-reconciliation-ledger-close-and-settlement-overnight", Seq.make(4182), still)} seat={{ at: "head" }} />
-    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} seat={{ at: "head" }} {lesson} />
+    <AddressLine
+      {...addressLineOf(
+        $lang,
+        "atlas/payments-reconciliation-ledger-close-and-settlement-overnight",
+        Seq.make(4182),
+        still,
+      )}
+      seat={{ at: "head" }}
+    />
+    <AddressLine
+      {...addressLineOf($lang, LONG, Seq.make(4182), still)}
+      seat={{ at: "head" }}
+      {lesson}
+    />
   </div>
 </Case>
 
@@ -79,8 +106,22 @@
     label="inbox"
     heading="2 waiting"
     rows={[
-      { key: "1", href: "#/talk/shop/checkout", kind: "letter", first: "The total is fixed.", from: "checkout", ago: "2m" },
-      { key: "2", href: undefined, kind: "handback", first: "Tests pass on main.", from: "ci", ago: "5m" },
+      {
+        key: "1",
+        href: "#/talk/shop/checkout",
+        kind: "letter",
+        first: "The total is fixed.",
+        from: "checkout",
+        ago: "2m",
+      },
+      {
+        key: "2",
+        href: undefined,
+        kind: "handback",
+        first: "Tests pass on main.",
+        from: "ci",
+        ago: "5m",
+      },
     ]}
   />
 </Case>

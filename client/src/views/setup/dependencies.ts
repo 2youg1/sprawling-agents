@@ -37,9 +37,7 @@ export function enablesKey(name: string): Key | null {
 
 // The one word a card is labelled by. The state is a value the city
 // sent; every word around it comes from the phrase table.
-export function stateKey(
-  state: DoctorState,
-): Key {
+export function stateKey(state: DoctorState): Key {
   if ("present" in state) return "machine_present";
   if ("broken" in state) return "machine_broken";
   return "machine_absent";

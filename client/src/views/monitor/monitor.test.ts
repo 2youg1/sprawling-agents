@@ -38,8 +38,16 @@ function asked(): Asked {
   };
 }
 
-const OPEN: MonitorState = { following: "following", terminal: "open", paths: ["src/a.rs", "src/b.rs"] };
-const FOLDED: MonitorState = { following: "paused", terminal: "folded", paths: ["src/a.rs", "src/b.rs"] };
+const OPEN: MonitorState = {
+  following: "following",
+  terminal: "open",
+  paths: ["src/a.rs", "src/b.rs"],
+};
+const FOLDED: MonitorState = {
+  following: "paused",
+  terminal: "folded",
+  paths: ["src/a.rs", "src/b.rs"],
+};
 
 describe("the toggles", () => {
   test("following is a pressed toggle, and pressing it pauses", () => {
@@ -77,7 +85,10 @@ describe("the panes", () => {
     const opened = lookOf(OPEN, "en", hands);
     expect([opened.record?.["aria-label"], opened.index]).toEqual(["terminal", undefined]);
     const closed = lookOf(FOLDED, "en", hands);
-    expect([closed.record, closed.index?.files.map((file) => file.path)]).toEqual([undefined, ["src/a.rs", "src/b.rs"]]);
+    expect([closed.record, closed.index?.files.map((file) => file.path)]).toEqual([
+      undefined,
+      ["src/a.rs", "src/b.rs"],
+    ]);
   });
 
   test("a file in the folded column asks the seat to jump to it", () => {

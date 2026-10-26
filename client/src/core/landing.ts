@@ -23,7 +23,11 @@ export type Landing =
   | { readonly kind: "here" }
   | { readonly kind: "elsewhere"; readonly run: RunId; readonly addr: Address };
 
-export function sentFrom(from: Address, task: string, runs: Readonly<Record<RunId, RunBelief>>): Sent {
+export function sentFrom(
+  from: Address,
+  task: string,
+  runs: Readonly<Record<RunId, RunBelief>>,
+): Sent {
   return { from, task, known: new Set(Object.values(runs).map((run) => run.run)) };
 }
 

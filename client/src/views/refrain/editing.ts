@@ -87,7 +87,11 @@ function textOf(text: string): Text {
 // The changes that turn `from` into `to`, as one change set on `from`.
 function between(from: string, to: string): ChangeSet {
   return ChangeSet.of(
-    diff(from, to).map((change) => ({ from: change.fromA, to: change.toA, insert: to.slice(change.fromB, change.toB) })),
+    diff(from, to).map((change) => ({
+      from: change.fromA,
+      to: change.toA,
+      insert: to.slice(change.fromB, change.toB),
+    })),
     from.length,
   );
 }
@@ -101,7 +105,12 @@ function listed(changes: ChangeSet): EditorChange[] {
 }
 
 function compared(original: string): Extension {
-  return unifiedMergeView({ original, mergeControls: false, gutter: true, syntaxHighlightDeletions: false });
+  return unifiedMergeView({
+    original,
+    mergeControls: false,
+    gutter: true,
+    syntaxHighlightDeletions: false,
+  });
 }
 
 // What both of RefRain's views are made of: line numbers, wrapped
@@ -119,7 +128,10 @@ function common(label: string, phrases: Readonly<Record<string, string>>): Exten
 
 export function openEditor(setup: EditorSetup): Editing {
   let base = setup.text;
-  let composed = ChangeSet.of(setup.changes.map((each) => ({ ...each })), base.length);
+  let composed = ChangeSet.of(
+    setup.changes.map((each) => ({ ...each })),
+    base.length,
+  );
   let sentText: string | null = null;
   let sinceSent: ChangeSet | null = null;
   let showing = false;
@@ -151,7 +163,11 @@ export function openEditor(setup: EditorSetup): Editing {
         merge.of([]),
         locked.of(EditorState.readOnly.of(false)),
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged || update.transactions.some((each) => each.annotation(Moved) === true)) return;
+          if (
+            !update.docChanged ||
+            update.transactions.some((each) => each.annotation(Moved) === true)
+          )
+            return;
           composed = composed.compose(update.changes);
           sinceSent = sinceSent?.compose(update.changes) ?? null;
           setup.onEdit();
@@ -170,7 +186,10 @@ export function openEditor(setup: EditorSetup): Editing {
   const move = (theirs: string, then: (onTheirs: ChangeSet) => ChangeSet): void => {
     const onTheirs = between(base, theirs);
     const kept = then(onTheirs);
-    view.dispatch({ changes: composed.invert(textOf(base)).compose(onTheirs).compose(kept), annotations: Moved.of(true) });
+    view.dispatch({
+      changes: composed.invert(textOf(base)).compose(onTheirs).compose(kept),
+      annotations: Moved.of(true),
+    });
     base = theirs;
     composed = kept;
     reoriginate();
@@ -215,7 +234,10 @@ export function openEditor(setup: EditorSetup): Editing {
     top: () => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
     reveal: (at) => {
       const position = Math.min(Math.max(at, 0), view.state.doc.length);
-      view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 24 }) });
+      view.dispatch({
+        selection: { anchor: position },
+        effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 24 }),
+      });
     },
     scrollTop: (at) => {
       const position = Math.min(Math.max(at, 0), view.state.doc.length);

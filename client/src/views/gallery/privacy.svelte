@@ -34,7 +34,10 @@
     {
       label: "privacy entry · refused, this account may not write an HKCU policy key",
       control: "tailored_experiences",
-      held: { stage: { kind: "refused", idem: IDEM }, shown: { refused: { code: "access_denied", error: REFUSAL } } },
+      held: {
+        stage: { kind: "refused", idem: IDEM },
+        shown: { refused: { code: "access_denied", error: REFUSAL } },
+      },
     },
     {
       label: "privacy entry · waiting, Windows may be asking for administrator approval",
@@ -79,6 +82,11 @@
 
 {#if swapped !== undefined}
   <Case label="privacy entry · swapped, the same entry through a second look" width={520}>
-    <Entry model={swapped} held={{ stage: { kind: "idle" }, shown: null }} onPress={() => undefined} look={SwapLook} />
+    <Entry
+      model={swapped}
+      held={{ stage: { kind: "idle" }, shown: null }}
+      onPress={() => undefined}
+      look={SwapLook}
+    />
   </Case>
 {/if}

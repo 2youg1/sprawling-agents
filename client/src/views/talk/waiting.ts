@@ -26,7 +26,9 @@ export interface Group {
 export function grouped(items: readonly ApprovalItem[]): Group[] {
   const groups = new Map<string, ApprovalItem[]>();
   for (const item of items) {
-    const key = item.tainted ? `item:${String(item.id)}` : `${item.cluster_key.class}:${item.cluster_key.detail}`;
+    const key = item.tainted
+      ? `item:${String(item.id)}`
+      : `${item.cluster_key.class}:${item.cluster_key.detail}`;
     const held = groups.get(key);
     if (held === undefined) {
       groups.set(key, [item]);

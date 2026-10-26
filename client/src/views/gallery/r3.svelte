@@ -56,13 +56,26 @@
       ["invited", { kind: "invited", invitation, told: null, busy: false }],
       [
         "invited · answered with another city's key",
-        { kind: "invited", invitation, told: { kind: "refusal", refusal: { kind: "refused", why: "fingerprint" } }, busy: false },
+        {
+          kind: "invited",
+          invitation,
+          told: { kind: "refusal", refusal: { kind: "refused", why: "fingerprint" } },
+          busy: false,
+        },
       ],
       ["the seed, once", { kind: "seed", seed: SEED, device: device(ed25519), persisted: false }],
-      ["paired · the door locked", { kind: "paired", device: device(ed25519), told: { kind: "locked" }, busy: false }],
+      [
+        "paired · the door locked",
+        { kind: "paired", device: device(ed25519), told: { kind: "locked" }, busy: false },
+      ],
       [
         "paired · the door refused",
-        { kind: "paired", device: device(ed25519), told: { kind: "refusal", refusal: { kind: "closed", code: "E_GATE_DENIED" } }, busy: false },
+        {
+          kind: "paired",
+          device: device(ed25519),
+          told: { kind: "refusal", refusal: { kind: "closed", code: "E_GATE_DENIED" } },
+          busy: false,
+        },
       ],
     ];
   }
@@ -83,7 +96,14 @@
     {#each WIDTHS as width (width)}
       <Case label={`remote group · ${name} at ${String(width)}`} {width}>
         <div class="@container/page">
-          <RemoteState {standing} keeps={KEEPS[at] ?? null} onPair={() => undefined} onSeen={() => undefined} onLock={() => undefined} onForget={() => undefined} />
+          <RemoteState
+            {standing}
+            keeps={KEEPS[at] ?? null}
+            onPair={() => undefined}
+            onSeen={() => undefined}
+            onLock={() => undefined}
+            onForget={() => undefined}
+          />
         </div>
       </Case>
     {/each}

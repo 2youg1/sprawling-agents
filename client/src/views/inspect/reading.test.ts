@@ -38,13 +38,31 @@ const SEARCH = call(2, {
   render: "generic",
   arguments: { head: JSON.stringify({ pattern: "fn main", path: "shop" }), cut: 0 },
 });
-const EDIT = call(3, { tool: "edit", effect: { write: { domain: Address.make("shop") } }, render: { diff: { locations: [] } } });
-const EXEC = call(4, { tool: "exec", effect: "egress", render: "terminal", outcome: "waiting", answered: null });
+const EDIT = call(3, {
+  tool: "edit",
+  effect: { write: { domain: Address.make("shop") } },
+  render: { diff: { locations: [] } },
+});
+const EXEC = call(4, {
+  tool: "exec",
+  effect: "egress",
+  render: "terminal",
+  outcome: "waiting",
+  answered: null,
+});
 const SHOT = call(5, {
   tool: "browser",
   effect: "egress",
   render: "generic",
-  output: { head: JSON.stringify({ image: `cas:b3-${"0".repeat(64)}`, width: 1280, height: 720, media_type: "image/png" }), cut: 0 },
+  output: {
+    head: JSON.stringify({
+      image: `cas:b3-${"0".repeat(64)}`,
+      width: 1280,
+      height: 720,
+      media_type: "image/png",
+    }),
+    cut: 0,
+  },
 });
 const UNPLACED = call(6, { tool: "mcp/github" });
 
@@ -53,7 +71,15 @@ describe("where a read call opens the file", () => {
   // D115): `file_path` numbers its offset from 1 (D119), the older `path`
   // from 0, and both open on the line an editor counts from 1.
   test("from the line either spelling of the call names", () => {
-    const asked = (args: object) => readFrom(call(9, { tool: "read", effect: "read", render: "generic", arguments: { head: JSON.stringify(args), cut: 0 } }));
+    const asked = (args: object) =>
+      readFrom(
+        call(9, {
+          tool: "read",
+          effect: "read",
+          render: "generic",
+          arguments: { head: JSON.stringify(args), cut: 0 },
+        }),
+      );
     expect([
       asked({ path: "shop/main.rs", offset: 9 }),
       asked({ file_path: "shop/main.rs", offset: 10 }),
@@ -72,13 +98,29 @@ describe("how the inspector reads a call", () => {
   // The registration names terminals and diffs; the two other readings
   // are told apart by what the call recorded, never by its tool's name.
   test("by the registration first, then by the shape the call recorded", () => {
-    expect([READ, SEARCH, EDIT, EXEC, SHOT, UNPLACED].map(readingOf)).toEqual(["file", "printed", "diff", "terminal", "shot", "printed"]);
+    expect([READ, SEARCH, EDIT, EXEC, SHOT, UNPLACED].map(readingOf)).toEqual([
+      "file",
+      "printed",
+      "diff",
+      "terminal",
+      "shot",
+      "printed",
+    ]);
   });
 
   test("follows the newest answered file call above the newest command, running or not", () => {
     const rounds: RoundsAnswer = {
       run: RUN,
-      turns: [{ calls: [READ, EDIT, SEARCH, EXEC, UNPLACED], notes: [], number: 1, opened: Seq.make(0), t: TimeMs.make(0), timing: "measured" }],
+      turns: [
+        {
+          calls: [READ, EDIT, SEARCH, EXEC, UNPLACED],
+          notes: [],
+          number: 1,
+          opened: Seq.make(0),
+          t: TimeMs.make(0),
+          timing: "measured",
+        },
+      ],
     };
     expect(followingIn(rounds)).toEqual([
       { kind: "call", run: RUN, at: EDIT.at },
@@ -95,13 +137,31 @@ describe("the checkpoints around a call", () => {
     run: RUN,
     opened_at: OPENED,
     turns: [
-      { calls: [], notes: [{ checkpointed: { at: Seq.make(10), oid: FIRST } }], number: 1, opened: Seq.make(0), t: TimeMs.make(0), timing: "measured" },
-      { calls: [], notes: [{ checkpointed: { at: Seq.make(20), oid: SECOND } }], number: 2, opened: Seq.make(11), t: TimeMs.make(0), timing: "measured" },
+      {
+        calls: [],
+        notes: [{ checkpointed: { at: Seq.make(10), oid: FIRST } }],
+        number: 1,
+        opened: Seq.make(0),
+        t: TimeMs.make(0),
+        timing: "measured",
+      },
+      {
+        calls: [],
+        notes: [{ checkpointed: { at: Seq.make(20), oid: SECOND } }],
+        number: 2,
+        opened: Seq.make(11),
+        t: TimeMs.make(0),
+        timing: "measured",
+      },
     ],
   };
 
   test("are the newest one before it, or the opening tree, and the first one after it", () => {
-    expect([bracketOf(rounds, Seq.make(5)), bracketOf(rounds, Seq.make(15)), bracketOf(rounds, Seq.make(25))]).toEqual([
+    expect([
+      bracketOf(rounds, Seq.make(5)),
+      bracketOf(rounds, Seq.make(15)),
+      bracketOf(rounds, Seq.make(25)),
+    ]).toEqual([
       { base: OPENED, head: FIRST },
       { base: FIRST, head: SECOND },
       { base: SECOND, head: null },

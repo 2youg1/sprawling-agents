@@ -16,7 +16,9 @@
   const look: PairLook = $props();
 </script>
 
-<div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-base gap-y-snug border-b border-edge px-wide py-snug">
+<div
+  class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-base gap-y-snug border-b border-edge px-wide py-snug"
+>
   {#each look.sides as side (side.key)}
     <span class="text-note text-text-faint">{side.label}</span>
     <select

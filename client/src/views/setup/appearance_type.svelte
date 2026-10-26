@@ -162,7 +162,11 @@
   </div>
 {/snippet}
 
-<Card title={say($lang, "appearance_face")} note={say($lang, "appearance_face_note")} receipt={receipt("face")}>
+<Card
+  title={say($lang, "appearance_face")}
+  note={say($lang, "appearance_face_note")}
+  receipt={receipt("face")}
+>
   <Segmented
     label={say($lang, "appearance_face")}
     options={cellsOf(FACES, FACE_WORDS, said)}
@@ -177,7 +181,11 @@
   {/if}
 </Card>
 
-<Card title={say($lang, "appearance_mono")} note={say($lang, "appearance_mono_note")} receipt={receipt("mono")}>
+<Card
+  title={say($lang, "appearance_mono")}
+  note={say($lang, "appearance_mono_note")}
+  receipt={receipt("mono")}
+>
   <Segmented
     label={say($lang, "appearance_mono")}
     options={cellsOf(FACES, FACE_WORDS, said)}
@@ -192,7 +200,11 @@
   {/if}
 </Card>
 
-<Card title={say($lang, "appearance_reading")} note={say($lang, "appearance_reading_note")} receipt={receipt("reading")}>
+<Card
+  title={say($lang, "appearance_reading")}
+  note={say($lang, "appearance_reading_note")}
+  receipt={receipt("reading")}
+>
   <Segmented
     label={say($lang, "appearance_reading")}
     options={cellsOf(READING_FACES, READING_WORDS, said)}
@@ -202,12 +214,20 @@
     }}
   />
   <!-- The sample carries the card's own choice, so it shows the face this card holds wherever the card is drawn. -->
-  <p class="rounded-card bg-chrome p-base font-read text-body leading-relaxed text-text" data-read={look.reading}>
+  <p
+    class="rounded-card bg-chrome p-base font-read text-body leading-relaxed text-text"
+    data-read={look.reading}
+  >
     {say($lang, "appearance_reading_sample")}
   </p>
 </Card>
 
-<Card title={say($lang, "appearance_body")} note={say($lang, "appearance_body_note")} constraint={sizeFloor()} receipt={receipt("body")}>
+<Card
+  title={say($lang, "appearance_body")}
+  note={say($lang, "appearance_body_note")}
+  constraint={sizeFloor()}
+  receipt={receipt("body")}
+>
   <Field
     label={say($lang, "appearance_body")}
     labelling="hidden"

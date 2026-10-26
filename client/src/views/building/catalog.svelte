@@ -43,7 +43,9 @@
 
   const question = $derived<Query>({ catalog: { building } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (answer) => ("catalog" in answer ? answer.catalog : undefined)));
+  const read = $derived(
+    readAnswer($asked, (answer) => ("catalog" in answer ? answer.catalog : undefined)),
+  );
   const answer = $derived(read.kind === "held" ? read.value : undefined);
 
   let scope = $state<Scope>("building");
@@ -71,7 +73,8 @@
 
   function save(): void {
     const table = { tools: draft.tools, namespaces: draft.namespaces };
-    const command = scope === "building" ? configureCatalog(building, table) : configureCityCatalog(table);
+    const command =
+      scope === "building" ? configureCatalog(building, table) : configureCityCatalog(table);
     if (u.send(command)) sent = draft;
   }
 
@@ -111,7 +114,10 @@
   <div class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
     <p class="text-note text-text-faint">
       {say($lang, "catalog_skills_rules")}
-      <a class="text-accent underline-offset-2 hover:underline" href={toFragment({ kind: "setup", group: "rules" })}>
+      <a
+        class="text-accent underline-offset-2 hover:underline"
+        href={toFragment({ kind: "setup", group: "rules" })}
+      >
         {say($lang, "catalog_skills_rules_link")}
       </a>
     </p>

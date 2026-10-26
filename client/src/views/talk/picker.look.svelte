@@ -25,13 +25,27 @@ already on the screen; a list opened in full scrolls inside that room. -->
 
   const { look, menu }: Props = $props();
 
-  const QUIET: SectionLook = { heading: "", aside: undefined, spare: 0, band: false, scrolls: false, empty: "", heard: {} };
-  const HEADING = "flex h-control-sm items-center justify-between gap-base px-snug text-note text-text-faint";
-  const ROW = "relative flex h-touch min-w-0 shrink-0 cursor-pointer items-center gap-snug rounded-control px-base text-body outline-1 -outline-offset-1 outline-transparent";
+  const QUIET: SectionLook = {
+    heading: "",
+    aside: undefined,
+    spare: 0,
+    band: false,
+    scrolls: false,
+    empty: "",
+    heard: {},
+  };
+  const HEADING =
+    "flex h-control-sm items-center justify-between gap-base px-snug text-note text-text-faint";
+  const ROW =
+    "relative flex h-touch min-w-0 shrink-0 cursor-pointer items-center gap-snug rounded-control px-base text-body outline-1 -outline-offset-1 outline-transparent";
   const NOTE = "line-clamp-2 min-h-[2lh] px-snug text-note text-text-quiet";
 
   const tone = (item: RowLook): string[] => [
-    item.chosen ? "wash-strong text-text" : item.cursor ? "bg-raised-hover text-text-quiet" : "text-text-quiet",
+    item.chosen
+      ? "wash-strong text-text"
+      : item.cursor
+        ? "bg-raised-hover text-text-quiet"
+        : "text-text-quiet",
     item.cursor ? "chosen" : "",
   ];
   // The window's height caps the panel, and so does the room on the side
@@ -40,7 +54,9 @@ already on the screen; a list opened in full scrolls inside that room. -->
   // inside that room rather than rising past the window's top. The gap
   // it keeps from its anchor, and as much again from the edge, comes off.
   const cap = $derived(
-    look.room === null ? undefined : `min(85dvh, calc(${String(look.room)}px - var(--spacing-snug) * 2))`,
+    look.room === null
+      ? undefined
+      : `min(85dvh, calc(${String(look.room)}px - var(--spacing-snug) * 2))`,
   );
   // The sentence under the band: the level the cursor is on, else the
   // level in use.
@@ -68,8 +84,10 @@ already on the screen; a list opened in full scrolls inside that room. -->
   {#each look.lists as list (list.key)}
     {@const section = menu.sections[list.key] ?? QUIET}
     {#if list.key === SECTION.first}
-      <input class="h-touch w-full min-w-0 shrink-0 rounded-control bg-page px-base text-body text-text outline-hidden placeholder:text-text-faint"
-        {...menu.filter} />
+      <input
+        class="h-touch w-full min-w-0 shrink-0 rounded-control bg-page px-base text-body text-text outline-hidden placeholder:text-text-faint"
+        {...menu.filter}
+      />
     {/if}
     <div class="flex min-w-0 flex-col gap-tight">
       <div class={HEADING}>
@@ -85,17 +103,29 @@ already on the screen; a list opened in full scrolls inside that room. -->
         aria-label={section.heading}
       >
         {#each list.rows as item (item.key)}
-          <li class={[ROW, section.band ? "flex-1 justify-center" : "justify-between", ...tone(item)]}
-            aria-label={section.heard[item.row.id]} {...item.wire}>
+          <li
+            class={[ROW, section.band ? "flex-1 justify-center" : "justify-between", ...tone(item)]}
+            aria-label={section.heard[item.row.id]}
+            {...item.wire}
+          >
             <!-- The name keeps its width and the facts beside it give
                  way, so a provider is never cut to a prefix. -->
-            <span class={section.band || item.row.secondary === undefined ? "min-w-0 truncate" : "max-w-[60%] shrink-0 truncate"}>{item.row.label}</span>
+            <span
+              class={section.band || item.row.secondary === undefined
+                ? "min-w-0 truncate"
+                : "max-w-[60%] shrink-0 truncate"}>{item.row.label}</span
+            >
             {#if item.row.secondary !== undefined && !section.band}
               <span class="min-w-0 truncate text-note text-text-faint">{item.row.secondary}</span>
             {/if}
           </li>
         {:else}
-          <li role="presentation" class="flex h-touch items-center px-base text-note text-text-faint">{section.empty}</li>
+          <li
+            role="presentation"
+            class="flex h-touch items-center px-base text-note text-text-faint"
+          >
+            {section.empty}
+          </li>
         {/each}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself) -->
         {@render spareRows(list.rows.length === 0 ? Math.max(0, section.spare - 1) : section.spare)}

@@ -11,4 +11,6 @@ wash under the pointer, the way every press inside the thread does. -->
   const look: FoldLook = $props();
 </script>
 
-<button {...look.wire} class="rounded-control px-tight hover:wash hover:text-text-quiet">{look.label}</button>
+<button {...look.wire} class="rounded-control px-tight hover:wash hover:text-text-quiet"
+  >{look.label}</button
+>

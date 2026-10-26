@@ -19,7 +19,10 @@ room, lit while a pointer rests on it. -->
   <ul>
     {#each rows as row (row.key)}
       <li>
-        <a href={row.href} class="flex items-baseline gap-base rounded-control py-tight hover:bg-raised-hover">
+        <a
+          href={row.href}
+          class="flex items-baseline gap-base rounded-control py-tight hover:bg-raised-hover"
+        >
           <span class="shrink-0 text-text-quiet">{row.kind}</span>
           <span class="min-w-0 flex-1 truncate">{row.first}</span>
           <span class="max-w-3/10 truncate text-text-faint">{row.from}</span>

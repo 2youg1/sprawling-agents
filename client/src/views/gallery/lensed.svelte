@@ -12,7 +12,14 @@
   // lens over forty turns, and the evidence lens with and without
   // anything to check.
 
-  import type { Answer, EvidenceItem, PrefixSegment, PrefixSlot, PromptTools, Query } from "../../wire";
+  import type {
+    Answer,
+    EvidenceItem,
+    PrefixSegment,
+    PrefixSlot,
+    PromptTools,
+    Query,
+  } from "../../wire";
   import { Address, B3Hash, Locator, RunId, Seq } from "../../wire";
 
   const RUN = RunId.make("5b1e7d2a-9c3f-4e8b-a1d2-3c4b5a6f7e80");
@@ -24,7 +31,11 @@
       hash: B3Hash.make(String(at).repeat(64)),
       sources: [
         { addr: Address.make(`shop/${slot}/Memo.md`), kept: text.length, dropped: 0 },
-        { addr: Address.make(`shop/${slot}/Plan.md`), kept: text.length, dropped: at === 2 ? 1_840 : 0 },
+        {
+          addr: Address.make(`shop/${slot}/Plan.md`),
+          kept: text.length,
+          dropped: at === 2 ? 1_840 : 0,
+        },
       ],
       stored,
       text,
@@ -32,8 +43,18 @@
   }
 
   const SEGMENTS: readonly PrefixSegment[] = [
-    segmentOf("city", 1, true, "You are a resident of the city sprawling. Keep to the building you were placed in."),
-    segmentOf("building", 2, true, "The shop sells what its residents make.\nEvery change ships with a test."),
+    segmentOf(
+      "city",
+      1,
+      true,
+      "You are a resident of the city sprawling. Keep to the building you were placed in.",
+    ),
+    segmentOf(
+      "building",
+      2,
+      true,
+      "The shop sells what its residents make.\nEvery change ships with a test.",
+    ),
     segmentOf("resident", 3, false, ""),
     segmentOf("run", 4, true, "Tidy the release notes for 0.0.10."),
   ];
@@ -45,22 +66,61 @@
     len: 1840,
     index: 412,
     rows: [
-      { name: "edit", namespace: "sprawling", exposure: "core", from: "default", len: 980, hint: "Replace text in a file you have read" },
-      { name: "github_create_issue", namespace: "github", exposure: "off", from: "building", len: 310, hint: "create a issue on the forge" },
-      { name: "plan", namespace: "sprawling", exposure: "dormant", from: "default", len: 640, hint: "Claim a node of the roadmap" },
-      { name: "read", namespace: "sprawling", exposure: "core", from: "fixed", len: 860, hint: "Open one file by its path" },
+      {
+        name: "edit",
+        namespace: "sprawling",
+        exposure: "core",
+        from: "default",
+        len: 980,
+        hint: "Replace text in a file you have read",
+      },
+      {
+        name: "github_create_issue",
+        namespace: "github",
+        exposure: "off",
+        from: "building",
+        len: 310,
+        hint: "create a issue on the forge",
+      },
+      {
+        name: "plan",
+        namespace: "sprawling",
+        exposure: "dormant",
+        from: "default",
+        len: 640,
+        hint: "Claim a node of the roadmap",
+      },
+      {
+        name: "read",
+        namespace: "sprawling",
+        exposure: "core",
+        from: "fixed",
+        len: 860,
+        hint: "Open one file by its path",
+      },
     ],
   };
 
   const ITEMS: readonly EvidenceItem[] = [
-    { at: Seq.make(412), kind: "screenshot", locator: Locator.make("shop/notes/.evidence/412.png"), picture: { width: 1440, height: 900, media_type: "image/png" } },
-    { at: Seq.make(418), kind: "finished", locator: Locator.make("shop/notes/CHANGELOG.md"), picture: null },
+    {
+      at: Seq.make(412),
+      kind: "screenshot",
+      locator: Locator.make("shop/notes/.evidence/412.png"),
+      picture: { width: 1440, height: 900, media_type: "image/png" },
+    },
+    {
+      at: Seq.make(418),
+      kind: "finished",
+      locator: Locator.make("shop/notes/CHANGELOG.md"),
+      picture: null,
+    },
   ];
 
   function answering(items: readonly EvidenceItem[]): (query: Query) => Answer | undefined {
     return (query) => {
       if (typeof query !== "object") return undefined;
-      if ("prefix" in query) return { prefix: { run: query.prefix.run, segments: SEGMENTS, tools: TOOLS } };
+      if ("prefix" in query)
+        return { prefix: { run: query.prefix.run, segments: SEGMENTS, tools: TOOLS } };
       if ("evidence" in query) return { evidence: { run: query.evidence.run, items } };
       return undefined;
     };
@@ -87,17 +147,33 @@
 </script>
 
 <Case label="run · the prompt lens as the city answers it">
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(ITEMS)}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={answering(ITEMS)}
+  >
     <Prompt run={RUN} />
   </Stand>
 </Case>
 
-<Case label="run · the prompt lens, one segment open with its copy receipt, one the store no longer holds">
-  <PromptLook {...lookOf({ segments: SEGMENTS, tools: TOOLS }, { open: new Set([OPENED, "tools"]), receipt: OPENED }, $lang, NOBODY)} />
+<Case
+  label="run · the prompt lens, one segment open with its copy receipt, one the store no longer holds"
+>
+  <PromptLook
+    {...lookOf(
+      { segments: SEGMENTS, tools: TOOLS },
+      { open: new Set([OPENED, "tools"]), receipt: OPENED },
+      $lang,
+      NOBODY,
+    )}
+  />
 </Case>
 
 <Case label="run · the prompt lens of a run sent no prompt">
-  <PromptLook {...lookOf({ segments: [], tools: null }, { open: new Set(), receipt: null }, $lang, NOBODY)} />
+  <PromptLook
+    {...lookOf({ segments: [], tools: null }, { open: new Set(), receipt: null }, $lang, NOBODY)}
+  />
 </Case>
 
 <Case label="run · the context lens over forty turns">
@@ -105,8 +181,15 @@
 </Case>
 
 {#each [ITEMS, []] as items, at (at)}
-  <Case label={`run · the evidence lens ${items.length === 0 ? "with nothing to check" : "with a screenshot and a finish"}`}>
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(items)}>
+  <Case
+    label={`run · the evidence lens ${items.length === 0 ? "with nothing to check" : "with a screenshot and a finish"}`}
+  >
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={answering(items)}
+    >
       <Evidence run={RUN} />
     </Stand>
   </Case>

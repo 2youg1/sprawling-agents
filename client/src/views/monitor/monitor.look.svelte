@@ -21,26 +21,37 @@
 
   const look: MonitorLook = $props();
 
-  const TOGGLE = "inline-flex h-control-sm items-center rounded-control px-snug text-label transition-colors ease-leave hover:ease-arrive";
-  const PANE = "pane relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-accent";
+  const TOGGLE =
+    "inline-flex h-control-sm items-center rounded-control px-snug text-label transition-colors ease-leave hover:ease-arrive";
+  const PANE =
+    "pane relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-accent";
 </script>
 
 <section class="flex min-h-0 flex-1 flex-col" aria-label={look.label}>
-  <header class="flex flex-wrap items-center gap-snug border-b border-edge bg-chrome px-pane py-snug text-note">
+  <header
+    class="flex flex-wrap items-center gap-snug border-b border-edge bg-chrome px-pane py-snug text-note"
+  >
     <span class="text-label text-text">{look.heading}</span>
     <span class="text-text-faint figure">{look.tally}</span>
     <!-- Following is the resting state and reads as a lit word; paused
     stands on a raised fill, because it is the state that asks to be
     taken back up. -->
     <button
-      class="{TOGGLE} ms-auto {look.follow.held ? 'text-accent hover:bg-raised' : 'bg-raised text-text hover:bg-raised-hover'}"
+      class="{TOGGLE} ms-auto {look.follow.held
+        ? 'text-accent hover:bg-raised'
+        : 'bg-raised text-text hover:bg-raised-hover'}"
       {...look.follow.wire}>{look.follow.label}</button
     >
-    <button class="{TOGGLE} text-text-quiet hover:bg-raised hover:text-text" {...look.fold.wire}>{look.fold.label}</button>
+    <button class="{TOGGLE} text-text-quiet hover:bg-raised hover:text-text" {...look.fold.wire}
+      >{look.fold.label}</button
+    >
   </header>
   <div class="flex min-h-0 flex-1">
     {#if look.index !== undefined}
-      <nav class="w-index shrink-0 overflow-y-auto border-e border-edge py-tight" aria-label={look.index.label}>
+      <nav
+        class="w-index shrink-0 overflow-y-auto border-e border-edge py-tight"
+        aria-label={look.index.label}
+      >
         {#each look.index.files as file (file.path)}
           <button
             class="block w-full truncate px-snug py-tight text-start font-mono text-note text-text-quiet transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive"
@@ -49,7 +60,10 @@
         {/each}
       </nav>
     {/if}
-    <div class="{PANE} {look.record === undefined ? '' : 'beside border-e border-edge'}" {...look.code}>
+    <div
+      class="{PANE} {look.record === undefined ? '' : 'beside border-e border-edge'}"
+      {...look.code}
+    >
       {@render look.column()}
     </div>
     {#if look.record !== undefined}

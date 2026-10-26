@@ -31,7 +31,11 @@
 
 <div class="flex min-w-0 flex-col gap-base">
   <header class="flex flex-wrap items-baseline gap-x-base gap-y-snug">
-    <svelte:element this={look.level === 1 ? "h1" : "h2"} class="text-title font-title" tabindex="-1">{look.title}</svelte:element>
+    <svelte:element
+      this={look.level === 1 ? "h1" : "h2"}
+      class="text-title font-title"
+      tabindex="-1">{look.title}</svelte:element
+    >
     <p class="figure text-note text-text-quiet">{look.counts}</p>
   </header>
 
@@ -53,17 +57,34 @@
     </nav>
   {/if}
 
-  <ul class="flex flex-wrap gap-x-wide gap-y-tight text-note text-text-quiet" aria-label={look.legend.label}>
+  <ul
+    class="flex flex-wrap gap-x-wide gap-y-tight text-note text-text-quiet"
+    aria-label={look.legend.label}
+  >
     {#each look.legend.phases as each (each.phase)}
-      <li class="flex items-center gap-snug"><span class={["inline-block h-snug w-base rounded-pill", PHASE_FILL[each.phase]]} aria-hidden="true"></span>{each.word}</li>
+      <li class="flex items-center gap-snug">
+        <span
+          class={["inline-block h-snug w-base rounded-pill", PHASE_FILL[each.phase]]}
+          aria-hidden="true"
+        ></span>{each.word}
+      </li>
     {/each}
   </ul>
 
-  <div class="flex min-w-0 items-end gap-snug border-b border-edge pr-snug pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
+  <div
+    class="flex min-w-0 items-end gap-snug border-b border-edge pr-snug pb-tight font-mono figure text-note text-text-quiet"
+    aria-hidden="true"
+  >
     <span class="min-w-0 flex-1"></span>
     <span class="relative h-base w-[40%] shrink-0">
       {#each look.folds as fold (fold.minutes)}
-        <span class={["absolute top-0 border-l border-edge-input pl-tight", fold.wide ? "hidden @lg/page:inline" : ""]} style:left="{String(fold.at)}%">{fold.label}</span>
+        <span
+          class={[
+            "absolute top-0 border-l border-edge-input pl-tight",
+            fold.wide ? "hidden @lg/page:inline" : "",
+          ]}
+          style:left="{String(fold.at)}%">{fold.label}</span
+        >
       {/each}
       <span class="absolute top-0 right-0 font-sans text-text">{look.now}</span>
     </span>
@@ -83,24 +104,45 @@
           row.current ? "wash-strong shadow-[inset_2px_0_0_var(--color-accent)]" : "",
         ]}
       >
-        <span class="shrink-0 pl-snug font-mono whitespace-pre text-text-quiet" aria-hidden="true">{row.guide}</span>
+        <span class="shrink-0 pl-snug font-mono whitespace-pre text-text-quiet" aria-hidden="true"
+          >{row.guide}</span
+        >
         {#if row.body.kind === "building"}
-          <span class="min-w-0 flex-1 truncate font-mono font-label text-text">{row.body.name}</span>
-          <span class={["inline-flex shrink-0 items-center gap-tight font-mono figure", row.body.asking === 0 ? "text-text-quiet" : "text-alert"]}><Glyph name="hand" size="sm" />{String(row.body.asking)}</span>
+          <span class="min-w-0 flex-1 truncate font-mono font-label text-text">{row.body.name}</span
+          >
+          <span
+            class={[
+              "inline-flex shrink-0 items-center gap-tight font-mono figure",
+              row.body.asking === 0 ? "text-text-quiet" : "text-alert",
+            ]}><Glyph name="hand" size="sm" />{String(row.body.asking)}</span
+          >
           <span class="shrink-0 font-mono figure text-text-quiet">{String(row.body.runs)}</span>
         {:else if row.body.kind === "room"}
           <span class="min-w-0 flex-1 truncate font-mono text-text-quiet">{row.body.name}</span>
         {:else if row.body.kind === "run"}
           {@const mark = PHASE_MARK[row.body.phase]}
           <Glyph name={mark.glyph} size="sm" class={["shrink-0", INK[mark.weight]]} />
-          <span class="hidden shrink-0 font-mono text-text-quiet @lg/page:inline">{row.body.id}</span>
+          <span class="hidden shrink-0 font-mono text-text-quiet @lg/page:inline"
+            >{row.body.id}</span
+          >
           <span class="min-w-0 flex-1 truncate text-text">{row.body.title}</span>
-          <span class={["hidden max-w-[30%] shrink-0 truncate text-note @lg/page:inline", INK[mark.weight]]}>{row.body.said}</span>
+          <span
+            class={[
+              "hidden max-w-[30%] shrink-0 truncate text-note @lg/page:inline",
+              INK[mark.weight],
+            ]}>{row.body.said}</span
+          >
           <span class="relative h-snug w-[40%] shrink-0" aria-hidden="true">
-            <span class="absolute inset-y-0 rounded-pill bg-edge" style:left="{row.body.bar.left.toFixed(3)}%" style:width="{row.body.bar.width.toFixed(3)}%"></span>
+            <span
+              class="absolute inset-y-0 rounded-pill bg-edge"
+              style:left="{row.body.bar.left.toFixed(3)}%"
+              style:width="{row.body.bar.width.toFixed(3)}%"
+            ></span>
             <span
               class={["absolute inset-y-0 w-snug rounded-pill", PHASE_FILL[row.body.phase]]}
-              style:left="clamp(0px, calc({row.body.bar.left.toFixed(3)}% + {row.body.bar.width.toFixed(3)}% - var(--spacing-snug)), calc(100% - var(--spacing-snug)))"
+              style:left="clamp(0px, calc({row.body.bar.left.toFixed(3)}% + {row.body.bar.width.toFixed(
+                3,
+              )}% - var(--spacing-snug)), calc(100% - var(--spacing-snug)))"
             ></span>
           </span>
         {/if}

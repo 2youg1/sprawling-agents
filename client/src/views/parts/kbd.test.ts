@@ -22,13 +22,19 @@ const WORDS = {
 };
 
 function sheet(seat: Seat, heard: string[]) {
-  return sheetOf({ uid: "k1", seat, onClose: () => heard.push("close"), hold: () => undefined }, WORDS);
+  return sheetOf(
+    { uid: "k1", seat, onClose: () => heard.push("close"), hold: () => undefined },
+    WORDS,
+  );
 }
 
 describe("the chord sheet's relations", () => {
   test("the heading names it and the rebinding line describes it", () => {
     const look = sheet("modal", []);
-    expect([look.sheet["aria-labelledby"], look.sheet["aria-describedby"]]).toEqual(["k1-title", "k1-where"]);
+    expect([look.sheet["aria-labelledby"], look.sheet["aria-describedby"]]).toEqual([
+      "k1-title",
+      "k1-where",
+    ]);
     expect([look.heading, look.where]).toEqual([
       { id: "k1-title", text: "Keyboard" },
       { id: "k1-where", text: "Rebind a chord in Settings." },
@@ -36,7 +42,10 @@ describe("the chord sheet's relations", () => {
   });
 
   test("only a specimen carries the open attribute", () => {
-    expect([sheet("modal", []).sheet.open, sheet("specimen", []).sheet.open]).toEqual([false, true]);
+    expect([sheet("modal", []).sheet.open, sheet("specimen", []).sheet.open]).toEqual([
+      false,
+      true,
+    ]);
   });
 });
 

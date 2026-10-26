@@ -17,7 +17,16 @@
 
   import { QUERIES } from "../../core/asking";
   import { MAYOR } from "../../core/route";
-  import type { Answer, EventKind, EventRecord, IdentityAnswer, Opening, Query, SessionLine, Turn } from "../../wire";
+  import type {
+    Answer,
+    EventKind,
+    EventRecord,
+    IdentityAnswer,
+    Opening,
+    Query,
+    SessionLine,
+    Turn,
+  } from "../../wire";
   import { B3Hash, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 
   const MODEL = "anthropic/claude-sonnet-5";
@@ -34,7 +43,12 @@
     },
   };
 
-  function record(seq: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+  function record(
+    seq: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       run: RUN,
       seq: Seq.make(seq),
@@ -56,7 +70,14 @@
     ];
   }
 
-  function turn(number: number, t: number, said: string, first: number, took: number, output: number): Turn {
+  function turn(
+    number: number,
+    t: number,
+    said: string,
+    first: number,
+    took: number,
+    output: number,
+  ): Turn {
     return {
       calls: [],
       notes: [],
@@ -84,14 +105,36 @@
       names: { mayor: "Cat" },
     };
     const turns: readonly Turn[] = [
-      turn(1, now - 119_000, "Four crates read the ledger: storage writes it, and accounting, wire and citysim read it.", 412, 2_400, 140),
-      turn(2, now - 100_000, "accounting folds it into the views; wire only carries the records a client asks for.", 388, 1_600, 96),
+      turn(
+        1,
+        now - 119_000,
+        "Four crates read the ledger: storage writes it, and accounting, wire and citysim read it.",
+        412,
+        2_400,
+        140,
+      ),
+      turn(
+        2,
+        now - 100_000,
+        "accounting folds it into the views; wire only carries the records a client asks for.",
+        388,
+        1_600,
+        96,
+      ),
     ];
     return (query) => {
       if (query === QUERIES.identity) return { identity: RENAMED };
       if (named && typeof query === "object" && "sessions" in query) {
         // The one session the records above open, which the address line numbers.
-        const line: SessionLine = { at: TimeMs.make(now - 60_000), began: Seq.make(1), last: Seq.make(3), runs: 1, name: null, preview: null, start: { opened: { carry: "nothing" } } };
+        const line: SessionLine = {
+          at: TimeMs.make(now - 60_000),
+          began: Seq.make(1),
+          last: Seq.make(3),
+          runs: 1,
+          name: null,
+          preview: null,
+          start: { opened: { carry: "nothing" } },
+        };
         return { sessions: { room: query.sessions.room, sessions: [line], earlier: 0 } };
       }
       if (!named || typeof query !== "object" || !("rounds" in query)) return undefined;
@@ -110,16 +153,33 @@
   const now = ui().now();
 </script>
 
-<Case label="frozen facts · the Mayor's session under the name it froze, the address line at its head, its first head with model · effort · mode, each reply with TTFT and t/s" width={760}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, true)} records={recordsAt(now)}>
+<Case
+  label="frozen facts · the Mayor's session under the name it froze, the address line at its head, its first head with model · effort · mode, each reply with TTFT and t/s"
+  width={760}
+>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={answering(now, true)}
+    records={recordsAt(now)}
+  >
     <div class="h-[520px] px-wide">
       <Talk address={MAYOR} band={false} seat={PAGE} />
     </div>
   </Stand>
 </Case>
 
-<Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, the address line at its head with no number yet" width={760}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, false)}>
+<Case
+  label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, the address line at its head with no number yet"
+  width={760}
+>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={answering(now, false)}
+  >
     <div class="h-[420px] px-wide">
       <Talk address={MAYOR} band={false} seat={PAGE} />
     </div>

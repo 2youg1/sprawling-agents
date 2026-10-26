@@ -20,7 +20,13 @@ import { configureSearch } from "../../../core/commands";
 import { say } from "../../../core/lang";
 import type { Key, Lang } from "../../../core/lang";
 import { ServerLabel } from "../../../wire";
-import type { AxError, Command, SearchConfiguration, SearchSupplier, SettledSearch } from "../../../wire";
+import type {
+  AxError,
+  Command,
+  SearchConfiguration,
+  SearchSupplier,
+  SettledSearch,
+} from "../../../wire";
 import type { CustomSearch } from "../providers/rosters";
 
 export type Choice = "default" | "custom" | "off";
@@ -61,7 +67,15 @@ export interface SearchHands {
 const BLANK: SupplierDraft = { id: "", url: "", remote: "", query: "", count: "", objective: "" };
 
 export function freshSearch(): SearchEditor {
-  return { draft: BLANK, editing: null, adding: false, kept: null, note: null, refused: null, sent: null };
+  return {
+    draft: BLANK,
+    editing: null,
+    adding: false,
+    kept: null,
+    note: null,
+    refused: null,
+    sent: null,
+  };
 }
 
 const labelled = Schema.is(ServerLabel);
@@ -144,8 +158,13 @@ export function cancel(editor: SearchEditor): void {
 export function unsaveable(editor: SearchEditor, custom: CustomSearch | null): Key | null {
   const { draft } = editor;
   if (!labelled(draft.id.trim())) return "setup_account_id_shape";
-  if (editor.editing === null && custom?.suppliers.some((each) => each.id === draft.id.trim()) === true) return "search_id_taken";
-  if ([draft.url, draft.remote, draft.query].some((part) => part.trim() === "")) return "search_required";
+  if (
+    editor.editing === null &&
+    custom?.suppliers.some((each) => each.id === draft.id.trim()) === true
+  )
+    return "search_id_taken";
+  if ([draft.url, draft.remote, draft.query].some((part) => part.trim() === ""))
+    return "search_required";
   return null;
 }
 
@@ -169,7 +188,8 @@ export function save(editor: SearchEditor, hands: SearchHands): void {
     accounts: listed.find((each) => each.id === id)?.accounts ?? [],
   };
   const at = listed.findIndex((each) => each.id === id);
-  const suppliers = at < 0 ? [...listed, supplier] : listed.map((each, index) => (index === at ? supplier : each));
+  const suppliers =
+    at < 0 ? [...listed, supplier] : listed.map((each, index) => (index === at ? supplier : each));
   if (!commit(editor, hands, { custom: { selected: custom?.selected ?? id, suppliers } })) return;
   cancel(editor);
 }
@@ -185,7 +205,12 @@ export function select(editor: SearchEditor, hands: SearchHands, id: ServerLabel
 export function remove(editor: SearchEditor, hands: SearchHands, id: ServerLabel): void {
   const custom = customOf(shownSearch(editor, hands.settled()));
   if (custom === null || custom.selected === id || custom.suppliers.length <= 1) return;
-  if (!commit(editor, hands, { custom: { ...custom, suppliers: custom.suppliers.filter((each) => each.id !== id) } })) return;
+  if (
+    !commit(editor, hands, {
+      custom: { ...custom, suppliers: custom.suppliers.filter((each) => each.id !== id) },
+    })
+  )
+    return;
   if (editor.editing === id) cancel(editor);
 }
 

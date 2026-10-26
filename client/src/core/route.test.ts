@@ -68,8 +68,15 @@ describe("route", () => {
   });
 
   test("a stretch is named after the room by a character no address can hold", () => {
-    expect(toFragment({ kind: "talk", address: parser, session: Seq.make(12) })).toBe("#/talk/lab/parser:12");
-    for (const broken of ["#/talk/lab/parser:", "#/talk/lab/parser:x", "#/talk/lab/parser:-1", "#/talk/:4"]) {
+    expect(toFragment({ kind: "talk", address: parser, session: Seq.make(12) })).toBe(
+      "#/talk/lab/parser:12",
+    );
+    for (const broken of [
+      "#/talk/lab/parser:",
+      "#/talk/lab/parser:x",
+      "#/talk/lab/parser:-1",
+      "#/talk/:4",
+    ]) {
       expect(fromFragment(broken), broken).toEqual(Option.none());
     }
   });
@@ -88,24 +95,18 @@ describe("route", () => {
   });
 
   test("a conversation is named by its room and not by a number", () => {
-    expect(toFragment({ kind: "talk", address: parser })).toBe(
-      "#/talk/lab/parser",
-    );
+    expect(toFragment({ kind: "talk", address: parser })).toBe("#/talk/lab/parser");
     expect(fromFragment("#/talk/lab/parser")).toEqual(
       Option.some({ kind: "talk", address: parser }),
     );
-    expect(fromFragment("#/s/lab/parser")).toEqual(
-      Option.some({ kind: "talk", address: parser }),
-    );
+    expect(fromFragment("#/s/lab/parser")).toEqual(Option.some({ kind: "talk", address: parser }));
     expect(toFragment({ kind: "talk", address: MAYOR })).toBe("#/");
   });
 
   test("a room named in any script opens from the address bar the browser wrote", () => {
     const named = Address.make("shop/收到。");
     const written = "#/talk/shop/%E6%94%B6%E5%88%B0%E3%80%82";
-    expect(fromFragment(written)).toEqual(
-      Option.some({ kind: "talk", address: named }),
-    );
+    expect(fromFragment(written)).toEqual(Option.some({ kind: "talk", address: named }));
     expect(fromFragment(toFragment({ kind: "talk", address: named }))).toEqual(
       Option.some({ kind: "talk", address: named }),
     );
@@ -213,10 +214,10 @@ describe("deep links", () => {
   });
 
   test("a run lens and a guide step are a path segment", () => {
-    expect([toFragment({ kind: "run", run: seven, lens: "turns" }), toFragment({ kind: "welcome", step: "mcp" })]).toEqual([
-      `#/run/${seven}/turns`,
-      "#/welcome/mcp",
-    ]);
+    expect([
+      toFragment({ kind: "run", run: seven, lens: "turns" }),
+      toFragment({ kind: "welcome", step: "mcp" }),
+    ]).toEqual([`#/run/${seven}/turns`, "#/welcome/mcp"]);
   });
 
   test("a locator with a key missing, a key too many or a value the wire refuses names nothing", () => {
@@ -245,7 +246,9 @@ describe("deep links", () => {
 
 describe("building destinations", () => {
   const notes = Address.make("notes");
-  const progress: BuildingProgress["progress"] = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
+  const progress: BuildingProgress["progress"] = {
+    planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 },
+  };
   const buildings: readonly BuildingProgress[] = [
     { addr: lab, adoptable: false, blocked: [], problems: [], progress, ready: 0 },
     { addr: notes, adoptable: true, blocked: [], problems: [], progress, ready: 0 },
@@ -253,7 +256,11 @@ describe("building destinations", () => {
 
   test("an established building, an adoptable folder and an unknown name each have one destination and view", () => {
     const unknown = Address.make("new-project");
-    expect([buildingDestination(lab, buildings), buildingDestination(notes, buildings), buildingDestination(unknown, buildings)]).toEqual([
+    expect([
+      buildingDestination(lab, buildings),
+      buildingDestination(notes, buildings),
+      buildingDestination(unknown, buildings),
+    ]).toEqual([
       { kind: "building", view: { kind: "building", address: lab } },
       { kind: "adopt", view: { kind: "raise", address: notes } },
       { kind: "build", view: { kind: "raise", address: unknown } },
@@ -263,7 +270,12 @@ describe("building destinations", () => {
 
 describe("naming a room in a building", () => {
   test("a name the city takes is the room's address, and one it refuses is none", () => {
-    expect([roomIn(lab, " first try "), roomIn(lab, "a/b"), roomIn(lab, "   "), roomIn(lab, "dots.")]).toEqual([
+    expect([
+      roomIn(lab, " first try "),
+      roomIn(lab, "a/b"),
+      roomIn(lab, "   "),
+      roomIn(lab, "dots."),
+    ]).toEqual([
       Option.some(Address.make("lab/first try")),
       Option.none(),
       Option.none(),

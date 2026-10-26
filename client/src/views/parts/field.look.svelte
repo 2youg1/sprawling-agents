@@ -30,7 +30,10 @@
 </script>
 
 <div class="flex w-full min-w-0 flex-col gap-tight">
-  <label {...look.labelWire} class={["text-note text-text-quiet", look.labelling === "hidden" && "sr-only"]}>
+  <label
+    {...look.labelWire}
+    class={["text-note text-text-quiet", look.labelling === "hidden" && "sr-only"]}
+  >
     {look.label}
   </label>
   <div
@@ -56,7 +59,10 @@
     {/if}
   </div>
   {#if look.note !== undefined}
-    <p {...look.note.wire} class={["text-note", look.note.kind === "error" ? "text-alert" : "text-text-faint"]}>
+    <p
+      {...look.note.wire}
+      class={["text-note", look.note.kind === "error" ? "text-alert" : "text-text-faint"]}
+    >
       {look.note.text}
     </p>
   {/if}

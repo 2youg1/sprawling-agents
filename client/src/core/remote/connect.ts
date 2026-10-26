@@ -62,13 +62,20 @@ const DEVICE_ID_BYTES = 16;
 // The address of one of the door's paths on this page's own host; null
 // off `https:`, where a browser does not let a page hold a device key
 // (D8), so there is no door to reach.
-export function remoteUrl(location: Pick<Location, "protocol" | "host">, path: Path): string | null {
+export function remoteUrl(
+  location: Pick<Location, "protocol" | "host">,
+  path: Path,
+): string | null {
   return location.protocol === "https:" ? `wss://${location.host}${path}` : null;
 }
 
 // One pairing: hello, the city's answer, the sealed claim, and the
 // device id the city seals back.
-export async function pairOver(url: string, invitation: Invitation, key: DeviceKey): Promise<Paired | Refusal> {
+export async function pairOver(
+  url: string,
+  invitation: Invitation,
+  key: DeviceKey,
+): Promise<Paired | Refusal> {
   const pairing = await pairHello(fresh());
   if (pairing === null) return { kind: "refused", why: "agreement" };
   const door = await reach(url);
@@ -175,11 +182,19 @@ function reach(url: string): Promise<Door | null> {
     },
   };
   return new Promise((settle) => {
-    socket.addEventListener("open", () => {
-      settle(door);
-    }, { once: true });
-    socket.addEventListener("error", () => {
-      settle(null);
-    }, { once: true });
+    socket.addEventListener(
+      "open",
+      () => {
+        settle(door);
+      },
+      { once: true },
+    );
+    socket.addEventListener(
+      "error",
+      () => {
+        settle(null);
+      },
+      { once: true },
+    );
   });
 }

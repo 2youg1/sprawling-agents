@@ -56,7 +56,12 @@ const WORD: Record<Saving["kind"], Key | null> = {
 
 // What the foot says, from where the save stands, the sentence that
 // says when a change takes effect, and whether the card has a button.
-export function standingOf(saving: Saving, settled: string, pressed: boolean, words: (key: Key) => string): Standing {
+export function standingOf(
+  saving: Saving,
+  settled: string,
+  pressed: boolean,
+  words: (key: Key) => string,
+): Standing {
   const word = WORD[saving.kind];
   return {
     word: word === null ? null : words(word),

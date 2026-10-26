@@ -45,7 +45,11 @@ export function clock(lang: Lang, at: number): string {
 // A day of the calendar in the reader's language, for a date that names
 // a day rather than a moment, such as the day a snapshot was taken.
 export function calendarDay(lang: Lang, at: number): string {
-  return new Intl.DateTimeFormat(LOCALE[lang], { year: "numeric", month: "long", day: "numeric" }).format(at);
+  return new Intl.DateTimeFormat(LOCALE[lang], {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(at);
 }
 
 // The time of day alone, for a column where the day is the same on
@@ -55,7 +59,11 @@ export function hhmm(at: number): string {
 }
 
 export function hhmmss(at: number): string {
-  return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return new Date(at).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 // The time of day to the millisecond, for a column where two moments

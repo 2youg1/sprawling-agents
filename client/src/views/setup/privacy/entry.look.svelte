@@ -55,7 +55,9 @@
   <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-base gap-y-tight text-note">
     {#each look.facts as fact (fact.label)}
       <dt class="text-text-quiet">{fact.label}</dt>
-      <dd class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}>{fact.value}</dd>
+      <dd class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}>
+        {fact.value}
+      </dd>
     {/each}
   </dl>
   <details class="text-note">
@@ -69,7 +71,10 @@
       {/each}
     </div>
   {/if}
-  <p role="status" class={["text-note", look.status?.weight === "alert" ? "text-alert" : "text-text-quiet"]}>
+  <p
+    role="status"
+    class={["text-note", look.status?.weight === "alert" ? "text-alert" : "text-text-quiet"]}
+  >
     {look.status?.text ?? ""}
   </p>
 </article>

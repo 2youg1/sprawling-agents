@@ -37,18 +37,26 @@
   const pinned = $derived(PINNED[offer.pinned]);
   const version = $derived(offer.version ?? say($lang, "acp_version_unknown"));
   const found = $derived(
-    offer.source === "detected" ? ` · ${fill(say($lang, "acp_on_path"), { program: programOf(offer) })}` : "",
+    offer.source === "detected"
+      ? ` · ${fill(say($lang, "acp_on_path"), { program: programOf(offer) })}`
+      : "",
   );
 </script>
 
-<div class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-base" role="group" aria-label={offer.name}>
+<div
+  class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-base"
+  role="group"
+  aria-label={offer.name}
+>
   {#if named}
     <div class="flex flex-wrap items-baseline justify-between gap-x-base gap-y-tight">
       <span class="text-label font-label text-text">{offer.name}</span>
       <span class="text-note text-text-faint">{say($lang, SOURCE[offer.source])}{found}</span>
     </div>
   {/if}
-  <code class="block min-w-0 break-all rounded-control bg-page px-snug py-tight font-mono text-note text-text">
+  <code
+    class="block min-w-0 break-all rounded-control bg-page px-snug py-tight font-mono text-note text-text"
+  >
     {offer.launch_preview}
   </code>
   <dl class="flex flex-wrap gap-x-wide gap-y-tight text-note">
@@ -60,7 +68,9 @@
     {/if}
     <div class="flex gap-tight">
       <dt class="text-text-faint">{say($lang, "acp_version")}</dt>
-      <dd class="text-text-quiet">{pinned === undefined ? version : `${version} (${say($lang, pinned)})`}</dd>
+      <dd class="text-text-quiet">
+        {pinned === undefined ? version : `${version} (${say($lang, pinned)})`}
+      </dd>
     </div>
     <div class="flex gap-tight">
       <dt class="text-text-faint">{say($lang, "acp_licence")}</dt>
@@ -80,9 +90,14 @@
   <p class="text-note text-text-quiet">{say($lang, "acp_consent")}</p>
   <div class="flex flex-wrap gap-snug pt-tight">
     {#if seats}
-      <Button label={say($lang, "acp_add_and_use")} tone="primary" loading={adding} onPress={() => {
+      <Button
+        label={say($lang, "acp_add_and_use")}
+        tone="primary"
+        loading={adding}
+        onPress={() => {
           onAdd(offer, true);
-        }} />
+        }}
+      />
     {/if}
     <Button
       label={say($lang, adding ? "acp_adding" : "acp_add_only")}

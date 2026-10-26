@@ -18,9 +18,18 @@
 
   // Used, first reminder, handoff: the three positions a ring is read at.
   const RINGS: readonly { readonly label: string; readonly context: Context }[] = [
-    { label: "context ring · 41 % used, both reminders ahead", context: { used: 82_400, window: WINDOW, first: 30, second: 65 } },
-    { label: "context ring · 88 % used, past the handoff", context: { used: 176_000, window: WINDOW, first: 30, second: 65 } },
-    { label: "context ring · an older city that states no first reminder", context: { used: 30_000, window: WINDOW, first: null, second: 65 } },
+    {
+      label: "context ring · 41 % used, both reminders ahead",
+      context: { used: 82_400, window: WINDOW, first: 30, second: 65 },
+    },
+    {
+      label: "context ring · 88 % used, past the handoff",
+      context: { used: 176_000, window: WINDOW, first: 30, second: 65 },
+    },
+    {
+      label: "context ring · an older city that states no first reminder",
+      context: { used: 30_000, window: WINDOW, first: null, second: 65 },
+    },
   ];
 
   const BARS: readonly Context[] = [
@@ -31,7 +40,9 @@
 
   // A steady stream, and one that stalled halfway and then came in a rush.
   const STEADY: readonly number[] = Array.from({ length: 20 }, (_, at) => 0.7 + (at % 3) * 0.1);
-  const STALLED: readonly number[] = [0.4, 0.5, 0.6, 0.5, 0.4, 0.5, 0, 0, 0, 0, 0, 0, 0.1, 1, 0.9, 0.8, 0.6, 0.5, 0.4, 0.3];
+  const STALLED: readonly number[] = [
+    0.4, 0.5, 0.6, 0.5, 0.4, 0.5, 0, 0, 0, 0, 0, 0, 0.1, 1, 0.9, 0.8, 0.6, 0.5, 0.4, 0.3,
+  ];
 
   const MARKS: readonly Mark[] = [
     { top: 0.02, height: 0.04, phase: "model" },
@@ -41,7 +52,10 @@
     { top: 0.63, height: 0.08, phase: "tool" },
     { top: 0.995, height: 0.004, phase: "done" },
   ];
-  const READ: readonly Stretch[] = [[0, 0.34], [0.58, 0.12]];
+  const READ: readonly Stretch[] = [
+    [0, 0.34],
+    [0.58, 0.12],
+  ];
   const THUMB: Stretch = [0.6, 0.1];
   const IDLE: TrackWire = { onpointerdown: () => undefined, onpointermove: () => undefined };
 </script>
@@ -98,7 +112,13 @@
 <Case label="read wear · every phase, two read stretches and the thumb" width={120}>
   <div class="relative h-output">
     <div class="absolute inset-y-0 right-0 w-snug">
-      <Wear hint={say($lang, "talk_wear_hint")} track={IDLE} read={READ} thumb={THUMB} marks={MARKS} />
+      <Wear
+        hint={say($lang, "talk_wear_hint")}
+        track={IDLE}
+        read={READ}
+        thumb={THUMB}
+        marks={MARKS}
+      />
     </div>
   </div>
 </Case>

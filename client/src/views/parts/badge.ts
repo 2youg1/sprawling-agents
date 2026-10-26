@@ -82,12 +82,18 @@ export interface Quiet {
 // The one reading of what a badge is marked with, or `undefined` when a
 // count of zero draws nothing.
 export function badgeOf(props: AnyBadgeProps): BadgeLook | undefined {
-  if (props.count !== undefined) return countOf(props.count, props.cap ?? CAP, props.weight ?? "alert");
+  if (props.count !== undefined)
+    return countOf(props.count, props.cap ?? CAP, props.weight ?? "alert");
   if (props.status !== undefined) {
     const look = statusLook(props.status);
     return { form: "word", text: props.text, mark: look.glyph, tier: look.weight };
   }
-  return { form: "word", text: props.text, mark: props.dot === true ? "dot" : undefined, tier: props.weight ?? "quiet" };
+  return {
+    form: "word",
+    text: props.text,
+    mark: props.dot === true ? "dot" : undefined,
+    tier: props.weight ?? "quiet",
+  };
 }
 
 function countOf(count: number | "fresh", cap: number, tier: Weight): BadgeLook | undefined {

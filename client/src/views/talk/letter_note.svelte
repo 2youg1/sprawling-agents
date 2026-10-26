@@ -36,13 +36,19 @@ to the sender's room, the session that sent it, and when it arrived
   const { lang } = u;
   const sender = $derived(residentAt(from));
   const head = $derived.by((): Piece[] => [
-    { kind: "words", text: kind === null ? say($lang, "talk_letter") : kindSaid($lang, kind), ink: "faint" },
+    {
+      kind: "words",
+      text: kind === null ? say($lang, "talk_letter") : kindSaid($lang, kind),
+      ink: "faint",
+    },
     ...(sender !== null
       ? [named(called(sender, null, $lang), toFragment({ kind: "talk", address: sender }))]
       : from !== undefined && from !== null
         ? [named(from, null)]
         : []),
-    ...(session === null ? [] : [named(say($lang, "talk_letter_session"), toFragment({ kind: "run", run: session }))]),
+    ...(session === null
+      ? []
+      : [named(say($lang, "talk_letter_session"), toFragment({ kind: "run", run: session }))]),
     stamped(clock($lang, t)),
   ]);
 </script>

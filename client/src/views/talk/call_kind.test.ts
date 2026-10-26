@@ -27,16 +27,28 @@ function call(render: Call["render"], args: object, said: object | null, cut = 0
   };
 }
 
-const sent = call("signal", { action: "send", to: "lab/kiln", text: "glaze is dry\nfire at noon" }, { id: "r-s1", to: "lab/kiln", kind: "mention", delivered: true });
-const waited = call("signal", { action: "send", to: "lab/kiln", text: "ready?", wait: true }, {
-  id: "r-s2",
-  to: "lab/kiln",
-  kind: "mention",
-  delivered: true,
-  waiting: "a reply from lab/kiln",
-});
+const sent = call(
+  "signal",
+  { action: "send", to: "lab/kiln", text: "glaze is dry\nfire at noon" },
+  { id: "r-s1", to: "lab/kiln", kind: "mention", delivered: true },
+);
+const waited = call(
+  "signal",
+  { action: "send", to: "lab/kiln", text: "ready?", wait: true },
+  {
+    id: "r-s2",
+    to: "lab/kiln",
+    kind: "mention",
+    delivered: true,
+    waiting: "a reply from lab/kiln",
+  },
+);
 const pulled = call("signal", { action: "pull" }, { signals: [] });
-const handed = call("delegate", { room: "lab/helper", task: "measure the kiln", goal: "a number, then stop" }, { room: "lab/helper", starts: "when this turn settles" });
+const handed = call(
+  "delegate",
+  { room: "lab/helper", task: "measure the kiln", goal: "a number, then stop" },
+  { room: "lab/helper", starts: "when this turn settles" },
+);
 
 function words(of: Call): string {
   const kind = kindOf(of);
@@ -63,15 +75,22 @@ describe("a send and a delegation read as what they did (client D85)", () => {
   });
 
   test("a delegation names the room and the task, and when it starts", () => {
-    expect(words(handed)).toBe("delegate | to lab/helper: measure the kiln | starts after this turn");
+    expect(words(handed)).toBe(
+      "delegate | to lab/helper: measure the kiln | starts after this turn",
+    );
   });
 
   test("arguments cut by the window fall back to the subject rather than a guess", () => {
-    expect(lineOf(call("signal", { action: "send", to: "lab/kiln", text: "x" }, null, 3))).toEqual({ kind: "subject", subject: "send" });
+    expect(lineOf(call("signal", { action: "send", to: "lab/kiln", text: "x" }, null, 3))).toEqual({
+      kind: "subject",
+      subject: "send",
+    });
   });
 
   test("a send in flight has no outcome yet", () => {
-    expect(outcomeOf(call("signal", { action: "send", to: "lab/kiln", text: "x" }, null))).toBeNull();
+    expect(
+      outcomeOf(call("signal", { action: "send", to: "lab/kiln", text: "x" }, null)),
+    ).toBeNull();
   });
 
   test("neither is drawn on the right side as a diff", () => {
@@ -93,7 +112,12 @@ describe("a send reads where its letter landed when the city recorded it (wire D
   });
 
   test("a sync send still waiting for its reply already says where its letter went", () => {
-    expect(outcomeOf({ ...call("signal", { action: "send", to: "lab/kiln", text: "x", wait: true }, null), landing: "knocked" })).toBe("talk_landed_knocked");
+    expect(
+      outcomeOf({
+        ...call("signal", { action: "send", to: "lab/kiln", text: "x", wait: true }, null),
+        landing: "knocked",
+      }),
+    ).toBe("talk_landed_knocked");
   });
 
   test("a Ledger written before the landing line reads what the tool answered", () => {
@@ -107,17 +131,39 @@ describe("why a failed call failed", () => {
     outcome: "failed",
     output: head === null ? null : { head, cut },
   });
-  const refusal = JSON.stringify({ code: "E_PATH_NOT_FOUND", action: "read", subject: "crates/nowhere", nearby: [], recovery: "list it", retry: "no" });
+  const refusal = JSON.stringify({
+    code: "E_PATH_NOT_FOUND",
+    action: "read",
+    subject: "crates/nowhere",
+    nearby: [],
+    recovery: "list it",
+    retry: "no",
+  });
 
   test("a refusal is read by its code, whatever code it is, and a cut one by its words", () => {
-    expect(failureOf(failed(refusal))).toEqual({ kind: "refused", code: "E_PATH_NOT_FOUND", subject: "crates/nowhere" });
-    expect(failureOf(failed(JSON.stringify({ code: "E_NEWER_THAN_THIS_PAGE", subject: "x" })))).toEqual({ kind: "refused", code: "E_NEWER_THAN_THIS_PAGE", subject: "x" });
-    expect(failureOf(failed(refusal.slice(0, 20), 400))).toEqual({ kind: "said", text: refusal.slice(0, 20) });
+    expect(failureOf(failed(refusal))).toEqual({
+      kind: "refused",
+      code: "E_PATH_NOT_FOUND",
+      subject: "crates/nowhere",
+    });
+    expect(
+      failureOf(failed(JSON.stringify({ code: "E_NEWER_THAN_THIS_PAGE", subject: "x" }))),
+    ).toEqual({ kind: "refused", code: "E_NEWER_THAN_THIS_PAGE", subject: "x" });
+    expect(failureOf(failed(refusal.slice(0, 20), 400))).toEqual({
+      kind: "said",
+      text: refusal.slice(0, 20),
+    });
   });
 
   test("a tool's own words give their first line that says anything, and silence gives nothing", () => {
-    expect(failureOf(failed("\n  upstream answered 503\nretry later"))).toEqual({ kind: "said", text: "upstream answered 503" });
-    expect(failureOf(failed(`${"x".repeat(159)}  ${"y".repeat(400)}`))).toEqual({ kind: "said", text: `${"x".repeat(159)}\u2026` });
+    expect(failureOf(failed("\n  upstream answered 503\nretry later"))).toEqual({
+      kind: "said",
+      text: "upstream answered 503",
+    });
+    expect(failureOf(failed(`${"x".repeat(159)}  ${"y".repeat(400)}`))).toEqual({
+      kind: "said",
+      text: `${"x".repeat(159)}\u2026`,
+    });
     expect(failureOf(failed(""))).toEqual({ kind: "silent" });
     expect(failureOf(failed(null))).toEqual({ kind: "silent" });
   });

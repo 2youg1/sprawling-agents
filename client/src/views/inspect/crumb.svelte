@@ -37,6 +37,7 @@
   <span class="min-w-0 flex-1 truncate font-mono"
     >{path.slice(0, cut)}<span class="font-label text-text-quiet">{path.slice(cut)}</span></span
   >
-  {#if children !== undefined}<span class="shrink-0 whitespace-nowrap">{@render children()}</span>{/if}
+  {#if children !== undefined}<span class="shrink-0 whitespace-nowrap">{@render children()}</span
+    >{/if}
   <Reach {path} {line} {shown} />
 </div>

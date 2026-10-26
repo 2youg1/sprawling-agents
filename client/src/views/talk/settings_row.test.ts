@@ -20,7 +20,13 @@ import { menuOf, sameBinding } from "./settings_row";
 const nothing = (): (() => void) => () => undefined;
 
 test("the fixture's starting menu is the only one a row opens without a hand", () => {
-  expect([menuOf("open"), menuOf("model"), menuOf("provider"), menuOf("level"), menuOf("closed")]).toEqual(["policy", "model", "model", "model", null]);
+  expect([
+    menuOf("open"),
+    menuOf("model"),
+    menuOf("provider"),
+    menuOf("level"),
+    menuOf("closed"),
+  ]).toEqual(["policy", "model", "model", "model", null]);
 });
 
 test("a binding handed over again with the same keys and lists is the one already held", () => {
@@ -34,7 +40,11 @@ test("a binding handed over again with the same keys and lists is the one alread
   ]).toEqual([false, true, false, false]);
 });
 
-function permissions(open: boolean): { readonly look: ReturnType<typeof permissionsOf>; readonly calls: string[]; readonly chosen: unknown[] } {
+function permissions(open: boolean): {
+  readonly look: ReturnType<typeof permissionsOf>;
+  readonly calls: string[];
+  readonly chosen: unknown[];
+} {
   const calls: string[] = [];
   const chosen: unknown[] = [];
   const hands: PermissionsHands = {
@@ -44,7 +54,11 @@ function permissions(open: boolean): { readonly look: ReturnType<typeof permissi
     inside: () => false,
     hold: { frame: nothing, trigger: nothing, first: nothing },
   };
-  return { look: permissionsOf("en", { ...FIRST_POLICY, admit: "tested" }, open, hands), calls, chosen };
+  return {
+    look: permissionsOf("en", { ...FIRST_POLICY, admit: "tested" }, open, hands),
+    calls,
+    chosen,
+  };
 }
 
 test("each switch and select of the permissions panel changes its own field alone", () => {
@@ -71,10 +85,21 @@ test("each switch and select of the permissions panel changes its own field alon
 test("the permissions panel closes onto its entry on Escape and lets the focus go when it leaves", () => {
   const { look, calls } = permissions(true);
   const marks: string[] = [];
-  look.panel?.wire.onkeydown({ key: "Escape", preventDefault: () => marks.push("prevented"), stopPropagation: () => marks.push("stopped") });
-  look.panel?.wire.onkeydown({ key: "Enter", preventDefault: () => marks.push("prevented"), stopPropagation: () => marks.push("stopped") });
+  look.panel?.wire.onkeydown({
+    key: "Escape",
+    preventDefault: () => marks.push("prevented"),
+    stopPropagation: () => marks.push("stopped"),
+  });
+  look.panel?.wire.onkeydown({
+    key: "Enter",
+    preventDefault: () => marks.push("prevented"),
+    stopPropagation: () => marks.push("stopped"),
+  });
   look.frame.onfocusout({ relatedTarget: null });
-  expect({ calls, marks }).toEqual({ calls: ["close opener", "close leave"], marks: ["prevented", "stopped"] });
+  expect({ calls, marks }).toEqual({
+    calls: ["close opener", "close leave"],
+    marks: ["prevented", "stopped"],
+  });
   expect([look.trigger["aria-expanded"], look.trigger["aria-haspopup"]]).toEqual([true, "dialog"]);
   expect(permissions(false).look.panel).toBeUndefined();
 });

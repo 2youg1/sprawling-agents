@@ -29,7 +29,10 @@ describe("the layers key", () => {
       const name = look.key.as === "button" ? look.key.wire["aria-label"] : undefined;
       expect(name).toBe(`layers · ${tier}`);
       expect(look.hint).toBe(`layers · ${tier} [chord]`);
-      expect(look.foot).toEqual({ kind: "tiers", ticks: TIERS.map((each) => ({ key: each, held: each === tier })) });
+      expect(look.foot).toEqual({
+        kind: "tiers",
+        ticks: TIERS.map((each) => ({ key: each, held: each === tier })),
+      });
     }
   });
 

@@ -18,7 +18,13 @@
 
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
-import type { RegistryNewest, ReleaseAnswer, ReleaseLine, ReleaseVerdict, UpdateHint } from "../../wire";
+import type {
+  RegistryNewest,
+  ReleaseAnswer,
+  ReleaseLine,
+  ReleaseVerdict,
+  UpdateHint,
+} from "../../wire";
 import { confirmedCommand, registryLineOf, updateOf } from "./reading";
 
 // The four inks a sentence about this release is set in.
@@ -50,7 +56,13 @@ export interface UpdateLook {
   readonly channel: string;
   // Present when the city offers more than one command: the choice that
   // decides which, with its unchosen first entry and the commands.
-  readonly choice: { readonly unchosen: string; readonly commands: readonly string[]; readonly wire: ChannelWire } | undefined;
+  readonly choice:
+    | {
+        readonly unchosen: string;
+        readonly commands: readonly string[];
+        readonly wire: ChannelWire;
+      }
+    | undefined;
   // The command to run, once it is known.
   readonly command: string | undefined;
 }
@@ -69,7 +81,12 @@ export interface Hands {
   readonly choose: (command: string | null) => void;
 }
 
-export function lookOf(answer: ReleaseAnswer, lang: Lang, chosen: string | null, hands: Hands): AnswerLook {
+export function lookOf(
+  answer: ReleaseAnswer,
+  lang: Lang,
+  chosen: string | null,
+  hands: Hands,
+): AnswerLook {
   const updateLook = (hint: UpdateHint): UpdateLook => {
     const how = updateOf(hint);
     const label = say(lang, "release_channel_confirm");
@@ -98,12 +115,18 @@ export function lookOf(answer: ReleaseAnswer, lang: Lang, chosen: string | null,
       return {
         name: say(lang, line.registry),
         newest: line.newest ?? undefined,
-        reason: line.reason === null ? undefined : { text: say(lang, line.reason.key), said: line.reason.said ?? undefined },
+        reason:
+          line.reason === null
+            ? undefined
+            : { text: say(lang, line.reason.key), said: line.reason.said ?? undefined },
       };
     });
   if ("refused" in answer) {
     return {
-      refused: { text: say(lang, "release_refused_registries"), recovery: answer.refused.refusal.recovery },
+      refused: {
+        text: say(lang, "release_refused_registries"),
+        recovery: answer.refused.refusal.recovery,
+      },
       statements: [],
       registries: [],
       update: undefined,
@@ -114,7 +137,10 @@ export function lookOf(answer: ReleaseAnswer, lang: Lang, chosen: string | null,
     return {
       refused: undefined,
       statements: [
-        { ink: "text", text: fill(say(lang, "release_mine"), { version: mine.version, released: mine.released }) },
+        {
+          ink: "text",
+          text: fill(say(lang, "release_mine"), { version: mine.version, released: mine.released }),
+        },
         { ink: "quiet", text: say(lang, "release_origin_unconfirmed") },
       ],
       registries: registries(answer.unconfirmed.registries),
@@ -130,10 +156,13 @@ export function lookOf(answer: ReleaseAnswer, lang: Lang, chosen: string | null,
     };
   }
   const { mine, newest, verdict } = answer.stands;
-  const mineText = fill(say(lang, mine.released.length === 0 ? "release_mine_undated" : "release_mine"), {
-    version: mine.version,
-    released: mine.released,
-  });
+  const mineText = fill(
+    say(lang, mine.released.length === 0 ? "release_mine_undated" : "release_mine"),
+    {
+      version: mine.version,
+      released: mine.released,
+    },
+  );
   return {
     refused: undefined,
     statements: [{ ink: "text", text: mineText }, verdictOf(verdict, newest, lang)],
@@ -151,10 +180,13 @@ function verdictOf(verdict: ReleaseVerdict, newest: ReleaseLine, lang: Lang): St
     case "behind":
       return {
         ink: "alert",
-        text: fill(say(lang, newest.released.length === 0 ? "release_behind_undated" : "release_behind"), {
-          version: newest.version,
-          released: newest.released,
-        }),
+        text: fill(
+          say(lang, newest.released.length === 0 ? "release_behind_undated" : "release_behind"),
+          {
+            version: newest.version,
+            released: newest.released,
+          },
+        ),
       };
   }
 }

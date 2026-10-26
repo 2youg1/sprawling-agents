@@ -21,7 +21,9 @@ export interface Stopped {
 
 // The pending refusals among `notices`, newest first.
 export function stoppedOf(notices: readonly Notice[]): Stopped {
-  const stopped = [...notices].reverse().filter((notice) => urgencyOf(notice.error) === "needs_you");
+  const stopped = [...notices]
+    .reverse()
+    .filter((notice) => urgencyOf(notice.error) === "needs_you");
   return {
     asks: stopped.filter((notice) => notice.error.code === "E_APPROVAL_PENDING"),
     failures: stopped.filter((notice) => notice.error.code !== "E_APPROVAL_PENDING"),

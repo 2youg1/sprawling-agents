@@ -78,7 +78,8 @@ export function tpsOf(turn: Turn): number | null {
 // line written before the key did, `crates/wire/spec/Reading.lean` D28).
 // The unit travels with the number because a 0 from two millisecond
 // moments means "under a millisecond", never "0 µs".
-export type Took = { readonly unit: "us"; readonly n: number } | { readonly unit: "ms"; readonly n: number };
+export type Took =
+  { readonly unit: "us"; readonly n: number } | { readonly unit: "ms"; readonly n: number };
 
 // How long a call took, for the screens that write it: its own
 // microseconds when the Ledger has them, else `lastedOf`'s milliseconds.
@@ -110,7 +111,9 @@ export function callTime(call: Call, now: number): CallTime {
   switch (call.outcome) {
     case "waiting": {
       const ms = now - call.called;
-      return ms < COUNTED_AFTER_MS || call.timing !== "measured" ? { kind: "starting" } : { kind: "running", ms };
+      return ms < COUNTED_AFTER_MS || call.timing !== "measured"
+        ? { kind: "starting" }
+        : { kind: "running", ms };
     }
     case "answered":
     case "failed": {

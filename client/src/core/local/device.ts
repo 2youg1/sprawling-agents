@@ -38,15 +38,22 @@ const ONLY = "this";
 // A fresh device key, or null where this browser's WebCrypto has no
 // Ed25519, which leaves it unable to pair at all.
 export async function makeKey(): Promise<MadeKey | null> {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign"]).catch(() => null);
+  const pair = await crypto.subtle
+    .generateKey({ name: "Ed25519" }, false, ["sign"])
+    .catch(() => null);
   if (pair === null || !("privateKey" in pair)) return null;
   const raw = await crypto.subtle.exportKey("raw", pair.publicKey).catch(() => null);
   return raw === null ? null : { key: pair.privateKey, public: hex(new Uint8Array(raw)) };
 }
 
 // The signature `/session` asks for, over the message `challenged` spells.
-export async function signed(device: LocalDevice, message: Uint8Array<ArrayBuffer>): Promise<string | null> {
-  const signature = await crypto.subtle.sign({ name: "Ed25519" }, device.key, message).catch(() => null);
+export async function signed(
+  device: LocalDevice,
+  message: Uint8Array<ArrayBuffer>,
+): Promise<string | null> {
+  const signature = await crypto.subtle
+    .sign({ name: "Ed25519" }, device.key, message)
+    .catch(() => null);
   return signature === null ? null : hex(new Uint8Array(signature));
 }
 
@@ -110,7 +117,9 @@ export async function kept(): Promise<LocalDevice | null> {
 export async function keep(device: LocalDevice): Promise<boolean> {
   const base = await opened();
   if (base === null) return false;
-  const written = await done(base.transaction(STORE, "readwrite").objectStore(STORE).put(device, ONLY));
+  const written = await done(
+    base.transaction(STORE, "readwrite").objectStore(STORE).put(device, ONLY),
+  );
   base.close();
   return written !== null;
 }

@@ -17,7 +17,9 @@ import { dividerLookOf, stepOf } from "./divider";
 import type { DividerHands } from "./divider";
 import { landing, sheetHeadOf } from "./sheet_head";
 
-const press = (key: string): { key: string; preventDefault: () => void; prevented: () => boolean } => {
+const press = (
+  key: string,
+): { key: string; preventDefault: () => void; prevented: () => boolean } => {
   let prevented = false;
   return {
     key,
@@ -55,7 +57,10 @@ describe("a divider's keys", () => {
       drag: (now) => log.push(`drag ${String(now)}`),
       follow: (x) => log.push(`follow ${String(x)}`),
     };
-    const look = dividerLookOf({ label: "width of sessions", controls: "w-sessions", span: 3, widest: 7, dragging: false }, hands);
+    const look = dividerLookOf(
+      { label: "width of sessions", controls: "w-sessions", span: 3, widest: 7, dragging: false },
+      hands,
+    );
     const end = press("End");
     const enter = press("Enter");
     const tab = press("Tab");
@@ -69,30 +74,38 @@ describe("a divider's keys", () => {
   });
 
   test("the separator says what it sizes and how wide that is, in columns", () => {
-    const hands: DividerHands = { set: () => undefined, reset: () => undefined, drag: () => undefined, follow: () => undefined };
-    const { wire } = dividerLookOf({ label: "width of sessions", controls: "w-sessions", span: 3, widest: 7, dragging: false }, hands);
-    expect([wire.role, wire.tabindex, wire["aria-orientation"], wire["aria-controls"], wire["aria-valuenow"], wire["aria-valuemin"], wire["aria-valuemax"]]).toEqual([
-      "separator",
-      0,
-      "vertical",
-      "w-sessions",
-      3,
-      NARROWEST,
-      7,
-    ]);
+    const hands: DividerHands = {
+      set: () => undefined,
+      reset: () => undefined,
+      drag: () => undefined,
+      follow: () => undefined,
+    };
+    const { wire } = dividerLookOf(
+      { label: "width of sessions", controls: "w-sessions", span: 3, widest: 7, dragging: false },
+      hands,
+    );
+    expect([
+      wire.role,
+      wire.tabindex,
+      wire["aria-orientation"],
+      wire["aria-controls"],
+      wire["aria-valuenow"],
+      wire["aria-valuemin"],
+      wire["aria-valuemax"],
+    ]).toEqual(["separator", 0, "vertical", "w-sessions", 3, NARROWEST, 7]);
   });
 });
 
 describe("the world sheet's tabs", () => {
   test("the arrows wrap at both ends, Home and End go to the first and the last", () => {
-    expect([landing(3, 2, "ArrowRight"), landing(3, 0, "ArrowLeft"), landing(3, 1, "Home"), landing(3, 1, "End"), landing(3, 1, "Enter"), landing(0, -1, "Home")]).toEqual([
-      0,
-      2,
-      0,
-      2,
-      undefined,
-      undefined,
-    ]);
+    expect([
+      landing(3, 2, "ArrowRight"),
+      landing(3, 0, "ArrowLeft"),
+      landing(3, 1, "Home"),
+      landing(3, 1, "End"),
+      landing(3, 1, "Enter"),
+      landing(0, -1, "Home"),
+    ]).toEqual([0, 2, 0, 2, undefined, undefined]);
   });
 
   test("only the shown tab is a stop; each controls its pane and is the label of it", () => {
@@ -109,13 +122,22 @@ describe("the world sheet's tabs", () => {
         prefix: "w",
         words: { back: "back to the conversation", strip: "what the world layer shows" },
       },
-      { leave: () => undefined, show: (pane) => shown.push(pane), focus: (pane) => focused.push(pane), hold: () => () => undefined },
+      {
+        leave: () => undefined,
+        show: (pane) => shown.push(pane),
+        focus: (pane) => focused.push(pane),
+        hold: () => () => undefined,
+      },
     );
     const right = press("ArrowRight");
     look.tabs[2]?.wire.onkeydown(right);
     expect({
       stops: look.tabs.map((tab) => tab.wire.tabindex),
-      ids: look.tabs.map((tab) => [tab.wire.id, tab.wire["aria-controls"], tab.wire["aria-selected"]]),
+      ids: look.tabs.map((tab) => [
+        tab.wire.id,
+        tab.wire["aria-controls"],
+        tab.wire["aria-selected"],
+      ]),
       shown,
       focused,
       prevented: right.prevented(),

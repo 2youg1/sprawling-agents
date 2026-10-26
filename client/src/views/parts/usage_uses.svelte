@@ -30,7 +30,10 @@
     if (last === undefined) return { kind: "never", said: say($lang, "usage_never") };
     return {
       kind: "used",
-      count: fill(say($lang, "usage_count"), { n: String(uses.length), when: clock($lang, last.at) }),
+      count: fill(say($lang, "usage_count"), {
+        n: String(uses.length),
+        when: clock($lang, last.at),
+      }),
       days: dayLine(days),
       fold: say($lang, "usage_every_use"),
       uses: uses.map((used) => ({

@@ -25,12 +25,16 @@ export interface AskedLook {
 
 export function shownOf(lang: Lang, content: ContentAnswer | undefined): Shown {
   if (content === undefined) return { kind: "asking" };
-  if (content.binary) return { kind: "binary", said: fill(say(lang, "file_binary"), { kib: kib(content.bytes) }) };
+  if (content.binary)
+    return { kind: "binary", said: fill(say(lang, "file_binary"), { kib: kib(content.bytes) }) };
   return {
     kind: "text",
     text: content.text,
     cut: content.truncated
-      ? fill(say(lang, "file_truncated"), { kib: kib(content.text.length), total: kib(content.bytes) })
+      ? fill(say(lang, "file_truncated"), {
+          kib: kib(content.text.length),
+          total: kib(content.bytes),
+        })
       : undefined,
   };
 }

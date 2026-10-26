@@ -40,9 +40,15 @@
 </script>
 
 {#if look.form === "word"}
-  <span class={["inline-flex items-center gap-tight rounded-pill px-snug py-tight text-note whitespace-nowrap", INK[look.tier]]}>
+  <span
+    class={[
+      "inline-flex items-center gap-tight rounded-pill px-snug py-tight text-note whitespace-nowrap",
+      INK[look.tier],
+    ]}
+  >
     {#if look.mark === "dot"}
-      <span class={["inline-block size-dot rounded-pill", FILL[look.tier]]} aria-hidden="true"></span>
+      <span class={["inline-block size-dot rounded-pill", FILL[look.tier]]} aria-hidden="true"
+      ></span>
     {:else if look.mark !== undefined}
       <Glyph name={look.mark} size="sm" class="shrink-0" />
     {/if}

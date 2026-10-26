@@ -13,13 +13,9 @@ import { kindSaid, waitingSaid } from "./inbox";
 
 describe("the queued-signal section", () => {
   test("says each kind through the table, an unknown kind as written", () => {
-    expect(["mention", "thread", "broadcast", "steer", "rumour"].map((kind) => kindSaid("en", kind))).toEqual([
-      "mention",
-      "thread",
-      "broadcast",
-      "steer",
-      "rumour",
-    ]);
+    expect(
+      ["mention", "thread", "broadcast", "steer", "rumour"].map((kind) => kindSaid("en", kind)),
+    ).toEqual(["mention", "thread", "broadcast", "steer", "rumour"]);
   });
 
   test("says one signal in the singular and more in the plural", () => {

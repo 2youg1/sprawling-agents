@@ -16,7 +16,9 @@ describe("a pasted mcpServers block", () => {
   });
 
   test("carries the command and its arguments as one line", () => {
-    expect(readFragment('{"mcpServers":{"docs":{"command":"npx","args":["-y","mcp-docs"]}}}')).toEqual({
+    expect(
+      readFragment('{"mcpServers":{"docs":{"command":"npx","args":["-y","mcp-docs"]}}}'),
+    ).toEqual({
       kind: "servers",
       drafts: [
         {
@@ -33,7 +35,9 @@ describe("a pasted mcpServers block", () => {
 
   test("reads a url without a stated type as http, and keeps its headers", () => {
     expect(
-      readFragment('{"mcpServers":{"apps":{"url":"https://example.test/mcp","headers":{"X-Key":"k"}}}}'),
+      readFragment(
+        '{"mcpServers":{"apps":{"url":"https://example.test/mcp","headers":{"X-Key":"k"}}}}',
+      ),
     ).toEqual({
       kind: "servers",
       drafts: [
@@ -51,7 +55,9 @@ describe("a pasted mcpServers block", () => {
 
   test("answers unreadable rather than throwing", () => {
     expect(readFragment("{")).toEqual({ kind: "unreadable" });
-    expect(readFragment('{"mcpServers":{"docs":{"args":"not a list"}}}')).toEqual({ kind: "unreadable" });
+    expect(readFragment('{"mcpServers":{"docs":{"args":"not a list"}}}')).toEqual({
+      kind: "unreadable",
+    });
   });
 });
 
@@ -63,7 +69,10 @@ describe("what the wire carries", () => {
           ...EMPTY,
           label: "docs",
           command: "npx -y mcp-docs",
-          env: [{ name: "TOKEN", value: "secret:mcp/docs" }, { name: "", value: "" }],
+          env: [
+            { name: "TOKEN", value: "secret:mcp/docs" },
+            { name: "", value: "" },
+          ],
         },
         [],
       ),
@@ -87,9 +96,15 @@ describe("what the wire carries", () => {
       ...EMPTY,
       label: "apps",
       url: "https://example.test/mcp",
-      headers: [{ name: "X-Key", value: "k" }, { name: "X-Account", value: "acme" }],
+      headers: [
+        { name: "X-Key", value: "k" },
+        { name: "X-Account", value: "acme" },
+      ],
     } as const;
-    const headers = [["X-Key", "k"], ["X-Account", "acme"]] as const;
+    const headers = [
+      ["X-Key", "k"],
+      ["X-Account", "acme"],
+    ] as const;
     expect(encode({ ...url, transport: "http" }, [])).toEqual({
       kind: "ready",
       server: {
@@ -114,8 +129,17 @@ describe("what the wire carries", () => {
 
   test("a label is present, spellable and free before anything else is judged", () => {
     expect(encode(EMPTY, [])).toEqual({ kind: "blocked", blocker: "label_missing" });
-    expect(encode({ ...EMPTY, label: "My_Server" }, [])).toEqual({ kind: "blocked", blocker: "label_grammar" });
-    expect(encode({ ...EMPTY, label: "docs" }, ["docs"])).toEqual({ kind: "blocked", blocker: "label_taken" });
-    expect(encode({ ...EMPTY, label: "docs" }, [])).toEqual({ kind: "blocked", blocker: "command_missing" });
+    expect(encode({ ...EMPTY, label: "My_Server" }, [])).toEqual({
+      kind: "blocked",
+      blocker: "label_grammar",
+    });
+    expect(encode({ ...EMPTY, label: "docs" }, ["docs"])).toEqual({
+      kind: "blocked",
+      blocker: "label_taken",
+    });
+    expect(encode({ ...EMPTY, label: "docs" }, [])).toEqual({
+      kind: "blocked",
+      blocker: "command_missing",
+    });
   });
 });

@@ -51,7 +51,9 @@
   const total = $derived(positions.bytes(positions.editor.length));
   const reached = $derived(windows.at(-1)?.span.end ?? 0);
   const done = $derived(windows.length > 0 && reached >= total);
-  const question = $derived({ preview: { version: positions.version, viewport: { start: reached, end: total } } });
+  const question = $derived({
+    preview: { version: positions.version, viewport: { start: reached, end: total } },
+  });
 
   $effect(() => {
     if (done || unsupported !== null || lost !== null) return;
@@ -63,16 +65,20 @@
       if (read.kind !== "held") return;
       const preview = read.value.preview;
       if ("unsupported" in preview) unsupported = preview.unsupported.encoding;
-      else if (preview.laid.span.start === from && (windows.at(-1)?.span.end ?? 0) === from) windows = [...windows, preview.laid];
+      else if (preview.laid.span.start === from && (windows.at(-1)?.span.end ?? 0) === from)
+        windows = [...windows, preview.laid];
     });
   });
 
   $effect(() => {
     const watched = sentinel;
     if (watched === undefined) return;
-    const seen = new IntersectionObserver((entries) => {
-      near = entries.some((entry) => entry.isIntersecting);
-    }, { root: scroller ?? null, rootMargin: "600px" });
+    const seen = new IntersectionObserver(
+      (entries) => {
+        near = entries.some((entry) => entry.isIntersecting);
+      },
+      { root: scroller ?? null, rootMargin: "600px" },
+    );
     seen.observe(watched);
     return () => {
       seen.disconnect();
@@ -90,7 +96,9 @@
   // The carried place, once the window that holds it is drawn.
   $effect(() => {
     if (anchor === null || (anchor >= reached && !done)) return;
-    const target = placed().filter((each) => each.start <= anchor).at(-1);
+    const target = placed()
+      .filter((each) => each.start <= anchor)
+      .at(-1);
     target?.element.scrollIntoView({ block: "start" });
     onTop(target?.start ?? 0);
   });
@@ -123,7 +131,9 @@
     </Line>
   {/if}
   {#if unsupported !== null}
-    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_preview_unsupported"), { encoding: unsupported })}</p>
+    <p class="p-pane text-note text-text-quiet">
+      {fill(say($lang, "refrain_preview_unsupported"), { encoding: unsupported })}
+    </p>
   {:else if lost !== null}
     <div class="p-pane"><Unanswered query={lost} asked={question} /></div>
   {:else if done && windows.every((each) => each.blocks.length === 0)}

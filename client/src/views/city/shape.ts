@@ -18,7 +18,15 @@ export interface Box {
 
 const STEPS = 8;
 
-function corner(cx: number, cy: number, r: number, n: number, from: number, sx: number, sy: number): string {
+function corner(
+  cx: number,
+  cy: number,
+  r: number,
+  n: number,
+  from: number,
+  sx: number,
+  sy: number,
+): string {
   let d = "";
   for (let i = 0; i <= STEPS; i += 1) {
     const t = from + (i / STEPS) * (Math.PI / 2);

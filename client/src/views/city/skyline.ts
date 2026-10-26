@@ -61,7 +61,13 @@ export type MarkLook =
       readonly posture: Doing["kind"];
       readonly label: string;
     }
-  | { readonly kind: "flag"; readonly x: number; readonly y: number; readonly running: boolean; readonly label: string };
+  | {
+      readonly kind: "flag";
+      readonly x: number;
+      readonly y: number;
+      readonly running: boolean;
+      readonly label: string;
+    };
 
 // A label under a tower: the whole of it, for the accessible name and
 // the `<title>` a pointer shows, what of it fits under the tower, and
@@ -204,7 +210,12 @@ function floorsFor(runs: number, hall: boolean): number {
   return Math.min(8, base + Math.ceil(runs / 4));
 }
 
-function towerOf(place: Slot, ground: number, seat: SkylineSeat, onPick: (addr: Address) => void): TowerLook {
+function towerOf(
+  place: Slot,
+  ground: number,
+  seat: SkylineSeat,
+  onPick: (addr: Address) => void,
+): TowerLook {
   const { lang } = seat;
   const top = ground - place.h;
   const addr = place.building.addr;
@@ -226,7 +237,11 @@ function towerOf(place: Slot, ground: number, seat: SkylineSeat, onPick: (addr: 
     w: place.w,
     h: place.h,
     top,
-    outline: squircle({ x: place.x, y: top, w: place.w, h: place.h }, place.hall ? 10 : 6, seat.power),
+    outline: squircle(
+      { x: place.x, y: top, w: place.w, h: place.h },
+      place.hall ? 10 : 6,
+      seat.power,
+    ),
     door,
     cells: cellsOf(place, top),
     lamp: stuck > 0 ? `${String(stuck)} ${say(lang, "status_blocked")}` : null,
@@ -253,7 +268,8 @@ function towerOf(place: Slot, ground: number, seat: SkylineSeat, onPick: (addr: 
     ],
     bar,
     name: { whole: name, shown: fitted(name, room, NAME_SIZE), size: NAME_SIZE },
-    line: line === null ? null : { whole: line, shown: fitted(line, room, LINE_SIZE), size: LINE_SIZE },
+    line:
+      line === null ? null : { whole: line, shown: fitted(line, room, LINE_SIZE), size: LINE_SIZE },
     wire: {
       role: "link",
       tabindex: 0,

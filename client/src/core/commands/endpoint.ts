@@ -82,7 +82,10 @@ function tuningFrame(tuning: Tuning): EndpointTuning {
     request_max_retries: count(tuning.requestMaxRetries),
     stream_idle_timeout_ms: span(tuning.streamIdleTimeoutMs),
     headers: named(tuning.headers).map((row) => ({ name: row.name.trim(), value: row.value })),
-    overrides: named(tuning.overrides).map((row) => ({ pointer: row.name.trim(), value: row.value })),
+    overrides: named(tuning.overrides).map((row) => ({
+      pointer: row.name.trim(),
+      value: row.value,
+    })),
     proxying: tuning.proxying,
   };
 }
@@ -108,7 +111,11 @@ export function probeEndpoint(e: Endpoint): Command {
 // `admit` holds the rows ticked on the endpoint's list and `named` the
 // ids the person typed; the city registers a typed id whether or not
 // the list carries it (wire D57).
-export function attachEndpoint(e: Endpoint, admit: readonly string[], named: readonly string[]): Command {
+export function attachEndpoint(
+  e: Endpoint,
+  admit: readonly string[],
+  named: readonly string[],
+): Command {
   return {
     attach_endpoint: {
       name: providerName(e.id),

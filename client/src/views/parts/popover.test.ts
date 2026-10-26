@@ -16,7 +16,11 @@ import type { PopoverColumn, PopoverRow } from "./popover";
 import { keysOf, listId, lookOf, pressed, rowId } from "./popover_wiring";
 import type { Hands, Keyed, Place, PopoverLook, PopoverView } from "./popover_wiring";
 
-const key = (name: string, shiftKey = false): Keyed => ({ key: name, shiftKey, preventDefault: () => undefined });
+const key = (name: string, shiftKey = false): Keyed => ({
+  key: name,
+  shiftKey,
+  preventDefault: () => undefined,
+});
 
 // Every shape of one to three lists, each with zero to four rows.
 function shapes(): readonly (readonly number[])[] {
@@ -42,7 +46,10 @@ function places(rows: readonly number[]): readonly Place[] {
   );
 }
 
-function check(names: readonly string[], holds: (rows: readonly number[], from: Place, to: Place, name: string) => boolean): string[] {
+function check(
+  names: readonly string[],
+  holds: (rows: readonly number[], from: Place, to: Place, name: string) => boolean,
+): string[] {
   const wrong: string[] = [];
   for (const rows of shapes())
     for (const from of places(rows))
@@ -55,18 +62,28 @@ function check(names: readonly string[], holds: (rows: readonly number[], from: 
 }
 
 const inside = (rows: readonly number[], to: Place): boolean =>
-  to.column >= 0 && to.column < rows.length && to.cursor >= 0 && to.cursor < Math.max(1, rows.at(to.column) ?? 0);
+  to.column >= 0 &&
+  to.column < rows.length &&
+  to.cursor >= 0 &&
+  to.cursor < Math.max(1, rows.at(to.column) ?? 0);
 
 describe("the key table", () => {
   test("a move stays inside its list (a_move_stays_inside)", () => {
     expect(
-      check(["ArrowDown", "ArrowUp", "Home", "End"], (rows, from, to) => inside(rows, to) && to.column === from.column),
+      check(
+        ["ArrowDown", "ArrowUp", "Home", "End"],
+        (rows, from, to) => inside(rows, to) && to.column === from.column,
+      ),
     ).toEqual([]);
   });
 
   test("Tab changes list and starts at its top (a_new_column_starts_at_its_top)", () => {
     expect(
-      check(["Tab"], (rows, from, to) => inside(rows, to) && to.cursor === 0 && to.column === (from.column + 1) % rows.length),
+      check(
+        ["Tab"],
+        (rows, from, to) =>
+          inside(rows, to) && to.cursor === 0 && to.column === (from.column + 1) % rows.length,
+      ),
     ).toEqual([]);
     expect(pressed({ column: 0, cursor: 2 }, key("Tab", true), [3, 3, 3])).toEqual({
       kind: "move",
@@ -104,7 +121,10 @@ interface Record {
   readonly closed: number[];
 }
 
-function wired(place: Place, holder: "list" | "caller"): { look: PopoverLook; record: Record; keys: (k: Keyed) => boolean } {
+function wired(
+  place: Place,
+  holder: "list" | "caller",
+): { look: PopoverLook; record: Record; keys: (k: Keyed) => boolean } {
   const record: Record = { placed: [], applied: [], closed: [] };
   const hands: Hands = {
     place: (to) => record.placed.push(to),
@@ -124,7 +144,11 @@ function wired(place: Place, holder: "list" | "caller"): { look: PopoverLook; re
     title: "fork_pick_title",
     say: (word) => word,
   };
-  return { look: lookOf(view, hands, { header: undefined, row: undefined }), record, keys: keysOf(view, hands) };
+  return {
+    look: lookOf(view, hands, { header: undefined, row: undefined }),
+    record,
+    keys: keysOf(view, hands),
+  };
 }
 
 describe("the value a look is given", () => {
@@ -136,7 +160,13 @@ describe("the value a look is given", () => {
 
   test("the list the cursor is in holds the one Tab stop and names the cursor row", () => {
     const { look } = wired({ column: 1, cursor: 0 }, "list");
-    expect(look.lists.map((list) => [list.wire.tabindex, list.wire["aria-activedescendant"], list.wire.id])).toEqual([
+    expect(
+      look.lists.map((list) => [
+        list.wire.tabindex,
+        list.wire["aria-activedescendant"],
+        list.wire.id,
+      ]),
+    ).toEqual([
       [-1, null, listId("p1", 0)],
       [0, rowId("p1", 1, 0), listId("p1", 1)],
     ]);
@@ -144,7 +174,9 @@ describe("the value a look is given", () => {
 
   test("with a caller's text box holding the focus, no list takes a Tab stop or names the cursor", () => {
     const { look } = wired({ column: 0, cursor: 1 }, "caller");
-    expect(look.lists.map((list) => [list.wire.tabindex, list.wire["aria-activedescendant"]])).toEqual([
+    expect(
+      look.lists.map((list) => [list.wire.tabindex, list.wire["aria-activedescendant"]]),
+    ).toEqual([
       [-1, null],
       [-1, null],
     ]);
@@ -152,7 +184,9 @@ describe("the value a look is given", () => {
 
   test("aria-selected is the applied row and never the cursor", () => {
     const { look } = wired({ column: 0, cursor: 1 }, "list");
-    expect(look.lists.at(0)?.rows.map((row) => [row.wire["aria-selected"], row.chosen, row.cursor])).toEqual([
+    expect(
+      look.lists.at(0)?.rows.map((row) => [row.wire["aria-selected"], row.chosen, row.cursor]),
+    ).toEqual([
       [true, true, false],
       [false, false, true],
     ]);
@@ -161,7 +195,11 @@ describe("the value a look is given", () => {
   test("a claimed key on a list is taken from the platform, a pointer moves the cursor and a click applies", () => {
     const { look, record } = wired({ column: 0, cursor: 0 }, "list");
     let prevented = 0;
-    const down: Keyed = { key: "ArrowDown", shiftKey: false, preventDefault: () => (prevented += 1) };
+    const down: Keyed = {
+      key: "ArrowDown",
+      shiftKey: false,
+      preventDefault: () => (prevented += 1),
+    };
     look.lists.at(0)?.wire.onkeydown(down);
     look.lists.at(1)?.rows.at(1)?.wire.onmouseenter();
     look.lists.at(1)?.rows.at(0)?.wire.onclick();

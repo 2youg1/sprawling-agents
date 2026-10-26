@@ -22,7 +22,15 @@ import { mount, unmount } from "svelte";
 
 import App from "./app.svelte";
 import { langOf } from "./core/lang";
-import { NO_CREDENTIAL, browserLabel, enter, mayHaveDoor, openCodeIn, pairWith, withoutOpenCode } from "./core/local/entering";
+import {
+  NO_CREDENTIAL,
+  browserLabel,
+  enter,
+  mayHaveDoor,
+  openCodeIn,
+  pairWith,
+  withoutOpenCode,
+} from "./core/local/entering";
 import type { Credential, Entry } from "./core/local/entering";
 import { preferences } from "./core/prefs";
 import type { PreferenceDoor } from "./core/prefs";

@@ -26,7 +26,13 @@
       <dt class="truncate text-note text-text-faint">{reading.label}</dt>
       <dd class="text-heading figure">
         {#if reading.wire !== null}
-          <a {...reading.wire} class={["transition-colors ease-leave hover:text-accent hover:ease-arrive", INK[reading.tone]]}>{reading.value}</a>
+          <a
+            {...reading.wire}
+            class={[
+              "transition-colors ease-leave hover:text-accent hover:ease-arrive",
+              INK[reading.tone],
+            ]}>{reading.value}</a
+          >
         {:else}
           <span class={INK[reading.tone]}>{reading.value}</span>
         {/if}

@@ -24,7 +24,13 @@ import type { Enrolling, Enrolment, SecretAt } from "../../../core/enrol";
 import { say } from "../../../core/lang";
 import type { Key, Lang } from "../../../core/lang";
 import { ServerLabel } from "../../../wire";
-import type { AccountRetries, AccountStatus, AxError, Command, ProviderAccount } from "../../../wire";
+import type {
+  AccountRetries,
+  AccountStatus,
+  AxError,
+  Command,
+  ProviderAccount,
+} from "../../../wire";
 
 export type Step = "up" | "down";
 
@@ -141,7 +147,16 @@ export interface Hands {
 const BLANK: AccountDraft = { id: "", reference: "", header: "", key: "" };
 
 export function freshEditor(): Editor {
-  return { draft: BLANK, editing: null, note: null, refused: null, pending: null, sent: null, removed: null, forgetting: false };
+  return {
+    draft: BLANK,
+    editing: null,
+    note: null,
+    refused: null,
+    pending: null,
+    sent: null,
+    removed: null,
+    forgetting: false,
+  };
 }
 
 const labelled = Schema.is(ServerLabel);
@@ -192,7 +207,12 @@ export function edit(editor: Editor, account: ProviderAccount): void {
   if (editor.pending !== null) return;
   editor.editing = account.id;
   editor.note = null;
-  editor.draft = { id: account.id, reference: account.reference ?? "", header: account.header ?? "", key: "" };
+  editor.draft = {
+    id: account.id,
+    reference: account.reference ?? "",
+    header: account.header ?? "",
+    key: "",
+  };
 }
 
 export function cancel(editor: Editor): void {
@@ -228,17 +248,35 @@ export function save(editor: Editor, hands: Hands): void {
     store(editor, hands, account);
     return;
   }
-  const filing: Filing = { ticket: Symbol("filing"), account, owner: roster.owner, ...hands.reach() };
+  const filing: Filing = {
+    ticket: Symbol("filing"),
+    account,
+    owner: roster.owner,
+    ...hands.reach(),
+  };
   const at = roster.filed(account.id);
   editor.pending = filing;
   void hands
-    .enrol({ origin: filing.origin, token: filing.token, realm: at.realm, name: at.name, value: draft.key, lang: hands.lang() })
+    .enrol({
+      origin: filing.origin,
+      token: filing.token,
+      realm: at.realm,
+      name: at.name,
+      value: draft.key,
+      lang: hands.lang(),
+    })
     .then((outcome) => {
       if (editor.pending?.ticket !== filing.ticket) return;
       editor.pending = null;
       const now = hands.reach();
-      if (hands.roster().owner !== filing.owner || now.origin !== filing.origin || now.token !== filing.token) return;
-      if (outcome.kind === "stored") store(editor, hands, { ...filing.account, reference: outcome.reference });
+      if (
+        hands.roster().owner !== filing.owner ||
+        now.origin !== filing.origin ||
+        now.token !== filing.token
+      )
+        return;
+      if (outcome.kind === "stored")
+        store(editor, hands, { ...filing.account, reference: outcome.reference });
       else editor.note = outcome.reason;
     });
 }
@@ -249,7 +287,8 @@ export function save(editor: Editor, hands: Hands): void {
 function store(editor: Editor, hands: Hands, account: ProviderAccount): void {
   const rows = shown(editor, hands.roster());
   const at = rows.findIndex((row) => row.id === account.id);
-  const next = at < 0 ? [...rows, account] : rows.map((row, index) => (index === at ? account : row));
+  const next =
+    at < 0 ? [...rows, account] : rows.map((row, index) => (index === at ? account : row));
   if (!commit(editor, hands, next)) return;
   editor.editing = null;
   editor.draft = BLANK;
@@ -274,7 +313,14 @@ export function remove(editor: Editor, hands: Hands, id: string): void {
   if (rows.length <= 1) return;
   const reference = rows.find((row) => row.id === id)?.reference ?? null;
   const stored = roster.keys.some((status) => status.id === id && status.key === "stored");
-  if (!commit(editor, hands, rows.filter((row) => row.id !== id))) return;
+  if (
+    !commit(
+      editor,
+      hands,
+      rows.filter((row) => row.id !== id),
+    )
+  )
+    return;
   // Only a key the vault holds is offered: one the environment supplies
   // is refused by the city (gateway D33), and an anonymous account has
   // none.

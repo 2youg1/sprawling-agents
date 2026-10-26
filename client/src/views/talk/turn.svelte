@@ -55,7 +55,8 @@ bar and the thread cannot disagree about where a round is. -->
     readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onHover }: Props = $props();
+  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onHover }: Props =
+    $props();
 
   const { lang } = ui();
 

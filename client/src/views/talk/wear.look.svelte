@@ -26,14 +26,26 @@
   const pct = (share: number): string => `${String(share * 100)}%`;
 </script>
 
-<div class="track relative h-full cursor-pointer touch-none overflow-hidden" title={hint} {...track}>
+<div
+  class="track relative h-full cursor-pointer touch-none overflow-hidden"
+  title={hint}
+  {...track}
+>
   <div class="line bg-edge"></div>
   {#each read as [top, height], at (at)}
     <div class="worn bg-edge-input" style:top={pct(top)} style:height={pct(height)}></div>
   {/each}
-  <div class="tick thumb bg-raised-hover" style:top={pct(thumb[0])} style:height={pct(thumb[1])}></div>
+  <div
+    class="tick thumb bg-raised-hover"
+    style:top={pct(thumb[0])}
+    style:height={pct(thumb[1])}
+  ></div>
   {#each marks as mark, at (at)}
-    <div class={["tick", PHASE_FILL[mark.phase]]} style:top={pct(mark.top)} style:height={pct(Math.min(mark.height, 0.01))}></div>
+    <div
+      class={["tick", PHASE_FILL[mark.phase]]}
+      style:top={pct(mark.top)}
+      style:height={pct(Math.min(mark.height, 0.01))}
+    ></div>
   {/each}
 </div>
 

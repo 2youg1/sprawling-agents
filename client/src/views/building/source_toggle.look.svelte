@@ -18,7 +18,9 @@ arrive on the arriving curve and leave on the leaving one. -->
   {...look.wire}
   class={[
     "h-control-sm rounded-pill px-snug font-mono text-note transition-colors still:transition-none",
-    look.pressed ? "bg-raised text-text ease-arrive" : "text-text-faint ease-leave hover:bg-raised hover:text-text-quiet",
+    look.pressed
+      ? "bg-raised text-text ease-arrive"
+      : "text-text-faint ease-leave hover:bg-raised hover:text-text-quiet",
   ]}
 >
   {look.label}

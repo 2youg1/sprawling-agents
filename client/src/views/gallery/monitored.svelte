@@ -19,7 +19,10 @@
 
   const ESC = String.fromCharCode(27);
 
-  const said = (value: unknown): { cut: number; head: string } => ({ cut: 0, head: JSON.stringify(value) });
+  const said = (value: unknown): { cut: number; head: string } => ({
+    cut: 0,
+    head: JSON.stringify(value),
+  });
 
   const TURNS: readonly Turn[] = [
     {
@@ -54,7 +57,8 @@
           output: said({
             arm: "shell",
             stdout: `running 3 tests\ntest append ... ${ESC}[32mok${ESC}[0m\ntest full ... ${ESC}[31mFAILED${ESC}[0m\n`,
-            stderr: "memory allocation of 2147483648 bytes failed\nerror: test failed, to rerun pass `-p ledger --lib`\n",
+            stderr:
+              "memory allocation of 2147483648 bytes failed\nerror: test failed, to rerun pass `-p ledger --lib`\n",
             exit_code: 101,
             memory_ceiling: {
               state: "hit",
@@ -69,7 +73,9 @@
           timing: "measured",
           tool: "exec",
           outcome: "waiting",
-          arguments: said({ arm: { program: { path: "cargo", args: ["clippy", "-p", "ledger"] } } }),
+          arguments: said({
+            arm: { program: { path: "cargo", args: ["clippy", "-p", "ledger"] } },
+          }),
         },
       ],
     },
@@ -84,7 +90,13 @@
 
 <Case label="monitor · a run's code beside its terminal">
   <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
-    <Monitor turns={TURNS} tail={NO_TAIL} live={true} onDraft={() => undefined} onSteer={() => undefined} />
+    <Monitor
+      turns={TURNS}
+      tail={NO_TAIL}
+      live={true}
+      onDraft={() => undefined}
+      onSteer={() => undefined}
+    />
   </div>
 </Case>
 
@@ -92,7 +104,15 @@
 terminal was, and the follow toggle stands on its raised fill. -->
 <Case label="monitor · the terminal folded">
   <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
-    <Monitor turns={TURNS} tail={NO_TAIL} live={true} following="paused" terminal="folded" onDraft={() => undefined} onSteer={() => undefined} />
+    <Monitor
+      turns={TURNS}
+      tail={NO_TAIL}
+      live={true}
+      following="paused"
+      terminal="folded"
+      onDraft={() => undefined}
+      onSteer={() => undefined}
+    />
   </div>
 </Case>
 
@@ -101,6 +121,12 @@ revert; with no editor chosen it offers nothing, and draws no empty
 strip of actions over its lines. -->
 <Case label="monitor · a finished run">
   <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
-    <Monitor turns={TURNS} tail={NO_TAIL} live={false} onDraft={() => undefined} onSteer={() => undefined} />
+    <Monitor
+      turns={TURNS}
+      tail={NO_TAIL}
+      live={false}
+      onDraft={() => undefined}
+      onSteer={() => undefined}
+    />
   </div>
 </Case>

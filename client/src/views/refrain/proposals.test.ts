@@ -41,7 +41,15 @@ const CARD: ProposalCard = {
 };
 
 function refusal(action: string, subject: string): AxError {
-  return { action, code: "E_VERSION_CONFLICT", gate: null, nearby: [], recovery: "reject the card", retry: "no", subject };
+  return {
+    action,
+    code: "E_VERSION_CONFLICT",
+    gate: null,
+    nearby: [],
+    recovery: "reject the card",
+    retry: "no",
+    subject,
+  };
 }
 
 describe("the verdicts a card sends", () => {
@@ -82,7 +90,9 @@ describe("the verdicts a card sends", () => {
   });
 
   test("an edit that takes nothing takes nothing", () => {
-    const none = new Map([...editOf(CARD)].map(([place, take]) => [place, { ...take, taken: false }]));
+    const none = new Map(
+      [...editOf(CARD)].map(([place, take]) => [place, { ...take, taken: false }]),
+    );
     expect(takesAny(none)).toBe(false);
     expect(verdictsOf(CARD, none)).toEqual([]);
   });
@@ -117,10 +127,16 @@ describe("where a sent answer stands", () => {
 
   test("a refusal is this card's when it names this card, no card, or the document", () => {
     const other = B3Hash.make("d".repeat(64));
-    expect(refusesCard(refusal("decide proposals", `proposal ${ID} is named twice`), DOC, ID)).toBe(true);
-    expect(refusesCard(refusal("decide a proposal", "sentence 4 is not on this card"), DOC, ID)).toBe(true);
+    expect(refusesCard(refusal("decide proposals", `proposal ${ID} is named twice`), DOC, ID)).toBe(
+      true,
+    );
+    expect(
+      refusesCard(refusal("decide a proposal", "sentence 4 is not on this card"), DOC, ID),
+    ).toBe(true);
     expect(refusesCard(refusal("save a document", DOC), DOC, ID)).toBe(true);
-    expect(refusesCard(refusal("decide proposals", `proposal ${other} was decided already`), DOC, ID)).toBe(false);
+    expect(
+      refusesCard(refusal("decide proposals", `proposal ${other} was decided already`), DOC, ID),
+    ).toBe(false);
     expect(refusesCard(refusal("save a document", "shop/notes/other.md"), DOC, ID)).toBe(false);
   });
 });

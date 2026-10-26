@@ -53,11 +53,22 @@ export interface LinkLook {
 }
 
 export type LineLook =
-  | { readonly kind: "text"; readonly key: string; readonly rank: Rank; readonly face: Face; readonly text: string }
+  | {
+      readonly kind: "text";
+      readonly key: string;
+      readonly rank: Rank;
+      readonly face: Face;
+      readonly text: string;
+    }
   // A moment, written for a reader and stated for a machine.
   | { readonly kind: "time"; readonly key: string; readonly text: string; readonly at: string }
   // Where the run lives: its building, then its room.
-  | { readonly kind: "place"; readonly key: string; readonly building: LinkLook; readonly room: LinkLook };
+  | {
+      readonly kind: "place";
+      readonly key: string;
+      readonly building: LinkLook;
+      readonly room: LinkLook;
+    };
 
 export interface CellLook {
   readonly key: string;
@@ -149,7 +160,12 @@ function spent(turns: readonly Turn[], lang: Lang): CellLook {
     wide: false,
     lines: [
       text("usd", "value", "figure", usd(figuresOf(turns).usd)),
-      text("turns", "more", "figure", fill(say(lang, "run_head_turns"), { n: String(turns.length) })),
+      text(
+        "turns",
+        "more",
+        "figure",
+        fill(say(lang, "run_head_turns"), { n: String(turns.length) }),
+      ),
     ],
   };
 }
@@ -176,7 +192,10 @@ function origin(room: Address | null, lang: Lang): CellLook | null {
       {
         kind: "place",
         key: room,
-        building: { text: building, wire: { href: toFragment({ kind: "building", address: building }) } },
+        building: {
+          text: building,
+          wire: { href: toFragment({ kind: "building", address: building }) },
+        },
         room: { text: roomOf(room), wire: { href: toFragment({ kind: "talk", address: room }) } },
       },
     ],

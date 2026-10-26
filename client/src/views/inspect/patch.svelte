@@ -73,7 +73,10 @@
         folded: (n) => fill(say($lang, "change_folded"), { n }),
         quote: (n) => fill(say($lang, "change_line_quote"), { n }),
       },
-      { href: talk === undefined ? undefined : toFragment({ kind: "talk", address: talk }), choose },
+      {
+        href: talk === undefined ? undefined : toFragment({ kind: "talk", address: talk }),
+        choose,
+      },
     ),
   );
 </script>

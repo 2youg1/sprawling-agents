@@ -69,21 +69,57 @@
     </linearGradient>
   </defs>
   {#each look.stars as star (star.slot)}
-    <circle cx={star.x} cy={star.y} r={star.r} class="fill-drawn-part blink"
-      style="animation-delay: {star.delay}ms; animation-duration: 2.6s" />
+    <circle
+      cx={star.x}
+      cy={star.y}
+      r={star.r}
+      class="fill-drawn-part blink"
+      style="animation-delay: {star.delay}ms; animation-duration: 2.6s"
+    />
   {/each}
-  <rect x="0" y={look.ground} width={look.width} height={look.height - look.ground} fill="url(#ground)" />
-  <line x1="0" y1={look.ground} x2={look.width} y2={look.ground} class="stroke-drawn-line" stroke-width="1" />
+  <rect
+    x="0"
+    y={look.ground}
+    width={look.width}
+    height={look.height - look.ground}
+    fill="url(#ground)"
+  />
+  <line
+    x1="0"
+    y1={look.ground}
+    x2={look.width}
+    y2={look.ground}
+    class="stroke-drawn-line"
+    stroke-width="1"
+  />
   {#each look.towers as tower (tower.key)}
     <g class="group cursor-pointer" {...tower.wire}>
-      <rect x={tower.x - 16} y={tower.top - 16} width={tower.w + 32} height={tower.h + 16}
-        rx="24" fill="url(#glow)"
-        class={["transition-opacity", tower.lit ? "opacity-100 ease-arrive" : "opacity-0 ease-leave"]} />
+      <rect
+        x={tower.x - 16}
+        y={tower.top - 16}
+        width={tower.w + 32}
+        height={tower.h + 16}
+        rx="24"
+        fill="url(#glow)"
+        class={[
+          "transition-opacity",
+          tower.lit ? "opacity-100 ease-arrive" : "opacity-0 ease-leave",
+        ]}
+      />
       {#if tower.hall}
-        <path d="M{tower.x + tower.w / 2 - 34} {tower.top} a34 26 0 0 1 68 0 z"
-          class="fill-drawn-solid-lit stroke-drawn-edge" stroke-width="1" />
-        <line x1={tower.x + tower.w / 2} y1={tower.top - 26} x2={tower.x + tower.w / 2} y2={tower.top - 38}
-          class="stroke-drawn-stem" stroke-width="1.2" />
+        <path
+          d="M{tower.x + tower.w / 2 - 34} {tower.top} a34 26 0 0 1 68 0 z"
+          class="fill-drawn-solid-lit stroke-drawn-edge"
+          stroke-width="1"
+        />
+        <line
+          x1={tower.x + tower.w / 2}
+          y1={tower.top - 26}
+          x2={tower.x + tower.w / 2}
+          y2={tower.top - 38}
+          class="stroke-drawn-stem"
+          stroke-width="1.2"
+        />
         <circle cx={tower.x + tower.w / 2} cy={tower.top - 40} r="2" class="fill-drawn-aside" />
       {/if}
       <path
@@ -96,47 +132,124 @@
         ]}
         stroke-width={tower.picked ? "2" : "1"}
       />
-      <line x1={tower.x + 8} y1={tower.top + 10} x2={tower.x + tower.w - 8} y2={tower.top + 10}
-        class="stroke-drawn-line" stroke-width="1" />
+      <line
+        x1={tower.x + 8}
+        y1={tower.top + 10}
+        x2={tower.x + tower.w - 8}
+        y2={tower.top + 10}
+        class="stroke-drawn-line"
+        stroke-width="1"
+      />
       {#each tower.cells as cell (cell.slot)}
-        <rect x={cell.x} y={cell.y} width="12" height="14" rx="1.5" class={["transition-colors", PANE[cell.pane]]} />
+        <rect
+          x={cell.x}
+          y={cell.y}
+          width="12"
+          height="14"
+          rx="1.5"
+          class={["transition-colors", PANE[cell.pane]]}
+        />
       {/each}
       {#if tower.hall}
         {#each [0, 1, 2, 3] as column (column)}
-          <rect x={tower.x + tower.w / 2 - 42 + column * 28 - 2.5} y={look.ground - 46}
-            width="5" height="46" rx="1" class="fill-drawn-line" />
+          <rect
+            x={tower.x + tower.w / 2 - 42 + column * 28 - 2.5}
+            y={look.ground - 46}
+            width="5"
+            height="46"
+            rx="1"
+            class="fill-drawn-line"
+          />
         {/each}
       {/if}
-      <rect x={tower.door.x} y={tower.door.y} width={tower.door.w} height={tower.door.h} rx="2" class="fill-drawn-hollow" />
-      <rect x={tower.door.x + 2} y={tower.door.y + 2} width={tower.door.w - 4} height="4" rx="1"
-        class={["transition-colors", tower.lit ? "fill-accent-solid ease-arrive" : "fill-drawn-solid-lit ease-leave"]} />
+      <rect
+        x={tower.door.x}
+        y={tower.door.y}
+        width={tower.door.w}
+        height={tower.door.h}
+        rx="2"
+        class="fill-drawn-hollow"
+      />
+      <rect
+        x={tower.door.x + 2}
+        y={tower.door.y + 2}
+        width={tower.door.w - 4}
+        height="4"
+        rx="1"
+        class={[
+          "transition-colors",
+          tower.lit ? "fill-accent-solid ease-arrive" : "fill-drawn-solid-lit ease-leave",
+        ]}
+      />
       {#if tower.lamp !== null}
         <g class="blink" aria-label={tower.lamp}>
-          <line x1={tower.door.x - 10} y1={look.ground} x2={tower.door.x - 10} y2={look.ground - 26}
-            class="stroke-drawn-part" stroke-width="1" />
+          <line
+            x1={tower.door.x - 10}
+            y1={look.ground}
+            x2={tower.door.x - 10}
+            y2={look.ground - 26}
+            class="stroke-drawn-part"
+            stroke-width="1"
+          />
           <circle cx={tower.door.x - 10} cy={look.ground - 28} r="3" class="fill-alert" />
         </g>
       {/if}
-      <rect x={tower.x} y={look.ground + 2} width={tower.w} height={PLINTH} rx="2" class="fill-drawn-solid" />
+      <rect
+        x={tower.x}
+        y={look.ground + 2}
+        width={tower.w}
+        height={PLINTH}
+        rx="2"
+        class="fill-drawn-solid"
+      />
       {#if tower.bar !== null}
-        <rect x={tower.x + 6} y={look.ground + 7} width={tower.w - 12} height="3" rx="1.5" class="fill-drawn-line" />
-        <rect x={tower.x + 6} y={look.ground + 7} width={(tower.w - 12) * tower.bar.done} height="3" rx="1.5" class="fill-accent" />
-        <rect x={tower.x + 6 + (tower.w - 12) * tower.bar.done} y={look.ground + 7}
-          width={(tower.w - 12) * tower.bar.blocked} height="3" rx="1.5" class="fill-alert" />
+        <rect
+          x={tower.x + 6}
+          y={look.ground + 7}
+          width={tower.w - 12}
+          height="3"
+          rx="1.5"
+          class="fill-drawn-line"
+        />
+        <rect
+          x={tower.x + 6}
+          y={look.ground + 7}
+          width={(tower.w - 12) * tower.bar.done}
+          height="3"
+          rx="1.5"
+          class="fill-accent"
+        />
+        <rect
+          x={tower.x + 6 + (tower.w - 12) * tower.bar.done}
+          y={look.ground + 7}
+          width={(tower.w - 12) * tower.bar.blocked}
+          height="3"
+          rx="1.5"
+          class="fill-alert"
+        />
       {/if}
-      <text x={tower.x + tower.w / 2} y={look.ground + PLINTH + 22} text-anchor="middle"
+      <text
+        x={tower.x + tower.w / 2}
+        y={look.ground + PLINTH + 22}
+        text-anchor="middle"
         class={[
           "font-mono transition-colors ease-leave group-hover:fill-text group-hover:ease-arrive",
           "group-focus-visible:fill-text group-focus-visible:ease-arrive",
           tower.picked ? "fill-text" : "fill-text-quiet",
         ]}
-        font-size={tower.name.size}>
+        font-size={tower.name.size}
+      >
         <title>{tower.name.whole}</title>
         {tower.name.shown}
       </text>
       {#if tower.line !== null}
-        <text x={tower.x + tower.w / 2} y={look.ground + PLINTH + 38} text-anchor="middle"
-          class="fill-text-disabled font-mono" font-size={tower.line.size}>
+        <text
+          x={tower.x + tower.w / 2}
+          y={look.ground + PLINTH + 38}
+          text-anchor="middle"
+          class="fill-text-disabled font-mono"
+          font-size={tower.line.size}
+        >
           <title>{tower.line.whole}</title>
           {tower.line.shown}
         </text>

@@ -13,8 +13,13 @@ const image = `sha256:${"a".repeat(64)}`;
 test("the generated image decoder refuses mutable tags and noncanonical digests", () => {
   const read = Schema.decodeOption(ContainerImage);
   expect(Option.isSome(read(image))).toBe(true);
-  for (const invalid of ["alpine:latest", "sha256:abc", image.toUpperCase(), `${image}
-`]) {
+  for (const invalid of [
+    "alpine:latest",
+    "sha256:abc",
+    image.toUpperCase(),
+    `${image}
+`,
+  ]) {
     expect(Option.isNone(read(invalid))).toBe(true);
   }
 });

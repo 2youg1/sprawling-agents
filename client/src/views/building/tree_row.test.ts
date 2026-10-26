@@ -19,7 +19,13 @@ describe("a row of the building's tree", () => {
   });
 
   test("a file and a transcript open elsewhere and announce no disclosure", () => {
-    const marks: readonly TreeMark[] = [{ kind: "file" }, { kind: "transcript", hint: "opens the run" }];
-    expect(marks.map((mark) => treeRowWire(mark, () => undefined)["aria-expanded"])).toEqual([undefined, undefined]);
+    const marks: readonly TreeMark[] = [
+      { kind: "file" },
+      { kind: "transcript", hint: "opens the run" },
+    ];
+    expect(marks.map((mark) => treeRowWire(mark, () => undefined)["aria-expanded"])).toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 });

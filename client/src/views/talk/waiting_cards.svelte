@@ -42,21 +42,32 @@
   // the work and undoes nothing, so the card names the place that does
   // bring a file back.
   const cards = $derived(
-    grouped(items).map(
-      (group): WaitingCardLook => ({
-        key: group.key,
-        asker: fill(say($lang, "wait_from"), { actor: group.first.actor }),
-        at: ago($lang, group.first.created, u.now()),
-        allow: { label: say($lang, "wait_allow"), onPress: () => { rule(group, "allow"); } },
-        deny: { label: say($lang, "wait_deny"), onPress: () => { rule(group, "deny"); } },
-        action: group.first.action_desc,
-        locator: group.first.artifact,
-        keeps: say($lang, "wait_deny_keeps"),
-        bin: { text: say($lang, "wait_bin"), href: toFragment({ kind: "record", lens: "bin" }) },
-        same: group.items.length > 1 ? fill(say($lang, "wait_same"), { n: String(group.items.length) }) : undefined,
-        tainted: group.first.tainted ? say($lang, "wait_tainted") : undefined,
-      }),
-    ),
+    grouped(items).map((group): WaitingCardLook => ({
+      key: group.key,
+      asker: fill(say($lang, "wait_from"), { actor: group.first.actor }),
+      at: ago($lang, group.first.created, u.now()),
+      allow: {
+        label: say($lang, "wait_allow"),
+        onPress: () => {
+          rule(group, "allow");
+        },
+      },
+      deny: {
+        label: say($lang, "wait_deny"),
+        onPress: () => {
+          rule(group, "deny");
+        },
+      },
+      action: group.first.action_desc,
+      locator: group.first.artifact,
+      keeps: say($lang, "wait_deny_keeps"),
+      bin: { text: say($lang, "wait_bin"), href: toFragment({ kind: "record", lens: "bin" }) },
+      same:
+        group.items.length > 1
+          ? fill(say($lang, "wait_same"), { n: String(group.items.length) })
+          : undefined,
+      tainted: group.first.tainted ? say($lang, "wait_tainted") : undefined,
+    })),
   );
 </script>
 

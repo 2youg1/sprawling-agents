@@ -60,14 +60,21 @@
 
   // A file the city holds: `total` bytes long, `text` being its first
   // window, which is the whole file when the coverage says so.
-  function held(version: B3Hash, text: string, total: number, coverage: "whole" | "head"): DocumentState {
+  function held(
+    version: B3Hash,
+    text: string,
+    total: number,
+    coverage: "whole" | "head",
+  ): DocumentState {
     const encoding = text.startsWith("\uFEFF") ? "utf8_bom" : "utf8";
     return {
       held: {
         version,
         format: text.startsWith("#") ? "markdown" : "plain",
         bytes: total,
-        body: { text: { encoding, coverage, head: { span: { start: 0, end: bytes(text) }, text } } },
+        body: {
+          text: { encoding, coverage, head: { span: { start: 0, end: bytes(text) }, text } },
+        },
       },
     };
   }
@@ -90,7 +97,10 @@
     }
     if ("range" in query && query.range.version === V0) {
       const start = query.range.range.start;
-      const window = start === 0 ? { span: { start: 0, end: bytes(BEFORE) }, text: BEFORE } : { span: { start, end: start }, text: "" };
+      const window =
+        start === 0
+          ? { span: { start: 0, end: bytes(BEFORE) }, text: BEFORE }
+          : { span: { start, end: start }, text: "" };
       return { range: { version: V0, window } };
     }
     if ("versions" in query && query.versions.at === `shop/${MOVED}`) {
@@ -101,7 +111,12 @@
       return { versions: { at: query.versions.at, versions, more: false } };
     }
     if ("preview" in query && query.preview.version === V1) {
-      return { preview: { version: V1, preview: { laid: { span: { start: 0, end: bytes(MARKDOWN) }, blocks: PLAN } } } };
+      return {
+        preview: {
+          version: V1,
+          preview: { laid: { span: { start: 0, end: bytes(MARKDOWN) }, blocks: PLAN } },
+        },
+      };
     }
     return undefined;
   }
@@ -125,11 +140,24 @@
         order: "bullet" as const,
         spacing: "tight" as const,
         items: [
-          { span: span(102, 126), check: "done" as const, blocks: [{ paragraph: { span: span(108, 126), inline: [{ text: "read the whole text" }] } }] },
+          {
+            span: span(102, 126),
+            check: "done" as const,
+            blocks: [
+              { paragraph: { span: span(108, 126), inline: [{ text: "read the whole text" }] } },
+            ],
+          },
           {
             span: span(127, 155),
             check: "open" as const,
-            blocks: [{ paragraph: { span: span(133, 155), inline: [{ text: "save through " }, { code: "PutRange" }] } }],
+            blocks: [
+              {
+                paragraph: {
+                  span: span(133, 155),
+                  inline: [{ text: "save through " }, { code: "PutRange" }],
+                },
+              },
+            ],
           },
         ],
       },
@@ -142,11 +170,20 @@
         body: [{ cells: [[{ text: "coordinates" }], [{ code: "document_pos.ts" }]] }],
       },
     },
-    { code: { span: span(214, 287), info: "rust", text: "let applied = documents::save(source, baseline, &edits)?;\n" } },
+    {
+      code: {
+        span: span(214, 287),
+        info: "rust",
+        text: "let applied = documents::save(source, baseline, &edits)?;\n",
+      },
+    },
   ];
 
   function keptDraft(): string {
-    return writeDraft({ version: V0, changes: [{ from: 24, to: 24, insert: " Kept as a draft." }] });
+    return writeDraft({
+      version: V0,
+      changes: [{ from: 24, to: 24, insert: " Kept as a draft." }],
+    });
   }
 
   const MOVED_PLACE = draftPlace(Address.make(`shop/${MOVED}`));
@@ -174,7 +211,14 @@
   const lang = ui().lang;
   // Every kind of receipt but `clean`, which leaves no word: the head
   // line as a person meets it after each.
-  const KINDS: readonly Receipt["kind"][] = ["draft", "saving", "pending", "saved", "conflict", "refused"];
+  const KINDS: readonly Receipt["kind"][] = [
+    "draft",
+    "saving",
+    "pending",
+    "saved",
+    "conflict",
+    "refused",
+  ];
 
   const FRAME = "refrain-specimen flex h-[480px] flex-col overflow-hidden bg-page";
 </script>
@@ -215,7 +259,12 @@
   </Case>
   <Case label="refrain · the replaced version against the city's" width={600}>
     <div class={FRAME}>
-      <Document at={Address.make(`shop/${MOVED}`)} building={SHOP} version={null} reading="versions" />
+      <Document
+        at={Address.make(`shop/${MOVED}`)}
+        building={SHOP}
+        version={null}
+        reading="versions"
+      />
     </div>
   </Case>
   <Case label="refrain · the head line, every word a save leaves on it" width={600}>

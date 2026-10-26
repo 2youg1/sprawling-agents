@@ -68,7 +68,9 @@ export interface ListWire {
 // `aria-controls` names; the focus leaving it closes the menu.
 export interface PopupWire {
   readonly id: string;
-  readonly onfocusout: (event: FocusEvent & { readonly currentTarget: EventTarget & HTMLElement }) => void;
+  readonly onfocusout: (
+    event: FocusEvent & { readonly currentTarget: EventTarget & HTMLElement },
+  ) => void;
 }
 
 // The `<li>` around an item takes no role of its own, so a screen

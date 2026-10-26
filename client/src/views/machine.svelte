@@ -1,32 +1,32 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What this machine has, as the city found it when it started. The
-// first step of the first half hour used to be one command to copy and
-// no way of knowing whether it had worked; this is the answer.
-//
-// The answer and its three states each have their own component under
-// `views/machine/`, re-exported here so the gallery reaches the same
-// pieces the page reaches. This file owns only the ask: the city said
-// it has no such answer means nobody has asked this machine since it
-// was served, because serving one no longer spends the seconds it takes
-// to start thirty-two programs and ask each its version. The page that
-// shows the answer is the page that asks for it - once per opening,
-// whether or not the city holds an older answer, and through the same
-// command the button sends, so "look at this machine" keeps one
-// authority (`crates/sprawling/Spec.lean` §8-120). Once an answer is here, each
-// item's newest release is asked of its publisher, one question per
-// item, and filled in as the answers arrive.
+  // What this machine has, as the city found it when it started. The
+  // first step of the first half hour used to be one command to copy and
+  // no way of knowing whether it had worked; this is the answer.
+  //
+  // The answer and its three states each have their own component under
+  // `views/machine/`, re-exported here so the gallery reaches the same
+  // pieces the page reaches. This file owns only the ask: the city said
+  // it has no such answer means nobody has asked this machine since it
+  // was served, because serving one no longer spends the seconds it takes
+  // to start thirty-two programs and ask each its version. The page that
+  // shows the answer is the page that asks for it - once per opening,
+  // whether or not the city holds an older answer, and through the same
+  // command the button sends, so "look at this machine" keeps one
+  // authority (`crates/sprawling/Spec.lean` §8-120). Once an answer is here, each
+  // item's newest release is asked of its publisher, one question per
+  // item, and filled in as the answers arrive.
 
-export { default as MachineReport } from "./machine/report.svelte";
-export { default as MachineSkeleton } from "./machine/skeleton.svelte";
-export { default as MachineUnchecked } from "./machine/unchecked.svelte";
+  export { default as MachineReport } from "./machine/report.svelte";
+  export { default as MachineSkeleton } from "./machine/skeleton.svelte";
+  export { default as MachineUnchecked } from "./machine/unchecked.svelte";
 
-// The one command this screen exists to hand over.
-const DOCTOR = "sprawling doctor --install";
+  // The one command this screen exists to hand over.
+  const DOCTOR = "sprawling doctor --install";
 </script>
 
 <script lang="ts">
@@ -108,7 +108,9 @@ const DOCTOR = "sprawling doctor --install";
   // Each item's newest release, by name. Keyed on the list of names, so
   // a fresh answer about the same items asks nothing again.
   let newest = $state.raw<Readonly<Record<string, DoctorNewest>>>({});
-  const names = $derived(answer === undefined ? "" : answer.items.map((each) => each.name).join(" "));
+  const names = $derived(
+    answer === undefined ? "" : answer.items.map((each) => each.name).join(" "),
+  );
   $effect(() => {
     const asked = names === "" ? [] : names.split(" ");
     const stops = asked.map((item) =>
@@ -197,13 +199,23 @@ const DOCTOR = "sprawling doctor --install";
     />
     <!-- wording-ok: the one command this screen exists to hand over;
     a machine spelling, identical in both languages (client/Spec.lean §4-10) -->
-    <code class="flex h-control items-center rounded-control border border-edge px-base font-mono text-note text-text">
+    <code
+      class="flex h-control items-center rounded-control border border-edge px-base font-mono text-note text-text"
+    >
       {DOCTOR}
     </code>
     <Copy text={DOCTOR} />
   </div>
   {#if answer !== undefined}
-    <Report {answer} onInstall={install} {planned} onInstallAll={installAll} {walk} {newest} onInstallPack={installPack} />
+    <Report
+      {answer}
+      onInstall={install}
+      {planned}
+      onInstallAll={installAll}
+      {walk}
+      {newest}
+      onInstallPack={installPack}
+    />
   {:else if reaching}
     <Skeleton />
   {:else}

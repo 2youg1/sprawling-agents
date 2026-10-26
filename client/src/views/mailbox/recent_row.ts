@@ -63,7 +63,10 @@ export interface RowHands {
 
 export function rowOf(shown: Shown, lang: Lang, ago: string, hands: RowHands): RecentRowLook {
   const name = say(lang, "mailbox_fork_last");
-  const runs = shown.line.runs === 1 ? say(lang, "mailbox_run_one") : fill(say(lang, "mailbox_runs"), { n: String(shown.line.runs) });
+  const runs =
+    shown.line.runs === 1
+      ? say(lang, "mailbox_run_one")
+      : fill(say(lang, "mailbox_runs"), { n: String(shown.line.runs) });
   const note = noteOf(shown.branch, shown.room, lang, hands.stop);
   const waiting = waitWhy(shown.branch);
   const why = shown.forkable ? waiting : "mailbox_fork_unheld";

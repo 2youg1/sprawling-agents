@@ -120,7 +120,7 @@ describe("the browser half", () => {
     const first = FakeSocket.opened[0];
     expect(first).toBeDefined();
     first?.onopen?.();
-    first?.onmessage?.({ data: "{\"welcome\":" });
+    first?.onmessage?.({ data: '{"welcome":' });
 
     expect(get(conn.state).kind).toBe("refused");
     expect(first?.closed).toBe(true);
@@ -202,8 +202,10 @@ describe("the browser half", () => {
     first?.onclose?.();
     page.show();
 
-    expect({ opened: FakeSocket.opened.length, waiting: booked.filter((entry) => !entry.cancelled).length })
-      .toEqual({ opened: 2, waiting: 0 });
+    expect({
+      opened: FakeSocket.opened.length,
+      waiting: booked.filter((entry) => !entry.cancelled).length,
+    }).toEqual({ opened: 2, waiting: 0 });
   });
   // Words said while the link is down are the person's, not the socket's:
   // they wait for the city and go out, in order, once it greets again,
@@ -211,7 +213,9 @@ describe("the browser half", () => {
   test("holds words said off the link and sends them on the welcome", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
-    const welcome = JSON.stringify({ welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null } });
+    const welcome = JSON.stringify({
+      welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null },
+    });
     FakeSocket.opened[0]?.onopen?.();
     FakeSocket.opened[0]?.onclose?.();
     const words = steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests");
@@ -236,11 +240,16 @@ describe("the browser half", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     FakeSocket.opened[0]?.onopen?.();
-    FakeSocket.opened[0]?.onmessage?.({ data: "{\"welcome\":" });
-    const accepted = conn.command(steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests"));
+    FakeSocket.opened[0]?.onmessage?.({ data: '{"welcome":' });
+    const accepted = conn.command(
+      steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests"),
+    );
 
-    expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) })
-      .toEqual({ state: "refused", accepted: false, held: 0 });
+    expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) }).toEqual({
+      state: "refused",
+      accepted: false,
+      held: 0,
+    });
   });
 
   // A press made while the link is down sends nothing, and the page says
@@ -297,7 +306,11 @@ describe("the browser half", () => {
     };
     first?.onmessage?.({ data: JSON.stringify({ event: record }) });
     const stop = conn.asking.ask("metrics").subscribe(() => undefined);
-    first?.onmessage?.({ data: JSON.stringify({ answered: { ask_id: 1, as_of: 11, outcome: { answer: { metrics } } } }) });
+    first?.onmessage?.({
+      data: JSON.stringify({
+        answered: { ask_id: 1, as_of: 11, outcome: { answer: { metrics } } },
+      }),
+    });
     const before = booked.length;
     first?.onclose?.();
     booked[before]?.run();
@@ -305,10 +318,14 @@ describe("the browser half", () => {
     second?.onopen?.();
     second?.onmessage?.({ data: JSON.stringify({ welcome: { ...welcome, resume_from: 60 } }) });
 
-    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
+    const asked: unknown[] | undefined = second?.sent
+      .slice(1)
+      .map((text): unknown => JSON.parse(text));
     stop();
 
-    expect(asked).toEqual([{ ask: { ask_id: 2, query: { history_range: { from: 11, to: 60, limit: 200 } } } }]);
+    expect(asked).toEqual([
+      { ask: { ask_id: 2, query: { history_range: { from: 11, to: 60, limit: 200 } } } },
+    ]);
   });
   // A welcome from another ledger - the city was made again - names a
   // head the old mark means nothing against: the page forgets what it
@@ -318,7 +335,13 @@ describe("the browser half", () => {
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
-    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null, epoch: "a".repeat(64) };
+    const welcome = {
+      wire_v: WIRE_V,
+      schema: WIRE_HASH,
+      resume_from: 10,
+      city: null,
+      epoch: "a".repeat(64),
+    };
     first?.onmessage?.({ data: JSON.stringify({ welcome }) });
     const record = {
       seq: 10,
@@ -340,7 +363,9 @@ describe("the browser half", () => {
     const renewed = { ...welcome, resume_from: 60, epoch: "b".repeat(64) };
     second?.onmessage?.({ data: JSON.stringify({ welcome: renewed }) });
 
-    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
+    const asked: unknown[] | undefined = second?.sent
+      .slice(1)
+      .map((text): unknown => JSON.parse(text));
     stop();
 
     expect(asked).toEqual([{ ask: { ask_id: 2, query: "metrics" } }]);

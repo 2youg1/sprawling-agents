@@ -102,10 +102,9 @@
 
   const u = ui();
   const { lang } = u;
-   
+
   const buildings = useBuildings();
 
-   
   let chosen = $state<Address>(HALL);
   let scope = $state<Scope>("building");
   let door = $state<Door>("command");
@@ -176,11 +175,13 @@ other. -->
     <Banner text={banner} />
   {/if}
   <div class="@container flex min-h-0 min-w-0 flex-1">
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-wide @min-[64rem]:silver-columns @min-[64rem]:items-start">
+    <div
+      class="flex min-h-0 min-w-0 flex-1 flex-col gap-wide @min-[64rem]:silver-columns @min-[64rem]:items-start"
+    >
       <BuildingColumn
         label={say($lang, "mcp_building")}
         buildings={$buildings}
-        chosen={chosen}
+        {chosen}
         hall={say($lang, "city_hall")}
         onPick={(addr) => {
           chosen = addr;
@@ -195,12 +196,7 @@ other. -->
         />
         <div class="flex flex-col gap-base border-t border-edge pt-base">
           <h2 class="text-note text-text-faint">{say($lang, "mcp_doors")}</h2>
-          <Tabs
-            label={say($lang, "mcp_doors")}
-            lenses={lenses}
-            current={door}
-            onPick={pick}
-          >
+          <Tabs label={say($lang, "mcp_doors")} {lenses} current={door} onPick={pick}>
             {#snippet panel(lens: Lens)}
               {#if lens.id === "command"}
                 <ByCommand intake={reach.intake} />

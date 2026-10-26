@@ -39,7 +39,8 @@
   const heading = $derived(
     boundary?.kind === "forked"
       ? fill(say($lang, "results_session_forked"), {
-          mother: motherName($belief.runs[boundary.mother]?.task ?? "") ?? say($lang, "fork_mother"),
+          mother:
+            motherName($belief.runs[boundary.mother]?.task ?? "") ?? say($lang, "fork_mother"),
           turn: String(boundary.turn),
         })
       : say($lang, "results_session_this"),

@@ -18,7 +18,8 @@ import { landing, lookOf } from "./tabs";
 import type { Hands, Lens, Pressed, TabsLook } from "./tabs";
 
 const SIZES = [1, 2, 3, 4, 5, 6, 7, 8];
-const positions = (total: number): readonly number[] => Array.from({ length: total }, (_, at) => at);
+const positions = (total: number): readonly number[] =>
+  Array.from({ length: total }, (_, at) => at);
 
 describe("a key lands inside the set, as the model walks it", () => {
   test("every arrow, Home and End lands on a tab of the set", () => {
@@ -105,7 +106,9 @@ const symbols = (bag: object): readonly symbol[] => Object.getOwnPropertySymbols
 describe("the wire bags a look spreads", () => {
   test("only the current tab is a Tab stop, and only it is selected", () => {
     const { look } = rig("turns");
-    expect(look.tabs.map((tab) => [tab.wire.tabindex, tab.wire["aria-selected"], tab.current])).toEqual([
+    expect(
+      look.tabs.map((tab) => [tab.wire.tabindex, tab.wire["aria-selected"], tab.current]),
+    ).toEqual([
       [-1, false, false],
       [0, true, true],
       [-1, false, false],
@@ -136,7 +139,12 @@ describe("the wire bags a look spreads", () => {
     const second = lookOf(
       { label: "lenses", lenses: LENSES, current: "time", onPick: () => undefined, panel: PANEL },
       "u2",
-      { focus: () => undefined, keep: () => () => undefined, watch: () => undefined, reachable: true },
+      {
+        focus: () => undefined,
+        keep: () => () => undefined,
+        watch: () => undefined,
+        reachable: true,
+      },
     );
     const ids = (look: TabsLook): readonly string[] => [
       ...look.tabs.map((tab) => tab.wire.id),
@@ -185,7 +193,11 @@ describe("the panels", () => {
   });
 
   test("the shown panel is a stop of its own exactly while nothing inside takes the focus", () => {
-    expect(rig("turns", false).look.panels.map((panel) => panel.wire.tabindex)).toEqual([undefined, 0, undefined]);
+    expect(rig("turns", false).look.panels.map((panel) => panel.wire.tabindex)).toEqual([
+      undefined,
+      0,
+      undefined,
+    ]);
     expect(rig("turns", true).look.panels.map((panel) => panel.wire.tabindex)).toEqual([
       undefined,
       undefined,
@@ -195,6 +207,10 @@ describe("the panels", () => {
 
   test("the seat watches the shown panel and no other", () => {
     const { look, watch } = rig("turns");
-    expect(look.panels.map((panel) => symbols(panel.wire).map((key) => panel.wire[key]))).toEqual([[], [watch], []]);
+    expect(look.panels.map((panel) => symbols(panel.wire).map((key) => panel.wire[key]))).toEqual([
+      [],
+      [watch],
+      [],
+    ]);
   });
 });

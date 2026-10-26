@@ -58,9 +58,14 @@ export interface DialogLook {
 // element's hold down and put it back.
 const HOLD = createAttachmentKey();
 
-export function lookOf(props: DialogProps, uid: string, hold: Attachment<HTMLDialogElement>): DialogLook {
+export function lookOf(
+  props: DialogProps,
+  uid: string,
+  hold: Attachment<HTMLDialogElement>,
+): DialogLook {
   const heading = { id: `${uid}-title`, text: props.title };
-  const detail = props.detail === undefined ? undefined : { id: `${uid}-detail`, text: props.detail };
+  const detail =
+    props.detail === undefined ? undefined : { id: `${uid}-detail`, text: props.detail };
   return {
     sheet: {
       [HOLD]: hold,
@@ -80,7 +85,11 @@ export function lookOf(props: DialogProps, uid: string, hold: Attachment<HTMLDia
     grounds: props.children,
     answers: [
       { label: props.cancelLabel, tone: "secondary", onPress: props.onCancel },
-      { label: props.confirmLabel, tone: props.destructive === true ? "destructive" : "primary", onPress: props.onConfirm },
+      {
+        label: props.confirmLabel,
+        tone: props.destructive === true ? "destructive" : "primary",
+        onPress: props.onConfirm,
+      },
     ],
   };
 }

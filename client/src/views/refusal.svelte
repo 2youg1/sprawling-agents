@@ -72,7 +72,8 @@
   // A refusal carries what its subject names, folded where every
   // notice's subject is folded (`core/belief/shape`), so the deed acts
   // on the city's own reading rather than a second grammar of its own.
-  type Said = { readonly kind: "refused"; readonly refused: Refused } | { readonly kind: "no_run_in_front" };
+  type Said =
+    { readonly kind: "refused"; readonly refused: Refused } | { readonly kind: "no_run_in_front" };
 
   interface Toast {
     readonly id: number;
@@ -202,7 +203,8 @@
       return;
     }
     heard = refusal;
-    if (claims(get(u.conversing), refusal, $belief) || branchClaims(get(u.branches.held), refusal)) return;
+    if (claims(get(u.conversing), refusal, $belief) || branchClaims(get(u.branches.held), refusal))
+      return;
     const refused: Refused = { error: refusal, about: aboutOf(refusal) };
     if (deliverable(urgencyOf(refusal), attention.read(), u.now())) {
       push({ kind: "refused", refused });
@@ -228,7 +230,12 @@
     }
     const measure = (): void => {
       const rect = form.getBoundingClientRect();
-      stand = { kind: "composer", left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top };
+      stand = {
+        kind: "composer",
+        left: rect.left,
+        width: rect.width,
+        bottom: window.innerHeight - rect.top,
+      };
     };
     measure();
     const watching = new ResizeObserver(measure);
@@ -306,25 +313,23 @@
 
 <Look
   {stand}
-  toasts={toasts.map(
-    (toast): ToastLook => ({
-      key: toast.id,
-      gone: toast.gone,
-      wire: {
-        onmouseenter: () => {
-          hold(toast, "pointer");
-        },
-        onmouseleave: () => {
-          letGo(toast, "pointer");
-        },
-        onfocusin: () => {
-          hold(toast, "focus");
-        },
-        onfocusout: (event) => {
-          if (!within(event)) letGo(toast, "focus");
-        },
+  toasts={toasts.map((toast): ToastLook => ({
+    key: toast.id,
+    gone: toast.gone,
+    wire: {
+      onmouseenter: () => {
+        hold(toast, "pointer");
       },
-    }),
-  )}
+      onmouseleave: () => {
+        letGo(toast, "pointer");
+      },
+      onfocusin: () => {
+        hold(toast, "focus");
+      },
+      onfocusout: (event) => {
+        if (!within(event)) letGo(toast, "focus");
+      },
+    },
+  }))}
   {body}
 />

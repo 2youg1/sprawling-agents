@@ -30,7 +30,12 @@ describe("a progress bar", () => {
   test("without an end states neither value and is busy", () => {
     for (const total of [0, -1]) {
       expect(lookOf({ label: "files walked", done: 3, total })).toEqual({
-        bar: { role: "progressbar", "aria-label": "files walked", "aria-valuemin": 0, "aria-busy": "true" },
+        bar: {
+          role: "progressbar",
+          "aria-label": "files walked",
+          "aria-valuemin": 0,
+          "aria-busy": "true",
+        },
         reached: undefined,
       });
     }

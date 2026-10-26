@@ -73,7 +73,8 @@ export interface SplitLook {
 
 // A key's move: to a number of lines, back to the regions' own
 // proportions, or nothing for a key the line does not take.
-export type Keyed = { readonly kind: "lines"; readonly lines: number } | { readonly kind: "reset" } | undefined;
+export type Keyed =
+  { readonly kind: "lines"; readonly lines: number } | { readonly kind: "reset" } | undefined;
 
 function clamped(props: Pick<SplitProps, "least" | "most">, lines: number): number {
   return Math.min(props.most, Math.max(props.least, lines));
@@ -98,7 +99,11 @@ export function keyed(props: Pick<SplitProps, "lines" | "least" | "most">, key: 
 
 // The lines a drag has reached: the lines held when it began, moved by
 // whole steps of the pointer's travel.
-export function dragged(props: Pick<SplitProps, "least" | "most" | "step">, from: Grip, y: number): number {
+export function dragged(
+  props: Pick<SplitProps, "least" | "most" | "step">,
+  from: Grip,
+  y: number,
+): number {
   return clamped(props, from.lines + Math.round((y - from.y) / props.step));
 }
 

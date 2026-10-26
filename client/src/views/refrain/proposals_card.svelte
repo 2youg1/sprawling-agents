@@ -28,7 +28,15 @@
   import type { Address, AxError, B3Hash, Command, ProposalCard } from "../../wire";
   import Decide from "../parts/decide.svelte";
   import type { Choice } from "../parts/decide.svelte";
-  import { advance, editOf, refusesCard, rejectionOf, retaken, standingOf, verdictsOf } from "./proposals";
+  import {
+    advance,
+    editOf,
+    refusesCard,
+    rejectionOf,
+    retaken,
+    standingOf,
+    verdictsOf,
+  } from "./proposals";
   import type { Deciding, Edit, Happened, Take } from "./proposals";
   import { cardLookOf, refusalsOf } from "./proposals_card";
   import Look from "./proposals_card.look.svelte";
@@ -62,7 +70,9 @@
   // the card is open for editing.
   const held = $derived({ standing, deciding, edit: editing ? edit : null, lead });
   const asker = $derived(
-    fill(say($lang, "proposal_from"), { who: $belief.runs[card.run]?.addr ?? card.run.slice(0, 8) }),
+    fill(say($lang, "proposal_from"), {
+      who: $belief.runs[card.run]?.addr ?? card.run.slice(0, 8),
+    }),
   );
 
   function happen(happened: Happened): void {
@@ -146,7 +156,8 @@
           happen({ kind: "lost" });
           return;
         }
-        if (deciding.kind === "pending" && u.conn.command(deciding.command)) happen({ kind: "relinked" });
+        if (deciding.kind === "pending" && u.conn.command(deciding.command))
+          happen({ kind: "relinked" });
       });
     });
   });

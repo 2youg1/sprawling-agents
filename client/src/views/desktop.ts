@@ -54,7 +54,11 @@ export interface DesktopLook {
   readonly missing: string | undefined;
   // The one press: the reason it cannot be used is present while
   // nothing in the box changed.
-  readonly save: { readonly label: string; readonly why: string | undefined; readonly press: () => void };
+  readonly save: {
+    readonly label: string;
+    readonly why: string | undefined;
+    readonly press: () => void;
+  };
   // Said beside the save while an empty file is shown unchanged.
   readonly none: string | undefined;
   readonly scope: Address;
@@ -77,8 +81,13 @@ export function lookOf(state: DesktopState, lang: Lang, hands: Hands): DesktopLo
         hands.type(event.currentTarget.value);
       },
     },
-    missing: state.file === "missing" ? fill(say(lang, "desktop_missing"), { path: scope }) : undefined,
-    save: { label: say(lang, "desktop_save"), why: state.edited ? undefined : say(lang, "desktop_unchanged"), press: hands.save },
+    missing:
+      state.file === "missing" ? fill(say(lang, "desktop_missing"), { path: scope }) : undefined,
+    save: {
+      label: say(lang, "desktop_save"),
+      why: state.edited ? undefined : say(lang, "desktop_unchanged"),
+      press: hands.save,
+    },
     none: !state.edited && state.file === "empty" ? say(lang, "desktop_none") : undefined,
     scope,
   };

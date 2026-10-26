@@ -73,14 +73,20 @@
         {#snippet body()}
           <p class="text-body">{notice.error.action}</p>
           <p class="font-mono text-note wrap-anywhere text-text-quiet">{notice.error.subject}</p>
-          <p class="mt-snug text-note text-text">{recoveryWords($lang, notice.error.code, notice.error.recovery)}</p>
+          <p class="mt-snug text-note text-text">
+            {recoveryWords($lang, notice.error.code, notice.error.recovery)}
+          </p>
           <p class="mt-snug text-note text-text-quiet">{say($lang, WHY.ask)}</p>
         {/snippet}
       </Decide>
     </div>
   {/each}
   {#each failures as notice (notice.key)}
-    <div class="flex min-w-0 items-start gap-snug rounded-card focus-visible:wash" data-entry tabindex="-1">
+    <div
+      class="flex min-w-0 items-start gap-snug rounded-card focus-visible:wash"
+      data-entry
+      tabindex="-1"
+    >
       <div class="min-w-0 flex-1">
         <Notice
           seat="drawer"
@@ -113,7 +119,9 @@
             />
           {/snippet}
         </Notice>
-        <p class="mt-tight text-note text-text-quiet">{fill(say($lang, WHY.failure), { code: notice.error.code })}</p>
+        <p class="mt-tight text-note text-text-quiet">
+          {fill(say($lang, WHY.failure), { code: notice.error.code })}
+        </p>
       </div>
       <kbd class="entry-n mt-snug" aria-hidden="true"></kbd>
     </div>

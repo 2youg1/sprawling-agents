@@ -130,7 +130,9 @@ test("the runs of a room cost the room, not the city", () => {
     frozen: RUNS - WORKING,
     halted: [],
     pursuits: [],
-    runs: Array.from({ length: RUNS }, (_, index) => listed(RUNS - 1 - index, roomOf(RUNS - 1 - index))),
+    runs: Array.from({ length: RUNS }, (_, index) =>
+      listed(RUNS - 1 - index, roomOf(RUNS - 1 - index)),
+    ),
   });
   const reads = 200;
   const records = Array.from({ length: 2 * reads }, (_, each) =>
@@ -147,7 +149,9 @@ test("the runs of a room cost the room, not the city", () => {
   const belief = get(store.belief);
   expect({
     held,
-    first: heldIn(belief, roomOf(1)).slice(0, 3).map((run) => run.run),
+    first: heldIn(belief, roomOf(1))
+      .slice(0, 3)
+      .map((run) => run.run),
     within: heldWithin(belief, "hall").length,
     none: heldIn(belief, "hall").length,
   }).toEqual({
@@ -181,7 +185,11 @@ test("the cancelled count costs one run a record, not the city", () => {
   store.apply({ ...record(0, 2 * reads + 2, "run_frozen"), data: { completion: "cancelled" } });
   const once = get(store.belief).cancelled;
   store.apply({ ...record(0, 2 * reads + 3, "run_frozen"), data: { completion: "cancelled" } });
-  expect({ during, once, again: get(store.belief).cancelled }).toEqual({ during: 0, once: 1, again: 1 });
+  expect({ during, once, again: get(store.belief).cancelled }).toEqual({
+    during: 0,
+    once: 1,
+    again: 1,
+  });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });
 

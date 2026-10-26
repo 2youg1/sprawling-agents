@@ -47,8 +47,12 @@ export function remindersOf(answer: Answer | undefined): Reminders {
 // ring's tip and the session sheet's context cell say them alike.
 export function remindersSaid(lang: Lang, reminders: Reminders): readonly string[] {
   return [
-    ...(reminders.first === null ? [] : [fill(say(lang, "ring_first"), { n: String(reminders.first) })]),
-    ...(reminders.second === null ? [] : [fill(say(lang, "ring_second"), { n: String(reminders.second) })]),
+    ...(reminders.first === null
+      ? []
+      : [fill(say(lang, "ring_first"), { n: String(reminders.first) })]),
+    ...(reminders.second === null
+      ? []
+      : [fill(say(lang, "ring_second"), { n: String(reminders.second) })]),
   ];
 }
 

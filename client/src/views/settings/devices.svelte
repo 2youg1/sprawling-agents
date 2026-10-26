@@ -24,7 +24,9 @@
 
   const u = ui();
   const asked = u.conn.asking.ask(QUERIES.devices);
-  const read = $derived(readAnswer($asked, (held) => ("devices" in held ? held.devices.devices : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("devices" in held ? held.devices.devices : undefined)),
+  );
   // This browser's own id, so its row can say so.
   let here = $state<string | null>(null);
   onMount(() => {
@@ -37,7 +39,13 @@
 </script>
 
 {#if read.kind === "held"}
-  <Look devices={read.value} {here} now={u.now()} local={!u.origin.startsWith("https:")} onForget={forget} />
+  <Look
+    devices={read.value}
+    {here}
+    now={u.now()}
+    local={!u.origin.startsWith("https:")}
+    onForget={forget}
+  />
 {:else if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={QUERIES.devices} />
 {/if}

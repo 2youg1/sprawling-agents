@@ -34,10 +34,18 @@ type Chosen = "write" | "admit" | "landing";
 // The menu: one column per value, each row a value the wire offers, the
 // one the page holds marked.
 export function policyColumns(lang: Lang, policy: RunPolicy): readonly PopoverColumn[] {
-  const column = <K extends Chosen>(field: K, label: Key, values: readonly RunPolicy[K][]): PopoverColumn => ({
+  const column = <K extends Chosen>(
+    field: K,
+    label: Key,
+    values: readonly RunPolicy[K][],
+  ): PopoverColumn => ({
     id: field,
     label,
-    rows: values.map((each) => ({ id: each, label: say(lang, `admission_value_${each}`), chosen: each === policy[field] })),
+    rows: values.map((each) => ({
+      id: each,
+      label: say(lang, `admission_value_${each}`),
+      chosen: each === policy[field],
+    })),
   });
   return [
     column("write", "admission_write", WRITE_LIMITS),
@@ -52,7 +60,12 @@ export function picked(policy: RunPolicy, column: string, row: string): RunPolic
   const write = WRITE_LIMITS.find((each) => column === "write" && each === row);
   const admit = ADMISSIONS.find((each) => column === "admit" && each === row);
   const landing = LANDINGS.find((each) => column === "landing" && each === row);
-  return { ...policy, write: write ?? policy.write, admit: admit ?? policy.admit, landing: landing ?? policy.landing };
+  return {
+    ...policy,
+    write: write ?? policy.write,
+    admit: admit ?? policy.admit,
+    landing: landing ?? policy.landing,
+  };
 }
 
 // What the closed control says: the write limit, then whichever of the
@@ -135,7 +148,12 @@ export interface PermissionsHands {
   };
 }
 
-export function permissionsOf(lang: Lang, policy: RunPolicy, open: boolean, hands: PermissionsHands): PermissionsLook {
+export function permissionsOf(
+  lang: Lang,
+  policy: RunPolicy,
+  open: boolean,
+  hands: PermissionsHands,
+): PermissionsLook {
   const mode = say(lang, `mode_${policy.mode}`);
   const face = `${mode} · ${policyFace(lang, policy)}`;
   return {
@@ -188,7 +206,10 @@ function panelOf(lang: Lang, policy: RunPolicy, hands: PermissionsHands): PanelL
         hands.close("opener");
       },
     },
-    switches: [{ ...work, wire: { ...work.wire, [HOLD]: hands.hold.first } }, switchOf("write", "talk_write_switch")],
+    switches: [
+      { ...work, wire: { ...work.wire, [HOLD]: hands.hold.first } },
+      switchOf("write", "talk_write_switch"),
+    ],
     selects: policyColumns(lang, policy)
       .filter((column) => column.id !== "write")
       .map((column) => ({

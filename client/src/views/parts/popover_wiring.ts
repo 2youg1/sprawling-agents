@@ -58,13 +58,19 @@ export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pres
   const walk = (by: number): Pressed =>
     here === 0
       ? { kind: "move", to: place }
-      : { kind: "move", to: { column: place.column, cursor: Math.min(here - 1, Math.max(0, place.cursor + by)) } };
+      : {
+          kind: "move",
+          to: { column: place.column, cursor: Math.min(here - 1, Math.max(0, place.cursor + by)) },
+        };
   // A turn starts the next list at its top even when there is only one
   // list to turn to, as the model's `wrap` does.
   const turn = (by: number): Pressed =>
     rows.length === 0
       ? { kind: "move", to: place }
-      : { kind: "move", to: { column: (place.column + by + rows.length) % rows.length, cursor: 0 } };
+      : {
+          kind: "move",
+          to: { column: (place.column + by + rows.length) % rows.length, cursor: 0 },
+        };
   switch (key.key) {
     case "ArrowDown":
       return walk(1);

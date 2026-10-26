@@ -40,7 +40,11 @@ const HOLD = createAttachmentKey();
 // address that says open would disagree with the address. A click whose
 // target is the dialog itself landed on the backdrop, because the inner
 // frame fills the whole element, and that is the one click that closes.
-export function dialogOf(titleId: string, onClose: () => void, hold: Attachment<HTMLDialogElement>): DialogWire {
+export function dialogOf(
+  titleId: string,
+  onClose: () => void,
+  hold: Attachment<HTMLDialogElement>,
+): DialogWire {
   return {
     "aria-labelledby": titleId,
     oncancel: (event) => {

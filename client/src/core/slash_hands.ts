@@ -10,7 +10,17 @@
 import type { RunBelief } from "./belief";
 import type { Key } from "./lang";
 import type { View } from "./route";
-import type { Address, BuildingProgress, Carry, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
+import type {
+  Address,
+  BuildingProgress,
+  Carry,
+  Command,
+  Effort,
+  RunId,
+  RunPolicy,
+  Seq,
+  SessionTags,
+} from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.

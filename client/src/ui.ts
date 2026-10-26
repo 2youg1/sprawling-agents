@@ -125,9 +125,8 @@ function readied(value: Opening): Ui {
     conversing: writable<Conversing>(NOT_CONVERSING),
     branches: keepBranches({ belief: value.conn.belief, send: value.conn.command, go: going }),
     tags: keepTags(value.conn),
-    approvals: derived(
-      value.conn.asking.ask(QUERIES.approvals),
-      (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),
+    approvals: derived(value.conn.asking.ask(QUERIES.approvals), (answer) =>
+      answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined,
     ),
     chooseEffort: effort.set,
     choosePolicy: policy.set,
@@ -136,7 +135,8 @@ function readied(value: Opening): Ui {
     hearing: () => {
       const answer: Answer | undefined = get(hearing);
       return (
-        answer !== undefined && "endpoints" in answer &&
+        answer !== undefined &&
+        "endpoints" in answer &&
         answer.endpoints.chosen.some((each) => each.tag === "transcribe")
       );
     },
@@ -181,7 +181,12 @@ export function ui(): Ui {
       closing: readable(null),
       dismissRefusal: () => undefined,
       markNoticesSeen: () => undefined,
-      monitor: { samples: readable([]), watch: () => () => undefined, watchSummary: () => () => undefined, setBeat: () => undefined },
+      monitor: {
+        samples: readable([]),
+        watch: () => () => undefined,
+        watchSummary: () => () => undefined,
+        setBeat: () => undefined,
+      },
     },
     prefs: loadPreferences(memory(), ""),
     bar: { hash: "" },

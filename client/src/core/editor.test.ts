@@ -55,7 +55,9 @@ describe("editorLink", () => {
       { path: "shop/main.rs", folder: "/srv/city", line: 0 },
       { path: "shop/main.rs", folder: "/srv/city", line: 1.5 },
     ];
-    expect(outside.map((each) => editorLink({ editor: "vscode", ...each }))).toEqual(outside.map(() => null));
+    expect(outside.map((each) => editorLink({ editor: "vscode", ...each }))).toEqual(
+      outside.map(() => null),
+    );
   });
 });
 

@@ -11,7 +11,13 @@
 
 import { configureSearch, reattachEndpoint } from "../../../core/commands";
 import { referenceFor, searchReferenceFor } from "../../../core/enrol";
-import type { AccountRetries, AccountStatus, EndpointSummary, SearchConfiguration, SearchSupplier } from "../../../wire";
+import type {
+  AccountRetries,
+  AccountStatus,
+  EndpointSummary,
+  SearchConfiguration,
+  SearchSupplier,
+} from "../../../wire";
 import type { Roster } from "./account_editor";
 
 // The `Custom` arm of `[search]`: the selected supplier and the list.
@@ -21,7 +27,10 @@ export type CustomSearch = Extract<SearchConfiguration, { readonly custom: unkno
 // with the tuning as the city read it out; the retry count it carries
 // beside the list falls back to the city's figure, `fallback`, which
 // the page reads rather than spells.
-export function endpointRoster(endpoint: EndpointSummary, fallback: AccountRetries | undefined): Roster {
+export function endpointRoster(
+  endpoint: EndpointSummary,
+  fallback: AccountRetries | undefined,
+): Roster {
   const accounts = endpoint.tuning.accounts ?? null;
   return {
     kind: "provider",
@@ -58,7 +67,9 @@ export function supplierRoster(
       configureSearch({
         custom: {
           selected: custom.selected,
-          suppliers: custom.suppliers.map((each) => (each.id === supplier.id ? { ...each, accounts: [...rows] } : each)),
+          suppliers: custom.suppliers.map((each) =>
+            each.id === supplier.id ? { ...each, accounts: [...rows] } : each,
+          ),
         },
       }),
     retries: undefined,

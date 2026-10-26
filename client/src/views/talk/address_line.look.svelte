@@ -51,7 +51,10 @@
   {#if lesson !== undefined}
     <!-- The gap before the lesson is a space inside it, not a margin, so a column that cuts the lesson to nothing keeps no gap. -->
     <span class="min-w-0 shrink-10000 truncate text-text-faint" aria-hidden="true"
-      >&emsp;{lesson.words}{#if lesson.chord !== ""}<span class="pointer-coarse:hidden">&ensp;{lesson.chord}</span>{/if}</span>
+      >&emsp;{lesson.words}{#if lesson.chord !== ""}<span class="pointer-coarse:hidden"
+          >&ensp;{lesson.chord}</span
+        >{/if}</span
+    >
   {/if}
 {/snippet}
 

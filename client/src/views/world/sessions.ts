@@ -131,7 +131,8 @@ export interface GroupLook {
 
 export interface SessionsLook {
   // Absent while no row carries a tag.
-  readonly filter: { readonly wire: FilterWire; readonly toggles: readonly ToggleLook[] } | undefined;
+  readonly filter:
+    { readonly wire: FilterWire; readonly toggles: readonly ToggleLook[] } | undefined;
   // Whether the pane is as narrow as the right pane leaves it, which
   // drops the second line and the time.
   readonly narrow: boolean;
@@ -173,7 +174,10 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
     context: told?.context,
     menu: {
       named: at.named,
-      label: fill(say(lang, "world_row_name"), { room: title, when: ago(lang, stretch.line.at, now) }),
+      label: fill(say(lang, "world_row_name"), {
+        room: title,
+        when: ago(lang, stretch.line.at, now),
+      }),
       tags: at.tags,
       pinning: at.pinning,
       session: { name: stretch.line.name ?? "", run: stretch.current ? (last?.run ?? null) : null },
@@ -190,11 +194,15 @@ function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
   const delegated = delegatedBy(stretch, lang);
   const ranOn = ranOnOf(stretch, lang);
   return {
-    phase: dot === "run" && last?.doing.kind === "awaiting_reply" ? phaseSaid(lang, last.doing, now) : undefined,
+    phase:
+      dot === "run" && last?.doing.kind === "awaiting_reply"
+        ? phaseSaid(lang, last.doing, now)
+        : undefined,
     delegated: delegated === "" ? undefined : delegated,
     about: aboutOf(stretch, last, lang),
     ranOn: ranOn === "" ? undefined : ranOn,
-    context: stretch.current && last !== undefined ? { room: stretch.room, run: last.run } : undefined,
+    context:
+      stretch.current && last !== undefined ? { room: stretch.room, run: last.run } : undefined,
   };
 }
 
@@ -207,7 +215,9 @@ function pinOf(pinning: Exclude<Pinning, "none">, lang: Lang): PinLook {
 
 function hrefOf(stretch: Stretch): string {
   return toFragment(
-    stretch.current ? { kind: "talk", address: stretch.room } : { kind: "talk", address: stretch.room, session: stretch.line.began },
+    stretch.current
+      ? { kind: "talk", address: stretch.room }
+      : { kind: "talk", address: stretch.room, session: stretch.line.began },
   );
 }
 
@@ -240,7 +250,11 @@ export function titleOf(stretch: Stretch): string {
 // when the city does not say it.
 function ranOnOf(stretch: Stretch, lang: Lang): string {
   const { model, effort, workspace } = stretch.line;
-  return [model ?? null, effort === undefined || effort === null ? null : say(lang, `effort_${effort}`), workspace ?? null]
+  return [
+    model ?? null,
+    effort === undefined || effort === null ? null : say(lang, `effort_${effort}`),
+    workspace ?? null,
+  ]
     .filter((each) => each !== null && each !== "")
     .join(" · ");
 }
@@ -259,7 +273,9 @@ function startOf(stretch: Stretch): Key {
 function delegatedBy(stretch: Stretch, lang: Lang): string {
   const start = stretch.line.start;
   const by = "dispatched" in start ? dispatcherOf(start.dispatched.by) : null;
-  return by?.kind === "resident" ? fill(say(lang, "talk_dispatched_by"), { who: called(by.address, null, lang) }) : "";
+  return by?.kind === "resident"
+    ? fill(say(lang, "talk_dispatched_by"), { who: called(by.address, null, lang) })
+    : "";
 }
 
 // The tag filter: "all" first, then each tag a listed row carries; one

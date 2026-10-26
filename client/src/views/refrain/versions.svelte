@@ -48,11 +48,15 @@
   const DRAFT = "draft";
 
   const asked = $derived(u.conn.asking.ask({ versions: { at } }));
-  const read = $derived(readAnswer($asked, (answer) => ("versions" in answer ? answer.versions : undefined)));
+  const read = $derived(
+    readAnswer($asked, (answer) => ("versions" in answer ? answer.versions : undefined)),
+  );
   // A version written twice is listed once, where it was written last.
   const listed = $derived(
     read.kind === "held"
-      ? read.value.versions.filter((each, index, all) => all.findIndex((other) => other.version === each.version) === index)
+      ? read.value.versions.filter(
+          (each, index, all) => all.findIndex((other) => other.version === each.version) === index,
+        )
       : [],
   );
 
@@ -65,17 +69,27 @@
   }
 
   function nameOf(each: DocumentVersion): string {
-    const parts = [short(each.version), sourceOf(each), ...(each.bytes === undefined || each.bytes === null ? [] : [kib(each.bytes)])];
-    return each.kept ? parts.join(" · ") : `${parts.join(" · ")} · ${say($lang, "refrain_version_not_kept")}`;
+    const parts = [
+      short(each.version),
+      sourceOf(each),
+      ...(each.bytes === undefined || each.bytes === null ? [] : [kib(each.bytes)]),
+    ];
+    return each.kept
+      ? parts.join(" · ")
+      : `${parts.join(" · ")} · ${say($lang, "refrain_version_not_kept")}`;
   }
 
   // The draft is the editor's text when the reading opens, not as it is
   // typed: a comparison of a moving text would redraw on every key.
   const draft = $derived(
-    session.receipt.kind === "clean" || session.receipt.kind === "saved" ? null : (session.editing?.text() ?? null),
+    session.receipt.kind === "clean" || session.receipt.kind === "saved"
+      ? null
+      : (session.editing?.text() ?? null),
   );
   const sides = $derived([
-    ...(draft === null ? [] : [{ value: DRAFT, label: say($lang, "refrain_version_draft"), kept: true }]),
+    ...(draft === null
+      ? []
+      : [{ value: DRAFT, label: say($lang, "refrain_version_draft"), kept: true }]),
     ...listed.map((each) => ({ value: each.version, label: nameOf(each), kept: each.kept })),
   ]);
   const choosable = $derived(sides.filter((each) => each.kept));
@@ -102,7 +116,11 @@
       key: side.key,
       label: side.label,
       held: side.held,
-      options: sides.map((each) => ({ value: each.value, label: each.label, disabled: !each.kept })),
+      options: sides.map((each) => ({
+        value: each.value,
+        label: each.label,
+        disabled: !each.kept,
+      })),
       wire: sideWire(side.label, side.pick),
     })),
     more: read.kind === "held" && read.value.more ? say($lang, "refrain_versions_more") : null,
@@ -125,7 +143,10 @@
   }
 
   $effect(() => {
-    for (const [value, gathered] of [[left, leftText], [right, rightText]] as const) {
+    for (const [value, gathered] of [
+      [left, leftText],
+      [right, rightText],
+    ] as const) {
       const listedVersion = listed.find((each) => each.version === value)?.version;
       const held = session.versions.some((each) => each.version === value);
       const wanted = listedVersion === undefined || held ? null : listedVersion;
@@ -138,7 +159,8 @@
   const a = $derived(textOf(left, leftText));
   const b = $derived(textOf(right, rightText));
   const lost = $derived(leftText.lost !== null || rightText.lost !== null);
-  const nameOfSide = (value: string | null): string => sides.find((each) => each.value === value)?.label ?? "";
+  const nameOfSide = (value: string | null): string =>
+    sides.find((each) => each.value === value)?.label ?? "";
 
   let host = $state<HTMLDivElement>();
   const wire = editorWire((box) => {
@@ -186,10 +208,16 @@
   {:else if a === null || b === null}
     <p class="p-pane text-note text-text-faint">{say($lang, "refrain_version_reading")}</p>
   {:else if a === b}
-    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_diff_same"), { version: nameOfSide(left) })}</p>
+    <p class="p-pane text-note text-text-quiet">
+      {fill(say($lang, "refrain_diff_same"), { version: nameOfSide(left) })}
+    </p>
   {:else}
     <div class="flex justify-end border-b border-edge px-wide py-tight">
-      <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
+      <Button
+        label={say($lang, "refrain_export_comparison")}
+        tone="quiet"
+        onPress={exportComparison}
+      />
     </div>
     <Editor {wire} />
   {/if}

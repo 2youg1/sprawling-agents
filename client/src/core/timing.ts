@@ -103,7 +103,9 @@ export function markEndAtFrame(interaction: Interaction): void {
 // The durations recorded for `interaction`, oldest first, in
 // milliseconds at the browser's resolution.
 export function measured(interaction: Interaction): readonly number[] {
-  return performance.getEntriesByName(PREFIX + interaction, "measure").map((entry) => entry.duration);
+  return performance
+    .getEntriesByName(PREFIX + interaction, "measure")
+    .map((entry) => entry.duration);
 }
 
 // Drops every entry of `interaction`, for a reader that has taken them.

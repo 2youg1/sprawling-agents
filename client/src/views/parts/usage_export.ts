@@ -29,7 +29,11 @@ export type Exported =
 export function exportedOf(answer: Answer): Exported | undefined {
   if ("usage_export" in answer) return { kind: "file", body: answer.usage_export.body };
   if ("unavailable" in answer) {
-    return { kind: "unavailable", query: answer.unavailable.query, reason: answer.unavailable.reason ?? undefined };
+    return {
+      kind: "unavailable",
+      query: answer.unavailable.query,
+      reason: answer.unavailable.reason ?? undefined,
+    };
   }
   return undefined;
 }

@@ -53,7 +53,13 @@ export function scrolls(press: KeyPress): boolean {
 // something while the monitor is on the page; a modified `F` belongs to
 // the browser or the shell, and an `F` typed into a field is a letter.
 export function resumes(press: ResumePress): boolean {
-  return press.key.toLowerCase() === "f" && !press.typing && !press.ctrlKey && !press.metaKey && !press.altKey;
+  return (
+    press.key.toLowerCase() === "f" &&
+    !press.typing &&
+    !press.ctrlKey &&
+    !press.metaKey &&
+    !press.altKey
+  );
 }
 
 // The bag spread on the follow toggle.
@@ -160,7 +166,10 @@ export function lookOf(state: MonitorState, lang: Lang, hands: Hands): MonitorWi
   return {
     label: say(lang, "mon_monitor"),
     heading: say(lang, "mon_code"),
-    tally: state.paths.length === 1 ? say(lang, "mon_files_one") : fill(say(lang, "mon_files_n"), { n: count(state.paths.length) }),
+    tally:
+      state.paths.length === 1
+        ? say(lang, "mon_files_one")
+        : fill(say(lang, "mon_files_n"), { n: count(state.paths.length) }),
     follow: {
       label: say(lang, following ? "mon_following" : "mon_paused"),
       held: following,

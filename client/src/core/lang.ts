@@ -51,10 +51,7 @@ export function endonym(lang: Lang): string {
 // caller did not fill is left as written, so it shows on screen: a
 // visible `{runs}` is a defect somebody reports, and a silently emptied
 // sentence is one nobody does.
-export function fill(
-  pattern: string,
-  slots: Readonly<Record<string, string>>,
-): string {
+export function fill(pattern: string, slots: Readonly<Record<string, string>>): string {
   let out = pattern;
   for (const [name, value] of Object.entries(slots)) {
     out = out.replaceAll(`{${name}}`, value);

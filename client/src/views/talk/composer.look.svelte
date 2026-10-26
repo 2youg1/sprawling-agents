@@ -20,7 +20,10 @@
 </script>
 
 <form
-  class={["relative rounded-control transition-colors", look.over ? "wash ease-arrive" : "ease-leave"]}
+  class={[
+    "relative rounded-control transition-colors",
+    look.over ? "wash ease-arrive" : "ease-leave",
+  ]}
   {...look.form}
 >
   {#if look.menu !== undefined}{@render look.menu()}{/if}
@@ -31,14 +34,15 @@
         {#if look.door !== undefined}
           <!-- In the place of the placeholder, above the box so its one
                control takes a press; the rest lets a press through. -->
-          <div class="pointer-events-none absolute inset-x-0 top-0 z-(--layer-raised) flex py-snug text-body leading-relaxed text-text-faint">
+          <div
+            class="pointer-events-none absolute inset-x-0 top-0 z-(--layer-raised) flex py-snug text-body leading-relaxed text-text-faint"
+          >
             {@render look.door()}
           </div>
         {/if}
         <textarea
           class="block max-h-output min-h-key w-full resize-none overflow-y-auto bg-transparent py-snug text-body leading-relaxed text-text caret-accent outline-hidden field-sizing-content placeholder:text-text-faint"
-          {...look.box}
-        ></textarea>
+          {...look.box}></textarea>
       </div>
       {@render look.keys()}
     </div>

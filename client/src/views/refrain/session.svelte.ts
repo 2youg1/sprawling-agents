@@ -20,7 +20,15 @@ import { get } from "svelte/store";
 import { readAnswer } from "../../core/answered";
 import { positionsOf } from "../../core/document_pos";
 import type { EditorChange, Positions } from "../../core/document_pos";
-import { RECEIPT_QUERY, advance, draftPlace, readDraft, receiptIn, saveOf, writeDraft } from "../../core/document_save";
+import {
+  RECEIPT_QUERY,
+  advance,
+  draftPlace,
+  readDraft,
+  receiptIn,
+  saveOf,
+  writeDraft,
+} from "../../core/document_save";
 import type { Happened, Receipt } from "../../core/document_save";
 import { nextSpan, opened, recorded, whole } from "../../core/document_windows";
 import type { Gathering, Opened } from "../../core/document_windows";
@@ -63,7 +71,9 @@ const DRAFT_PAUSE_MS = 300;
 // own prompt documents open beside a building's page (client/Spec.lean
 // 4-50, its ninth part) though they sit in no building.
 export function documentAt(building: Address, path: string): Address | null {
-  return Option.getOrNull(Schema.decodeOption(Address)(path.startsWith("/") ? path.slice(1) : `${building}/${path}`));
+  return Option.getOrNull(
+    Schema.decodeOption(Address)(path.startsWith("/") ? path.slice(1) : `${building}/${path}`),
+  );
 }
 
 // The sessions that hold words the city has not taken, by document and
@@ -88,8 +98,12 @@ export class Session {
   lostDraft = $state<B3Hash | null>(null);
   editing = $state.raw<Editing | null>(null);
 
-  readonly read = $derived(readAnswer(this.answer, (held) => ("document" in held ? held.document : undefined)));
-  readonly file = $derived<Opened | null>(this.read.kind === "held" ? opened(this.read.value) : null);
+  readonly read = $derived(
+    readAnswer(this.answer, (held) => ("document" in held ? held.document : undefined)),
+  );
+  readonly file = $derived<Opened | null>(
+    this.read.kind === "held" ? opened(this.read.value) : null,
+  );
   readonly locked = $derived.by((): Locked | null => this.lockOf());
 
   private readonly current: Gathered;
@@ -104,10 +118,15 @@ export class Session {
   ) {
     this.current = new Gathered(ui.conn.asking);
     this.other = new Gathered(ui.conn.asking);
-    $effect(() => ui.conn.asking.ask({ document: { at } }).subscribe((answer) => (this.answer = answer)));
+    $effect(() =>
+      ui.conn.asking.ask({ document: { at } }).subscribe((answer) => (this.answer = answer)),
+    );
     $effect(() => {
       const file = this.file;
-      if (file?.kind === "text" && file.gathering.version !== untrack(() => this.current.value?.version)) {
+      if (
+        file?.kind === "text" &&
+        file.gathering.version !== untrack(() => this.current.value?.version)
+      ) {
         untrack(() => {
           this.current.start(file.gathering);
         });
@@ -152,10 +171,13 @@ export class Session {
       return;
     }
     const kept = this.ui.prefs.draft(draftPlace(this.at));
-    const version = kept === "" ? null : readDraft(kept, Number.MAX_SAFE_INTEGER)?.version ?? null;
+    const version =
+      kept === "" ? null : (readDraft(kept, Number.MAX_SAFE_INTEGER)?.version ?? null);
     if (!settled(current, this.current.lost)) return;
     if (version === null || version === current.version) {
-      const changes = readDraft(kept, positionsOf(current.version, current.encoding, current.text).editor.length)?.changes ?? [];
+      const changes =
+        readDraft(kept, positionsOf(current.version, current.encoding, current.text).editor.length)
+          ?.changes ?? [];
       this.begin(current, changes, changes.length === 0 ? { kind: "clean" } : { kind: "draft" });
       return;
     }
@@ -170,7 +192,10 @@ export class Session {
       return;
     }
     const base = positionsOf(other.version, other.encoding, other.text);
-    this.begin(other, readDraft(kept, base.editor.length)?.changes ?? [], { kind: "conflict", current: current.version });
+    this.begin(other, readDraft(kept, base.editor.length)?.changes ?? [], {
+      kind: "conflict",
+      current: current.version,
+    });
     this.theirs = positionsOf(current.version, current.encoding, current.text);
     this.hold(this.theirs, "moved");
   }
@@ -185,7 +210,10 @@ export class Session {
 
   private hold(positions: Positions, source: Held["source"]): void {
     if (this.versions.some((each) => each.version === positions.version)) return;
-    this.versions = [...this.versions, { version: positions.version, text: positions.editor, source, at: this.ui.now() }];
+    this.versions = [
+      ...this.versions,
+      { version: positions.version, text: positions.editor, source, at: this.ui.now() },
+    ];
   }
 
   // The city answered another version of the file than the baseline:
@@ -214,7 +242,9 @@ export class Session {
   private lockOf(): Locked | null {
     const current = this.current.value;
     if (this.asked !== null && current !== null && this.asked !== current.version) {
-      return this.other.lost === null ? { kind: "recorded", version: this.asked } : { kind: "lost", version: this.asked };
+      return this.other.lost === null
+        ? { kind: "recorded", version: this.asked }
+        : { kind: "lost", version: this.asked };
     }
     if (current === null) return null;
     if (this.current.lost !== null) return { kind: "lost", version: current.version };
@@ -236,7 +266,10 @@ export class Session {
     const editing = this.editing;
     if (editing === null) return;
     const flying = editing.editedSinceSent();
-    this.happen({ kind: "edited", empty: flying === null ? editing.changes().length === 0 : !flying });
+    this.happen({
+      kind: "edited",
+      empty: flying === null ? editing.changes().length === 0 : !flying,
+    });
     clearTimeout(this.pause);
     this.pause = setTimeout(() => {
       this.keep();
@@ -319,7 +352,9 @@ export class Session {
     if (theirs?.version === version) {
       this.positions = theirs;
       this.theirs = null;
-      this.versions = this.versions.map((each) => (each.version === version ? { ...each, source: "saved" } : each));
+      this.versions = this.versions.map((each) =>
+        each.version === version ? { ...each, source: "saved" } : each,
+      );
     } else {
       this.expected = version;
     }

@@ -13,7 +13,15 @@ import { describe, expect, test } from "bun:test";
 import { landing, lookOf, tabStop, type StripHands, type StripLook, type StripTab } from "./strip";
 
 function tab(key: string, front: boolean): StripTab {
-  return { key, label: key, terminal: false, unsaved: false, front, href: `#/talk/${key}`, controls: "inspector-editor" };
+  return {
+    key,
+    label: key,
+    terminal: false,
+    unsaved: false,
+    front,
+    href: `#/talk/${key}`,
+    controls: "inspector-editor",
+  };
 }
 
 const WORDS = {
@@ -77,9 +85,12 @@ describe("the strip is one Tab stop", () => {
 
 describe("the arrows walk the strip and bring each tab forward", () => {
   test("they wrap at either end, and Home and End go to the ends", () => {
-    expect([landing(3, 0, "ArrowLeft"), landing(3, 2, "ArrowRight"), landing(3, 1, "Home"), landing(3, 1, "End")]).toEqual([
-      2, 0, 0, 2,
-    ]);
+    expect([
+      landing(3, 0, "ArrowLeft"),
+      landing(3, 2, "ArrowRight"),
+      landing(3, 1, "Home"),
+      landing(3, 1, "End"),
+    ]).toEqual([2, 0, 0, 2]);
     expect(landing(3, 1, "a")).toBeUndefined();
   });
 
@@ -109,7 +120,9 @@ describe("Delete closes the tab under the focus", () => {
 
 describe("the bags carry the Tabs pattern's values", () => {
   test("a tab names the panel it controls and whether it is selected, and links to its item", () => {
-    const { look } = drawn([{ ...tab("a", true), controls: "inspector-terminal", unsaved: true, terminal: true }]);
+    const { look } = drawn([
+      { ...tab("a", true), controls: "inspector-terminal", unsaved: true, terminal: true },
+    ]);
     const [only] = look.tabs;
     expect(only?.wire.role).toBe("tab");
     expect(only?.wire["aria-selected"]).toBe(true);

@@ -16,10 +16,9 @@ const offers = { models: [], levels: [] };
 describe("the `/` menu", () => {
   test("a line no verb matches opens no menu, so Enter reaches the box", () => {
     expect(menuColumns("en", "/etc/hosts is broken", offers)).toEqual([]);
-    expect(menuColumns("en", "/st", offers).flatMap((column) => column.rows.map((row) => row.id))).toEqual([
-      "/steer",
-      "/stop",
-    ]);
+    expect(
+      menuColumns("en", "/st", offers).flatMap((column) => column.rows.map((row) => row.id)),
+    ).toEqual(["/steer", "/stop"]);
   });
 });
 
@@ -45,13 +44,19 @@ function run(id: string, lastSeq: number, model: string | null): RunBelief {
 
 describe("the session's model", () => {
   test("is the newest run's since the session began, and none once a new session opens", () => {
-    const runs = [run("00000000-0000-4000-8000-000000000001", 3, "fake-small"), run("00000000-0000-4000-8000-000000000002", 7, "fake-chat")];
+    const runs = [
+      run("00000000-0000-4000-8000-000000000001", 3, "fake-small"),
+      run("00000000-0000-4000-8000-000000000002", 7, "fake-chat"),
+    ];
     expect(sessionModel(runs, Seq.make(2))).toBe("fake-chat");
     expect(sessionModel(runs, Seq.make(9))).toBeNull();
   });
 
   test("is the newest known model when the newest run has not called one yet", () => {
-    const runs = [run("00000000-0000-4000-8000-000000000001", 3, "fake-small"), run("00000000-0000-4000-8000-000000000002", 7, null)];
+    const runs = [
+      run("00000000-0000-4000-8000-000000000001", 3, "fake-small"),
+      run("00000000-0000-4000-8000-000000000002", 7, null),
+    ];
     expect(sessionModel(runs, Seq.make(2))).toBe("fake-small");
   });
 });
@@ -67,16 +72,29 @@ describe("picking a model", () => {
 
 test("a model pick sends selection alone, never a session command", () => {
   const sent: unknown[] = [];
-  const hands = { send: (command: unknown) => { sent.push(command); return true; }, go: ignore, chooseEffort: ignore };
+  const hands = {
+    send: (command: unknown) => {
+      sent.push(command);
+      return true;
+    },
+    go: ignore,
+    chooseEffort: ignore,
+  };
   picksFor(hands, null).model({ endpoint: "local", model: "fake-chat" });
   expect(sent).toHaveLength(1);
-  expect(sent).toMatchObject([{ select_model: { endpoint: "local", model: "fake-chat", tag: "main" } }]);
+  expect(sent).toMatchObject([
+    { select_model: { endpoint: "local", model: "fake-chat", tag: "main" } },
+  ]);
   picksFor(hands, "fake-small").model({ endpoint: "local", model: "fake-chat" });
   expect(sent).toHaveLength(1);
 });
 
 describe("a key in the box", () => {
-  const pressed = (key: string, shiftKey = false, isComposing = false) => ({ key, shiftKey, isComposing });
+  const pressed = (key: string, shiftKey = false, isComposing = false) => ({
+    key,
+    shiftKey,
+    isComposing,
+  });
   const keys = ["Enter", "Tab", "ArrowUp", "a"] as const;
   const boxes = [
     { menu: false, empty: false },
@@ -95,17 +113,28 @@ describe("a key in the box", () => {
   });
 
   test("Enter sends and Shift+Enter starts a line", () => {
-    expect([boxKey(pressed("Enter"), boxes[0]), boxKey(pressed("Enter", true), boxes[0])]).toEqual(["send", "type"]);
+    expect([boxKey(pressed("Enter"), boxes[0]), boxKey(pressed("Enter", true), boxes[0])]).toEqual([
+      "send",
+      "type",
+    ]);
   });
 
   test("ArrowUp recalls only in an empty box, where it cannot move the caret", () => {
-    expect([boxKey(pressed("ArrowUp"), boxes[1]), boxKey(pressed("ArrowUp"), boxes[0])]).toEqual(["recall", "type"]);
+    expect([boxKey(pressed("ArrowUp"), boxes[1]), boxKey(pressed("ArrowUp"), boxes[0])]).toEqual([
+      "recall",
+      "type",
+    ]);
   });
 
   // Under an open menu Tab completes and every other key is offered to
   // the menu first; one the menu does not take is the box's own again.
   test("an open menu takes Tab and is offered the rest", () => {
-    expect(keys.map((key) => boxKey(pressed(key), boxes[2]))).toEqual(["menu", "complete", "menu", "menu"]);
+    expect(keys.map((key) => boxKey(pressed(key), boxes[2]))).toEqual([
+      "menu",
+      "complete",
+      "menu",
+      "menu",
+    ]);
     expect(boxKey(pressed("Enter"), { ...boxes[2], menu: false })).toBe("send");
   });
 });

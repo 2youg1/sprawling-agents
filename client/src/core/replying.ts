@@ -46,7 +46,12 @@ export function question(text: string, laying: Laying, state: ReplyState): strin
 // sent past that point are judged open until another line arrives. A
 // settled answer stops short of the text's end only when it filled a
 // window, so the rest is asked next - unless it read nothing at all.
-export function answered(laying: Laying, asked: string, read: Answered<Laid>, state: ReplyState): Laying {
+export function answered(
+  laying: Laying,
+  asked: string,
+  read: Answered<Laid>,
+  state: ReplyState,
+): Laying {
   switch (read.kind) {
     case "asking":
       return laying;

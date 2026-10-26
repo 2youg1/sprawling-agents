@@ -16,7 +16,14 @@ describe("a step's head", () => {
   test("it controls its body, says whether it is open, and says where the step stands", () => {
     let pressed = 0;
     const look = stepLookOf(
-      { step: "dependencies", at: 1, standing: "skipped", open: true, id: "w-dependencies", lang: "en" },
+      {
+        step: "dependencies",
+        at: 1,
+        standing: "skipped",
+        open: true,
+        id: "w-dependencies",
+        lang: "en",
+      },
       () => {
         pressed += 1;
       },

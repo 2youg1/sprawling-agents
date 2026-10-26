@@ -31,15 +31,25 @@ const readings = new Map<string, number>();
 
 // A box with no place keeps nothing, and a place with no box mounted
 // yet has nothing to keep.
-export function keepSelection(place: string | undefined, box: HTMLTextAreaElement | undefined): void {
+export function keepSelection(
+  place: string | undefined,
+  box: HTMLTextAreaElement | undefined,
+): void {
   if (place !== undefined && box !== undefined) {
-    selections.set(place, { start: box.selectionStart, end: box.selectionEnd, direction: box.selectionDirection });
+    selections.set(place, {
+      start: box.selectionStart,
+      end: box.selectionEnd,
+      direction: box.selectionDirection,
+    });
   }
 }
 
 // Puts the place's selection back into the box, or leaves the caret
 // where the browser put it when this tab never stood there.
-export function restoreSelection(place: string | undefined, box: HTMLTextAreaElement | undefined): void {
+export function restoreSelection(
+  place: string | undefined,
+  box: HTMLTextAreaElement | undefined,
+): void {
   const kept = place === undefined ? undefined : selections.get(place);
   if (kept !== undefined) box?.setSelectionRange(kept.start, kept.end, kept.direction);
 }
@@ -57,7 +67,9 @@ export function readingAt(place: string): number | null {
 // room has none. A steer's words are not in the belief, so they are not
 // recalled.
 export function recalled(belief: Belief, room: Address): string | null {
-  return heldIn(belief, room)
-    .flatMap((run) => (run.task === null || run.task === "" ? [] : [run.task]))
-    .at(-1) ?? null;
+  return (
+    heldIn(belief, room)
+      .flatMap((run) => (run.task === null || run.task === "" ? [] : [run.task]))
+      .at(-1) ?? null
+  );
 }

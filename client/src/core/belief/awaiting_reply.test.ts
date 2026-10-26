@@ -29,7 +29,12 @@ function city(runs: readonly RunSummary[]): CityAnswer {
   return { active: runs.length, buildings: [], frozen: 0, halted: [], pursuits: [], runs };
 }
 
-function event(run: RunId, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+function event(
+  run: RunId,
+  at: number,
+  kind: EventKind,
+  data: Record<string, unknown>,
+): EventRecord {
   return {
     run,
     seq: Seq.make(at),
@@ -57,7 +62,15 @@ describe("a run waiting for a reply", () => {
   function waiting(): ReturnType<typeof createBelief> {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 1));
-    expect(store.apply(event(ONE, 2, "signal_wait_started", { on: "lab/west", signal: "r-s1", deadline_ms: 90_000 }))).toBeNull();
+    expect(
+      store.apply(
+        event(ONE, 2, "signal_wait_started", {
+          on: "lab/west",
+          signal: "r-s1",
+          deadline_ms: 90_000,
+        }),
+      ),
+    ).toBeNull();
     return store;
   }
 
@@ -82,14 +95,18 @@ describe("a run waiting for a reply", () => {
   // where the page last knew it.
   test("an ending this build cannot read leaves the run waiting and names the field", () => {
     const store = waiting();
-    expect(store.apply(event(ONE, 3, "signal_wait_ended", { signal: "r-s1", by: { end: "shrugged" } }))).toBe("signal_wait_ended.by.end");
+    expect(
+      store.apply(event(ONE, 3, "signal_wait_ended", { signal: "r-s1", by: { end: "shrugged" } })),
+    ).toBe("signal_wait_ended.by.end");
     expect(get(store.belief).runs[ONE]?.doing).toEqual(AWAITING);
   });
 
   test("a start this build cannot read names the field and states no wait", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 1));
-    expect(store.apply(event(ONE, 2, "signal_wait_started", { on: "lab/west", signal: "r-s1" }))).toBe("signal_wait_started.deadline_ms");
+    expect(
+      store.apply(event(ONE, 2, "signal_wait_started", { on: "lab/west", signal: "r-s1" })),
+    ).toBe("signal_wait_started.deadline_ms");
     expect(get(store.belief).runs[ONE]?.doing).toEqual({ kind: "thinking" });
   });
 

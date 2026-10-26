@@ -21,7 +21,9 @@ a run there (`sandbox.ts`), so the row never says "none". -->
 
   const u = ui();
   const { lang } = u;
-  const building = $derived(room === null ? readable(undefined) : u.conn.asking.ask(sandboxQuery(room)));
+  const building = $derived(
+    room === null ? readable(undefined) : u.conn.asking.ask(sandboxQuery(room)),
+  );
   const limits = $derived(restriction($building));
 </script>
 

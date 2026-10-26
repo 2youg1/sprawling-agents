@@ -54,7 +54,10 @@ export function speedOf(turns: readonly Turn[]): Speed | null {
   };
 }
 
-function measuredBy(turns: readonly Turn[], figure: (turn: Turn) => number | null): readonly number[] {
+function measuredBy(
+  turns: readonly Turn[],
+  figure: (turn: Turn) => number | null,
+): readonly number[] {
   return turns.flatMap((turn) => {
     const value = figure(turn);
     return value === null ? [] : [value];

@@ -64,7 +64,11 @@ export function possible(bench: Workbench, pane: Pane, side: Side): boolean {
   return side === "left" ? at > 0 : at >= 0 && at < bench.length - 1;
 }
 
-export function paneMenuLookOf(state: PaneMenuState, words: PaneMenuWords, hands: PaneMenuHands): PaneMenuLook {
+export function paneMenuLookOf(
+  state: PaneMenuState,
+  words: PaneMenuWords,
+  hands: PaneMenuHands,
+): PaneMenuLook {
   const popup = `${state.uid}-menu`;
   return {
     label: words.label,

@@ -77,7 +77,20 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container, bench]
+        options:
+          [
+            mutants,
+            mutants-modules,
+            sim,
+            shots,
+            release,
+            pgo,
+            fresh,
+            runtime,
+            keychain,
+            container,
+            bench,
+          ]
       responses_base:
         description: optional ref with the matched Responses instrument
         type: string

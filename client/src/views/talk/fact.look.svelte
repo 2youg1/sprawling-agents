@@ -31,7 +31,8 @@ where a colour alone would not (client/Spec.lean §7C). -->
 
   const { wire, asks = false, glyph, heard, children }: Props = $props();
 
-  const FACT = "fact inline-flex h-control-sm min-w-0 items-center gap-tight rounded-control px-snug text-note text-text-quiet";
+  const FACT =
+    "fact inline-flex h-control-sm min-w-0 items-center gap-tight rounded-control px-snug text-note text-text-quiet";
 </script>
 
 {#if wire === undefined}
@@ -41,7 +42,11 @@ where a colour alone would not (client/Spec.lean §7C). -->
     {@render children()}
   </span>
 {:else}
-  <button type="button" class="{FACT} trigger hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text" {...wire}>
+  <button
+    type="button"
+    class="{FACT} trigger hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
+    {...wire}
+  >
     {#if glyph !== undefined}<Glyph name={glyph} size="sm" />{/if}
     {@render children()}
   </button>

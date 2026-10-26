@@ -317,5 +317,16 @@ export function createBelief(now: () => number): BeliefStore {
     written(empty());
   }
 
-  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, forget, batch };
+  return {
+    belief: store,
+    adoptCity,
+    apply,
+    say,
+    logged,
+    refused,
+    named,
+    noticesSeen,
+    forget,
+    batch,
+  };
 }

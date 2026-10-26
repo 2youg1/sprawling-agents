@@ -32,7 +32,11 @@ export interface QuitAsked {
 export function quitOf(asked: QuitAsked): QuitLook {
   if (asked.here.startsWith("https:")) return { about: "quit_local_only", runs: 0, answers: [] };
   if (asked.runs === 0) {
-    return { about: "quit_about", runs: 0, answers: [{ mode: "drain", label: "quit_close", tone: "destructive" }] };
+    return {
+      about: "quit_about",
+      runs: 0,
+      answers: [{ mode: "drain", label: "quit_close", tone: "destructive" }],
+    };
   }
   return {
     about: "quit_about",

@@ -125,7 +125,9 @@
     const change = $belief.policies[address] ?? null;
     return change === null || (began !== null && change.seq <= began) ? null : change;
   });
-  const policyAt = $derived(changed === null ? -1 : shown.findIndex((run) => (run.started ?? 0) > changed.at));
+  const policyAt = $derived(
+    changed === null ? -1 : shown.findIndex((run) => (run.started ?? 0) > changed.at),
+  );
   const policyLine = $derived(
     changed === null
       ? null
@@ -194,7 +196,9 @@
   const landing = $derived.by((): Landing => {
     if (sent?.from !== address) return { kind: "pending" };
     const found = landingOf(sent, $belief.runs);
-    return found.kind === "elsewhere" && $belief.runs[found.run]?.doing.kind === "frozen" ? { kind: "pending" } : found;
+    return found.kind === "elsewhere" && $belief.runs[found.run]?.doing.kind === "frozen"
+      ? { kind: "pending" }
+      : found;
   });
 
   // Where the words last sent stand (`talk/delivery.ts`): read off the
@@ -215,7 +219,10 @@
       if (sent === null || landing.kind !== "pending") delivery = NONE;
       return;
     }
-    delivery = delivered(untrack(() => delivery), hear());
+    delivery = delivered(
+      untrack(() => delivery),
+      hear(),
+    );
   });
   const echo = $derived(delivery.kind === "none" ? null : delivery);
 
@@ -239,7 +246,13 @@
       return steered;
     }
     const went = u.send(
-      dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, policy: $policy }),
+      dispatch({
+        addr: address,
+        task: text,
+        goal: say($lang, "talk_goal"),
+        effort: $effort,
+        policy: $policy,
+      }),
     );
     if (went) {
       sent = sentFrom(address, text, $belief.runs);
@@ -273,7 +286,9 @@
     if (error !== null) refused = { words: held.words, error };
     u.conversing.set(error === null ? NOT_CONVERSING : { kind: "answered", refusal: error });
   });
-  $effect(() => () => { u.conversing.set(NOT_CONVERSING); });
+  $effect(() => () => {
+    u.conversing.set(NOT_CONVERSING);
+  });
 
   // One branch, from wherever a person pointed, through the page's one
   // branch door (`talk/branching.ts`, client D100): the line it cut at
@@ -338,7 +353,9 @@
   {#if said !== undefined}
     <div class="mb-snug flex flex-col gap-tight">
       <div class="flex items-baseline gap-base text-note text-text-faint">
-        <span class="font-label text-text">{called(address, answer?.opening?.names?.mayor, $lang)}</span>
+        <span class="font-label text-text"
+          >{called(address, answer?.opening?.names?.mayor, $lang)}</span
+        >
         <span class="figure">{hhmmss(said.t)}</span>
       </div>
       <p class="truncate text-body text-text">{said.said}</p>
@@ -350,7 +367,9 @@
   <Landed {landing} />
   {#if refused !== null}
     <Failed
-      what={refused.error.code === "E_MODEL_UNCHOSEN" ? say($lang, "talk_failed_model") : say($lang, "talk_failed_refused")}
+      what={refused.error.code === "E_MODEL_UNCHOSEN"
+        ? say($lang, "talk_failed_model")
+        : say($lang, "talk_failed_refused")}
       error={refused.error}
       onRetry={() => {
         const words = refused?.words;
@@ -381,7 +400,10 @@ in a full one: in an empty room it is lifted to the middle of the column,
 and the first send lets it sink to its seat
 (docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
-<div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
+<div
+  class={["flex min-h-0 flex-col", band ? "" : "h-full"]}
+  style:container-type={band ? undefined : "size"}
+>
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
       {#if runs.length > 0}
@@ -413,13 +435,19 @@ composition is rebuilt on the way. -->
   {/if}
   <div
     class="relative shrink-0 transition-transform duration-page"
-    style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
+    style:transform={!band && blank
+      ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))"
+      : undefined}
   >
     {#if branchNote !== null}
       <div class="mb-tight flex flex-wrap items-center gap-base">
         <p class="text-note text-text-faint" role="status">{branchNote.said}</p>
         {#if branchNote.stop !== null}
-          <Button label={branchNote.stop.label} name={branchNote.stop.name} onPress={branchNote.stop.onPress} />
+          <Button
+            label={branchNote.stop.label}
+            name={branchNote.stop.name}
+            onPress={branchNote.stop.onPress}
+          />
         {/if}
       </div>
     {/if}

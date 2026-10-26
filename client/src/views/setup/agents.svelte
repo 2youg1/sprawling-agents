@@ -26,7 +26,9 @@
 
   const u = ui();
   const asked = u.conn.asking.ask(QUERIES.agentCatalog);
-  const read = $derived(readAnswer($asked, (held) => ("agent_catalog" in held ? held.agent_catalog : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("agent_catalog" in held ? held.agent_catalog : undefined)),
+  );
 
   let text = $state("");
   let adding = $state<ReadonlySet<string>>(new Set());
@@ -54,7 +56,8 @@
   $effect(() => {
     if (read.kind !== "held") return;
     const added = new Set(read.value.added.map((line) => line.id));
-    if ([...adding].some((id) => added.has(id))) adding = new Set([...adding].filter((id) => !added.has(id)));
+    if ([...adding].some((id) => added.has(id)))
+      adding = new Set([...adding].filter((id) => !added.has(id)));
   });
 
   function add(offer: AgentOffer, here: boolean): void {

@@ -128,7 +128,9 @@
   );
 
   const city = u.conn.asking.ask(QUERIES.city);
-  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : undefined);
+  const buildings = $derived(
+    $city !== undefined && "city" in $city ? $city.city.buildings : undefined,
+  );
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
 
   const halted = $derived(cityIsShut($belief.halted));
@@ -137,7 +139,9 @@
   // room, so `here` is the room the address bar names and `live` is
   // the run in front of the person (`core/in_front`).
   const viewed = $derived(Option.getOrNull(current(u.bar)));
-  const here = $derived(named ?? (viewed !== null && viewed.kind === "talk" ? viewed.address : null));
+  const here = $derived(
+    named ?? (viewed !== null && viewed.kind === "talk" ? viewed.address : null),
+  );
   // The sessions of the room main stands in, asked only on a conversation;
   // the same question the page's workspace asks, which `asking` merges.
   let sessionLines = $state.raw<readonly SessionLine[]>([]);
@@ -153,7 +157,10 @@
   // Where a carried conversation branches from: the end of the newest run
   // of the room's current session, once that session has one.
   const carryFrom = $derived(
-    here !== null && viewed?.kind === "talk" && viewed.session === undefined && (sessionLines[0]?.runs ?? 0) > 0
+    here !== null &&
+      viewed?.kind === "talk" &&
+      viewed.session === undefined &&
+      (sessionLines[0]?.runs ?? 0) > 0
       ? newest(here)
       : null,
   );
@@ -170,12 +177,17 @@
     });
     // A page a key reaches is called what the key sheet calls it, and
     // shows the chord rather than its address.
-    const page = (action: Action, to: View): Entry => ({ ...goTo(to, say($lang, LABELS[action])), action });
+    const page = (action: Action, to: View): Entry => ({
+      ...goTo(to, say($lang, LABELS[action])),
+      action,
+    });
     // The room main stands in comes first: its sessions are what the
     // address line was pressed for (client/Spec.lean 4-10a).
     // While nothing is typed only the newest few are listed (`SESSIONS_AT_REST`).
     const viewing = viewed?.kind === "talk" ? viewed.session : undefined;
-    const sessions = (here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now()))
+    const sessions = (
+      here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now())
+    )
       .filter((place, at) => at < SESSIONS_AT_REST || query.trim() !== "")
       .map((place) => goTo(place.to, place.label, place.hint));
     const carry: Entry[] =
@@ -242,8 +254,16 @@
       for (const building of answer.city.buildings) {
         out.push(
           building.adoptable
-            ? goTo({ kind: "raise", address: building.addr }, building.addr, say($lang, "city_adoptable"))
-            : goTo({ kind: "building", address: building.addr }, building.addr, say($lang, "palette_building")),
+            ? goTo(
+                { kind: "raise", address: building.addr },
+                building.addr,
+                say($lang, "city_adoptable"),
+              )
+            : goTo(
+                { kind: "building", address: building.addr },
+                building.addr,
+                say($lang, "palette_building"),
+              ),
         );
       }
     }
@@ -352,7 +372,9 @@
   const carried = $derived.by((): Entry[] => {
     const from = carryFrom;
     if (!carrying || here === null || from === null) return [];
-    const known = [...$belief.rooms.keys()].flatMap((room) => Option.toArray(Schema.decodeOption(Address)(room)));
+    const known = [...$belief.rooms.keys()].flatMap((room) =>
+      Option.toArray(Schema.decodeOption(Address)(room)),
+    );
     return carryPlaces({
       here,
       rooms: known,
@@ -366,7 +388,11 @@
         why: place.why ?? waitWhy(opening),
         keeps: true,
         act: () => {
-          u.branches.open(place.to, { kind: "branch", origin: { run: from.run, at_seq: from.at } }, onClose);
+          u.branches.open(
+            place.to,
+            { kind: "branch", origin: { run: from.run, at_seq: from.at } },
+            onClose,
+          );
         },
       };
     });
@@ -382,8 +408,11 @@
     // searched by place alone: a row that matched on its hint would leave
     // the list the moment the hint changed, and take the city's refusal
     // with it (4-64b).
-    const searched = (entry: Entry): string => (carrying ? entry.label : `${entry.label} ${entry.hint}`);
-    return needle === "" ? all : all.filter((entry) => searched(entry).toLowerCase().includes(needle));
+    const searched = (entry: Entry): string =>
+      carrying ? entry.label : `${entry.label} ${entry.hint}`;
+    return needle === ""
+      ? all
+      : all.filter((entry) => searched(entry).toLowerCase().includes(needle));
   });
 
   function pick(entry: Entry | undefined): void {
@@ -408,7 +437,14 @@ pointer's extra way out, not the only one. -->
 <Modal wire={sheet} {seat}>
   <Look
     box={boxOf(
-      { asking: carrying ? "carry" : "places", query, cursor, count: shown.length, list: listId, lang: $lang },
+      {
+        asking: carrying ? "carry" : "places",
+        query,
+        cursor,
+        count: shown.length,
+        list: listId,
+        lang: $lang,
+      },
       {
         write: (line) => {
           query = line;
@@ -428,7 +464,9 @@ pointer's extra way out, not the only one. -->
     {#snippet list()}
       <Rows
         id={listId}
-        listing={query.trim().startsWith("/") && !carrying ? { kind: "verbs", groups: grouped } : { kind: "places" }}
+        listing={query.trim().startsWith("/") && !carrying
+          ? { kind: "verbs", groups: grouped }
+          : { kind: "places" }}
         {shown}
         {cursor}
         onHover={(at) => {

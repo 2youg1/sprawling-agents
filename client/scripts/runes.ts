@@ -18,7 +18,11 @@ import { compileModule } from "svelte/compiler";
 // condition only as the `--conditions` flag - `bunfig.toml` has no key
 // for it - so a run without the flag stops here and names the command
 // that carries it, instead of testing the server build.
-if (!Bun.resolveSync("svelte", import.meta.dir).replaceAll("\\", "/").endsWith("/index-client.js")) {
+if (
+  !Bun.resolveSync("svelte", import.meta.dir)
+    .replaceAll("\\", "/")
+    .endsWith("/index-client.js")
+) {
   console.error(
     "bun test resolved svelte's server build: run the tests through `bun run test [file...]`, " +
       "which passes `--conditions=browser`",
