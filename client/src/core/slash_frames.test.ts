@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { Schema } from "effect";
 
 import { Address, ClientFrame, IdemKey, ProviderName, RunId, Seq, TemplateName } from "../wire";
-import type { Command, Effort, RunPolicy } from "../wire";
+import type { BuildingProgress, Command, Effort, RunPolicy } from "../wire";
 import { openSession } from "./commands";
 import { encodeFrame } from "./frames";
 import type { View } from "./route";
@@ -27,6 +27,11 @@ const ROOM = Address.make("lab/room1");
 const MAYOR = Address.make("hall/mayor");
 const LIVE = RunId.make("00000000-0000-0000-0000-000000000001");
 const NEWEST = RunId.make("00000000-0000-0000-0000-000000000002");
+const IDLE: BuildingProgress["progress"] = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
+const BUILDINGS: readonly BuildingProgress[] = [
+  { addr: Address.make("lab"), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 },
+  { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: IDLE, ready: 0 },
+];
 // Each frame is minted a fresh key; on the way back it is given this
 // one, so a whole frame can be compared.
 const IDEM = IdemKey.make(`idem1-${"0".repeat(32)}`);
@@ -70,6 +75,7 @@ function ran(line: string): Done {
     here: ROOM,
     live: { run: LIVE, at: Seq.make(3) },
     newest: (room) => (room === MAYOR ? { run: NEWEST, at: Seq.make(9) } : null),
+    buildings: BUILDINGS,
     models: [{ endpoint: "local", model: "m-local" }],
     effort: "high",
     setEffort: (effort) => efforts.push(effort),
@@ -186,6 +192,16 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/room": [
     { line: "/room hall/mayor", done: going({ kind: "talk", address: MAYOR }) },
     { line: "/room", done: NOTHING },
+  ],
+  "/cd": [
+    { line: "/cd", done: going({ kind: "city" }) },
+    { line: "/cd lab", done: going({ kind: "building", address: Address.make("lab") }) },
+    { line: "/cd notes", done: going({ kind: "raise", address: Address.make("notes") }) },
+    { line: "/cd new-project", done: going({ kind: "raise", address: Address.make("new-project") }) },
+    { line: "/cd lab/room1", done: NOTHING },
+    { line: "/cd lab extra", done: NOTHING },
+    { line: "/cd lab:", done: NOTHING },
+    { line: "/cd /lab", done: NOTHING },
   ],
   "/go": [
     { line: "/go cost", done: going({ kind: "cost" }) },
