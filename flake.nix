@@ -58,6 +58,52 @@
           pkgs.${zigAttribute}
             or (throw "nixpkgs has no ${zigAttribute}, the series crates/desktop/ffi/zig-version pins (${zigPin})");
 
+        # Bun's version lives in `client/package.json`, in the `packageManager`
+        # field `oven-sh/setup-bun` reads on every workflow (AGENTS.md, the
+        # loop). nixpkgs answers the same question from its own pin and lags:
+        # it carries 1.4.2 while the client names 1.4.4, and this flake builds
+        # the bundle the binary embeds, so a bundle built by another Bun is
+        # another artifact. The version is read from that manifest and the
+        # archives come from Bun's own release, digested per platform; a bump
+        # is one line in the manifest plus the four digests, and `nix build`
+        # names the digest it wanted when one is stale.
+        #
+        # The digests are base16, the form `sha256sum bun-<platform>.zip`
+        # prints, so a reader can check one without another tool.
+        bunManifest = builtins.fromJSON (builtins.readFile ./client/package.json);
+        bunVersion =
+          if builtins.isString bunManifest.packageManager && pkgs.lib.hasPrefix "bun@" bunManifest.packageManager
+          then pkgs.lib.removePrefix "bun@" bunManifest.packageManager
+          else throw "client/package.json names no `packageManager`; the Nix build reads the Bun version from it";
+        bunArchive =
+          {
+            aarch64-darwin = {
+              name = "darwin-aarch64";
+              hash = "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510";
+            };
+            x86_64-darwin = {
+              name = "darwin-x64";
+              hash = "50a3491f73abc2fe81673171a85762d3bc2cc1680ccecadd983de99adf77977e";
+            };
+            aarch64-linux = {
+              name = "linux-aarch64";
+              hash = "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e";
+            };
+            x86_64-linux = {
+              name = "linux-x64-baseline";
+              hash = "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76";
+            };
+          }
+          .${system}
+            or (throw "no bun-v${bunVersion} archive is recorded for ${system}; add its digest to bunArchive in flake.nix");
+        bun = pkgs.bun.overrideAttrs (_: {
+          version = bunVersion;
+          src = pkgs.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v${bunVersion}/bun-${bunArchive.name}.zip";
+            hash = bunArchive.hash;
+          };
+        });
+
         # `just check` needs these on PATH; a devshell that stops short of
         # the repository's own closing condition is not a devshell. Which
         # tools those are is decided by the `prereqs` recipe in the
@@ -67,7 +113,7 @@
         tools = [
           pkgs.just
           pkgs.cargo-nextest
-          pkgs.bun
+          bun
           pkgs.cargo-deny
           pkgs.git
           pkgs.elan
@@ -98,7 +144,7 @@
         # Generated in the store on every lock change, never maintained as
         # another lock in the source tree. npm hashes come from bun.lock.
         bunNix = pkgs.runCommand "sprawling-bun-dependencies.nix"
-          { nativeBuildInputs = [ bunBuilder pkgs.bun ]; }
+          { nativeBuildInputs = [ bunBuilder bun ]; }
           ''
             cat > project-lock.js <<'JS'
             const lock = Bun.JSONC.parse(await Bun.file(Bun.argv.at(-1)).text());
@@ -145,7 +191,7 @@
           };
           # zig builds the console's renderer, `crates/console_ffi`, on every
           # platform (`crates/console_ffi/Spec.lean` D1).
-          nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just zig ];
+          nativeBuildInputs = nativeDeps ++ [ bun pkgs.just zig ];
           # just and zig are commands this package's build calls, not its
           # builder: each one's nixpkgs setup hook claims every phase still
           # unclaimed, and a zig build phase at the repository root has no
