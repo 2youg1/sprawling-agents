@@ -371,9 +371,8 @@ export function buildingOf(address: Address): Address {
 }
 
 export type BuildingDestination =
-  | { readonly kind: "building"; readonly view: View }
-  | { readonly kind: "adopt"; readonly view: View }
-  | { readonly kind: "build"; readonly view: View };
+  | { readonly kind: "building"; readonly view: { readonly kind: "building"; readonly address: Address } }
+  | { readonly kind: "adopt" | "build"; readonly view: { readonly kind: "raise"; readonly address: Address } };
 
 // Where a top-level address goes, read against the city's own building
 // list. Navigation and the raise form share this classification (client
