@@ -532,6 +532,18 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
+      # eslint's own cache, which is what makes this lane cost seconds
+      # instead of the two minutes the type-aware rules take: every rule
+      # that wants a type rebuilds the TypeScript program, and a file the
+      # cache says is unchanged is not linted again. A pull request
+      # restores `main`'s entry and lints only what it changed; the key
+      # moves with the linter's own inputs, so a rule or a version change
+      # starts from nothing rather than from a stale verdict.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: client/node_modules/.cache/eslint
+          key: eslint-${{ runner.os }}-${{ hashFiles('client/eslint.config.ts', 'client/tsconfig.json', 'client/bun.lock') }}
+          restore-keys: eslint-${{ runner.os }}-
       - name: lint, typecheck and test the client
         run: just check-client
 

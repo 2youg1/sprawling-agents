@@ -52,8 +52,9 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
 | `just commits <base>..<tip>` | every commit subject and `Verdict:` trailer in the range, judged against *Commits*; CI runs it on the change-set, and `just check` cannot, because a tree has no range |
 | `just models` | every Lean specification under `crates/`, built with no `sorry`, `admit` or `axiom`; fails where Lean is absent |
+| `just fmt` | every language's formatter — rustfmt, `zig fmt`, and `bun fmt`, whose width and file list live in the root `bunfig.toml`; `just fmt-check` runs the same three in check mode, and `just check` opens with it |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `wire` without `server` |
-| `just check-client` | the client's lint, typecheck and tests |
+| `just check-client` | the client's lint, `bun check`, typecheck and tests, on the bundle `build-web` made |
 | `just build-web` | the client bundle, built into `crates/sprawling/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |

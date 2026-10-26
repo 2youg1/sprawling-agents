@@ -217,17 +217,28 @@ prereqs mode="check":
     fi
     echo "prereqs: every required tool answers"
 
+# Every language's formatter: rustfmt for the Rust, `zig fmt` for the two
+# Zig leaves, `bun fmt` for the TypeScript, CSS and Svelte. `bunfig.toml`
+# says which files bun's formatter owns, how wide it wraps them, and which
+# files a generator keeps.
 fmt:
     cargo fmt --all
+    zig fmt crates/console_ffi/zig
+    {{ if os() == "windows" { "zig fmt crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
+    bun fmt
 
 # Both Zig leaves are formatted by `zig fmt`: the console's renderer on
 # every platform, where it is built (`crates/console_ffi/Spec.lean` D1),
 # and the desktop server's leaf on Windows, the one platform it is built
 # on (`crates/desktop/Spec.lean` section 8-12).
+#
+# The client's half answers in under a second, which is why `check` runs
+# this phase first.
 fmt-check:
     cargo fmt --all --check
     zig fmt --check crates/console_ffi/zig
     {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
+    bun fmt --check
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
 # escapes the zero-warning gate without it.
@@ -589,9 +600,13 @@ check-client: build-web client-checks
 
 # The generated offline playback page, then the client's own gates on
 # the dependencies build-web installed. Both checks run under Bun.
+# `bun check` is a type check of the client's TypeScript in about a fifth
+# of a second; it reads no `.svelte` file, so `bun run typecheck`'s
+# `svelte-check` stays the type lane and this one only catches a `.ts`
+# error sooner.
 client-checks:
     bun crates/city/skills/playback/assemble.js --check
-    cd client && bun run lint && bun run typecheck && bun run test
+    cd client && bun run lint && bun check && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.

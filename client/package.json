@@ -8,8 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "bun scripts/typecheck.ts",
-    "lint": "eslint --max-warnings 0 --concurrency=auto",
-    "test": "bun test --conditions=browser"
+    "lint": "eslint --max-warnings 0 --concurrency=auto --cache --cache-location node_modules/.cache/eslint",
+    "test": "bun test --conditions=browser",
+    "fmt": "cd .. && bun fmt"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
