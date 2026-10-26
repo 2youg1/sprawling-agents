@@ -59,7 +59,9 @@ export function answered(walk: Walk, answer: DoctorAnswer): Walk {
 // A refusal naming the running item ends it as failed.
 export function refused(walk: Walk, error: AxError): Walk {
   const now = running(walk);
-  return now !== null && error.subject.startsWith(`${now}:`) ? ended(walk, "failed", error.recovery) : walk;
+  return now !== null && error.subject.startsWith(`${now}:`)
+    ? ended(walk, "failed", error.recovery)
+    : walk;
 }
 
 function ended(walk: Walk, state: "done" | "failed", why: string | null): Walk {

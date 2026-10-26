@@ -28,10 +28,27 @@
 The list is positioned and takes no room, so `pb-output` (the list's own max height) grows the section to hold it. -->
 <Case label="combobox · open on click, nothing chosen">
   <div class="flex flex-col gap-base pb-output">
-    <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-      {choices} value={model} onPick={(value) => { model = value; }} starts="open" />
-    <Combobox label={say($lang, "setup_digest")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-      {choices} value={model} onPick={(value) => { model = value; }} />
+    <Combobox
+      label={say($lang, "setup_main")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      {choices}
+      value={model}
+      onPick={(value) => {
+        model = value;
+      }}
+      starts="open"
+    />
+    <Combobox
+      label={say($lang, "setup_digest")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      {choices}
+      value={model}
+      onPick={(value) => {
+        model = value;
+      }}
+    />
   </div>
 </Case>
 
@@ -39,8 +56,17 @@ The list is positioned and takes no room, so `pb-output` (the list's own max hei
 starts on the first, where its bar stands at the leading edge. -->
 <Case label="combobox · a value in force, the cursor on another row">
   <div class="pb-output">
-    <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-      {choices} value={held} onPick={(value) => { held = value; }} starts="open" />
+    <Combobox
+      label={say($lang, "setup_main")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      {choices}
+      value={held}
+      onPick={(value) => {
+        held = value;
+      }}
+      starts="open"
+    />
   </div>
 </Case>
 
@@ -52,8 +78,17 @@ showing. -->
 <Case label="combobox · in the bottom corner of a box that clips it, opening upward">
   <div class="flex h-palette flex-col items-end justify-end overflow-hidden">
     <div class="w-tree">
-      <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-        {choices} value={edge} onPick={(value) => { edge = value; }} starts="open" />
+      <Combobox
+        label={say($lang, "setup_main")}
+        placeholder={say($lang, "part_search")}
+        empty={say($lang, "part_no_match")}
+        {choices}
+        value={edge}
+        onPick={(value) => {
+          edge = value;
+        }}
+        starts="open"
+      />
     </div>
   </div>
 </Case>

@@ -29,7 +29,16 @@ export interface Fact {
 // happened. Named, because the shape of their values is not enough: an
 // `after` is a number like any count.
 const MACHINERY: ReadonlySet<string> = new Set([
-  "after", "before", "idem", "prev", "hash", "digest", "v", "seq", "oid", "tool_use_id",
+  "after",
+  "before",
+  "idem",
+  "prev",
+  "hash",
+  "digest",
+  "v",
+  "seq",
+  "oid",
+  "tool_use_id",
 ]);
 
 // A value no person reads: a hash, a run id, an object id.
@@ -43,7 +52,8 @@ export function factsOf(data: Payload): readonly Fact[] {
   return Object.entries(data)
     .flatMap(([name, value]): Fact[] => {
       if (MACHINERY.has(name) || name.endsWith("_hash")) return [];
-      if (typeof value === "number" || typeof value === "boolean") return [{ name, value: String(value) }];
+      if (typeof value === "number" || typeof value === "boolean")
+        return [{ name, value: String(value) }];
       if (typeof value !== "string" || value.trim() === "" || OPAQUE.test(value)) return [];
       return [{ name, value }];
     })

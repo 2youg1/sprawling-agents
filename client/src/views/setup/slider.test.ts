@@ -17,7 +17,13 @@ const figure = (at: number): string => `${String(at)}%`;
 describe("sliderOf", () => {
   test("a stated figure is drawn and read out", () => {
     const moved: string[] = [];
-    const look = sliderOf({ label: "blend", range: RANGE, at: 40, figure, onMove: (raw) => moved.push(raw) });
+    const look = sliderOf({
+      label: "blend",
+      range: RANGE,
+      at: 40,
+      figure,
+      onMove: (raw) => moved.push(raw),
+    });
     look.wire.oninput({ currentTarget: { value: "45" } });
     expect({ ...look, wire: { ...look.wire, oninput: undefined } }).toEqual({
       shown: "40%",
@@ -36,7 +42,13 @@ describe("sliderOf", () => {
   });
 
   test("with no figure the thumb rests at the start and nothing is said", () => {
-    const look = sliderOf({ label: "blend", range: RANGE, at: null, figure, onMove: () => undefined });
+    const look = sliderOf({
+      label: "blend",
+      range: RANGE,
+      at: null,
+      figure,
+      onMove: () => undefined,
+    });
     expect([look.shown, look.wire.value, look.wire["aria-valuetext"]]).toEqual(["", 0, undefined]);
   });
 });

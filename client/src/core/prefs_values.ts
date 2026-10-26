@@ -16,7 +16,11 @@ import { sizingOf } from "./sizing";
 
 // A stored word, or the posture this client ships with when the row is
 // empty or holds a word this build no longer offers.
-export function readOne<T extends string>(offered: readonly T[], raw: string | null, fallback: T): T {
+export function readOne<T extends string>(
+  offered: readonly T[],
+  raw: string | null,
+  fallback: T,
+): T {
   return offered.find((each) => each === raw) ?? fallback;
 }
 

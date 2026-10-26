@@ -24,7 +24,15 @@ import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import type { Address } from "../../wire";
-import type { Answer, BuildingProgress, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
+import type {
+  Answer,
+  BuildingProgress,
+  Command,
+  Effort,
+  EndpointsAnswer,
+  RunPolicy,
+  Seq,
+} from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
 import { offersOf } from "./picker";
@@ -61,7 +69,10 @@ export interface Served extends Names {
 // message sent here reaches, even while its newest run has not called
 // yet; `null` when the session has made no call at all.
 export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
-  return held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)?.model ?? null;
+  return (
+    held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)
+      ?.model ?? null
+  );
 }
 
 // Whether the room's current session has begun working: a run of it
@@ -75,8 +86,7 @@ export function startedIn(held: readonly RunBelief[], began: Seq | undefined): b
 
 // A model pick changes the next main selection and never opens a session.
 export type ModelMove =
-  | { readonly kind: "select"; readonly names: Names }
-  | { readonly kind: "stay" };
+  { readonly kind: "select"; readonly names: Names } | { readonly kind: "stay" };
 
 export function modelMove(names: Names, session: string | null): ModelMove {
   return session !== null ? { kind: "stay" } : { kind: "select", names };
@@ -125,11 +135,23 @@ export interface Offered {
   readonly argued: Arguments;
 }
 
-export function offeredBy(answer: EndpointsAnswer | undefined, stated: Effort | null, picks: Picks): Offered {
+export function offeredBy(
+  answer: EndpointsAnswer | undefined,
+  stated: Effort | null,
+  picks: Picks,
+): Offered {
   const endpoints = answer?.endpoints ?? [];
   const main = answer?.chosen.find((each) => each.tag === "main");
-  const models = endpoints.flatMap((endpoint) => endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })));
-  const inForce = offersOf(endpoints).find((each) => each.endpoint === main?.endpoint && each.model === main.model);
+  const models = endpoints.flatMap((endpoint) =>
+    endpoint.models.map((row) => ({
+      endpoint: endpoint.name,
+      label: endpoint.label,
+      model: row.id,
+    })),
+  );
+  const inForce = offersOf(endpoints).find(
+    (each) => each.endpoint === main?.endpoint && each.model === main.model,
+  );
   return {
     models,
     picker: { endpoints, chosen: main, stated, pick: { model: picks.model, level: picks.effort } },
@@ -176,7 +198,10 @@ export function menuColumns(lang: Lang, line: string, offers: Arguments): readon
       rows: verbs.map((each) => ({
         id: each.spelling,
         label: each.spelling,
-        secondary: each.spelling === COMPLETED.effort ? levelsNote(lang, offers.levels) : grammarNote(lang, each),
+        secondary:
+          each.spelling === COMPLETED.effort
+            ? levelsNote(lang, offers.levels)
+            : grammarNote(lang, each),
       })),
     },
   ];
@@ -189,7 +214,9 @@ function grammarNote(lang: Lang, verb: Slash): string {
 // `/effort` says which levels the model in force offers, rather than
 // every level the city can spell.
 function levelsNote(lang: Lang, levels: readonly Effort[]): string {
-  return levels.length === 0 ? say(lang, "slash_effort_none_offered") : fill(say(lang, "slash_effort_offered"), { levels: levels.join(" · ") });
+  return levels.length === 0
+    ? say(lang, "slash_effort_none_offered")
+    : fill(say(lang, "slash_effort_offered"), { levels: levels.join(" · ") });
 }
 
 function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColumn | null {
@@ -202,8 +229,16 @@ function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColum
         id: COMMANDS,
         label: "talk_column_model",
         rows: offers.models
-          .filter((each, at, all) => each.model.toLowerCase().includes(typed) && all.findIndex((other) => other.model === each.model) === at)
-          .map((each) => ({ id: `${COMPLETED.model} ${each.model}`, label: each.model, secondary: each.label })),
+          .filter(
+            (each, at, all) =>
+              each.model.toLowerCase().includes(typed) &&
+              all.findIndex((other) => other.model === each.model) === at,
+          )
+          .map((each) => ({
+            id: `${COMPLETED.model} ${each.model}`,
+            label: each.model,
+            secondary: each.label,
+          })),
       };
     case COMPLETED.effort:
       return offers.levels.length === 0
@@ -213,7 +248,11 @@ function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColum
             label: "talk_column_effort",
             rows: offers.levels
               .filter((level) => level.startsWith(typed))
-              .map((level) => ({ id: `${COMPLETED.effort} ${level}`, label: level, secondary: say(lang, `effort_note_${level}`) })),
+              .map((level) => ({
+                id: `${COMPLETED.effort} ${level}`,
+                label: level,
+                secondary: say(lang, `effort_note_${level}`),
+              })),
           };
     default:
       return null;

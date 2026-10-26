@@ -62,15 +62,33 @@ export function shownOf(path: string, base: string | undefined): string {
   return base !== undefined && path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
 }
 
-export function lookOf(props: PathProps, words: PathWords, reveal: (address: Address) => void): PathLook {
+export function lookOf(
+  props: PathProps,
+  words: PathWords,
+  reveal: (address: Address) => void,
+): PathLook {
   const { onOpen } = props;
   const address = Schema.decodeOption(Address)(props.path);
   return {
     shown: shownOf(props.path, props.base),
-    open: onOpen === undefined ? undefined : { type: "button", onclick: () => { onOpen(); } },
+    open:
+      onOpen === undefined
+        ? undefined
+        : {
+            type: "button",
+            onclick: () => {
+              onOpen();
+            },
+          },
     reveal: Option.match(address, {
       onNone: () => ({ glyph: "reveal", label: words.reveal, why: words.inert }),
-      onSome: (value) => ({ glyph: "reveal", label: words.reveal, onPress: () => { reveal(value); } }),
+      onSome: (value) => ({
+        glyph: "reveal",
+        label: words.reveal,
+        onPress: () => {
+          reveal(value);
+        },
+      }),
     }),
   };
 }

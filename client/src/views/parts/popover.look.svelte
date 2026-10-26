@@ -66,7 +66,9 @@
               {/if}
             </li>
           {:else}
-            <li role="presentation" class="px-snug py-tight text-note text-text-faint">{look.empty}</li>
+            <li role="presentation" class="px-snug py-tight text-note text-text-faint">
+              {look.empty}
+            </li>
           {/each}
         </ul>
       </div>

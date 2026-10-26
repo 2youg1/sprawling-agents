@@ -29,7 +29,9 @@ export function roomsOf(runs: Readonly<Record<string, RunBelief>>): Rooms {
     if (held === undefined) rooms.set(run.addr, [run]);
     else held.push(run);
   }
-  return new Map([...rooms].map(([room, held]) => [room, held.sort(earlier).map((run) => run.run)]));
+  return new Map(
+    [...rooms].map(([room, held]) => [room, held.sort(earlier).map((run) => run.run)]),
+  );
 }
 
 // The index after one run took a new reading in `held.runs`, where it
@@ -50,7 +52,10 @@ export function roomed(held: Belief, was: RunBelief | undefined, run: RunBelief)
     const other = held.runs[id];
     return other !== undefined && earlier(run, other) < 0;
   });
-  rooms.set(run.addr, at === -1 ? [...others, run.run] : [...others.slice(0, at), run.run, ...others.slice(at)]);
+  rooms.set(
+    run.addr,
+    at === -1 ? [...others, run.run] : [...others.slice(0, at), run.run, ...others.slice(at)],
+  );
   return rooms;
 }
 

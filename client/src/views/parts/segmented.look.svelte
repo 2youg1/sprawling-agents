@@ -79,14 +79,22 @@
         style:--held={String(Math.max(band.held, 0))}
       >
         {#if band.held >= 0}
-          <span aria-hidden="true" class={["slider pointer-events-none absolute inset-y-0 left-0 rounded-pill", FILL[band.tone]]}
+          <span
+            aria-hidden="true"
+            class={[
+              "slider pointer-events-none absolute inset-y-0 left-0 rounded-pill",
+              FILL[band.tone],
+            ]}
           ></span>
         {/if}
         {#each band.cells as cell (cell.key)}
           {#snippet drawn()}
             <button
               type="button"
-              class={["cell relative h-full w-full rounded-pill px-base py-tight text-label text-balance", ink(cell, band.tone)]}
+              class={[
+                "cell relative h-full w-full rounded-pill px-base py-tight text-label text-balance",
+                ink(cell, band.tone),
+              ]}
               {...cell.wire}
             >
               {cell.label}

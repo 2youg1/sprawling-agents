@@ -80,11 +80,8 @@ function oneOf<T extends string>(
   words: readonly T[],
 ): Field<T | null> {
   const held = record.data[key];
-  const found =
-    typeof held === "string" ? words.find((word) => word === held) : undefined;
-  return found === undefined
-    ? { value: null, at: where(record, key) }
-    : { value: found, at: null };
+  const found = typeof held === "string" ? words.find((word) => word === held) : undefined;
+  return found === undefined ? { value: null, at: where(record, key) } : { value: found, at: null };
 }
 
 // The first of these fields this build could not read, or null when it
@@ -159,7 +156,10 @@ export function branchOf(record: EventRecord): [string | null, string | null] {
 // `RunSummary.waiting.until` carries (wire D34). A record either key of
 // which this build cannot read names the first one that failed.
 export function waitOf(record: EventRecord): [Waiting | null, string | null] {
-  const read = Schema.decodeUnknownOption(Waiting)({ on: record.data.on, until: record.data.deadline_ms });
+  const read = Schema.decodeUnknownOption(Waiting)({
+    on: record.data.on,
+    until: record.data.deadline_ms,
+  });
   if (Option.isSome(read)) return [read.value, null];
   const on = Schema.decodeUnknownOption(Waiting.fields.on)(record.data.on);
   return [null, where(record, Option.isSome(on) ? "deadline_ms" : "on")];

@@ -14,7 +14,15 @@
   // which resident delegated it (`SessionStart::Dispatched { by }`).
   // Each room holds one run, so each thread shows only its own case.
 
-  import type { Answer, EventKind, EventRecord, Query, SessionLine, SessionStart, Turn } from "../../wire";
+  import type {
+    Answer,
+    EventKind,
+    EventRecord,
+    Query,
+    SessionLine,
+    SessionStart,
+    Turn,
+  } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens } from "../../wire";
 
   const MODEL = "anthropic/claude-sonnet-5";
@@ -85,8 +93,24 @@
     return now - (50 - seq) * 30_000;
   }
 
-  function record(scene: Scene, seq: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
-    return { run: scene.run, seq: Seq.make(seq), kind, t: TimeMs.make(at), who: "city", addr: scene.room, prev: B3Hash.make("0".repeat(64)), v: 1, data };
+  function record(
+    scene: Scene,
+    seq: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
+    return {
+      run: scene.run,
+      seq: Seq.make(seq),
+      kind,
+      t: TimeMs.make(at),
+      who: "city",
+      addr: scene.room,
+      prev: B3Hash.make("0".repeat(64)),
+      v: 1,
+      data,
+    };
   }
 
   export function recordsAt(now: number): readonly EventRecord[] {
@@ -156,7 +180,14 @@
       if (typeof query !== "object") return undefined;
       if ("rounds" in query) return rounds(query.rounds.run, now);
       if ("inbox_view" in query) return { inbox: { addr: query.inbox_view.addr, waiting: [] } };
-      if ("sessions" in query) return { sessions: { room: query.sessions.room, sessions: sessionsOf(query.sessions.room, now), earlier: 0 } };
+      if ("sessions" in query)
+        return {
+          sessions: {
+            room: query.sessions.room,
+            sessions: sessionsOf(query.sessions.room, now),
+            earlier: 0,
+          },
+        };
       return undefined;
     };
   }
@@ -178,14 +209,19 @@
   const answers = answering(now);
 
   const SHOWN: readonly (readonly [string, Address])[] = [
-    ["agent messages · a child room's opening, delegated by a resident and linked to its run", CHILD],
+    [
+      "agent messages · a child room's opening, delegated by a resident and linked to its run",
+      CHILD,
+    ],
     ["agent messages · a room's opening, dispatched by the User", BY_USER],
     ["agent messages · a room's opening, dispatched by the city", BY_CITY],
   ];
 </script>
 
 {#snippet head()}
-  <h2 class="flex h-control shrink-0 items-center text-note text-text-faint">{say($lang, "world_sessions")}</h2>
+  <h2 class="flex h-control shrink-0 items-center text-note text-text-faint">
+    {say($lang, "world_sessions")}
+  </h2>
 {/snippet}
 
 {#each SHOWN as [label, room] (room)}

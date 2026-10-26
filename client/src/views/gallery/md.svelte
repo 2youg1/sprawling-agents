@@ -70,7 +70,13 @@
           words(" block the city lays out, and the page reads "),
           { emphasis: [words("no")] },
           words(" Markdown of its own. The grammar is in "),
-          { link: { target: "https://example.invalid/spec", title: "", content: [words("the documents spec")] } },
+          {
+            link: {
+              target: "https://example.invalid/spec",
+              title: "",
+              content: [words("the documents spec")],
+            },
+          },
           words(", the plan in "),
           { link: { target: "notes/plan.md", title: "", content: [words("notes/plan.md")] } },
           words("."),
@@ -84,8 +90,25 @@
         order: { ordered: { start: 1 } },
         spacing: "tight",
         items: [
-          { span: at("1. Ask"), check: "not_a_task", blocks: [{ paragraph: { span: at("Ask the"), inline: [words("Ask the city with the reply's text")] } }] },
-          { span: at("2. Draw"), check: "not_a_task", blocks: [{ paragraph: { span: at("Draw what"), inline: [words("Draw what it laid out")] } }] },
+          {
+            span: at("1. Ask"),
+            check: "not_a_task",
+            blocks: [
+              {
+                paragraph: {
+                  span: at("Ask the"),
+                  inline: [words("Ask the city with the reply's text")],
+                },
+              },
+            ],
+          },
+          {
+            span: at("2. Draw"),
+            check: "not_a_task",
+            blocks: [
+              { paragraph: { span: at("Draw what"), inline: [words("Draw what it laid out")] } },
+            ],
+          },
         ],
       },
     },
@@ -95,8 +118,27 @@
         order: "bullet",
         spacing: "tight",
         items: [
-          { span: at("- [x]"), check: "done", blocks: [{ paragraph: { span: at("delete the"), inline: [words("delete the second grammar")] } }] },
-          { span: at("- [ ]"), check: "open", blocks: [{ paragraph: { span: at("read a round"), inline: [words("read a round trip on the remote door")] } }] },
+          {
+            span: at("- [x]"),
+            check: "done",
+            blocks: [
+              {
+                paragraph: { span: at("delete the"), inline: [words("delete the second grammar")] },
+              },
+            ],
+          },
+          {
+            span: at("- [ ]"),
+            check: "open",
+            blocks: [
+              {
+                paragraph: {
+                  span: at("read a round"),
+                  inline: [words("read a round trip on the remote door")],
+                },
+              },
+            ],
+          },
         ],
       },
     },
@@ -111,14 +153,59 @@
         ],
       },
     },
-    { quote: { span: at("> A block"), blocks: [{ paragraph: { span: at("A block"), inline: [words("A block the city has closed is never taken back.")] } }] } },
-    { code: { span: at("```rust"), info: "rust", text: "let laid = documents::reply(text, ReplyState::Settled)?;\n" } },
-    { unsupported: { span: at("<details>"), construct: "html", source: "<details>raw HTML</details>\n" } },
-    { footnote: { span: at("[^1]:"), name: "1", blocks: [{ paragraph: { span: at("The closure"), inline: [words("The closure rule is D31.")] } }] } },
+    {
+      quote: {
+        span: at("> A block"),
+        blocks: [
+          {
+            paragraph: {
+              span: at("A block"),
+              inline: [words("A block the city has closed is never taken back.")],
+            },
+          },
+        ],
+      },
+    },
+    {
+      code: {
+        span: at("```rust"),
+        info: "rust",
+        text: "let laid = documents::reply(text, ReplyState::Settled)?;\n",
+      },
+    },
+    {
+      unsupported: {
+        span: at("<details>"),
+        construct: "html",
+        source: "<details>raw HTML</details>\n",
+      },
+    },
+    {
+      footnote: {
+        span: at("[^1]:"),
+        name: "1",
+        blocks: [
+          { paragraph: { span: at("The closure"), inline: [words("The closure rule is D31.")] } },
+        ],
+      },
+    },
   ];
 
   // wording-ok: fixture text is a model's reply, not a page's words
-  const CLOSED = ["- `crates/kernel`", "- **Ledger**", "", "| step | what |", "|---|---|", "| 1 | read |", "", "```rust", "fn main() {}", "```", "", ""].join("\n");
+  const CLOSED = [
+    "- `crates/kernel`",
+    "- **Ledger**",
+    "",
+    "| step | what |",
+    "|---|---|",
+    "| 1 | read |",
+    "",
+    "```rust",
+    "fn main() {}",
+    "```",
+    "",
+    "",
+  ].join("\n");
   const STREAMING = `${CLOSED}then the plan it asks for, one step per`;
   const by = (source: string) => spanIn(CLOSED, source);
   const CLOSED_BLOCKS: readonly Block[] = [
@@ -128,8 +215,18 @@
         order: "bullet",
         spacing: "tight",
         items: [
-          { span: by("- `crates"), check: "not_a_task", blocks: [{ paragraph: { span: by("`crates"), inline: [{ code: "crates/kernel" }] } }] },
-          { span: by("- **"), check: "not_a_task", blocks: [{ paragraph: { span: by("**Ledger**"), inline: [{ strong: [words("Ledger")] }] } }] },
+          {
+            span: by("- `crates"),
+            check: "not_a_task",
+            blocks: [{ paragraph: { span: by("`crates"), inline: [{ code: "crates/kernel" }] } }],
+          },
+          {
+            span: by("- **"),
+            check: "not_a_task",
+            blocks: [
+              { paragraph: { span: by("**Ledger**"), inline: [{ strong: [words("Ledger")] }] } },
+            ],
+          },
         ],
       },
     },
@@ -149,17 +246,23 @@
   const FENCED = `${FENCED_HEAD}\`\`\`rust\nfn a() {}\n\nfn b`;
 
   // wording-ok: fixture text is a model's reply, not a page's words
-  const REFUSED = "A reply holding a NUL\u0000 is not text the city reads.\n\nIt is drawn as it was said.";
+  const REFUSED =
+    "A reply holding a NUL\u0000 is not text the city reads.\n\nIt is drawn as it was said.";
   // wording-ok: fixture text is a model's reply, not a page's words
-  const UNANSWERED = "## Not answered yet\n\nUntil the city lays it out, every word is drawn as it was said.";
+  const UNANSWERED =
+    "## Not answered yet\n\nUntil the city lays it out, every word is drawn as it was said.";
 
-  const laid = (text: string, blocks: readonly Block[]): Answer => ({ reply: { span: { start: 0, end: bytes(text) }, blocks } });
+  const laid = (text: string, blocks: readonly Block[]): Answer => ({
+    reply: { span: { start: 0, end: bytes(text) }, blocks },
+  });
 
   // Each question the cases below ask, by the text it carries.
   const REPLIES: Readonly<Record<string, Answer>> = {
     [SETTLED]: laid(SETTLED, SETTLED_BLOCKS),
     [CLOSED]: laid(CLOSED, CLOSED_BLOCKS),
-    [`${FENCED_HEAD}\`\`\`rust\nfn a() {}\n\n`]: laid(FENCED_HEAD, [{ paragraph: { span: spanIn(FENCED, "Before"), inline: [words("Before the code.")] } }]),
+    [`${FENCED_HEAD}\`\`\`rust\nfn a() {}\n\n`]: laid(FENCED_HEAD, [
+      { paragraph: { span: spanIn(FENCED, "Before"), inline: [words("Before the code.")] } },
+    ]),
     [REFUSED]: { unavailable: { query: "Reply" } },
   };
 
@@ -187,7 +290,10 @@
   <Case label="reply · settled, every block the city lays out" width={TALK}>
     <div class="max-w-[64ch] text-body"><Prose text={SETTLED} /></div>
   </Case>
-  <Case label="reply · streaming, the closed blocks laid out and the open paragraph raw" width={TALK}>
+  <Case
+    label="reply · streaming, the closed blocks laid out and the open paragraph raw"
+    width={TALK}
+  >
     <Saying text={STREAMING} {who} />
   </Case>
   <Case label="reply · streaming inside an open code fence, raw until it closes" width={TALK}>

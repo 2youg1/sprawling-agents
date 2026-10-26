@@ -26,20 +26,37 @@ function record(seq: number, run = ONE): EventRecord {
 }
 
 function line(seq: number, run: RunId | null = null): LogLine {
-  return { seq: Seq.make(seq), level: "effect", module: "runtime", line: `at ${String(seq)}`, run, t: null };
+  return {
+    seq: Seq.make(seq),
+    level: "effect",
+    module: "runtime",
+    line: `at ${String(seq)}`,
+    run,
+    t: null,
+  };
 }
 
-const keys = (entries: readonly { readonly key: string }[]): readonly string[] => entries.map((each) => each.key);
+const keys = (entries: readonly { readonly key: string }[]): readonly string[] =>
+  entries.map((each) => each.key);
 
 describe("the record's one timeline", () => {
   test("a line stands above the record its ledger position follows, newest first", () => {
     const page = { records: [record(4), record(5)], head: true };
-    expect(keys(entriesOf(page, [line(4), line(6)], "every", WIDE))).toEqual(["l6-1", "r5", "l4-0", "r4"]);
+    expect(keys(entriesOf(page, [line(4), line(6)], "every", WIDE))).toEqual([
+      "l6-1",
+      "r5",
+      "l4-0",
+      "r4",
+    ]);
   });
 
   test("an earlier page shows only the lines written while its records were", () => {
     const page = { records: [record(4), record(5)], head: false };
-    expect(keys(entriesOf(page, [line(3), line(5), line(9)], "every", WIDE))).toEqual(["l5-0", "r5", "r4"]);
+    expect(keys(entriesOf(page, [line(3), line(5), line(9)], "every", WIDE))).toEqual([
+      "l5-0",
+      "r5",
+      "r4",
+    ]);
   });
 
   test("the log read alone is its own window, whatever page the ledger is on", () => {
@@ -51,6 +68,9 @@ describe("the record's one timeline", () => {
     const page = { records: [record(4, ONE), record(5, TWO)], head: true };
     const lines = [line(5, TWO), line(6, ONE)];
     expect(keys(entriesOf(page, lines, "every", { ...WIDE, run: TWO }))).toEqual(["l5-0", "r5"]);
-    expect(keys(entriesOf(page, lines, "every", { ...WIDE, level: "effect" }))).toEqual(["l6-1", "l5-0"]);
+    expect(keys(entriesOf(page, lines, "every", { ...WIDE, level: "effect" }))).toEqual([
+      "l6-1",
+      "l5-0",
+    ]);
   });
 });

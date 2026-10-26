@@ -21,10 +21,17 @@ export type Answered<T> =
 
 // `pick` reads the one variant the view draws and answers `undefined`
 // for every other.
-export function readAnswer<T>(answer: Answer | undefined, pick: (answer: Answer) => T | undefined): Answered<T> {
+export function readAnswer<T>(
+  answer: Answer | undefined,
+  pick: (answer: Answer) => T | undefined,
+): Answered<T> {
   if (answer === undefined) return { kind: "asking" };
   if ("unavailable" in answer) {
-    return { kind: "unavailable", query: answer.unavailable.query, reason: answer.unavailable.reason ?? null };
+    return {
+      kind: "unavailable",
+      query: answer.unavailable.query,
+      reason: answer.unavailable.reason ?? null,
+    };
   }
   const value = pick(answer);
   // A variant nobody asked this slot for is named by its own key: the

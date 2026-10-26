@@ -82,8 +82,13 @@
     if (boundary.kind === "forked") {
       const task = mother?.task ?? null;
       const held = $lines;
-      const original = originalOf(boundary.mother, mother, held !== undefined && "sessions" in held ? held.sessions.sessions : []);
-      const when: RulePart[] = boundary.at === null ? [] : [{ kind: "text", text: clock($lang, boundary.at) }];
+      const original = originalOf(
+        boundary.mother,
+        mother,
+        held !== undefined && "sessions" in held ? held.sessions.sessions : [],
+      );
+      const when: RulePart[] =
+        boundary.at === null ? [] : [{ kind: "text", text: clock($lang, boundary.at) }];
       const parts: RulePart[] = [
         {
           kind: "text",
@@ -102,7 +107,12 @@
     // the part that is true in every case.
     if (boundary.at === null) return null;
     return {
-      parts: [{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: clock($lang, boundary.at) }) }],
+      parts: [
+        {
+          kind: "text",
+          text: fill(say($lang, "session_new_divider"), { at: clock($lang, boundary.at) }),
+        },
+      ],
       mark: "none",
       wire: {},
     };

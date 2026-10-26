@@ -10,13 +10,27 @@
   // the reader's local midnight, so the day is written twice, once above
   // each day's first row.
 
-  import type { Answer, EventKind, EventRecord, LogLevel, LogLine, Payload, Query } from "../../wire";
+  import type {
+    Answer,
+    EventKind,
+    EventRecord,
+    LogLevel,
+    LogLine,
+    Payload,
+    Query,
+  } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
   const RUN = RunId.make("3f2a9c4e-0d1b-4e7a-9a55-1c2b3d4e5f60");
   const MIDNIGHT = new Date(2026, 9, 2).getTime();
 
-  function written(seq: number, ms: number, kind: EventKind, data: Payload, addr: string | null): EventRecord {
+  function written(
+    seq: number,
+    ms: number,
+    kind: EventKind,
+    data: Payload,
+    addr: string | null,
+  ): EventRecord {
     return {
       run: RUN,
       seq: Seq.make(seq),
@@ -51,7 +65,10 @@
   ];
 
   function history(records: readonly EventRecord[]): (query: Query) => Answer | undefined {
-    return (query) => (typeof query === "object" && "history" in query ? { history: { records, earlier: null } } : undefined);
+    return (query) =>
+      typeof query === "object" && "history" in query
+        ? { history: { records, earlier: null } }
+        : undefined;
   }
 </script>
 
@@ -72,7 +89,12 @@
 
   const SHOWN: readonly Shown[] = [
     { name: "ledger and log across midnight", source: "every", records: RECORDS, width: 1440 },
-    { name: "the log alone, as #/record/log opens it", source: "log", records: RECORDS, width: 1440 },
+    {
+      name: "the log alone, as #/record/log opens it",
+      source: "log",
+      records: RECORDS,
+      width: 1440,
+    },
     { name: "ledger and log at a phone's width", source: "every", records: RECORDS, width: 390 },
     { name: "an empty ledger page", source: "ledger", records: [], width: 1440 },
   ];
@@ -80,7 +102,13 @@
 
 {#each SHOWN as shown (shown.name)}
   <Case label={`record · ${shown.name}`} width={shown.width}>
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={history(shown.records)} logs={LOGS}>
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={history(shown.records)}
+      logs={LOGS}
+    >
       <Timeline source={shown.source} onSource={() => undefined} />
     </Stand>
   </Case>
@@ -88,7 +116,13 @@
 
 {#each [1440, 390] as width (width)}
   <Case label={`record · the page with its three readings at ${String(width)}`} {width}>
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={history(RECORDS)} logs={LOGS}>
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={history(RECORDS)}
+      logs={LOGS}
+    >
       <RecordView lens="ledger" rank="section" />
     </Stand>
   </Case>

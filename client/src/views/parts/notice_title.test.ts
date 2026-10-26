@@ -22,7 +22,9 @@ describe("the heading of a timeout", () => {
   });
 
   test("of a request the city cut keeps the code's own sentence", () => {
-    expect(noticeTitle("en", "E_TIMEOUT", "api.zenmux.ai")).toBe("this took too long and was cut");
+    expect(noticeTitle("en", "E_TIMEOUT", "api.example.test")).toBe(
+      "this took too long and was cut",
+    );
   });
 });
 
@@ -40,7 +42,9 @@ describe("the next step under a refusal", () => {
   });
 
   test("has a word for every code the wire can carry", () => {
-    const missing = AxCode.literals.filter((code) => !Object.hasOwn(table, `recover_${code.toLowerCase()}`));
+    const missing = AxCode.literals.filter(
+      (code) => !Object.hasOwn(table, `recover_${code.toLowerCase()}`),
+    );
     expect(missing).toEqual([]);
   });
 });

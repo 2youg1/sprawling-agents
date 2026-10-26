@@ -37,7 +37,9 @@
     const held = $asked;
     return held !== undefined && "rounds" in held ? held.rounds : null;
   });
-  const quote = $derived([...(rounds?.turns ?? [])].reverse().find((turn) => (turn.said ?? "") !== "")?.said ?? null);
+  const quote = $derived(
+    [...(rounds?.turns ?? [])].reverse().find((turn) => (turn.said ?? "") !== "")?.said ?? null,
+  );
   const base = $derived(rounds?.opened_at ?? null);
   const head = $derived(rounds === null ? null : lastCheckpointIn(rounds.turns));
   const committed = $derived(base !== null && head !== null && head !== base);
@@ -73,16 +75,24 @@
       {:else if outcome === "waiting"}
         <span class="text-alert">{say($lang, "results_waiting")}</span>
         {#if run.ask !== null}
-          <span class="text-text {THEN}">{fill(say($lang, "results_row_ask"), { ask: run.ask })}</span>
+          <span class="text-text {THEN}"
+            >{fill(say($lang, "results_row_ask"), { ask: run.ask })}</span
+          >
         {/if}
       {:else if outcome === null && run.doing.kind !== "frozen"}
         <span class="text-accent">{say($lang, "results_block_working")}</span>
         <span class="text-text {THEN}">
-          <AsideLink text={say($lang, "results_block_open")} href={toFragment({ kind: "run", run: run.run })} />
+          <AsideLink
+            text={say($lang, "results_block_open")}
+            href={toFragment({ kind: "run", run: run.run })}
+          />
         </span>
       {:else}
         <span class="text-text">
-          {fill(say($lang, outcome === "failed" ? "results_block_failed" : "results_block_stopped"), { why })}
+          {fill(
+            say($lang, outcome === "failed" ? "results_block_failed" : "results_block_stopped"),
+            { why },
+          )}
         </span>
         {#if committed && base !== null}
           <span class={THEN}><Produced {base} {head} /></span>

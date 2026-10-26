@@ -75,11 +75,18 @@
           }}
         />
       </div>
-      <Button label={say($lang, "bld_pursue")} type="submit" tone={goal.trim() === "" ? "secondary" : "primary"} />
+      <Button
+        label={say($lang, "bld_pursue")}
+        type="submit"
+        tone={goal.trim() === "" ? "secondary" : "primary"}
+      />
     </form>
   {:else}
     <span
-      class={["size-dot shrink-0 rounded-pill", pursuit.state === "running" ? "bg-accent" : "bg-mark"]}
+      class={[
+        "size-dot shrink-0 rounded-pill",
+        pursuit.state === "running" ? "bg-accent" : "bg-mark",
+      ]}
       aria-hidden="true"
     ></span>
     <span class="min-w-0 flex-1 truncate text-note text-text">{pursuit.goal}</span>

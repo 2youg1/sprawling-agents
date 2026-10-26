@@ -38,7 +38,13 @@ describe("the hint node", () => {
 
 describe("Escape and hold-to-reveal", () => {
   test("Escape is the one key that dismisses", () => {
-    expect(["Escape", "Esc", "Enter", " ", "Tab"].map(dismisses)).toEqual([true, false, false, false, false]);
+    expect(["Escape", "Esc", "Enter", " ", "Tab"].map(dismisses)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   test("a dismissed hint is hidden and leaves hold-to-reveal", () => {

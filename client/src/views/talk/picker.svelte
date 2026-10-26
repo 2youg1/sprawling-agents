@@ -26,5 +26,12 @@ class. -->
   <Look look={popover} {menu} />
 {/snippet}
 
-<Popover label="picker_title" columns={menu.columns} onApply={menu.onApply} onClose={menu.onClose}
-  bind={menu.bind} onCursorChange={menu.onCursorChange} look={drawn} />
+<Popover
+  label="picker_title"
+  columns={menu.columns}
+  onApply={menu.onApply}
+  onClose={menu.onClose}
+  bind={menu.bind}
+  onCursorChange={menu.onCursorChange}
+  look={drawn}
+/>

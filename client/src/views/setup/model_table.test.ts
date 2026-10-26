@@ -28,7 +28,12 @@ const fact = (id: string, over: Partial<ModelFact> = {}): ModelFact => ({
 });
 
 const SERVED: readonly ModelFact[] = [
-  fact("vendor/writer", { contextTokens: 200_000, maxOutputTokens: 8192, inputPrice: "3", outputPrice: "15" }),
+  fact("vendor/writer", {
+    contextTokens: 200_000,
+    maxOutputTokens: 8192,
+    inputPrice: "3",
+    outputPrice: "15",
+  }),
   fact("vendor/video-maker"),
   fact("vendor/seer", { inputModalities: ["text", "image"], contextTokens: 64_000 }),
   fact("vendor/painter", { inputModalities: ["image"] }),
@@ -43,7 +48,10 @@ const line = (
 ): FiguresLine => ({
   id,
   window: window === null ? null : { tokens: Window.make(window[0]), from: window[1] },
-  ceiling: ceiling === "provider_default" ? ceiling : { sent: { tokens: Ceiling.make(ceiling[0]), from: ceiling[1] } },
+  ceiling:
+    ceiling === "provider_default"
+      ? ceiling
+      : { sent: { tokens: Ceiling.make(ceiling[0]), from: ceiling[1] } },
 });
 
 // What the city answers for `SERVED` on the chat face of a server on
@@ -73,7 +81,12 @@ describe("which rows the table offers", () => {
     expect(ids(lookOf(state, SERVED, [], "en"))).toEqual(["vendor/seer", "vendor/writer"]);
 
     lookOf(state, SERVED, [], "en").manual.input("vendor/video-maker, typed/one");
-    expect(ids(lookOf(state, SERVED, [], "en"))).toEqual(["typed/one", "vendor/seer", "vendor/video-maker", "vendor/writer"]);
+    expect(ids(lookOf(state, SERVED, [], "en"))).toEqual([
+      "typed/one",
+      "vendor/seer",
+      "vendor/video-maker",
+      "vendor/writer",
+    ]);
 
     lookOf(state, SERVED, [], "en").textOnly.toggle(false);
     expect(ids(lookOf(state, SERVED, [], "en"))).toEqual([
@@ -103,7 +116,11 @@ describe("what a press writes and what is handed back", () => {
     const state = freshTable();
     tick(lookOf(state, SERVED, [], "en"), "vendor/writer");
     expect(chosenRows(state, SERVED)).toEqual([
-      { id: "vendor/writer", stated: { contextTokens: null, maxOutputTokens: null, input: null }, tag: null },
+      {
+        id: "vendor/writer",
+        stated: { contextTokens: null, maxOutputTokens: null, input: null },
+        tag: null,
+      },
     ]);
   });
 
@@ -116,13 +133,21 @@ describe("what a press writes and what is handed back", () => {
     row?.input.pick("text_image");
     row?.role.pick("digest");
     expect(chosenRows(state, SERVED)).toEqual([
-      { id: "vendor/seer", stated: { contextTokens: 32_768, maxOutputTokens: null, input: "text_image" }, tag: "digest" },
+      {
+        id: "vendor/seer",
+        stated: { contextTokens: 32_768, maxOutputTokens: null, input: "text_image" },
+        tag: "digest",
+      },
     ]);
 
     row?.input.pick("");
     row?.role.pick("");
     expect(chosenRows(state, SERVED)).toEqual([
-      { id: "vendor/seer", stated: { contextTokens: 32_768, maxOutputTokens: null, input: null }, tag: null },
+      {
+        id: "vendor/seer",
+        stated: { contextTokens: 32_768, maxOutputTokens: null, input: null },
+        tag: null,
+      },
     ]);
   });
 
@@ -132,7 +157,10 @@ describe("what a press writes and what is handed back", () => {
     expect(ticks?.allPicked()).toBe(false);
     ticks?.onPickAll(true);
     expect(lookOf(state, SERVED, [], "en").table?.tick.allPicked()).toBe(true);
-    expect(chosenRows(state, SERVED).map((row) => row.id)).toEqual(["vendor/writer", "vendor/seer"]);
+    expect(chosenRows(state, SERVED).map((row) => row.id)).toEqual([
+      "vendor/writer",
+      "vendor/seer",
+    ]);
   });
 });
 
@@ -142,13 +170,15 @@ describe("the columns", () => {
     lookOf(state, SERVED, CITY, "en").textOnly.toggle(false);
     const look = lookOf(state, SERVED, CITY, "en");
     const context = look.table?.columns.find((column) => column.key === "context");
-    const rows = [...(look.table?.rows ?? [])].sort(context?.compare ?? (() => 0)).map((row) => row.id);
+    const rows = [...(look.table?.rows ?? [])]
+      .sort(context?.compare ?? (() => 0))
+      .map((row) => row.id);
     expect(rows).toEqual(["vendor/painter", "vendor/video-maker", "vendor/seer", "vendor/writer"]);
-    expect(look.table?.columns.filter((column) => column.compare !== undefined).map((column) => column.key)).toEqual([
-      "id",
-      "context",
-      "output",
-    ]);
+    expect(
+      look.table?.columns
+        .filter((column) => column.compare !== undefined)
+        .map((column) => column.key),
+    ).toEqual(["id", "context", "output"]);
   });
 
   test("a row's labels name the row, so two boxes in one column are told apart", () => {
@@ -174,13 +204,24 @@ describe("what an untouched box says the city will register", () => {
     const state = freshTable();
     state.manual = "relay-hidden-1";
     state.role["vendor/writer"] = "main";
-    expect(figuresQuery({ endpoint: "relay", baseUrl: RELAY, face: "open_ai" }, state, SERVED.slice(0, 1))).toEqual({
+    expect(
+      figuresQuery(
+        { endpoint: "relay", baseUrl: RELAY, face: "open_ai" },
+        state,
+        SERVED.slice(0, 1),
+      ),
+    ).toEqual({
       model_figures: {
         endpoint: providerName("relay"),
         base_url: RELAY,
         face: "open_ai",
         models: [
-          { id: "vendor/writer", context_tokens: Window.make(200_000), max_output_tokens: Ceiling.make(8192), tag: "main" },
+          {
+            id: "vendor/writer",
+            context_tokens: Window.make(200_000),
+            max_output_tokens: Ceiling.make(8192),
+            tag: "main",
+          },
           { id: "relay-hidden-1", context_tokens: null, max_output_tokens: null, tag: null },
         ],
       },
@@ -189,12 +230,24 @@ describe("what an untouched box says the city will register", () => {
 
   test("a catalogue-known id reads the vendor's window behind a relay, and unknown on this machine", () => {
     const served = [fact(SONNET)];
-    const atRelay = rowOf(lookOf(freshTable(), served, [line(SONNET, [200_000, "preset"], "provider_default")], "en"), SONNET);
-    expect(atRelay?.window).toMatchObject({ placeholder: "200000", source: "from the city's catalogue" });
+    const atRelay = rowOf(
+      lookOf(freshTable(), served, [line(SONNET, [200_000, "preset"], "provider_default")], "en"),
+      SONNET,
+    );
+    expect(atRelay?.window).toMatchObject({
+      placeholder: "200000",
+      source: "from the city's catalogue",
+    });
     expect(atRelay?.ceiling).toMatchObject({ placeholder: "", source: "the provider's default" });
 
-    const atLoopback = rowOf(lookOf(freshTable(), served, [line(SONNET, null, "provider_default")], "en"), SONNET);
-    expect(atLoopback?.window).toMatchObject({ placeholder: "", source: "unknown — the context reminder stays off" });
+    const atLoopback = rowOf(
+      lookOf(freshTable(), served, [line(SONNET, null, "provider_default")], "en"),
+      SONNET,
+    );
+    expect(atLoopback?.window).toMatchObject({
+      placeholder: "",
+      source: "unknown — the context reminder stays off",
+    });
   });
 
   test("each rung says where the figure came from, and a box waiting on the city says nothing", () => {
@@ -204,7 +257,12 @@ describe("what an untouched box says the city will register", () => {
       line("b", [50_000, "registered"], [64_000, "preset"]),
     ];
     const look = lookOf(freshTable(), served, answered, "en");
-    expect([rowOf(look, "a")?.window, rowOf(look, "a")?.ceiling, rowOf(look, "b")?.window, rowOf(look, "b")?.ceiling]).toMatchObject([
+    expect([
+      rowOf(look, "a")?.window,
+      rowOf(look, "a")?.ceiling,
+      rowOf(look, "b")?.window,
+      rowOf(look, "b")?.ceiling,
+    ]).toMatchObject([
       { placeholder: "131072", source: "from the provider's list" },
       { placeholder: "16384", source: "from the provider's list" },
       { placeholder: "50000", source: "as registered before" },

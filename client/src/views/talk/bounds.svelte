@@ -43,7 +43,9 @@
   }
 
   const gate = $derived.by((): Bound => {
-    const read = readAnswer($governance, (held) => ("governance" in held ? held.governance : undefined));
+    const read = readAnswer($governance, (held) =>
+      "governance" in held ? held.governance : undefined,
+    );
     switch (read.kind) {
       case "asking":
         return { words: "—", worrying: false };
@@ -51,7 +53,10 @@
         return { words: say($lang, "facts_unreadable"), worrying: true };
       case "held":
         return {
-          words: read.value.autonomy === "owner" ? say($lang, "autonomy_owner") : say($lang, "autonomy_clerk"),
+          words:
+            read.value.autonomy === "owner"
+              ? say($lang, "autonomy_owner")
+              : say($lang, "autonomy_clerk"),
           worrying: false,
         };
     }

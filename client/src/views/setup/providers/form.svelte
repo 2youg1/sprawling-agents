@@ -54,7 +54,16 @@
   import { ModelTable, type ModelRow } from "../models";
   import type { TableAbout } from "../model_rows";
   import Advanced from "./advanced.svelte";
-  import { BASE_URL, ID_SHAPE, endpointOf, freshDraft, hostOf, idOf, referenceOf, wireChoices } from "./draft";
+  import {
+    BASE_URL,
+    ID_SHAPE,
+    endpointOf,
+    freshDraft,
+    hostOf,
+    idOf,
+    referenceOf,
+    wireChoices,
+  } from "./draft";
   import type { Draft } from "./draft";
   import { facesOf, followed, hostChoices, picked, rowFor } from "./known";
   import Previews from "./preview.svelte";
@@ -129,7 +138,9 @@
   // not store.
   const knownAnswer = u.conn.asking.ask(QUERIES.knownHosts);
   const known = $derived(
-    readAnswer($knownAnswer, (held) => ("known_hosts" in held ? held.known_hosts.hosts : undefined)),
+    readAnswer($knownAnswer, (held) =>
+      "known_hosts" in held ? held.known_hosts.hosts : undefined,
+    ),
   );
   const hosts = $derived(known.kind === "held" ? known.value : []);
   const row = $derived(rowFor(hosts, draft.baseUrl));
@@ -162,7 +173,13 @@
   // the attach left lists it. The form starts over for the next provider.
   $effect(() => {
     const now = $attached;
-    if (attaching === null || now === attaching.before || now === undefined || !("endpoints" in now)) return;
+    if (
+      attaching === null ||
+      now === attaching.before ||
+      now === undefined ||
+      !("endpoints" in now)
+    )
+      return;
     const taken = attaching.id;
     if (!now.endpoints.endpoints.some((each) => each.name === taken)) return;
     attaching = null;
@@ -234,7 +251,12 @@
   function probeNow(): void {
     report = null;
     withKey((e) => {
-      const sent: Sent = { id: e.id, baseUrl: draft.baseUrl, wireApi: draft.wireApi, before: get(belief).probed };
+      const sent: Sent = {
+        id: e.id,
+        baseUrl: draft.baseUrl,
+        wireApi: draft.wireApi,
+        before: get(belief).probed,
+      };
       if (!u.send(probeEndpoint(e))) return;
       looking = true;
       pending = sent;
@@ -284,7 +306,8 @@
 
   <div class="flex flex-col gap-tight">
     <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
-    <Field placeholder="https://api.openai.com/v1"
+    <Field
+      placeholder="https://api.openai.com/v1"
       label={say($lang, "setup_base_url")}
       pattern={BASE_URL.source}
       mono
@@ -320,7 +343,7 @@
       kind="password"
       mono
       value={draft.key}
-      {...(keyed ? { placeholder: say($lang, "setup_key_kept") } : {})}
+      {...keyed ? { placeholder: say($lang, "setup_key_kept") } : {}}
       onInput={(value: string) => {
         edit("key", value);
       }}
@@ -354,14 +377,14 @@
       label={say($lang, "setup_look")}
       tone="secondary"
       loading={busy}
-      {...(complete ? {} : { why: say($lang, "setup_form_incomplete") })}
+      {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
       onPress={probeNow}
     />
     <Button
       label={say($lang, "setup_attach_btn")}
       tone="primary"
       loading={busy}
-      {...(complete ? {} : { why: say($lang, "setup_form_incomplete") })}
+      {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
       onPress={attachNow}
     />
   </div>
@@ -390,5 +413,5 @@
   />
   <Reach probed={null} error={refused} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
 
-  <Previews draft={draft} reference={reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
+  <Previews {draft} {reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
 </form>

@@ -27,7 +27,9 @@ export class DropZone {
     this.over = true;
   };
 
-  readonly leave = (event: DragEvent & { readonly currentTarget: EventTarget & HTMLElement }): void => {
+  readonly leave = (
+    event: DragEvent & { readonly currentTarget: EventTarget & HTMLElement },
+  ): void => {
     const next = event.relatedTarget;
     if (!(next instanceof Node && event.currentTarget.contains(next))) this.over = false;
   };

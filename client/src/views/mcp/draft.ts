@@ -132,7 +132,10 @@ function nameless(pairs: readonly Pair[]): boolean {
 }
 
 function started(label: string, draft: Draft): Encoded {
-  const words = draft.command.trim().split(/\s+/).filter((word) => word !== "");
+  const words = draft.command
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "");
   const program = words[0];
   if (program === undefined) return { kind: "blocked", blocker: "command_missing" };
   if (nameless(draft.env)) return { kind: "blocked", blocker: "pair_nameless" };

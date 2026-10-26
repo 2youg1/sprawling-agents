@@ -25,7 +25,11 @@
     {#if look.link !== undefined}
       <span class="shrink-0 text-note text-text-faint">{look.link.word}</span>
       {#if look.link.recovery !== undefined}
-        <Button tone="quiet" label={look.link.recovery.label} onPress={look.link.recovery.onPress} />
+        <Button
+          tone="quiet"
+          label={look.link.recovery.label}
+          onPress={look.link.recovery.onPress}
+        />
       {/if}
     {/if}
   </header>

@@ -19,13 +19,17 @@
 <div class="flex flex-col gap-snug">
   <textarea
     class="min-h-output w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
-    {...look.box}
-  ></textarea>
+    {...look.box}></textarea>
   {#if look.missing !== undefined}
     <p class="text-note text-text-faint">{look.missing}</p>
   {/if}
   <div class="flex items-center gap-base">
-    <Button label={look.save.label} tone="primary" {...(look.save.why === undefined ? {} : { why: look.save.why })} onPress={look.save.press} />
+    <Button
+      label={look.save.label}
+      tone="primary"
+      {...look.save.why === undefined ? {} : { why: look.save.why }}
+      onPress={look.save.press}
+    />
     {#if look.none !== undefined}
       <span class="text-note text-text-faint">{look.none}</span>
     {/if}

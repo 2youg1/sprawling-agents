@@ -25,7 +25,9 @@ const Spelling = Schema.fromJsonString(
   }),
 );
 
-const table = (await Bun.file(new URL("../../../tools/fixtures/address.jsonl", import.meta.url)).text())
+const table = (
+  await Bun.file(new URL("../../../tools/fixtures/address.jsonl", import.meta.url)).text()
+)
   .split("\n")
   .filter((line) => line.length > 0)
   .map((line) => Schema.decodeUnknownSync(Spelling)(line));
@@ -39,7 +41,9 @@ describe("address", () => {
   test("every spelling in the shared table gets its verdict", () => {
     for (const row of table) {
       const expected = row.verdict === "accepted" ? row.address : null;
-      expect<string | null>(Option.getOrNull(read(row.address)), JSON.stringify(row.address)).toBe(expected);
+      expect<string | null>(Option.getOrNull(read(row.address)), JSON.stringify(row.address)).toBe(
+        expected,
+      );
     }
   });
 });

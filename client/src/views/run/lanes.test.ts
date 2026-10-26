@@ -27,7 +27,12 @@ function call(n: number, called = 0, answered: number | null = null): Call {
   };
 }
 
-function turn(number: number, t: number, calls: readonly Call[], notes: readonly Note[] = []): Turn {
+function turn(
+  number: number,
+  t: number,
+  calls: readonly Call[],
+  notes: readonly Note[] = [],
+): Turn {
   return { calls, notes, number, opened: Seq.make(number), t: TimeMs.make(t), timing: "measured" };
 }
 
@@ -66,9 +71,16 @@ describe("the time lens", () => {
   // wire, so the rest of it is the person's.
   test("a turn that waited is cut where the request and the answer were recorded", () => {
     const wait = (t: number, answered: number | null): Note => ({
-      waiting: { at: Seq.make(t), t: TimeMs.make(t), answered: answered === null ? null : TimeMs.make(answered) },
+      waiting: {
+        at: Seq.make(t),
+        t: TimeMs.make(t),
+        answered: answered === null ? null : TimeMs.make(answered),
+      },
     });
-    const turns = [turn(1, 30, [call(1, 31, 34), call(2, 42, 44)], [wait(38, 41)]), turn(2, 46, [], [wait(50, null)])];
+    const turns = [
+      turn(1, 30, [call(1, 31, 34), call(2, 42, 44)], [wait(38, 41)]),
+      turn(2, 46, [], [wait(50, null)]),
+    ];
     expect(stretchesOf(turns, 60, null)).toEqual([
       { share: "model", turn: 1, from: 30, to: 31 },
       { share: "tool", turn: 1, from: 31, to: 34 },
@@ -86,7 +98,9 @@ describe("the time lens", () => {
   // one box per column, so the page holds a bounded number of boxes
   // however long the run went on.
   test("a lane never holds more boxes than it has columns", () => {
-    const turns = Array.from({ length: 10_000 }, (_, n) => turn(n + 1, n * 1000, n % 3 === 0 ? [call(n)] : []));
+    const turns = Array.from({ length: 10_000 }, (_, n) =>
+      turn(n + 1, n * 1000, n % 3 === 0 ? [call(n)] : []),
+    );
     const lane = columnsOf(stretchesOf(turns, 10_000_000, null), 0, 10_000_000, 400);
     expect(lane.length).toBeLessThanOrEqual(400);
     expect(lane[0]?.first).toBe(0);
@@ -94,7 +108,13 @@ describe("the time lens", () => {
   });
 
   test("a call list of ten thousand rows draws only the rows in view", () => {
-    const turns = Array.from({ length: 100 }, (_, n) => turn(n + 1, n, Array.from({ length: 100 }, (_, c) => call(c))));
+    const turns = Array.from({ length: 100 }, (_, n) =>
+      turn(
+        n + 1,
+        n,
+        Array.from({ length: 100 }, (_, c) => call(c)),
+      ),
+    );
     const total = callsOf(turns).length;
     expect(total).toBe(10_000);
     const rows = windowOf(total, 28, 5_000 * 28, 560);

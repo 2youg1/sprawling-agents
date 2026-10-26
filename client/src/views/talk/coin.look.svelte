@@ -26,7 +26,12 @@
 </script>
 
 {#snippet drawKey(hint: string | undefined)}
-  <button class="coin" data-up={look.face === "stop" ? "stop" : "send"} {...look.wire} aria-describedby={hint}>
+  <button
+    class="coin"
+    data-up={look.face === "stop" ? "stop" : "send"}
+    {...look.wire}
+    aria-describedby={hint}
+  >
     <span class="faces" aria-hidden="true">
       <span class="face" data-face="send"><Glyph name="send" size="key" /></span>
       <span class="face" data-face="stop"><Glyph name="stop" size="stop" solid /></span>

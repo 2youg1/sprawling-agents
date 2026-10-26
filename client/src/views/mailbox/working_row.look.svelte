@@ -16,7 +16,11 @@
 
   const look: WorkingRowLook = $props();
 
-  const INK: Readonly<Record<Weight, string>> = { quiet: "text-text-quiet", live: "text-accent", alert: "text-alert" };
+  const INK: Readonly<Record<Weight, string>> = {
+    quiet: "text-text-quiet",
+    live: "text-accent",
+    alert: "text-alert",
+  };
 </script>
 
 <li>

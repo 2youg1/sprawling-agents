@@ -88,7 +88,9 @@ const child = spawn(binary, process.argv.slice(2), {
       ? process.env.SPRAWLING_INSTALL_CHANNEL
       : __dirname.split(/[\\/]/).includes(".bun")
         ? "bun"
-        : __dirname.split(/[\\/]/).includes("_npx") ? "npm" : "package",
+        : __dirname.split(/[\\/]/).includes("_npx")
+          ? "npm"
+          : "package",
   },
 });
 const signals = ["SIGINT", "SIGTERM", "SIGHUP"];

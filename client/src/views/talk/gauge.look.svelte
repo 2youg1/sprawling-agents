@@ -39,7 +39,11 @@
   <Tip text={ring.reading}>
     <span class="relative grid size-key shrink-0 place-items-center">
       <span class="absolute inset-0 rounded-pill" {...ring.meter}></span>
-      <svg class="pointer-events-none absolute inset-0 -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
+      <svg
+        class="pointer-events-none absolute inset-0 -rotate-90"
+        viewBox="0 0 40 40"
+        aria-hidden="true"
+      >
         <!-- r is 18 of the view box's 40 units, the share of the key's
         square `checkpoint.look.svelte` turns its dots out to. -->
         <circle

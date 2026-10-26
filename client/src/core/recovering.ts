@@ -169,7 +169,9 @@ export function formOf(room: FormRoom, subject: string, words: string): Option.O
 // run does not offer it: a control that can never run is not an action.
 export function recoveryFor(error: Pick<AxError, "code" | "subject">): readonly Recovery[] {
   const offered = RECOVERIES[error.code];
-  return Option.isSome(readRunId(error.subject)) ? offered : offered.filter((each) => each !== STOP);
+  return Option.isSome(readRunId(error.subject))
+    ? offered
+    : offered.filter((each) => each !== STOP);
 }
 
 // The one lever a refused link offers beside its state word: the table's

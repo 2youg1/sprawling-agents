@@ -101,7 +101,11 @@ export function turned(sorted: Sorted, key: string): Sorted {
 }
 
 // The rows in the order the table draws them.
-export function ordered<T>(rows: readonly T[], columns: readonly Column<T>[], sorted: Sorted): readonly T[] {
+export function ordered<T>(
+  rows: readonly T[],
+  columns: readonly Column<T>[],
+  sorted: Sorted,
+): readonly T[] {
   const compare = columns.find((each) => each.key === sorted.by)?.compare;
   if (compare === undefined) return rows;
   const sorting = [...rows].sort(compare);
@@ -181,7 +185,11 @@ export interface TableLook<T> {
   readonly empty: Snippet | undefined;
 }
 
-export function lookOf<T>(props: TableProps<T>, sorted: Sorted, turn: (key: string) => void): TableLook<T> {
+export function lookOf<T>(
+  props: TableProps<T>,
+  sorted: Sorted,
+  turn: (key: string) => void,
+): TableLook<T> {
   const { caption, columns, keyOf, selection, empty } = props;
   const rows = ordered(props.rows, columns, sorted);
   return {
@@ -225,7 +233,12 @@ export function lookOf<T>(props: TableProps<T>, sorted: Sorted, turn: (key: stri
 }
 
 function headOf<T>(column: Column<T>, sorted: Sorted, turn: (key: string) => void): HeadLook {
-  const base = { key: column.key, header: column.header, min: column.min, summary: column.summary === true };
+  const base = {
+    key: column.key,
+    header: column.header,
+    min: column.min,
+    summary: column.summary === true,
+  };
   if (column.compare === undefined) {
     return { ...base, cell: {}, sort: undefined };
   }

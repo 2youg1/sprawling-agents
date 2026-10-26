@@ -49,7 +49,9 @@ describe("the context ring's look", () => {
   });
 
   test("puts no checkpoint for a reminder the city did not state", () => {
-    expect(ringOf("en", { ...BOTH, first: null })?.checkpoints).toEqual([{ reminder: "second", at: 65 }]);
+    expect(ringOf("en", { ...BOTH, first: null })?.checkpoints).toEqual([
+      { reminder: "second", at: 65 },
+    ]);
   });
 
   test("is absent where the model stated no window", () => {

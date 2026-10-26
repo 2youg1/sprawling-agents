@@ -44,7 +44,9 @@ export function stretchesOf(
         room: answer.room,
         line,
         current: at === 0,
-        runs: runs.filter((run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began)),
+        runs: runs.filter(
+          (run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began),
+        ),
       };
     });
   });
@@ -54,7 +56,10 @@ export function stretchesOf(
 // The stretch a route names: the room's current one when it names none or
 // names the current one, and `null` while the answer has not arrived or
 // does not hold it.
-export function lineIn(answer: SessionsAnswer | undefined, asked: Seq | undefined): SessionLine | null {
+export function lineIn(
+  answer: SessionsAnswer | undefined,
+  asked: Seq | undefined,
+): SessionLine | null {
   const lines = answer?.sessions ?? [];
   return (asked === undefined ? lines[0] : lines.find((line) => line.began === asked)) ?? null;
 }
@@ -81,7 +86,8 @@ export function grouped(
   tagsFor: (stretch: Stretch) => readonly Tag[],
   filter: Tag | null,
 ): Group[] {
-  const kept = filter === null ? stretches : stretches.filter((stretch) => tagsFor(stretch).includes(filter));
+  const kept =
+    filter === null ? stretches : stretches.filter((stretch) => tagsFor(stretch).includes(filter));
   const pinned = kept.filter((stretch) => pinningOf(stretch, tagsFor(stretch)) !== "none");
   const rest = kept.filter((stretch) => !pinned.includes(stretch));
   const buildings = [...new Set(rest.map((stretch) => buildingOf(stretch.room)))];

@@ -74,7 +74,10 @@ third layer). -->
   // that is known: a run waiting on the person says so; anything else
   // keeps its silence rather than invent a reason.
   const waitsForYou = $derived(
-    call.outcome === "waiting" && doing?.kind === "waiting" && time.kind === "running" && time.ms >= NAMED_AFTER_MS,
+    call.outcome === "waiting" &&
+      doing?.kind === "waiting" &&
+      time.kind === "running" &&
+      time.ms >= NAMED_AFTER_MS,
   );
   // A failed line says why against its time, cut to its width; the
   // whole reason is in the hint too, so a cut reason is read on hover and
@@ -83,7 +86,9 @@ third layer). -->
     const failure = failureOf(call);
     switch (failure.kind) {
       case "refused":
-        return fill(say($lang, "talk_call_failed_why"), { why: noticeTitle($lang, failure.code, failure.subject) });
+        return fill(say($lang, "talk_call_failed_why"), {
+          why: noticeTitle($lang, failure.code, failure.subject),
+        });
       case "said":
         return fill(say($lang, "talk_call_failed_why"), { why: failure.text });
       case "silent":

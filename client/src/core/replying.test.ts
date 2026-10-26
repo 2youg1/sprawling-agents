@@ -41,8 +41,15 @@ describe("a reply still being said", () => {
     const first = answered(UNLAID, "one\n\n", laid("one\n\n", [said("one", 0)]), "streaming");
     expect(first).toEqual({ blocks: [said("one", 0)], reached: 5, judged: "", refused: false });
     expect(question("one\n\ntwo, still", first, "streaming")).toBeNull();
-    expect(question("one\n\ntwo, still\nmore\n\n", first, "streaming")).toBe("two, still\nmore\n\n");
-    const second = answered(first, "two, still\nmore\n\n", laid("two, still\nmore\n\n", [said("two, still more", 0)]), "streaming");
+    expect(question("one\n\ntwo, still\nmore\n\n", first, "streaming")).toBe(
+      "two, still\nmore\n\n",
+    );
+    const second = answered(
+      first,
+      "two, still\nmore\n\n",
+      laid("two, still\nmore\n\n", [said("two, still more", 0)]),
+      "streaming",
+    );
     expect(second).toEqual({
       blocks: [said("one", 0), said("two, still more", 0)],
       reached: 22,
@@ -54,16 +61,19 @@ describe("a reply still being said", () => {
   test("does not ask again about lines the city read and left open", () => {
     const open = answered(UNLAID, "- a\n", laid("", []), "streaming");
     expect(open).toEqual({ blocks: [], reached: 0, judged: "- a\n", refused: false });
-    expect([question("- a\n- b", open, "streaming"), question("- a\n- b\n", open, "streaming")]).toEqual([
-      null,
-      "- a\n- b\n",
-    ]);
+    expect([
+      question("- a\n- b", open, "streaming"),
+      question("- a\n- b\n", open, "streaming"),
+    ]).toEqual([null, "- a\n- b\n"]);
   });
 
   test("counts the city's bytes as UTF-8 and the text's length in code units", () => {
     const asked = "第一段 😀\n\n";
     const after = answered(UNLAID, asked, laid(asked, [said("第一段 😀", 0)]), "streaming");
-    expect({ reached: after.reached, rest: `${asked}尾巴`.slice(after.reached) }).toEqual({ reached: 8, rest: "尾巴" });
+    expect({ reached: after.reached, rest: `${asked}尾巴`.slice(after.reached) }).toEqual({
+      reached: 8,
+      rest: "尾巴",
+    });
   });
 });
 
@@ -93,7 +103,12 @@ describe("either state", () => {
   });
 
   test("a refused stretch stays raw and is never asked again", () => {
-    const refused = answered(UNLAID, "a\u0000b\n\n", { kind: "unavailable", query: "Reply", reason: null }, "streaming");
+    const refused = answered(
+      UNLAID,
+      "a\u0000b\n\n",
+      { kind: "unavailable", query: "Reply", reason: null },
+      "streaming",
+    );
     expect({
       refused,
       streaming: question("a\u0000b\n\nmore\n\n", refused, "streaming"),

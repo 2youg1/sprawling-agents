@@ -79,9 +79,17 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
-  <Label format="docx" tool={TOOL.docx} settings={[say($lang, "format_docx_settings")]} {version} {notes} />
+  <Label
+    format="docx"
+    tool={TOOL.docx}
+    settings={[say($lang, "format_docx_settings")]}
+    {version}
+    {notes}
+  />
   {#if read === null}
-    <p class="px-wide py-snug text-note text-text-faint">{fill(say($lang, "format_reading"), { format: NAME.docx })}</p>
+    <p class="px-wide py-snug text-note text-text-faint">
+      {fill(say($lang, "format_reading"), { format: NAME.docx })}
+    </p>
   {:else if read.kind === "drawn"}
     <div class="flex min-h-0 flex-1 flex-col bg-raised">
       <Frame page={read.page} scheme="built" title={name} />

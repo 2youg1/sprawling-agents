@@ -35,11 +35,11 @@
    * interface, where the generic monospace face is a serif one on some
    * platforms. */
   --font-sans:
-    var(--face-sans), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
-    Consolas, "DejaVu Sans Mono", sans-serif;
+    var(--face-sans), ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono",
+    sans-serif;
   --font-mono:
-    var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
-    Consolas, "DejaVu Sans Mono", monospace;
+    var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono",
+    monospace;
   /* Mono text is text a person copies: a command, a path, a code. Geist
    * Mono's ligatures and contextual alternates draw ` --` and `->` as
    * other shapes, so what the screen shows is not what the shell runs.

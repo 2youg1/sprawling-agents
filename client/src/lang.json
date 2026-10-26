@@ -6352,28 +6352,28 @@
     "zh": "不合语法：{line}"
   },
   "sandbox_arm_default": {
-      "en": "platform default",
-      "zh": "平台缺省"
+    "en": "platform default",
+    "zh": "平台缺省"
   },
   "sandbox_arm_none": {
-      "en": "host",
-      "zh": "宿主"
+    "en": "host",
+    "zh": "宿主"
   },
   "sandbox_arm_copied_tree": {
-      "en": "copied tree",
-      "zh": "工作树副本"
+    "en": "copied tree",
+    "zh": "工作树副本"
   },
   "sandbox_arm_native": {
-      "en": "native",
-      "zh": "原生隔离"
+    "en": "native",
+    "zh": "原生隔离"
   },
   "sandbox_arm_container": {
-      "en": "container",
-      "zh": "容器"
+    "en": "container",
+    "zh": "容器"
   },
   "sandbox_arm_python": {
-      "en": "Python WASI",
-      "zh": "Python WASI 沙箱"
+    "en": "Python WASI",
+    "zh": "Python WASI 沙箱"
   },
   "sandbox_arm": {
     "en": "Execution boundary",
@@ -6384,32 +6384,32 @@
     "zh": "指定的边界必须可用；选择平台默认时沿用宿主平台的既有机制。"
   },
   "sandbox_container_help": {
-      "en": "Uses Docker or Podman with a prepared local immutable image. Runtime never pulls images. Each start checks network, user, mounts and resource limits; unavailable or refused boundaries fail closed.",
-      "zh": "使用 Docker 或 Podman 与已准备的本地固定镜像。运行时不拉取镜像。每次启动前检查网络、用户、挂载与资源限额；无法提供所选边界时拒绝执行。"
+    "en": "Uses Docker or Podman with a prepared local immutable image. Runtime never pulls images. Each start checks network, user, mounts and resource limits; unavailable or refused boundaries fail closed.",
+    "zh": "使用 Docker 或 Podman 与已准备的本地固定镜像。运行时不拉取镜像。每次启动前检查网络、用户、挂载与资源限额；无法提供所选边界时拒绝执行。"
   },
   "sandbox_container_needed": {
-      "en": "Enter the full local image ID and every nonzero limit.",
-      "zh": "请填写完整本地镜像 ID 和全部非零限额。"
+    "en": "Enter the full local image ID and every nonzero limit.",
+    "zh": "请填写完整本地镜像 ID 和全部非零限额。"
   },
   "sandbox_container_image": {
-      "en": "local image ID (sha256)",
-      "zh": "本地镜像 ID（sha256）"
+    "en": "local image ID (sha256)",
+    "zh": "本地镜像 ID（sha256）"
   },
   "sandbox_container_user": {
-      "en": "non-root UID",
-      "zh": "非 root UID"
+    "en": "non-root UID",
+    "zh": "非 root UID"
   },
   "sandbox_container_cpu_millis": {
-      "en": "CPU ceiling (millicpu)",
-      "zh": "CPU 上限（millicpu）"
+    "en": "CPU ceiling (millicpu)",
+    "zh": "CPU 上限（millicpu）"
   },
   "sandbox_container_memory_bytes": {
-      "en": "memory ceiling (bytes)",
-      "zh": "内存上限（字节）"
+    "en": "memory ceiling (bytes)",
+    "zh": "内存上限（字节）"
   },
   "sandbox_container_pids": {
-      "en": "process ceiling",
-      "zh": "进程数上限"
+    "en": "process ceiling",
+    "zh": "进程数上限"
   },
   "sandbox_env": {
     "en": "environment passed through",

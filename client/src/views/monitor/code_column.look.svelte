@@ -29,7 +29,11 @@
 
   const ROW: Record<Sign, string> = { added: "bg-accent/10", removed: "bg-alert/12", kept: "" };
   const SIGN: Record<Sign, string> = { added: "+", removed: "−", kept: "" };
-  const SIGN_INK: Record<Sign, string> = { added: "text-accent", removed: "text-alert", kept: "text-text-faint" };
+  const SIGN_INK: Record<Sign, string> = {
+    added: "text-accent",
+    removed: "text-alert",
+    kept: "text-text-faint",
+  };
 </script>
 
 {#if look.empty !== undefined}
@@ -37,7 +41,9 @@
 {/if}
 {#each look.files as file (file.path)}
   <div data-path={file.path}>
-    <div class="file sticky top-0 z-(--layer-raised) flex h-control items-center gap-snug border-b border-edge bg-chrome px-snug text-note">
+    <div
+      class="file sticky top-0 z-(--layer-raised) flex h-control items-center gap-snug border-b border-edge bg-chrome px-snug text-note"
+    >
       <span class="min-w-0 truncate font-mono text-text">{file.path}</span>
       <span class="shrink-0 rounded-pill bg-raised px-snug text-text-quiet">{file.how}</span>
     </div>
@@ -61,7 +67,8 @@
               <span class="number pe-tight text-right">{line.new}</span>
               <span class="sign text-center {SIGN_INK[line.sign]}">{SIGN[line.sign]}</span>
             </span>
-            <span class="text min-w-0 flex-1 pe-snug whitespace-pre-wrap wrap-break-word text-text-quiet"
+            <span
+              class="text min-w-0 flex-1 pe-snug whitespace-pre-wrap wrap-break-word text-text-quiet"
               ><Inked text={line.text} source={file.path} /></span
             >
           </div>

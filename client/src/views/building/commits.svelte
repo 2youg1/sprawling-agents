@@ -74,7 +74,9 @@
         }
       }
     }
-    const newest = readAnswer(answers.at(-1), (held) => ("commits" in held ? held.commits : undefined));
+    const newest = readAnswer(answers.at(-1), (held) =>
+      "commits" in held ? held.commits : undefined,
+    );
     const tail = newest.kind === "held" ? newest.value : undefined;
     return { rows, more: tail?.more === true, newest, edge: tail?.commits.at(-1)?.seq };
   }

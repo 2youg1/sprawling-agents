@@ -15,7 +15,12 @@
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
   import type { BranchHere } from "../talk/branching";
 
-  function refusal(code: AxError["code"], action: string, subject: string, recovery: string): AxError {
+  function refusal(
+    code: AxError["code"],
+    action: string,
+    subject: string,
+    recovery: string,
+  ): AxError {
     return { action, code, gate: null, nearby: [], recovery, retry: "no", subject };
   }
 
@@ -27,17 +32,40 @@
     "lab/east",
     "open the browser and press allow on the attach prompt",
   );
-  const STOPS = refusal("E_MODEL_UNCHOSEN", "dispatch to hall/mayor", "main", "choose a main model in settings");
-  const ORDINARY = refusal("E_PATH_NOT_FOUND", "read a file", "lab/east/docs/SPEC.md", "check the path and ask again");
+  const STOPS = refusal(
+    "E_MODEL_UNCHOSEN",
+    "dispatch to hall/mayor",
+    "main",
+    "choose a main model in settings",
+  );
+  const ORDINARY = refusal(
+    "E_PATH_NOT_FOUND",
+    "read a file",
+    "lab/east/docs/SPEC.md",
+    "check the path and ask again",
+  );
   // A branch the city would not open under the run working in its room.
-  const BUSY = refusal("E_BUSY", "start a new session", "hall/mayor: a run is running there", "stop that run first");
-  const BRANCHES: readonly BranchHere[] = [{ kind: "opening", of: "branch" }, { kind: "refused", of: "branch", error: BUSY }];
+  const BUSY = refusal(
+    "E_BUSY",
+    "start a new session",
+    "hall/mayor: a run is running there",
+    "stop that run first",
+  );
+  const BRANCHES: readonly BranchHere[] = [
+    { kind: "opening", of: "branch" },
+    { kind: "refused", of: "branch", error: BUSY },
+  ];
 
   // The city turned the page away: a page built for another wire, which
   // only a reload mends.
   const TURNED_AWAY = {
     kind: "refused",
-    error: refusal("E_WIRE_MISMATCH", "open the link to the city", "wire", "reload the page to fetch the client this city serves"),
+    error: refusal(
+      "E_WIRE_MISMATCH",
+      "open the link to the city",
+      "wire",
+      "reload the page to fetch the client this city serves",
+    ),
   } as const;
 
   // The fixture's clock: its runs began a few minutes before the page
@@ -52,7 +80,14 @@
   const WEST = Address.make("lab/west");
   const MAYOR = Address.make("hall/mayor");
 
-  function record(run: RunId, seq: number, ago: number, kind: EventRecord["kind"], addr: Address, data: Record<string, unknown>): EventRecord {
+  function record(
+    run: RunId,
+    seq: number,
+    ago: number,
+    kind: EventRecord["kind"],
+    addr: Address,
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       addr,
       data,
@@ -71,14 +106,33 @@
   const RECORDS: readonly EventRecord[] = [
     record(RUN_C, 1, 40 * MINUTE, "run_started", MAYOR, { task: "plan the documents crate" }),
     record(RUN_C, 2, 31 * MINUTE, "run_frozen", MAYOR, { completion: "done" }),
-    record(RUN_A, 3, 6 * MINUTE, "run_started", EAST, { task: "make the document reader lossless" }),
-    record(RUN_A, 4, 1 * MINUTE, "tool_called", EAST, { name: "exec", subject: "cargo nextest -p documents" }),
+    record(RUN_A, 3, 6 * MINUTE, "run_started", EAST, {
+      task: "make the document reader lossless",
+    }),
+    record(RUN_A, 4, 1 * MINUTE, "tool_called", EAST, {
+      name: "exec",
+      subject: "cargo nextest -p documents",
+    }),
     record(RUN_B, 5, 3 * MINUTE, "run_started", WEST, { task: "write the migration notes" }),
-    record(RUN_B, 6, 2 * MINUTE, "approval_requested", WEST, { action_desc: "exec: rm -rf target" }),
+    record(RUN_B, 6, 2 * MINUTE, "approval_requested", WEST, {
+      action_desc: "exec: rm -rf target",
+    }),
   ];
 
-  function line(began: number, last: number, ago: number, runs: number, start: SessionLine["start"]): SessionLine {
-    return { at: TimeMs.make(NOW - ago), began: Seq.make(began), last: Seq.make(last), runs, start };
+  function line(
+    began: number,
+    last: number,
+    ago: number,
+    runs: number,
+    start: SessionLine["start"],
+  ): SessionLine {
+    return {
+      at: TimeMs.make(NOW - ago),
+      began: Seq.make(began),
+      last: Seq.make(last),
+      runs,
+      start,
+    };
   }
 
   // Each room's sessions, newest first, as `Query::Sessions` answers.
@@ -87,7 +141,11 @@
       line(1, 2, 31 * MINUTE, 1, { opened: { carry: "handoff", from: null } }),
       line(0, 0, 3 * 60 * MINUTE, 4, { dispatched: { by: null } }),
     ],
-    [EAST]: [line(3, 4, 1 * MINUTE, 1, { opened: { carry: "nothing", from: { run: RUN_C, at_seq: Seq.make(2) } } })],
+    [EAST]: [
+      line(3, 4, 1 * MINUTE, 1, {
+        opened: { carry: "nothing", from: { run: RUN_C, at_seq: Seq.make(2) } },
+      }),
+    ],
     [WEST]: [line(5, 6, 2 * MINUTE, 1, { dispatched: { by: null } })],
   };
 
@@ -154,7 +212,13 @@ the alert's and does not pulse. -->
 </Case>
 
 <Case label="mailbox · every section holding something" width={440}>
-  <Stand link={LIVE} unread={[ASKS, STOPS, ORDINARY]} waiting={[ONE_QUESTION]} answers={sessions} records={RECORDS}>
+  <Stand
+    link={LIVE}
+    unread={[ASKS, STOPS, ORDINARY]}
+    waiting={[ONE_QUESTION]}
+    answers={sessions}
+    records={RECORDS}
+  >
     <div class={COLUMN}>
       <Column onClose={ignore} />
     </div>
@@ -187,12 +251,17 @@ run, and a room calling a tool and one waiting on the person. -->
       {@const line = SESSIONS[MAYOR]?.[forkable ? 0 : 1]}
       {#if line !== undefined}
         <RecentRow
-          {...recentRow({ room: MAYOR, line, forkable, branch: { kind: "none" } }, $lang, ago($lang, line.at, NOW), {
-            href: "#/gallery",
-            follow: ignore,
-            fork: ignore,
-            stop: null,
-          })}
+          {...recentRow(
+            { room: MAYOR, line, forkable, branch: { kind: "none" } },
+            $lang,
+            ago($lang, line.at, NOW),
+            {
+              href: "#/gallery",
+              follow: ignore,
+              fork: ignore,
+              stop: null,
+            },
+          )}
         />
       {/if}
     {/each}
@@ -205,12 +274,17 @@ run, and a room calling a tool and one waiting on the person. -->
       {@const line = SESSIONS[MAYOR]?.[0]}
       {#if line !== undefined}
         <RecentRow
-          {...recentRow({ room: MAYOR, line, forkable: true, branch }, $lang, ago($lang, line.at, NOW), {
-            href: "#/gallery",
-            follow: ignore,
-            fork: ignore,
-            stop: ignore,
-          })}
+          {...recentRow(
+            { room: MAYOR, line, forkable: true, branch },
+            $lang,
+            ago($lang, line.at, NOW),
+            {
+              href: "#/gallery",
+              follow: ignore,
+              fork: ignore,
+              stop: ignore,
+            },
+          )}
         />
       {/if}
     {/each}
@@ -221,7 +295,11 @@ run, and a room calling a tool and one waiting on the person. -->
   <ul class="bg-raised px-base">
     <WorkingRow
       {...workingRow(
-        { doing: { kind: "calling", tool: "exec", subject: null }, started: TimeMs.make(NOW - 6 * MINUTE), task: "make the document reader lossless" },
+        {
+          doing: { kind: "calling", tool: "exec", subject: null },
+          started: TimeMs.make(NOW - 6 * MINUTE),
+          task: "make the document reader lossless",
+        },
         EAST,
         $lang,
         NOW,
@@ -229,10 +307,16 @@ run, and a room calling a tool and one waiting on the person. -->
       )}
     />
     <WorkingRow
-      {...workingRow({ doing: { kind: "waiting" }, started: TimeMs.make(NOW - 3 * MINUTE), task: null }, WEST, $lang, NOW, {
-        href: "#/gallery",
-        onclick: ignore,
-      })}
+      {...workingRow(
+        { doing: { kind: "waiting" }, started: TimeMs.make(NOW - 3 * MINUTE), task: null },
+        WEST,
+        $lang,
+        NOW,
+        {
+          href: "#/gallery",
+          onclick: ignore,
+        },
+      )}
     />
   </ul>
 </Case>

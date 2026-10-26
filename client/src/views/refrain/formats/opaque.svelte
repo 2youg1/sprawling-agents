@@ -56,11 +56,16 @@
 
   // The other versions this document had that the store still keeps.
   const asked = $derived(u.conn.asking.ask({ versions: { at: path } }));
-  const listed = $derived(readAnswer($asked, (answer) => ("versions" in answer ? answer.versions : undefined)));
+  const listed = $derived(
+    readAnswer($asked, (answer) => ("versions" in answer ? answer.versions : undefined)),
+  );
   const others = $derived(
     listed.kind === "held"
       ? listed.value.versions.filter(
-          (each, index, all) => each.kept && each.version !== version && all.findIndex((seen) => seen.version === each.version) === index,
+          (each, index, all) =>
+            each.kept &&
+            each.version !== version &&
+            all.findIndex((seen) => seen.version === each.version) === index,
         )
       : [],
   );
@@ -73,7 +78,11 @@
   {#if !drawable}
     <Label {format} tool={TOOL[format]} settings={[]} {version} />
     <p class="px-wide py-snug text-note text-text-quiet">
-      {fill(say($lang, "format_too_large"), { format: NAME[format], kib: kib(bytes), most: kib(DRAWN_BYTES_MAX) })}
+      {fill(say($lang, "format_too_large"), {
+        format: NAME[format],
+        kib: kib(bytes),
+        most: kib(DRAWN_BYTES_MAX),
+      })}
     </p>
   {:else}
     {#if others.length > 0}
@@ -86,7 +95,12 @@
     {#if current.lost !== null || other.lost !== null}
       <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_lost")}</p>
     {:else if mine?.kind === "whole" && against !== null && theirs?.kind === "whole"}
-      <Compare {format} from={{ version: against, bytes: theirs.bytes }} to={{ version, bytes: mine.bytes }} {name} />
+      <Compare
+        {format}
+        from={{ version: against, bytes: theirs.bytes }}
+        to={{ version, bytes: mine.bytes }}
+        {name}
+      />
     {:else if mine?.kind === "whole" && against === null}
       {#if format === "pdf"}
         <Pdf bytes={mine.bytes} {version} {name} />
@@ -105,5 +119,7 @@
     {/if}
   {/if}
 {:else}
-  <p class="px-wide py-snug text-note text-text-quiet">{fill(say($lang, "file_binary"), { kib: kib(bytes) })}</p>
+  <p class="px-wide py-snug text-note text-text-quiet">
+    {fill(say($lang, "file_binary"), { kib: kib(bytes) })}
+  </p>
 {/if}

@@ -14,9 +14,15 @@
 </script>
 
 <div class="flex w-full min-w-0 flex-1 flex-col gap-wide pb-section">
-  <header class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug border-b border-edge pb-base">
+  <header
+    class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug border-b border-edge pb-base"
+  >
     <div class="flex min-w-0 flex-col gap-tight">
-      <svelte:element this={look.rank === "page" ? "h1" : "h2"} class="text-title font-title" {...look.heading}>
+      <svelte:element
+        this={look.rank === "page" ? "h1" : "h2"}
+        class="text-title font-title"
+        {...look.heading}
+      >
         {look.title}
       </svelte:element>
       {#if look.note !== undefined}

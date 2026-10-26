@@ -14,7 +14,9 @@ import { join } from "node:path";
 describe("template values are declared with {@const}", () => {
   test("no view declares a template value with a bare {const}", () => {
     const views = join(import.meta.dir, "..", "..");
-    const bare = [...new Bun.Glob("**/*.svelte").scanSync(views)].filter((file) => /\{const\s/.test(readFileSync(join(views, file), "utf8")));
+    const bare = [...new Bun.Glob("**/*.svelte").scanSync(views)].filter((file) =>
+      /\{const\s/.test(readFileSync(join(views, file), "utf8")),
+    );
     expect(bare).toEqual([]);
   });
 });

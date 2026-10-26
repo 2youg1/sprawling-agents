@@ -44,17 +44,24 @@ function inline(start: Record<string, string>): Inline & { readonly held: Map<st
   };
 }
 
-function stage(start: Record<string, string>): Stage & { readonly style: ReturnType<typeof inline> } {
+function stage(
+  start: Record<string, string>,
+): Stage & { readonly style: ReturnType<typeof inline> } {
   return { style: inline(start), sheet: { textContent: "" } };
 }
 
 describe("the colour tokens offered", () => {
   test("are the declared --color- variables, once each, in the order the stylesheet declares them", () => {
-    expect(colourTokens(["--color-g0", "--chroma", "--color-text", "--color-g0", "--tier-text", "--color-accent"])).toEqual([
-      "--color-g0",
-      "--color-text",
-      "--color-accent",
-    ]);
+    expect(
+      colourTokens([
+        "--color-g0",
+        "--chroma",
+        "--color-text",
+        "--color-g0",
+        "--tier-text",
+        "--color-accent",
+      ]),
+    ).toEqual(["--color-g0", "--color-text", "--color-accent"]);
   });
 });
 
@@ -62,7 +69,10 @@ describe("wearing an override", () => {
   test("lays each token on the root and the text in the one style element, and restoring default gives back the built-in page value by value", () => {
     const page = stage({ "--body-size": "16px", "--blend": "40%" });
     const before = new Map(page.style.held);
-    wearTheme(page, { tokens: { "--color-g2": "#202020", "--color-accent": "oklch(0.7 0.1 30)" }, css: ".x { color: red }" });
+    wearTheme(page, {
+      tokens: { "--color-g2": "#202020", "--color-accent": "oklch(0.7 0.1 30)" },
+      css: ".x { color: red }",
+    });
     expect(page.style.held.get("--color-g2")).toBe("#202020");
     expect(page.sheet.textContent).toBe(".x { color: red }");
 
@@ -86,7 +96,10 @@ describe("wearing an override", () => {
     const elsewhere = loadPreferences(memory(), "en");
     const second = stage({});
     wearKeptTheme(second, elsewhere);
-    elsewhere.adopt({ ...get(elsewhere.held), theme: { tokens: { "--color-accent": "#3366ff" }, css: null } }, []);
+    elsewhere.adopt(
+      { ...get(elsewhere.held), theme: { tokens: { "--color-accent": "#3366ff" }, css: null } },
+      [],
+    );
     expect(second.style.held.get("--color-accent")).toBe("#3366ff");
   });
 });
@@ -98,8 +111,16 @@ describe("legibility", () => {
   });
 
   test("a text token claims the tier its --tier- twin states, and one that falls short on the surface ceiling is warned about", () => {
-    const declared: Record<string, string> = { "--tier-text": "90", "--tier-text-quiet": "75", "--surface-ceiling": "g2", "--tier-slack": "0.05" };
-    const claims = textClaims(["--color-g2", "--color-text", "--color-text-quiet", "--color-accent"], (name) => declared[name] ?? "");
+    const declared: Record<string, string> = {
+      "--tier-text": "90",
+      "--tier-text-quiet": "75",
+      "--surface-ceiling": "g2",
+      "--tier-slack": "0.05",
+    };
+    const claims = textClaims(
+      ["--color-g2", "--color-text", "--color-text-quiet", "--color-accent"],
+      (name) => declared[name] ?? "",
+    );
     expect(claims).toEqual({
       surface: "--color-g2",
       slack: 0.05,
@@ -113,6 +134,8 @@ describe("legibility", () => {
       "--color-text": [0xf0, 0xf2, 0xf5],
       "--color-text-quiet": [0x55, 0x58, 0x5c],
     };
-    expect(shortfalls(claims, (token) => drawn[token] ?? null).map((each) => each.token)).toEqual(["--color-text-quiet"]);
+    expect(shortfalls(claims, (token) => drawn[token] ?? null).map((each) => each.token)).toEqual([
+      "--color-text-quiet",
+    ]);
   });
 });

@@ -34,7 +34,11 @@ export type Configured = Readonly<Record<GuideStep, boolean | null>>;
 // step the person skipped and then did elsewhere is done.
 export type Standing = "configured" | "required" | "skipped" | "seen" | "untouched";
 
-export function standingOf(step: GuideStep, progress: GuideProgress, configured: Configured): Standing {
+export function standingOf(
+  step: GuideStep,
+  progress: GuideProgress,
+  configured: Configured,
+): Standing {
   if (configured[step] === true) return "configured";
   if (step === "provider") return "required";
   return progress[step] ?? "untouched";
@@ -49,10 +53,12 @@ function markOf(progress: GuideProgress, step: Optional): GuideMark | null {
 export function currentOf(progress: GuideProgress, configured: Configured): GuideStep {
   const at = progress.at ?? null;
   if (at !== null) return at;
-  return STEPS.find((step) => {
-    const standing = standingOf(step, progress, configured);
-    return standing === "required" || standing === "untouched";
-  }) ?? "provider";
+  return (
+    STEPS.find((step) => {
+      const standing = standingOf(step, progress, configured);
+      return standing === "required" || standing === "untouched";
+    }) ?? "provider"
+  );
 }
 
 // The step after this one, `null` after the last.
@@ -122,7 +128,11 @@ export interface Launch {
 }
 
 export function launchOf(answer: EndpointsAnswer, welcomed: boolean): Launch {
-  return { endpoints: answer.endpoints.length, main: answer.chosen.some((each) => each.tag === "main"), welcomed };
+  return {
+    endpoints: answer.endpoints.length,
+    main: answer.chosen.some((each) => each.tag === "main"),
+    welcomed,
+  };
 }
 
 // A city with no provider endpoint can do nothing, so the guide opens

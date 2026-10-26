@@ -43,7 +43,6 @@
     catalog: "bld_catalog",
     sandbox: "bld_sandbox",
   };
-
 </script>
 
 <script lang="ts">
@@ -101,7 +100,9 @@
 
   const question = $derived<Query>({ building_view: { addr: address } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (answer) => ("building" in answer ? answer.building : undefined)));
+  const read = $derived(
+    readAnswer($asked, (answer) => ("building" in answer ? answer.building : undefined)),
+  );
   const building = $derived(read.kind === "held" ? read.value : undefined);
 
   const halted = $derived(buildingIsShut($belief.halted, address));
@@ -117,11 +118,13 @@
     return held.progress.planned;
   });
 
-
   // What the middle column is called: the address it shows, or the
   // section's word.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
-  const shownLabel: string = $derived(section === null ? (picked?.at ?? "") : say($lang, SECTION_WORD[section]));
+  const shownAddress: string = $derived(picked?.at ?? "");
+  const shownLabel: string = $derived(
+    section === null ? shownAddress : say($lang, SECTION_WORD[section]),
+  );
 
   function pick(next: Picked): void {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
@@ -187,7 +190,9 @@
        under 768 px reads them in that order, so a phone reaches the
        section, and a file open on the right, before the whole tree; from 768 px the index and the tree
        share the first three columns and the section spans both rows. -->
-  <div class="grid grid-cols-11 grid-rows-[auto_1fr] items-start gap-x-gutter gap-y-wide narrow:grid-cols-1 narrow:grid-rows-none">
+  <div
+    class="grid grid-cols-11 grid-rows-[auto_1fr] items-start gap-x-gutter gap-y-wide narrow:grid-cols-1 narrow:grid-rows-none"
+  >
     <nav
       class="col-[1/4] row-start-1 min-w-0 narrow:col-span-full narrow:row-auto"
       aria-label={say($lang, "bld_index")}
@@ -226,11 +231,15 @@
       {/if}
     </section>
     {#if opened}
-      <div class="sticky top-0 col-[8/12] row-[1/3] flex h-[calc(100dvh-var(--spacing-section)*4)] min-w-0 overflow-hidden rounded-panel border border-edge narrow:col-span-full narrow:row-auto">
+      <div
+        class="sticky top-0 col-[8/12] row-[1/3] flex h-[calc(100dvh-var(--spacing-section)*4)] min-w-0 overflow-hidden rounded-panel border border-edge narrow:col-span-full narrow:row-auto"
+      >
         <Right following={beside} current={undefined} talk={address} />
       </div>
     {/if}
-    <div class="col-[1/4] row-start-2 flex min-w-0 flex-col gap-wide narrow:col-span-full narrow:row-auto">
+    <div
+      class="col-[1/4] row-start-2 flex min-w-0 flex-col gap-wide narrow:col-span-full narrow:row-auto"
+    >
       <Tree root={address} {picked} onPick={pick} />
       {#if building !== undefined}
         <Rooms

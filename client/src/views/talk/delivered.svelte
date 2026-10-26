@@ -43,7 +43,10 @@ the same words as its task once the city starts the run. -->
     >
       {delivery.words}
     </div>
-    <div class={["mt-tight text-note", delivery.kind === "unknown" ? "text-alert" : "text-text-faint"]} role="status">
+    <div
+      class={["mt-tight text-note", delivery.kind === "unknown" ? "text-alert" : "text-text-faint"]}
+      role="status"
+    >
       {state}
     </div>
   </div>

@@ -13,9 +13,13 @@ words open under a rule on their left. -->
 </script>
 
 <details class="text-note text-text-faint" open={look.open}>
-  <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:wash hover:text-text-quiet">
+  <summary
+    class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:wash hover:text-text-quiet"
+  >
     <span class="text-text-faint">{look.label}</span>
     {look.length}
   </summary>
-  <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{look.text}</div>
+  <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">
+    {look.text}
+  </div>
 </details>

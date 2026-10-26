@@ -62,14 +62,26 @@
     retry: "no",
   });
   const FAILED: readonly Call[] = [
-    { ...call(51, "read", "crates/nowhere/src/lib.rs", 4), outcome: "failed", output: { head: REFUSAL, cut: 0 } },
+    {
+      ...call(51, "read", "crates/nowhere/src/lib.rs", 4),
+      outcome: "failed",
+      output: { head: REFUSAL, cut: 0 },
+    },
     {
       ...call(52, "fetch_docs", "docs.rs/git2/latest/git2/struct.Repository.html", 2_210),
       effect: "egress",
       outcome: "failed",
-      output: { head: "upstream answered 503 Service Unavailable after three attempts; the mirror was not tried\nretry later", cut: 0 },
+      output: {
+        head: "upstream answered 503 Service Unavailable after three attempts; the mirror was not tried\nretry later",
+        cut: 0,
+      },
     },
-    { ...call(53, "browser", "screenshot", 880), effect: "egress", outcome: "failed", output: null },
+    {
+      ...call(53, "browser", "screenshot", 880),
+      effect: "egress",
+      outcome: "failed",
+      output: null,
+    },
   ];
 
   const CALLS: readonly Call[] = [
@@ -88,7 +100,12 @@
 
 {#each ["whole", "cut"] as const as walked (walked)}
   <Case label={`file finder · lab · walked ${walked}`} width={640}>
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={finding(walked)}>
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={finding(walked)}
+    >
       <div class="flex flex-col gap-snug rounded-panel bg-raised p-snug">
         <Search under={LAB} titleId={`gd-finder-${walked}`} onClose={() => undefined} />
       </div>

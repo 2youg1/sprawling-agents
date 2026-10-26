@@ -106,7 +106,8 @@ export function modalWire(order: ModalOrder): ModalWire {
     onclick: (event) => {
       // The box fills the element edge to edge, so the only click that
       // lands on the element itself is a click on its backdrop.
-      if (backdrop === "closes" && seat === "modal" && event.target === event.currentTarget) onClose();
+      if (backdrop === "closes" && seat === "modal" && event.target === event.currentTarget)
+        onClose();
     },
     [HOLD]: order.hold,
   };

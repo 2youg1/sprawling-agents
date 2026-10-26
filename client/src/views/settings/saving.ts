@@ -32,7 +32,11 @@ export const RECEIPT_MS = 15_000;
 // The refusals a write of one document answers with: a name outside its
 // domain or an area that does not read, a document that moved since the
 // card read it, and a document the city cannot write.
-const WRITE_REFUSED: ReadonlySet<AxCode> = new Set<AxCode>(["E_CONFIG_INVALID", "E_VERSION_CONFLICT", "E_STORAGE_FATAL"]);
+const WRITE_REFUSED: ReadonlySet<AxCode> = new Set<AxCode>([
+  "E_CONFIG_INVALID",
+  "E_VERSION_CONFLICT",
+  "E_STORAGE_FATAL",
+]);
 
 // The person changed the card's text: a draft until it is sent, unless
 // the text is what the city holds again.

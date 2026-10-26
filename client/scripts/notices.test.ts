@@ -43,8 +43,18 @@ describe("third-party notices", () => {
   test("the file states each package with its licence texts verbatim, line endings folded", () => {
     expect(
       noticesText([
-        { name: "effect", version: "3.22.1", license: "MIT", texts: ["MIT License\r\n\r\nCopyright (c) E\r\n"] },
-        { name: "svelte", version: "5.57.1", license: "MIT", texts: ["Copyright (c) S\n", "NOTICE text\n"] },
+        {
+          name: "effect",
+          version: "3.22.1",
+          license: "MIT",
+          texts: ["MIT License\r\n\r\nCopyright (c) E\r\n"],
+        },
+        {
+          name: "svelte",
+          version: "5.57.1",
+          license: "MIT",
+          texts: ["Copyright (c) S\n", "NOTICE text\n"],
+        },
       ]),
     ).toBe(
       [

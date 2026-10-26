@@ -29,7 +29,10 @@ describe("a row the browser would not keep", () => {
   test("is held by the tab and said to be held by the tab alone", () => {
     const door = keptRows(full);
     door.setItem("sprawling.draft.lab", "half a sentence");
-    expect([door.getItem("sprawling.draft.lab"), unkeptIn(door)]).toEqual(["half a sentence", ["sprawling.draft.lab"]]);
+    expect([door.getItem("sprawling.draft.lab"), unkeptIn(door)]).toEqual([
+      "half a sentence",
+      ["sprawling.draft.lab"],
+    ]);
   });
 
   test("leaves the list once it is removed", () => {

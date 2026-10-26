@@ -20,11 +20,17 @@ control; the palette's keys belong to its list. -->
       <dt class="text-text-faint">{listener.word}</dt>
       <dd class="flex min-w-0 flex-col">
         <span class="flex min-w-0 items-baseline gap-base">
-          {#if listener.who !== undefined}<span class="truncate text-text">{listener.who}</span>{/if}
-          {#if listener.size !== undefined}<span class="figure shrink-0 text-text-faint">{listener.size}</span>{/if}
-          {#if listener.cut !== undefined}<span class="shrink-0 text-alert">{listener.cut}</span>{/if}
+          {#if listener.who !== undefined}<span class="truncate text-text">{listener.who}</span
+            >{/if}
+          {#if listener.size !== undefined}<span class="figure shrink-0 text-text-faint"
+              >{listener.size}</span
+            >{/if}
+          {#if listener.cut !== undefined}<span class="shrink-0 text-alert">{listener.cut}</span
+            >{/if}
         </span>
-        {#if listener.sources !== undefined}<span class="truncate text-text-faint">{listener.sources}</span>{/if}
+        {#if listener.sources !== undefined}<span class="truncate text-text-faint"
+            >{listener.sources}</span
+          >{/if}
       </dd>
     {/each}
   </dl>

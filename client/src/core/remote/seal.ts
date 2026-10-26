@@ -33,7 +33,10 @@ export type Payload = { readonly kind: "frame"; readonly text: string } | { read
 const FRAME = 0;
 const LOCK = 1;
 
-const TAGS: Readonly<Record<Direction, string>> = { device_to_city: "d->c", city_to_device: "c->d" };
+const TAGS: Readonly<Record<Direction, string>> = {
+  device_to_city: "d->c",
+  city_to_device: "c->d",
+};
 
 function nonce(direction: Direction, count: bigint): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(12);
@@ -55,7 +58,9 @@ export function sealer(key: Uint8Array<ArrayBuffer>, direction: Direction): Seal
       next += 1n;
       const held = await loaded;
       if (held === null) return null;
-      const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, held, bytes).catch(() => null);
+      const sealed = await crypto.subtle
+        .encrypt({ name: "AES-GCM", iv }, held, bytes)
+        .catch(() => null);
       return sealed === null ? null : new Uint8Array(sealed);
     },
   };

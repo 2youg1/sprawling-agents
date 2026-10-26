@@ -52,7 +52,9 @@
 
   const layersAsked = $derived<Query>({ layers: { addr: room } });
   const layers = $derived(u.conn.asking.ask(layersAsked));
-  const read = $derived(readAnswer($layers, (answer) => ("layers" in answer ? answer.layers : undefined)));
+  const read = $derived(
+    readAnswer($layers, (answer) => ("layers" in answer ? answer.layers : undefined)),
+  );
   let sent = $state.raw<PrefixAnswer | undefined>(undefined);
   $effect(() => {
     const run = last;
@@ -83,12 +85,17 @@
     return {
       rooms: choices,
       roomsLabel: say($lang, "prompts_rooms"),
-      heading: fill(say($lang, last === undefined ? "prompts_no_run" : "prompts_last_run"), { room }),
+      heading: fill(say($lang, last === undefined ? "prompts_no_run" : "prompts_last_run"), {
+        room,
+      }),
       slots: sent === undefined ? [] : slotsOf(sent, $lang),
       run:
         last === undefined
           ? undefined
-          : { label: say($lang, "prompts_open_run"), href: toFragment({ kind: "run", run: last, lens: "prompt" }) },
+          : {
+              label: say($lang, "prompts_open_run"),
+              href: toFragment({ kind: "run", run: last, lens: "prompt" }),
+            },
       note: say($lang, "prompts_next_run"),
       documentsLabel: say($lang, "prompts_documents"),
       cards: cardsOf(read.value.documents, building, $lang),
@@ -121,8 +128,13 @@
   open={asking !== null}
   title={asking === null
     ? ""
-    : fill(say($lang, asking.step === "inherit" ? "prompts_inherit_title" : "prompts_restore_title"), { at: asking.card.at })}
-  detail={asking === null ? "" : say($lang, asking.step === "inherit" ? "prompts_inherit_detail" : "prompts_restore_detail")}
+    : fill(
+        say($lang, asking.step === "inherit" ? "prompts_inherit_title" : "prompts_restore_title"),
+        { at: asking.card.at },
+      )}
+  detail={asking === null
+    ? ""
+    : say($lang, asking.step === "inherit" ? "prompts_inherit_detail" : "prompts_restore_detail")}
   confirmLabel={asking === null ? "" : actionWord(asking.step, $lang)}
   cancelLabel={say($lang, "part_cancel")}
   destructive

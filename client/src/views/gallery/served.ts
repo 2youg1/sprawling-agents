@@ -17,7 +17,14 @@
 
 import type { Key } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
-import type { AxCode, ApprovalClass, ApprovalItem, EndpointsAnswer, FiguresLine, ModelFactsSummary } from "../../wire";
+import type {
+  AxCode,
+  ApprovalClass,
+  ApprovalItem,
+  EndpointsAnswer,
+  FiguresLine,
+  ModelFactsSummary,
+} from "../../wire";
 import { ApprovalId, Ceiling, Locator, ServerLabel, TimeMs, Window } from "../../wire";
 import { UNTUNED } from "./configured";
 
@@ -119,7 +126,11 @@ export const FIGURED: readonly FiguresLine[] = [
     window: { tokens: Window.make(204_800), from: "upstream" },
     ceiling: { sent: { tokens: Ceiling.make(64_000), from: "upstream" } },
   },
-  { id: NUCLEUS, window: { tokens: Window.make(400_000), from: "upstream" }, ceiling: "provider_default" },
+  {
+    id: NUCLEUS,
+    window: { tokens: Window.make(400_000), from: "upstream" },
+    ceiling: "provider_default",
+  },
   { id: MUSE, window: null, ceiling: "provider_default" },
   {
     id: TYPED,
@@ -132,22 +143,22 @@ export const FIGURED: readonly FiguresLine[] = [
 // which is the difference the endpoint list exists to show. The first
 // lists two accounts, one whose key is stored and one whose is not.
 export const ENDPOINTS: EndpointsAnswer = {
-  chosen: [{ endpoint: "zenmux", model: CHOSEN.id, tag: "main" }],
+  chosen: [{ endpoint: "example", model: CHOSEN.id, tag: "main" }],
   endpoints: [
     {
-      base_url: "https://api.zenmux.ai/v1",
+      base_url: "https://api.example.test/v1",
       connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: true,
-      label: "ZenMux",
+      label: "Example",
       local: false,
       models: [facts(FABLE, 204_800, 64_000), facts(NUCLEUS, 400_000, null)],
-      name: "zenmux",
+      name: "example",
       tuning: {
         ...UNTUNED,
         accounts: [
-          { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
-          { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
+          { id: ServerLabel.make("main"), reference: "secret:providers/example.main" },
+          { id: ServerLabel.make("spare"), reference: "secret:providers/example.spare" },
         ],
       },
       account_status: [
@@ -206,63 +217,135 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
     heading: "notices_today",
     rows: [
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "the model changed from `fake-small` to `fake-chat`", at: "09:12", count: 2,
+      {
+        code: "E_CONFIG_INVALID",
+        action: "dispatch",
+        subject: "the model changed from `fake-small` to `fake-chat`",
+        at: "09:12",
+        count: 2,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "the room is frozen against this session; set main back in setup, or run /new" },
+        recovery: "the room is frozen against this session; set main back in setup, or run /new",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_BUSY", action: "open session", subject: "hall/mayor", at: "09:04", count: 1,
+      {
+        code: "E_BUSY",
+        action: "open session",
+        subject: "hall/mayor",
+        at: "09:04",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "a run is working in this room; run /stop first, then /new" },
+        recovery: "a run is working in this room; run /stop first, then /new",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_TIMEOUT", action: "probe", subject: "api.zenmux.ai", at: "08:47", count: 3,
+      {
+        code: "E_TIMEOUT",
+        action: "probe",
+        subject: "api.example.test",
+        at: "08:47",
+        count: 3,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "the provider did not answer in time; ask the link to try again" },
+        recovery: "the provider did not answer in time; ask the link to try again",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_PATH_NOT_FOUND", action: "read", subject: "city/lab/west/NOTES.md", at: "08:31", count: 1,
+      {
+        code: "E_PATH_NOT_FOUND",
+        action: "read",
+        subject: "city/lab/west/NOTES.md",
+        at: "08:31",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "that path is not on the listing this building answers with" },
+        recovery: "that path is not on the listing this building answers with",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_TOOL_UNAVAILABLE", action: "call", subject: "browser", at: "08:02", count: 1,
+      {
+        code: "E_TOOL_UNAVAILABLE",
+        action: "call",
+        subject: "browser",
+        at: "08:02",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "no engine is installed for this tool; run the doctor's recipe first" },
+        recovery: "no engine is installed for this tool; run the doctor's recipe first",
+      },
     ],
   },
   {
     heading: "notices_yesterday",
     rows: [
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_MODEL_UNCHOSEN", action: "choose the main model", subject: "lab/east", at: "18:22", count: 1,
+      {
+        code: "E_MODEL_UNCHOSEN",
+        action: "choose the main model",
+        subject: "lab/east",
+        at: "18:22",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "attach a provider on the settings page and pick a model for this tag" },
+        recovery: "attach a provider on the settings page and pick a model for this tag",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_GATE_DENIED", action: "write", subject: "hall/.sprawling/rules.md", at: "17:50", count: 1,
+      {
+        code: "E_GATE_DENIED",
+        action: "write",
+        subject: "hall/.sprawling/rules.md",
+        at: "17:50",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "a rule stopped this write; the rule names the alternative" },
+        recovery: "a rule stopped this write; the rule names the alternative",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_CREDENTIAL_MISSING", action: "probe", subject: "api.deepseek.com", at: "16:11", count: 2,
+      {
+        code: "E_CREDENTIAL_MISSING",
+        action: "probe",
+        subject: "api.deepseek.com",
+        at: "16:11",
+        count: 2,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "file a key for this endpoint in setup, then probe again" },
+        recovery: "file a key for this endpoint in setup, then probe again",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_INVALID_ARGS", action: "steer", subject: "run 0199c0de", at: "15:39", count: 1,
+      {
+        code: "E_INVALID_ARGS",
+        action: "steer",
+        subject: "run 0199c0de",
+        at: "15:39",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "the city could not read this request; the wire shape is in the SPEC" },
+        recovery: "the city could not read this request; the wire shape is in the SPEC",
+      },
     ],
   },
   {
     heading: "rec_earlier",
     rows: [
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_BUDGET_EXHAUSTED", action: "dispatch", subject: "lab/west", at: "11:26", count: 1,
+      {
+        code: "E_BUDGET_EXHAUSTED",
+        action: "dispatch",
+        subject: "lab/west",
+        at: "11:26",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "this run has spent all it may; raise the budget or start another run" },
+        recovery: "this run has spent all it may; raise the budget or start another run",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_WORKTREE_BUSY", action: "checkout", subject: "lab/west", at: "10:58", count: 1,
+      {
+        code: "E_WORKTREE_BUSY",
+        action: "checkout",
+        subject: "lab/west",
+        at: "10:58",
+        count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "another run holds this worktree; run /stop to let go of it" },
+        recovery: "another run holds this worktree; run /stop to let go of it",
+      },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_LOOP_SUSPECTED", action: "dispatch", subject: "hall/mayor", at: "09:41", count: 4,
+      {
+        code: "E_LOOP_SUSPECTED",
+        action: "dispatch",
+        subject: "hall/mayor",
+        at: "09:41",
+        count: 4,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "the watchdog suspected a loop and stopped the run; steer it elsewhere" },
+        recovery: "the watchdog suspected a loop and stopped the run; steer it elsewhere",
+      },
     ],
   },
 ];
@@ -271,17 +354,35 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
 // fourth refusal goes to the drawer rather than into a taller stack.
 export const TOASTS: readonly NoticeLine[] = [
   // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-  { code: "E_WIRE_MISMATCH", action: "connect", subject: "sprawling 0.0.6", at: "03:35", count: 1,
+  {
+    code: "E_WIRE_MISMATCH",
+    action: "connect",
+    subject: "sprawling 0.0.6",
+    at: "03:35",
+    count: 1,
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-    recovery: "the client and the city disagree on the wire; reload after the city updates" },
+    recovery: "the client and the city disagree on the wire; reload after the city updates",
+  },
   // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-  { code: "E_TIMEOUT", action: "ask", subject: "hall/mayor", at: "03:31", count: 2,
+  {
+    code: "E_TIMEOUT",
+    action: "ask",
+    subject: "hall/mayor",
+    at: "03:31",
+    count: 2,
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-    recovery: "the city did not answer in time; ask the link to try again" },
+    recovery: "the city did not answer in time; ask the link to try again",
+  },
   // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-  { code: "E_PROVIDER", action: "dispatch", subject: "api.zenmux.ai", at: "03:29", count: 1,
+  {
+    code: "E_PROVIDER",
+    action: "dispatch",
+    subject: "api.example.test",
+    at: "03:29",
+    count: 1,
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-    recovery: "the provider failed to answer; the city kept the words for another try" },
+    recovery: "the provider failed to answer; the city kept the words for another try",
+  },
 ];
 
 // One refusal with a home: it sits under the field it was refused at,
@@ -319,7 +420,10 @@ export const ROUND: readonly Utterance[] = [
 
 export const EARLIER_SEGMENT: readonly Utterance[] = [
   { speaker: "person", text: "What is on the shelves in this building?" },
-  { speaker: "resident", text: "Four holdings across three shelves, and one name the room asks for that no shelf has." },
+  {
+    speaker: "resident",
+    text: "Four holdings across three shelves, and one name the room asks for that no shelf has.",
+  },
   { speaker: "person", text: "Pin the engineering ones for the next run." },
 ];
 

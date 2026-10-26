@@ -40,7 +40,9 @@ describe("the recovery table", () => {
   // person round a loop, and fetching the client this city was built
   // with is the one thing that ends it.
   test("a wire mismatch offers a reload, never a reconnect", () => {
-    expect(recoveryFor({ code: "E_WIRE_MISMATCH", subject: "" }).map((recovery) => recovery.kind)).toEqual(["reload"]);
+    expect(
+      recoveryFor({ code: "E_WIRE_MISMATCH", subject: "" }).map((recovery) => recovery.kind),
+    ).toEqual(["reload"]);
   });
 });
 
@@ -48,9 +50,9 @@ describe("the recovery table", () => {
 // offered only where the subject is a run: on a room it could never run.
 describe("stopping from a notice", () => {
   test("a refusal about a run offers /stop", () => {
-    expect(recoveryFor({ code: "E_BUSY", subject: "00000000-0000-4000-8000-000000000001" })).toEqual([
-      { kind: "command", spelled: "/stop" },
-    ]);
+    expect(
+      recoveryFor({ code: "E_BUSY", subject: "00000000-0000-4000-8000-000000000001" }),
+    ).toEqual([{ kind: "command", spelled: "/stop" }]);
   });
 
   test("a refusal about a room offers nothing to stop", () => {

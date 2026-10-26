@@ -60,7 +60,11 @@ describe("walking an open menu", () => {
     opening(false, { show: () => shown.push("show") })(closed);
     const open = press("ArrowDown");
     opening(true, { show: () => shown.push("show") })(open);
-    expect({ shown, closed: closed.prevented(), open: open.prevented() }).toEqual({ shown: ["show"], closed: true, open: false });
+    expect({ shown, closed: closed.prevented(), open: open.prevented() }).toEqual({
+      shown: ["show"],
+      closed: true,
+      open: false,
+    });
   });
 });
 
@@ -76,10 +80,19 @@ function paneHands(log: string[]): PaneMenuHands {
 }
 
 describe("a pane label's menu", () => {
-  const words = { label: "sessions", arrange: "arrange sessions", left: "move left", right: "move right" };
+  const words = {
+    label: "sessions",
+    arrange: "arrange sessions",
+    left: "move left",
+    right: "move right",
+  };
 
   test("the pane on the left edge cannot move further left, and the item says so by being disabled", () => {
-    const look = paneMenuLookOf({ pane: "sessions", bench: WORKBENCH, arranged: "menu", open: true, uid: "p" }, words, paneHands([]));
+    const look = paneMenuLookOf(
+      { pane: "sessions", bench: WORKBENCH, arranged: "menu", open: true, uid: "p" },
+      words,
+      paneHands([]),
+    );
     expect(look.items.map((item) => [item.key, item.wire.disabled])).toEqual([
       ["left", true],
       ["right", false],
@@ -87,7 +100,11 @@ describe("a pane label's menu", () => {
   });
 
   test("the button names the menu it controls and says whether it is open", () => {
-    const look = paneMenuLookOf({ pane: "session", bench: WORKBENCH, arranged: "menu", open: false, uid: "p" }, words, paneHands([]));
+    const look = paneMenuLookOf(
+      { pane: "session", bench: WORKBENCH, arranged: "menu", open: false, uid: "p" },
+      words,
+      paneHands([]),
+    );
     expect({
       haspopup: look.trigger["aria-haspopup"],
       expanded: look.trigger["aria-expanded"],
@@ -111,8 +128,16 @@ describe("a pane label's menu", () => {
 
   test("a press on the button opens a closed menu and closes an open one; an item moves the pane", () => {
     const log: string[] = [];
-    paneMenuLookOf({ pane: "session", bench: WORKBENCH, arranged: "menu", open: false, uid: "p" }, words, paneHands(log)).trigger.onclick();
-    const open = paneMenuLookOf({ pane: "session", bench: WORKBENCH, arranged: "menu", open: true, uid: "p" }, words, paneHands(log));
+    paneMenuLookOf(
+      { pane: "session", bench: WORKBENCH, arranged: "menu", open: false, uid: "p" },
+      words,
+      paneHands(log),
+    ).trigger.onclick();
+    const open = paneMenuLookOf(
+      { pane: "session", bench: WORKBENCH, arranged: "menu", open: true, uid: "p" },
+      words,
+      paneHands(log),
+    );
     open.trigger.onclick();
     open.items[1]?.wire.onclick();
     expect(log).toEqual(["show", "close", "move right"]);
@@ -136,10 +161,20 @@ describe("a session row's menu", () => {
 
   test("a city with no name leaves the button disabled, with the reason beside it", () => {
     const look = sessionMenuLookOf(
-      { uid: "s", open: false, why: "not connected", name: "Actions for room1", items, naming: null },
+      {
+        uid: "s",
+        open: false,
+        why: "not connected",
+        name: "Actions for room1",
+        items,
+        naming: null,
+      },
       sessionHands([]),
     );
-    expect({ disabled: look.trigger.disabled, why: look.why }).toEqual({ disabled: true, why: "not connected" });
+    expect({ disabled: look.trigger.disabled, why: look.why }).toEqual({
+      disabled: true,
+      why: "not connected",
+    });
   });
 
   test("the field the menu turns into is described by its hint and marked invalid with it", () => {
@@ -181,7 +216,12 @@ describe("a session row's menu", () => {
     look.naming?.field.onkeydown(composing);
     look.naming?.field.onkeydown(escape);
     look.naming?.field.onkeydown(letter);
-    expect({ log, composing: composing.prevented(), escape: escape.prevented(), letter: letter.prevented() }).toEqual({
+    expect({
+      log,
+      composing: composing.prevented(),
+      escape: escape.prevented(),
+      letter: letter.prevented(),
+    }).toEqual({
       log: ["close"],
       composing: false,
       escape: true,

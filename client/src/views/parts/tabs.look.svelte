@@ -23,7 +23,10 @@
   {#each look.tabs as tab (tab.lens.id)}
     <button
       type="button"
-      class={["tab flex items-center gap-tight px-base py-snug text-label", tab.current && "current"]}
+      class={[
+        "tab flex items-center gap-tight px-base py-snug text-label",
+        tab.current && "current",
+      ]}
       {...tab.wire}
     >
       {tab.lens.label}

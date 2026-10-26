@@ -35,9 +35,15 @@ export interface Waiting {
 // What the seat wires the key with: whether the column is open, the
 // column's id, the press, and the hold that lets the seat put the focus
 // back on the key.
-export type MailboxWire = Pick<ButtonWire, "aria-expanded" | "aria-controls" | "onclick"> & Readonly<Record<symbol, Attachment<HTMLElement>>>;
+export type MailboxWire = Pick<ButtonWire, "aria-expanded" | "aria-controls" | "onclick"> &
+  Readonly<Record<symbol, Attachment<HTMLElement>>>;
 
-export function mailboxKey(waiting: Waiting, lang: Lang, hint: Hint, wire: MailboxWire): EdgeKeyLook {
+export function mailboxKey(
+  waiting: Waiting,
+  lang: Lang,
+  hint: Hint,
+  wire: MailboxWire,
+): EdgeKeyLook {
   const name = nameOf(waiting, lang);
   return {
     glyph: "inbox",

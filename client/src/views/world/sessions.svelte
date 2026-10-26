@@ -84,26 +84,44 @@
   const groups = $derived(grouped(stretches.all, tagsFor, by));
 
   function chosen(stretch: Stretch): boolean {
-    return stretch.room === here && (session === undefined ? stretch.current : stretch.line.began === session);
+    return (
+      stretch.room === here &&
+      (session === undefined ? stretch.current : stretch.line.began === session)
+    );
   }
 
   const look: SessionsLook = $derived({
-    filter: filterOf(offered, by, { label: say($lang, "world_tags"), all: say($lang, "world_tags_all") }, (tag) => {
-      filter = tag;
-    }),
+    filter: filterOf(
+      offered,
+      by,
+      { label: say($lang, "world_tags"), all: say($lang, "world_tags_all") },
+      (tag) => {
+        filter = tag;
+      },
+    ),
     narrow,
     groups: groups.map((group) => ({
       key: group.kind === "pinned" ? "" : group.building,
       heading: group.kind === "pinned" ? say($lang, "world_pinned") : group.building,
       rows: group.rows.map((stretch) => {
         const tags = tagsFor(stretch);
-        return rowOf(stretch, { lang: $lang, now: $tick, chosen: chosen(stretch), tags, pinning: pinningOf(stretch, tags), named: named(stretch) });
+        return rowOf(stretch, {
+          lang: $lang,
+          now: $tick,
+          chosen: chosen(stretch),
+          tags,
+          pinning: pinningOf(stretch, tags),
+          named: named(stretch),
+        });
       }),
     })),
   });
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col overflow-hidden px-snug" aria-label={say($lang, "world_sessions")}>
+<section
+  class="flex min-h-0 flex-1 flex-col overflow-hidden px-snug"
+  aria-label={say($lang, "world_sessions")}
+>
   {@render head()}
   <Look {...look} />
 </section>

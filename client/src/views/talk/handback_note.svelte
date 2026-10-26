@@ -31,7 +31,11 @@ it ended, finished with who verified it or stopped with the reason. -->
   const address = $derived(residentAt(from));
   const child = $derived(address === null ? (from ?? "") : called(address, null, $lang));
   const link = $derived(
-    session !== null ? toFragment({ kind: "run", run: session }) : address !== null ? toFragment({ kind: "talk", address }) : null,
+    session !== null
+      ? toFragment({ kind: "run", run: session })
+      : address !== null
+        ? toFragment({ kind: "talk", address })
+        : null,
   );
 </script>
 

@@ -37,7 +37,10 @@
           tab.front ? "front bg-page text-text" : "text-text-faint hover:text-text-quiet",
         ]}
       >
-        <a {...tab.wire} class="name flex h-full items-center gap-snug pl-pane whitespace-nowrap group-first/tab:pl-0">
+        <a
+          {...tab.wire}
+          class="name flex h-full items-center gap-snug pl-pane whitespace-nowrap group-first/tab:pl-0"
+        >
           {#if tab.terminal}<Glyph name="terminal" size="sm" />{/if}
           <span class="truncate">{tab.label}</span>
           {#if tab.unsaved !== undefined}

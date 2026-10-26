@@ -27,9 +27,9 @@
     value={field.value}
     placeholder={field.placeholder}
     onInput={field.input}
-    {...(field.help === undefined ? {} : { help: field.help })}
-    {...(field.step === undefined ? {} : { step: field.step })}
-    {...(field.pattern === undefined ? {} : { pattern: field.pattern })}
+    {...field.help === undefined ? {} : { help: field.help }}
+    {...field.step === undefined ? {} : { step: field.step }}
+    {...field.pattern === undefined ? {} : { pattern: field.pattern }}
   />
 {/snippet}
 
@@ -41,9 +41,25 @@
     {table.title}
     {#each table.rows as row (row.key)}
       <div class="flex items-center gap-tight">
-        <Field label={row.name.label} labelling="hidden" mono value={row.name.value} onInput={row.name.input} />
-        <Field label={row.value.label} labelling="hidden" mono value={row.value.value} onInput={row.value.input} />
-        <button type="button" class="flex size-control shrink-0 items-center justify-center rounded-control text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive" onclick={row.remove.press}>
+        <Field
+          label={row.name.label}
+          labelling="hidden"
+          mono
+          value={row.name.value}
+          onInput={row.name.input}
+        />
+        <Field
+          label={row.value.label}
+          labelling="hidden"
+          mono
+          value={row.value.value}
+          onInput={row.value.input}
+        />
+        <button
+          type="button"
+          class="flex size-control shrink-0 items-center justify-center rounded-control text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
+          onclick={row.remove.press}
+        >
           <Glyph name="cross" size="sm" />
           <span class="sr-only">{row.remove.label}</span>
         </button>
@@ -54,7 +70,9 @@
 {/snippet}
 
 <details class="flex flex-col gap-snug rounded-card bg-chrome px-base py-snug">
-  <summary class="w-fit cursor-pointer rounded-control px-snug py-tight text-label text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive">
+  <summary
+    class="w-fit cursor-pointer rounded-control px-snug py-tight text-label text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
+  >
     {look.title}
   </summary>
   <div class="fields grid gap-snug">
@@ -71,7 +89,12 @@
   </div>
   <div class="flex flex-col gap-tight text-note text-text-quiet">
     {look.proxying.label}
-    <Segmented label={look.proxying.label} options={look.proxying.options} held={look.proxying.held} onPick={look.proxying.pick} />
+    <Segmented
+      label={look.proxying.label}
+      options={look.proxying.options}
+      held={look.proxying.held}
+      onPick={look.proxying.pick}
+    />
     <span class="text-text-faint">{look.proxying.help}</span>
     {#if look.proxying.note !== undefined}
       <span class="text-text-faint">{look.proxying.note}</span>

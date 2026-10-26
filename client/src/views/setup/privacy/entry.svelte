@@ -34,7 +34,9 @@
   const { model, held, onPress, look = ShippedLook, root = uid }: Props = $props();
   const { lang } = ui();
 
-  const drawn = $derived(lookOf($lang, model, { root, stage: held.stage, shown: held.shown, press: onPress }));
+  const drawn = $derived(
+    lookOf($lang, model, { root, stage: held.stage, shown: held.shown, press: onPress }),
+  );
   const Look = $derived(look);
 </script>
 

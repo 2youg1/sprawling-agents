@@ -28,7 +28,8 @@ it is for. -->
   <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {#if look.facts !== undefined}{@render look.facts()}{/if}
-    {#if look.notLive !== undefined}<span class="px-snug text-note text-alert">{look.notLive}</span>{/if}
+    {#if look.notLive !== undefined}<span class="px-snug text-note text-alert">{look.notLive}</span
+      >{/if}
   </div>
   {#if look.model !== undefined || look.permissions !== undefined}
     <div class="-mr-snug ml-auto flex min-w-0 items-center narrow:mr-0">
@@ -36,14 +37,21 @@ it is for. -->
         {@const picker = look.model}
         <div class="contents" {...picker.frame}>
           {#if picker.menu !== undefined}<Picker menu={picker.menu} />{/if}
-          <button type="button"
+          <button
+            type="button"
             class="token inline-flex h-touch min-w-0 max-w-full items-center rounded-control text-note text-text-quiet hover:text-text aria-expanded:text-text"
-            {...picker.token}>
+            {...picker.token}
+          >
             {#each picker.segments as part, at (part.segment)}
               {#if at > 0}<span aria-hidden="true" class="shrink-0 text-text-faint">·</span>{/if}
-              <span data-segment={part.segment}
-                class={["inline-flex h-touch min-w-0 items-center rounded-control px-snug hover:wash", part.open && "wash", part.segment === "model" ? "" : "shrink-0"]}
-                ><span class="truncate">{part.label}</span></span>
+              <span
+                data-segment={part.segment}
+                class={[
+                  "inline-flex h-touch min-w-0 items-center rounded-control px-snug hover:wash",
+                  part.open && "wash",
+                  part.segment === "model" ? "" : "shrink-0",
+                ]}><span class="truncate">{part.label}</span></span
+              >
             {/each}
           </button>
         </div>
@@ -55,8 +63,10 @@ it is for. -->
             <span class="truncate">{permissions.face}</span>
           </Fact>
           {#if permissions.panel !== undefined}
-            <div class="rise absolute bottom-full left-0 z-(--layer-popover) mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
-              {...permissions.panel.wire}>
+            <div
+              class="rise absolute bottom-full left-0 z-(--layer-popover) mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
+              {...permissions.panel.wire}
+            >
               {#each permissions.panel.switches as each (each.key)}
                 <label class="flex items-center justify-between gap-base text-body text-text">
                   {each.label}
@@ -67,8 +77,13 @@ it is for. -->
                 {#each permissions.panel.selects as each (each.key)}
                   <label class="flex min-w-0 flex-1 flex-col gap-tight text-note text-text-quiet">
                     {each.label}
-                    <select class="h-control w-full min-w-0 rounded-control bg-page px-snug text-body text-text" {...each.wire}>
-                      {#each each.options as option (option.key)}<option value={option.key}>{option.label}</option>{/each}
+                    <select
+                      class="h-control w-full min-w-0 rounded-control bg-page px-snug text-body text-text"
+                      {...each.wire}
+                    >
+                      {#each each.options as option (option.key)}<option value={option.key}
+                          >{option.label}</option
+                        >{/each}
                     </select>
                   </label>
                 {/each}

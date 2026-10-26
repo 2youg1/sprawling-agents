@@ -15,7 +15,8 @@ cost and when it started. A row takes the row's wash under the pointer. -->
 </script>
 
 <a {...look.wire} class="flex items-center gap-base rounded-control px-snug py-snug hover:wash">
-  <span class={["inline-block size-dot shrink-0 rounded-pill", look.live ? "bg-accent" : "bg-mark"]}></span>
+  <span class={["inline-block size-dot shrink-0 rounded-pill", look.live ? "bg-accent" : "bg-mark"]}
+  ></span>
   <span class="min-w-0 flex-1 truncate text-text-quiet">{look.task}</span>
   <span class="shrink-0 text-text-faint">{look.posture}</span>
   {#if look.spent !== undefined}

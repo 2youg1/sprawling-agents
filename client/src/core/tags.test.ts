@@ -13,14 +13,23 @@ import { PIN, given, inUse, keepTags, kept, readTag, retagged, stripped, tagsOf 
 
 const CITY = Address.make("harbour");
 const MAYOR_ROOM = Address.make("hall/mayor");
-const at = (began: number): { city: Address; room: Address; began: Seq } => ({ city: CITY, room: MAYOR_ROOM, began: Seq.make(began) });
+const at = (began: number): { city: Address; room: Address; began: Seq } => ({
+  city: CITY,
+  room: MAYOR_ROOM,
+  began: Seq.make(began),
+});
 const tags = (...words: string[]): Tag[] => words.map((word) => Tag.make(word));
 
 describe("the tags a person gives sessions", () => {
   test("what a person types is folded to lower case, and a word that is no tag is nothing", () => {
     expect(readTag("  Bug ")).toBe(Tag.make("bug"));
     expect(readTag("重构")).toBe(Tag.make("重构"));
-    expect([readTag(""), readTag("two words"), readTag("#x"), readTag("x".repeat(25))]).toEqual([null, null, null, null]);
+    expect([readTag(""), readTag("two words"), readTag("#x"), readTag("x".repeat(25))]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
   });
 
   test("giving and stripping answer the session's whole new set", () => {
@@ -32,8 +41,14 @@ describe("the tags a person gives sessions", () => {
   });
 
   test("a set replaces the session's set, and an empty one removes it", () => {
-    const held: SessionTags[] = [{ ...at(3), tags: tags("bug") }, { ...at(9), tags: tags("x") }];
-    expect(retagged(held, { ...at(3), tags: tags("y") })).toEqual([{ ...at(9), tags: tags("x") }, { ...at(3), tags: tags("y") }]);
+    const held: SessionTags[] = [
+      { ...at(3), tags: tags("bug") },
+      { ...at(9), tags: tags("x") },
+    ];
+    expect(retagged(held, { ...at(3), tags: tags("y") })).toEqual([
+      { ...at(9), tags: tags("x") },
+      { ...at(3), tags: tags("y") },
+    ]);
     expect(retagged(held, { ...at(3), tags: [] })).toEqual([{ ...at(9), tags: tags("x") }]);
   });
 
@@ -72,9 +87,9 @@ describe("the tags a person gives sessions", () => {
     expect(get(kept.held)).toEqual([{ ...at(3), tags: tags("bug") }]);
     expect(kept.retag({ ...at(3), tags: tags("bug", "pin") })).toBe(true);
     expect(get(kept.held)).toEqual([{ ...at(3), tags: tags("bug", "pin") }]);
-    expect(sent.map((frame) => ("put_preferences" in frame ? frame.put_preferences.patch : null))).toEqual([
-      { tags: { ...at(3), tags: tags("bug", "pin") } },
-    ]);
+    expect(
+      sent.map((frame) => ("put_preferences" in frame ? frame.put_preferences.patch : null)),
+    ).toEqual([{ tags: { ...at(3), tags: tags("bug", "pin") } }]);
     live = false;
     expect(kept.retag({ ...at(3), tags: [] })).toBe(false);
     expect(get(kept.held)).toEqual([{ ...at(3), tags: tags("bug", "pin") }]);

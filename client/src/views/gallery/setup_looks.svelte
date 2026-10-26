@@ -67,7 +67,15 @@
 </script>
 
 {#snippet slider(at: number | null)}
-  <Slider {...sliderOf({ label: say($lang, "appearance_blend"), range: BLEND_PERCENT, at, figure: percent, onMove: still })} />
+  <Slider
+    {...sliderOf({
+      label: say($lang, "appearance_blend"),
+      range: BLEND_PERCENT,
+      at,
+      figure: percent,
+      onMove: still,
+    })}
+  />
 {/snippet}
 
 <Case label="setup card · a change just landed, with its range" width={CARD}>
@@ -104,22 +112,48 @@
   <ul class="flex flex-col">
     <li class="flex items-center gap-base border-b border-edge py-snug text-label">
       <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS.palette)}</span>
-      <ChordLook {...chordOf({ ...chord, action: "palette", spelled: spell(DEFAULTS.palette), listening: true }, HANDS)} />
+      <ChordLook
+        {...chordOf(
+          { ...chord, action: "palette", spelled: spell(DEFAULTS.palette), listening: true },
+          HANDS,
+        )}
+      />
     </li>
     <li class="flex items-center gap-base border-b border-edge py-snug text-label">
-      <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS["tier.cycle"])}</span>
-      <ChordLook {...chordOf({ ...chord, action: "tier.cycle", spelled: spell(DEFAULTS["tier.cycle"]), listening: false }, HANDS)} />
+      <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS["tier.cycle"])}</span
+      >
+      <ChordLook
+        {...chordOf(
+          {
+            ...chord,
+            action: "tier.cycle",
+            spelled: spell(DEFAULTS["tier.cycle"]),
+            listening: false,
+          },
+          HANDS,
+        )}
+      />
     </li>
     <li class="flex items-center gap-base py-snug text-label">
       <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS.finder)}</span>
-      <ChordLook {...chordOf({ ...chord, action: "finder", spelled: spell(DEFAULTS.finder), listening: false }, HANDS)} />
+      <ChordLook
+        {...chordOf(
+          { ...chord, action: "finder", spelled: spell(DEFAULTS.finder), listening: false },
+          HANDS,
+        )}
+      />
     </li>
   </ul>
 </Case>
 
 <Case label="setup colours · a token overridden and one as drawn" width={CARD}>
   <ul class="flex flex-col gap-tight">
-    <Token {...tokenOf({ name: "--color-accent", drawn: undefined, reset: reset("--color-accent") }, TOKENS)} />
+    <Token
+      {...tokenOf(
+        { name: "--color-accent", drawn: undefined, reset: reset("--color-accent") },
+        TOKENS,
+      )}
+    />
     <Token {...tokenOf({ name: "--color-edge", drawn: undefined, reset: undefined }, TOKENS)} />
   </ul>
 </Case>

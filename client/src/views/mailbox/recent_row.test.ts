@@ -17,19 +17,42 @@ import type { AxError, SessionLine } from "../../wire";
 import { rowOf } from "./recent_row";
 import type { RowHands } from "./recent_row";
 
-const LINE: SessionLine = { at: TimeMs.make(0), began: Seq.make(1), last: Seq.make(4), runs: 2, start: { dispatched: { by: null } } };
-const HANDS: RowHands = { href: "#/talk/lab/east", follow: () => undefined, fork: () => undefined, stop: null };
+const LINE: SessionLine = {
+  at: TimeMs.make(0),
+  began: Seq.make(1),
+  last: Seq.make(4),
+  runs: 2,
+  start: { dispatched: { by: null } },
+};
+const HANDS: RowHands = {
+  href: "#/talk/lab/east",
+  follow: () => undefined,
+  fork: () => undefined,
+  stop: null,
+};
 const ROOM = Address.make("lab/east");
 const NONE = { kind: "none" } as const;
 const STOP = (): void => undefined;
 
 function refused(code: AxError["code"]): AxError {
-  return { code, action: "start a new session", subject: "lab/east: a run is running there", recovery: "", nearby: [], retry: "no" };
+  return {
+    code,
+    action: "start a new session",
+    subject: "lab/east: a run is running there",
+    recovery: "",
+    nearby: [],
+    retry: "no",
+  };
 }
 
 describe("a recent session's row", () => {
   test("links to the room as an entry, and says how the session began", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: NONE }, "en", "1 min ago", HANDS);
+    const look = rowOf(
+      { room: ROOM, line: LINE, forkable: true, branch: NONE },
+      "en",
+      "1 min ago",
+      HANDS,
+    );
     expect(look.link).toEqual({ href: HANDS.href, onclick: HANDS.follow, "data-entry": "" });
     expect(look.began).toBe("dispatched · 2 runs");
   });
@@ -51,7 +74,12 @@ describe("a recent session's row", () => {
   });
 
   test("says the branch is opening, and waits for it", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "opening", of: "branch" } }, "en", "", HANDS);
+    const look = rowOf(
+      { room: ROOM, line: LINE, forkable: true, branch: { kind: "opening", of: "branch" } },
+      "en",
+      "",
+      HANDS,
+    );
     expect([look.began, look.fork.why, look.fork.wire["aria-disabled"], look.stop]).toEqual([
       say("en", "branch_opening"),
       say("en", "branch_opening"),
@@ -61,7 +89,12 @@ describe("a recent session's row", () => {
   });
 
   test("waits while another row's branch is opening", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "elsewhere" } }, "en", "", HANDS);
+    const look = rowOf(
+      { room: ROOM, line: LINE, forkable: true, branch: { kind: "elsewhere" } },
+      "en",
+      "",
+      HANDS,
+    );
     expect([look.began, look.fork.why, look.fork.wire["aria-disabled"]]).toEqual([
       "dispatched · 2 runs",
       say("en", "branch_one_at_a_time"),
@@ -70,7 +103,17 @@ describe("a recent session's row", () => {
   });
 
   test("says why a busy room refused the branch, with /stop for its run, and forks again", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_BUSY") } }, "en", "", { ...HANDS, stop: STOP });
+    const look = rowOf(
+      {
+        room: ROOM,
+        line: LINE,
+        forkable: true,
+        branch: { kind: "refused", of: "branch", error: refused("E_BUSY") },
+      },
+      "en",
+      "",
+      { ...HANDS, stop: STOP },
+    );
     expect([look.began, look.fork.wire["aria-disabled"], look.stop]).toEqual([
       say("en", "branch_busy"),
       false,
@@ -79,8 +122,28 @@ describe("a recent session's row", () => {
   });
 
   test("offers no /stop once the room has no run working, nor for another refusal", () => {
-    const busy = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_BUSY") } }, "en", "", HANDS);
-    const other = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_INVALID_ARGS") } }, "en", "", { ...HANDS, stop: STOP });
+    const busy = rowOf(
+      {
+        room: ROOM,
+        line: LINE,
+        forkable: true,
+        branch: { kind: "refused", of: "branch", error: refused("E_BUSY") },
+      },
+      "en",
+      "",
+      HANDS,
+    );
+    const other = rowOf(
+      {
+        room: ROOM,
+        line: LINE,
+        forkable: true,
+        branch: { kind: "refused", of: "branch", error: refused("E_INVALID_ARGS") },
+      },
+      "en",
+      "",
+      { ...HANDS, stop: STOP },
+    );
     expect([busy.stop, other.stop]).toEqual([null, null]);
     expect(other.began.startsWith("not branched: ")).toBe(true);
   });

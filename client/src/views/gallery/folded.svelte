@@ -20,7 +20,12 @@
   const ROUND = RunId.make("0199c0de-a23a-4000-8000-000000000001");
   const MODEL = "anthropic/claude-sonnet-5";
 
-  function record(seq: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+  function record(
+    seq: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       run: ROUND,
       seq: Seq.make(seq),

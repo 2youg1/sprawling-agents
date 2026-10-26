@@ -83,7 +83,9 @@
         room: stretch.room,
         line: stretch.line,
         origin: tailOf(stretch),
-        text: [stretch.room, ...stretch.runs.map((each) => each.task ?? "")].join("\n").toLowerCase(),
+        text: [stretch.room, ...stretch.runs.map((each) => each.task ?? "")]
+          .join("\n")
+          .toLowerCase(),
       }))
       .filter((row) => row.text.includes(needle));
   });
@@ -135,7 +137,11 @@
   });
 </script>
 
-<Section title="mailbox_recent" empty={search.trim() === "" ? "mailbox_recent_none" : "mailbox_search_none"} count={rows.length}>
+<Section
+  title="mailbox_recent"
+  empty={search.trim() === "" ? "mailbox_recent_none" : "mailbox_search_none"}
+  count={rows.length}
+>
   {#if stretches.all.length > 0}
     <input
       type="search"
@@ -145,7 +151,9 @@
       placeholder={say($lang, "mailbox_search")}
       bind:value={search}
     />
-    <p id="{uid}-reach" class="py-tight text-note text-text-faint">{say($lang, "mailbox_search_reach")}</p>
+    <p id="{uid}-reach" class="py-tight text-note text-text-faint">
+      {say($lang, "mailbox_search_reach")}
+    </p>
   {/if}
   <ul
     bind:this={list}
@@ -155,18 +163,25 @@
     {#each rows.slice(shown.first, shown.end) as row (`${row.room}@${String(row.line.began)}`)}
       {@const branch = branchOf(row)}
       <Row
-        {...rowOf({ room: row.room, line: row.line, forkable: row.origin !== null, branch }, $lang, ago($lang, row.line.at, u.now()), {
-          href: toFragment({ kind: "talk", address: row.room }),
-          follow: onLeave,
-          fork: () => {
-            fork(row);
+        {...rowOf(
+          { room: row.room, line: row.line, forkable: row.origin !== null, branch },
+          $lang,
+          ago($lang, row.line.at, u.now()),
+          {
+            href: toFragment({ kind: "talk", address: row.room }),
+            follow: onLeave,
+            fork: () => {
+              fork(row);
+            },
+            stop: branch.kind === "refused" ? stopIn(row.room) : null,
           },
-          stop: branch.kind === "refused" ? stopIn(row.room) : null,
-        })}
+        )}
       />
     {/each}
   </ul>
   {#if earlier > 0}
-    <p class="py-snug text-note text-text-faint">{fill(say($lang, "mailbox_earlier"), { n: String(earlier) })}</p>
+    <p class="py-snug text-note text-text-faint">
+      {fill(say($lang, "mailbox_earlier"), { n: String(earlier) })}
+    </p>
   {/if}
 </Section>

@@ -17,7 +17,8 @@
 </script>
 
 <span class="relative block h-hair rounded-pill bg-edge-panel" aria-hidden="true">
-  <span class="used absolute inset-y-0 left-0 rounded-pill bg-text-quiet" style:width="{share}%"></span>
+  <span class="used absolute inset-y-0 left-0 rounded-pill bg-text-quiet" style:width="{share}%"
+  ></span>
   {#if handoff !== undefined}
     <Checkpoint {...handoff} along="line" />
   {/if}

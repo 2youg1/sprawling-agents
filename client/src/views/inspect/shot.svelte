@@ -52,7 +52,9 @@
   });
 
   const said = $derived(
-    object === null || fetched.lost !== null || fetched.value?.kind === "too_large" ? "inspect_shot_lost" : "inspect_shot_reading",
+    object === null || fetched.lost !== null || fetched.value?.kind === "too_large"
+      ? "inspect_shot_lost"
+      : "inspect_shot_reading",
   );
 </script>
 

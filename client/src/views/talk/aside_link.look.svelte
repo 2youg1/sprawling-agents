@@ -16,4 +16,5 @@ no wash, because it sits in a sentence rather than standing as a press. -->
 <a
   href={look.href}
   class="underline decoration-from-font underline-offset-2 transition-colors ease-leave hover:text-text hover:ease-arrive"
->{look.text}</a>
+  >{look.text}</a
+>

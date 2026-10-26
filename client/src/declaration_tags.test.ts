@@ -29,7 +29,9 @@ describe("declaration tags", () => {
     const found = svelteFiles(src).flatMap((file) =>
       readFileSync(file, "utf8")
         .split("\n")
-        .flatMap((line, index) => (DECLARATION_TAG.test(line) ? [`${relative(src, file)}:${String(index + 1)}`] : [])),
+        .flatMap((line, index) =>
+          DECLARATION_TAG.test(line) ? [`${relative(src, file)}:${String(index + 1)}`] : [],
+        ),
     );
     expect(found).toEqual([]);
   });

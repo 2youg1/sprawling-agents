@@ -43,7 +43,9 @@
 
   const SIDES: readonly Side[] = ["left", "right"];
   function live(): HTMLElement[] {
-    return SIDES.filter((side) => possible($bench, pane, side)).flatMap((side) => drawn.get(side) ?? []);
+    return SIDES.filter((side) => possible($bench, pane, side)).flatMap(
+      (side) => drawn.get(side) ?? [],
+    );
   }
 
   function show(): void {

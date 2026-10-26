@@ -36,7 +36,12 @@
 
   type Ending = "reply" | "timeout" | "left";
 
-  function record(seq: number, ago: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
+  function record(
+    seq: number,
+    ago: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       addr: PLANNER,
       data,
@@ -56,7 +61,11 @@
     const waiting = [
       record(1, 6 * MINUTE, "run_started", { task: TASK }),
       record(2, 2 * MINUTE, "tool_called", { name: "signal", subject: PARSER }),
-      record(3, 2 * MINUTE, "signal_wait_started", { on: PARSER, signal: `${RUN}-s1`, deadline_ms: UNTIL }),
+      record(3, 2 * MINUTE, "signal_wait_started", {
+        on: PARSER,
+        signal: `${RUN}-s1`,
+        deadline_ms: UNTIL,
+      }),
     ];
     if (ending === null) return waiting;
     const by = ending === "reply" ? { end: "reply", reply: "parser-s1" } : { end: ending };
@@ -66,18 +75,44 @@
   const AWAITING: Doing = { kind: "awaiting_reply", wait: { on: PARSER, until: UNTIL } };
 
   function boardOf(doing: Doing): readonly BoardRun[] {
-    return [{ run: RUN, addr: PLANNER, task: TASK, goal: null, started: NOW - 6 * MINUTE, ended: null, doing }];
+    return [
+      {
+        run: RUN,
+        addr: PLANNER,
+        task: TASK,
+        goal: null,
+        started: NOW - 6 * MINUTE,
+        ended: null,
+        doing,
+      },
+    ];
   }
 
-  const CASES: readonly { readonly label: string; readonly records: readonly EventRecord[]; readonly board: readonly BoardRun[] }[] = [
+  const CASES: readonly {
+    readonly label: string;
+    readonly records: readonly EventRecord[];
+    readonly board: readonly BoardRun[];
+  }[] = [
     {
       label: "a sync wait in progress",
       records: recordsOf(null),
       board: boardOf(AWAITING),
     },
-    { label: "the wait ended by a reply", records: recordsOf("reply"), board: boardOf(afterWait(AWAITING, "reply")) },
-    { label: "the wait ended by its timeout", records: recordsOf("timeout"), board: boardOf(afterWait(AWAITING, "timeout")) },
-    { label: "the wait ended by the run leaving", records: recordsOf("left"), board: boardOf(afterWait(AWAITING, "left")) },
+    {
+      label: "the wait ended by a reply",
+      records: recordsOf("reply"),
+      board: boardOf(afterWait(AWAITING, "reply")),
+    },
+    {
+      label: "the wait ended by its timeout",
+      records: recordsOf("timeout"),
+      board: boardOf(afterWait(AWAITING, "timeout")),
+    },
+    {
+      label: "the wait ended by the run leaving",
+      records: recordsOf("left"),
+      board: boardOf(afterWait(AWAITING, "left")),
+    },
   ];
 </script>
 

@@ -60,7 +60,10 @@ export function adopted(held: Preferences, answer: PreferencesAnswer): Preferenc
     welcomed: answer.welcomed ?? held.welcomed,
     panel: answer.panel ?? held.panel,
     proxying: answer.proxying ?? held.proxying,
-    appearance: answer.appearance === undefined ? held.appearance : appearanceOfCity(answer.appearance, held.appearance),
+    appearance:
+      answer.appearance === undefined
+        ? held.appearance
+        : appearanceOfCity(answer.appearance, held.appearance),
     theme: answer.theme === undefined ? held.theme : themeOf(answer.theme),
   };
 }
@@ -100,6 +103,7 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     chroma: stated.chroma,
     motion: stated.motion,
     glass: stated.glass ?? held.glass,
-    blend: stated.blend_percent === undefined ? held.blend : blendOf(String(stated.blend_percent ?? "")),
+    blend:
+      stated.blend_percent === undefined ? held.blend : blendOf(String(stated.blend_percent ?? "")),
   };
 }

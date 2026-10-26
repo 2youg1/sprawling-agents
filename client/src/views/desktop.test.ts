@@ -22,7 +22,13 @@ function hands(): { readonly typed: string[]; readonly saves: number[]; readonly
   return { typed, saves, hands: { type: (text) => typed.push(text), save: () => saves.push(1) } };
 }
 
-const at = (state: Partial<DesktopState>): DesktopState => ({ addr: HALL, draft: "", edited: false, file: "held", ...state });
+const at = (state: Partial<DesktopState>): DesktopState => ({
+  addr: HALL,
+  draft: "",
+  edited: false,
+  file: "held",
+  ...state,
+});
 
 describe("the allowlist editor", () => {
   test("typing hands the text to the seat, and the box shows the draft", () => {
@@ -42,7 +48,9 @@ describe("the allowlist editor", () => {
 
   test("a missing file names where a save creates it; an empty one says so until somebody types", () => {
     const seat = hands();
-    expect(lookOf(at({ file: "missing" }), "en", seat.hands).missing).toContain("hall/.sprawling/DESKTOP.toml");
+    expect(lookOf(at({ file: "missing" }), "en", seat.hands).missing).toContain(
+      "hall/.sprawling/DESKTOP.toml",
+    );
     expect(lookOf(at({ file: "held" }), "en", seat.hands).missing).toBeUndefined();
     expect(lookOf(at({ file: "empty" }), "en", seat.hands).none).toBeDefined();
     expect(lookOf(at({ file: "empty", edited: true }), "en", seat.hands).none).toBeUndefined();

@@ -25,7 +25,8 @@ const POLICY =
 // so the space between its pages is the pane behind it.
 export function framed(source: string, scheme: "authored" | "built"): string {
   const page = new DOMParser().parseFromString(source, "text/html");
-  for (const element of page.querySelectorAll('meta[http-equiv="refresh" i], base')) element.remove();
+  for (const element of page.querySelectorAll('meta[http-equiv="refresh" i], base'))
+    element.remove();
   for (const element of page.querySelectorAll("[target]")) element.removeAttribute("target");
   const policy = page.createElement("meta");
   policy.httpEquiv = "Content-Security-Policy";

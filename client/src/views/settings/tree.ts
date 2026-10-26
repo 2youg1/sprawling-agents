@@ -95,7 +95,12 @@ export const TREE: readonly Branch[] = [
     ],
     // The guide stays reachable after the person has left it
     // (refrain 3-15): its steps are where a skipped setting is made.
-    more: [group("about"), { kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced"), group("privacy")],
+    more: [
+      group("about"),
+      { kind: "page", view: { kind: "welcome" }, word: "welcome_title" },
+      group("advanced"),
+      group("privacy"),
+    ],
   },
 ];
 
@@ -109,7 +114,11 @@ export interface Standing {
 // The branch the panel opens on: the one holding the page beneath when
 // the tree offers that page, else the one holding the group drawn.
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
-  return placeOf((leaf) => offers(leaf, beneath)) ?? placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ?? FIRST;
+  return (
+    placeOf((leaf) => offers(leaf, beneath)) ??
+    placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ??
+    FIRST
+  );
 }
 
 const FIRST: Standing = { branch: 0, more: false };
@@ -136,7 +145,11 @@ function offers(entry: Entry, beneath: View): boolean {
 // One page per building the city names, the hall among them, so a city
 // of one building still lists it.
 export function buildingPages(addresses: readonly Address[]): readonly Page[] {
-  return addresses.map((address) => ({ kind: "page", view: { kind: "building", address }, word: "settings_buildings" }));
+  return addresses.map((address) => ({
+    kind: "page",
+    view: { kind: "building", address },
+    word: "settings_buildings",
+  }));
 }
 
 // The group a panel opened without one shows: the first the tree
@@ -168,7 +181,11 @@ export function nestOf(view: View): Nest | null {
 
 // The entry a line key moves the focus to from the entry at `at`; -1
 // is a focus outside the entries.
-export function stepped<T>(entries: readonly T[], at: number, move: LineMove | null): T | undefined {
+export function stepped<T>(
+  entries: readonly T[],
+  at: number,
+  move: LineMove | null,
+): T | undefined {
   switch (move) {
     case "line.next":
       return entries[Math.min(at + 1, entries.length - 1)];
@@ -193,7 +210,9 @@ export function byInitial<T>(
   letter: string,
   initial: (entry: T) => string | undefined,
 ): T | undefined {
-  return [...entries.slice(at + 1), ...entries.slice(0, at + 1)].find((each) => initial(each) === letter);
+  return [...entries.slice(at + 1), ...entries.slice(0, at + 1)].find(
+    (each) => initial(each) === letter,
+  );
 }
 
 // What the tree's look is given. Every word is already in the person's
@@ -330,7 +349,9 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
     },
   });
   const leafOf = (leaf: Leaf): LeafLook =>
-    leaf.kind === "group" ? groupOf(leaf.group, state.group, hands) : pageOf(leaf, state, hands.words);
+    leaf.kind === "group"
+      ? groupOf(leaf.group, state.group, hands)
+      : pageOf(leaf, state, hands.words);
   const nestLookOf = (nest: Nest, word: Key): NestLook => ({
     kind: "nest",
     key: nest,
@@ -344,11 +365,16 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
       return {
         key: branch.word,
         fold: foldOf(branch.word, state.folds.branch === at, list, { kind: "branch", at }),
-        entries: branch.entries.map((entry) => (entry.kind === "nest" ? nestLookOf(entry.nest, entry.word) : leafOf(entry))),
+        entries: branch.entries.map((entry) =>
+          entry.kind === "nest" ? nestLookOf(entry.nest, entry.word) : leafOf(entry),
+        ),
         more:
           branch.more.length === 0
             ? null
-            : { fold: foldOf("settings_more", state.folds.more, `${list}-more`, { kind: "more" }), entries: branch.more.map(leafOf) },
+            : {
+                fold: foldOf("settings_more", state.folds.more, `${list}-more`, { kind: "more" }),
+                entries: branch.more.map(leafOf),
+              },
       };
     }),
   };

@@ -52,11 +52,16 @@
       const invitation = invitationIn(u.bar.hash);
       const lack = lacking();
       if (invitation === null) standing = { kind: "unreadable" };
-      else standing = lack === null ? { kind: "invited", invitation, told: null, busy: false } : { kind: "lacking", lack };
+      else
+        standing =
+          lack === null
+            ? { kind: "invited", invitation, told: null, busy: false }
+            : { kind: "lacking", lack };
       return;
     }
     const device = await kept();
-    standing = device === null ? { kind: "unpaired" } : { kind: "paired", device, told: null, busy: false };
+    standing =
+      device === null ? { kind: "unpaired" } : { kind: "paired", device, told: null, busy: false };
   }
 
   // What this page cannot do without, before a key is made: an https://
@@ -64,7 +69,8 @@
   // IndexedDB to keep the key in. WebCrypto's curves are found out when
   // the key is made.
   function lacking(): Lack | null {
-    if (!window.isSecureContext || remoteUrl(window.location, "/remote/pair") === null) return "insecure";
+    if (!window.isSecureContext || remoteUrl(window.location, "/remote/pair") === null)
+      return "insecure";
     return typeof indexedDB === "undefined" ? "storage" : null;
   }
 
@@ -83,15 +89,27 @@
     }
     const paired = await pairOver(url, invitation, key);
     if (paired.kind !== "paired") {
-      standing = { kind: "invited", invitation, told: { kind: "refusal", refusal: paired }, busy: false };
+      standing = {
+        kind: "invited",
+        invitation,
+        told: { kind: "refusal", refusal: paired },
+        busy: false,
+      };
       return;
     }
-    const device: Device = { city: paired.city, fingerprint: invitation.city, id: paired.id, key, at: u.now() };
+    const device: Device = {
+      city: paired.city,
+      fingerprint: invitation.city,
+      id: paired.id,
+      key,
+      at: u.now(),
+    };
     if (!(await keep(device))) {
       standing = { kind: "invited", invitation, told: { kind: "unkept" }, busy: false };
       return;
     }
-    const persisted = "storage" in navigator ? await navigator.storage.persist().catch(() => false) : false;
+    const persisted =
+      "storage" in navigator ? await navigator.storage.persist().catch(() => false) : false;
     // The code is spent; it leaves the address bar and the history entry.
     history.replaceState(null, "", toFragment({ kind: "setup", group: "remote" }));
     standing = { kind: "seed", seed: encode(seed), device, persisted };
@@ -105,7 +123,10 @@
     }
     standing = { kind: "paired", device, told: null, busy: true };
     const locked = await lockOver(url, device);
-    const told = locked.kind === "locked" ? { kind: "locked" as const } : { kind: "refusal" as const, refusal: locked };
+    const told =
+      locked.kind === "locked"
+        ? { kind: "locked" as const }
+        : { kind: "refusal" as const, refusal: locked };
     standing = { kind: "paired", device, told, busy: false };
   }
 </script>
@@ -118,7 +139,8 @@
       if (standing.kind === "invited" && !standing.busy) void pair(standing.invitation);
     }}
     onSeen={() => {
-      if (standing.kind === "seed") standing = { kind: "paired", device: standing.device, told: null, busy: false };
+      if (standing.kind === "seed")
+        standing = { kind: "paired", device: standing.device, told: null, busy: false };
     }}
     onLock={() => {
       if (standing.kind === "paired" && !standing.busy) void lock(standing.device);

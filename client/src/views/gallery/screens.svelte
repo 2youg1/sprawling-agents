@@ -39,9 +39,7 @@
   const PLANNED: BuildingAnswer = {
     addr: Address.make("lab"),
     archive: [],
-    blocked: [
-      { line: "waiting on the endpoint to answer", source: NodeId.make("3"), waiting: 2 },
-    ],
+    blocked: [{ line: "waiting on the endpoint to answer", source: NodeId.make("3"), waiting: 2 }],
     docs: [],
     mcp: [],
     plan: [
@@ -112,7 +110,14 @@
     pursuits: [],
     runs: [],
     buildings: [
-      { addr: Address.make("notes"), adoptable: false, blocked: [], problems: [], progress: idle, ready: 0 },
+      {
+        addr: Address.make("notes"),
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: idle,
+        ready: 0,
+      },
       {
         addr: Address.make("the model changed from one provider to the next"),
         adoptable: false,
@@ -137,10 +142,12 @@
   // a machine that says it is boxed in while the box has no lid is
   // worse than one that says it has no box.
   const MACHINE: DoctorAnswer = {
-    core: "raised", scanning: "does_not_apply",
+    core: "raised",
+    scanning: "does_not_apply",
     custody: { keeps: "across_reboots", store: "platform_service" },
     sandbox: {
-      arm: "windows_job_object", named: "native",
+      arm: "windows_job_object",
+      named: "native",
       coverage: [
         { axis: "filesystem", kept: "kept" },
         { axis: "process_tree", kept: "kept" },
@@ -329,7 +336,9 @@ sit above these in the shipped drawer and keep their own fixture. -->
 three by whoever keeps the list: a fourth refusal goes to the drawer
 rather than into a taller corner. -->
 <Case label="notices · three toasts, stacked at the corner">
-  <div class="flex min-h-output w-full flex-col items-end justify-end gap-snug rounded-card border border-dashed border-edge-input p-snug">
+  <div
+    class="flex min-h-output w-full flex-col items-end justify-end gap-snug rounded-card border border-dashed border-edge-input p-snug"
+  >
     {#each TOASTS as toast (toast.subject + toast.at)}
       <Notice
         seat="toast"
@@ -352,7 +361,9 @@ rather than into a taller corner. -->
 </Case>
 
 <Case label="notices · a stop key with no run in front">
-  <div class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug">
+  <div
+    class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug"
+  >
     <Notice seat="toast" weight="info" heading="no_run_in_front" next="stop_whole_city" />
   </div>
 </Case>

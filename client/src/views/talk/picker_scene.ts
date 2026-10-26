@@ -70,7 +70,9 @@ export function sceneOf(lang: Lang, facts: PickerFacts, held: PickerHeld): Scene
   const offers = offersOf(facts.endpoints);
   const order = orderOf(offers);
   const names = held.pick ?? facts.chosen;
-  const offer = offers.find((each) => each.endpoint === names?.endpoint && each.model === names.model);
+  const offer = offers.find(
+    (each) => each.endpoint === names?.endpoint && each.model === names.model,
+  );
   const first = firstLevel(order, offers);
   const parentId = held.parent ?? (offer === undefined ? first.at(0)?.id : parentOf(order, offer));
   return {
@@ -88,19 +90,29 @@ export function sceneOf(lang: Lang, facts: PickerFacts, held: PickerHeld): Scene
 // there would use.
 export function combinationOf(scene: Pick<Scene, "offer" | "used">): Combination | null {
   const { offer, used } = scene;
-  return offer === undefined ? null : { endpoint: offer.endpoint, model: offer.model, level: used?.level ?? null };
+  return offer === undefined
+    ? null
+    : { endpoint: offer.endpoint, model: offer.model, level: used?.level ?? null };
 }
 
 // The combination in force before anything is chosen: the city's `main`
 // and the level a request to it would use.
 export function inForce(facts: PickerFacts): Combination | null {
-  const offer = offersOf(facts.endpoints).find((each) => each.endpoint === facts.chosen?.endpoint && each.model === facts.chosen.model);
-  return combinationOf({ offer, used: offer === undefined ? null : usedLevel(offer.facts.thinking, facts.stated) });
+  const offer = offersOf(facts.endpoints).find(
+    (each) => each.endpoint === facts.chosen?.endpoint && each.model === facts.chosen.model,
+  );
+  return combinationOf({
+    offer,
+    used: offer === undefined ? null : usedLevel(offer.facts.thinking, facts.stated),
+  });
 }
 
 // A level as the upstream words it, else as the city does.
 export function levelWord(scene: Scene, level: Effort): string {
-  return scene.offer?.facts.thinking.words.find((each) => each.effort === level)?.word ?? say(scene.lang, `effort_${level}`);
+  return (
+    scene.offer?.facts.thinking.words.find((each) => each.effort === level)?.word ??
+    say(scene.lang, `effort_${level}`)
+  );
 }
 
 // What an offer costs and holds, in the provider's own figures.
@@ -115,7 +127,9 @@ export function priceOf(lang: Lang, offer: Offer): string {
 }
 
 export function comboName(scene: Scene, combo: Combination): string {
-  const offer = scene.offers.find((each) => each.endpoint === combo.endpoint && each.model === combo.model);
+  const offer = scene.offers.find(
+    (each) => each.endpoint === combo.endpoint && each.model === combo.model,
+  );
   const level = combo.level === null ? [] : [say(scene.lang, `effort_${combo.level}`)];
   return [combo.model, offer?.provider ?? combo.endpoint, ...level].join(" · ");
 }
@@ -126,7 +140,12 @@ export function modelsSection(order: Order): Section {
 }
 
 export function noMatch(lang: Lang, order: Order, section: Section): string {
-  return say(lang, (section === SECTION.first) === (order === "models_first") ? "picker_no_model_match" : "picker_no_provider_match");
+  return say(
+    lang,
+    (section === SECTION.first) === (order === "models_first")
+      ? "picker_no_model_match"
+      : "picker_no_provider_match",
+  );
 }
 
 export function comboId(combo: Combination): string {
@@ -136,14 +155,28 @@ export function comboId(combo: Combination): string {
 // The words of one entry: a model reads its name and how many providers
 // serve it, a provider its name and what the model costs there, with the
 // provider's own id for the model where it differs from the shared one.
-export function entryWords(scene: Scene, section: Section, entry: Entry): { label: string; secondary: string | undefined } {
+export function entryWords(
+  scene: Scene,
+  section: Section,
+  entry: Entry,
+): { label: string; secondary: string | undefined } {
   const { lang, order } = scene;
   const only = entry.offers.length === 1 ? entry.offers.at(0) : undefined;
   const listsModels = (section === SECTION.first) === (order === "models_first");
   if (section === SECTION.first && order === "models_first") {
-    return { label: entry.id, secondary: only === undefined ? fill(say(lang, "picker_provider_count"), { n: String(entry.offers.length) }) : only.provider };
+    return {
+      label: entry.id,
+      secondary:
+        only === undefined
+          ? fill(say(lang, "picker_provider_count"), { n: String(entry.offers.length) })
+          : only.provider,
+    };
   }
-  if (section === SECTION.first) return { label: entry.offers.at(0)?.provider ?? entry.id, secondary: entry.offers.at(0)?.local === true ? say(lang, "picker_price_local") : undefined };
+  if (section === SECTION.first)
+    return {
+      label: entry.offers.at(0)?.provider ?? entry.id,
+      secondary: entry.offers.at(0)?.local === true ? say(lang, "picker_price_local") : undefined,
+    };
   if (only === undefined) return { label: entry.id, secondary: undefined };
   if (listsModels) return { label: only.model, secondary: priceOf(lang, only) };
   const own = only.model === only.canonical ? [] : [only.model];

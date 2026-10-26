@@ -88,15 +88,22 @@ export interface ReadFrom {
 export function readFrom(call: Call): ReadFrom | null {
   const asked = call.arguments;
   if (call.effect !== "read" || asked === null || asked === undefined || asked.cut > 0) return null;
-  return Option.match(Schema.decodeUnknownOption(Schema.fromJsonString(ReadOne), { onExcessProperty: "error" })(asked.head), {
-    onNone: () => null,
-    onSome: readFromAsked,
-  });
+  return Option.match(
+    Schema.decodeUnknownOption(Schema.fromJsonString(ReadOne), { onExcessProperty: "error" })(
+      asked.head,
+    ),
+    {
+      onNone: () => null,
+      onSome: readFromAsked,
+    },
+  );
 }
 
 export function pictureOf(call: Call): Picture | null {
   const head = call.output?.head;
-  return head === undefined ? null : Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(Picture))(head));
+  return head === undefined
+    ? null
+    : Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(Picture))(head));
 }
 
 export function readingOf(call: Call): Reading {
@@ -118,7 +125,13 @@ export function readingOf(call: Call): Reading {
 // because a run that only planned and delegated has nothing to inspect.
 export function followingIn(rounds: RoundsAnswer): readonly RightItem[] {
   const calls = rounds.turns.flatMap((turn) => turn.calls).reverse();
-  const editor = calls.find((call) => regionOf(readingOf(call)) === "editor" && call.outcome === "answered");
-  const terminal = calls.find((call) => readingOf(call) === "terminal" && call.outcome !== "failed");
-  return [editor, terminal].flatMap((call): RightItem[] => (call === undefined ? [] : [{ kind: "call", run: rounds.run, at: call.at }]));
+  const editor = calls.find(
+    (call) => regionOf(readingOf(call)) === "editor" && call.outcome === "answered",
+  );
+  const terminal = calls.find(
+    (call) => readingOf(call) === "terminal" && call.outcome !== "failed",
+  );
+  return [editor, terminal].flatMap((call): RightItem[] =>
+    call === undefined ? [] : [{ kind: "call", run: rounds.run, at: call.at }],
+  );
 }

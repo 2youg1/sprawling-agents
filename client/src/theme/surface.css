@@ -102,8 +102,10 @@
     repeat(3, minmax(0, 1fr));
   grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--spacing-gutter);
-  padding: max(var(--spacing-margin), env(safe-area-inset-top, 0px)) max(var(--spacing-margin), env(safe-area-inset-right, 0px))
-    max(var(--spacing-margin), env(safe-area-inset-bottom, 0px)) max(var(--spacing-margin), env(safe-area-inset-left, 0px));
+  padding: max(var(--spacing-margin), env(safe-area-inset-top, 0px))
+    max(var(--spacing-margin), env(safe-area-inset-right, 0px))
+    max(var(--spacing-margin), env(safe-area-inset-bottom, 0px))
+    max(var(--spacing-margin), env(safe-area-inset-left, 0px));
   /* The edge keys sit in the composer's chip row on one column; the
    * name they find it by is this frame's alone, so two specimens on one
    * page never borrow each other's row. */
@@ -115,8 +117,10 @@
     --shell-columns: 1;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    padding: max(var(--spacing-pane), env(safe-area-inset-top, 0px)) max(var(--spacing-pane), env(safe-area-inset-right, 0px))
-      max(var(--spacing-pane), env(safe-area-inset-bottom, 0px)) max(var(--spacing-pane), env(safe-area-inset-left, 0px));
+    padding: max(var(--spacing-pane), env(safe-area-inset-top, 0px))
+      max(var(--spacing-pane), env(safe-area-inset-right, 0px))
+      max(var(--spacing-pane), env(safe-area-inset-bottom, 0px))
+      max(var(--spacing-pane), env(safe-area-inset-left, 0px));
   }
 }
 
@@ -128,7 +132,9 @@
  * between a page and the conversation sees the same edges. */
 @utility silver-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--silver-side) * var(--silver) - var(--spacing-gutter)) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(0, 1fr) calc(var(--silver-side) * var(--silver) - var(--spacing-gutter))
+    minmax(0, 1fr);
   column-gap: var(--spacing-gutter);
 }
 

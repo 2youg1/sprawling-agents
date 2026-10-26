@@ -27,5 +27,10 @@ export interface FileRowLook {
 }
 
 export function fileRowWire(label: string, current: boolean, open: () => void): FileRowWire {
-  return { type: "button", "aria-label": label, "aria-current": current ? "true" : undefined, onclick: open };
+  return {
+    type: "button",
+    "aria-label": label,
+    "aria-current": current ? "true" : undefined,
+    onclick: open,
+  };
 }

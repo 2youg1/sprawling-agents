@@ -8,7 +8,12 @@
   import { putPreferences } from "../../core/commands";
   import { say, type Key } from "../../core/lang";
   import { ui } from "../../ui";
-  import { CorePlacement, CorePriority, type CorePreferences, type PreferencePatch } from "../../wire";
+  import {
+    CorePlacement,
+    CorePriority,
+    type CorePreferences,
+    type PreferencePatch,
+  } from "../../wire";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
   import Unanswered from "../parts/unanswered.svelte";
@@ -42,15 +47,20 @@
   let baseline = $state.raw<CorePreferences | null>(null);
   let readBeforeSave = $state.raw<CorePreferences | null>(null);
   const bytes = $derived(memory.trim() === "" ? null : Number(memory));
-  const valid = $derived(bytes === null || (/^[1-9][0-9]*$/.test(memory.trim()) && Number.isSafeInteger(bytes)));
+  const valid = $derived(
+    bytes === null || (/^[1-9][0-9]*$/.test(memory.trim()) && Number.isSafeInteger(bytes)),
+  );
 
   $effect(() => {
     if (core === undefined) return;
-    if (awaiting !== null && core !== readBeforeSave
-        && (saving.kind === "saving" || saving.kind === "unverified")
-        && (awaiting.placement === undefined || core.placement === awaiting.placement)
-        && (awaiting.priority === undefined || core.priority === awaiting.priority)
-        && (awaiting.memory_bytes === undefined || (core.memory_bytes ?? null) === awaiting.memory_bytes)) {
+    if (
+      awaiting !== null &&
+      core !== readBeforeSave &&
+      (saving.kind === "saving" || saving.kind === "unverified") &&
+      (awaiting.placement === undefined || core.placement === awaiting.placement) &&
+      (awaiting.priority === undefined || core.priority === awaiting.priority) &&
+      (awaiting.memory_bytes === undefined || (core.memory_bytes ?? null) === awaiting.memory_bytes)
+    ) {
       saving = { kind: "saved" };
       awaiting = null;
     }
@@ -58,7 +68,10 @@
       baseline = core;
       placement = core.placement;
       priority = core.priority;
-      memory = core.memory_bytes === undefined || core.memory_bytes === null ? "" : String(core.memory_bytes);
+      memory =
+        core.memory_bytes === undefined || core.memory_bytes === null
+          ? ""
+          : String(core.memory_bytes);
     }
   });
   let seen = $belief.refusal;
@@ -70,12 +83,24 @@
   });
 
   function moved(): void {
-    saving = edited(baseline !== null && (placement !== baseline.placement || priority !== baseline.priority
-      || bytes !== (baseline.memory_bytes ?? null) || !valid));
+    saving = edited(
+      baseline !== null &&
+        (placement !== baseline.placement ||
+          priority !== baseline.priority ||
+          bytes !== (baseline.memory_bytes ?? null) ||
+          !valid),
+    );
   }
 
   function save(): void {
-    if (core === undefined || baseline === null || placement === undefined || priority === undefined || !valid) return;
+    if (
+      core === undefined ||
+      baseline === null ||
+      placement === undefined ||
+      priority === undefined ||
+      !valid
+    )
+      return;
     const patches: PreferencePatch[] = [];
     let wanted: CorePreferences = {};
     if (placement !== baseline.placement) {
@@ -110,24 +135,50 @@
 </script>
 
 {#if core !== undefined && placement !== undefined && priority !== undefined}
-  <Card title="performance_core" note="performance_core_note" {saving} settled="performance_restart" onSave={save}>
+  <Card
+    title="performance_core"
+    note="performance_core_note"
+    {saving}
+    settled="performance_restart"
+    onSave={save}
+  >
     <Segmented
       label={say($lang, "performance_placement")}
       held={placement}
-      options={CorePlacement.literals.map((value) => ({ value, label: say($lang, PLACEMENT[value][0]) }))}
-      onPick={(value) => { placement = value; moved(); }}
+      options={CorePlacement.literals.map((value) => ({
+        value,
+        label: say($lang, PLACEMENT[value][0]),
+      }))}
+      onPick={(value) => {
+        placement = value;
+        moved();
+      }}
     />
     <p class="text-note text-text-quiet">{say($lang, PLACEMENT[placement][1])}</p>
     <Segmented
       label={say($lang, "performance_priority")}
       held={priority}
-      options={CorePriority.literals.map((value) => ({ value, label: say($lang, PRIORITY[value][0]) }))}
-      onPick={(value) => { priority = value; moved(); }}
+      options={CorePriority.literals.map((value) => ({
+        value,
+        label: say($lang, PRIORITY[value][0]),
+      }))}
+      onPick={(value) => {
+        priority = value;
+        moved();
+      }}
     />
     <p class="text-note text-text-quiet">{say($lang, PRIORITY[priority][1])}</p>
-    <Field label={say($lang, "performance_memory")} value={memory} help={say($lang, "performance_memory_note")}
-      {...(valid ? {} : { error: say($lang, "performance_memory_invalid") })}
-      onInput={(value) => { memory = value; moved(); }} mono />
+    <Field
+      label={say($lang, "performance_memory")}
+      value={memory}
+      help={say($lang, "performance_memory_note")}
+      {...valid ? {} : { error: say($lang, "performance_memory_invalid") }}
+      onInput={(value) => {
+        memory = value;
+        moved();
+      }}
+      mono
+    />
   </Card>
 {:else if $asked !== undefined && "unavailable" in $asked}
   <Unanswered query={$asked.unavailable.query} asked={QUERIES.preferences} />

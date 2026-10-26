@@ -9,7 +9,14 @@ import type { AxError } from "../../wire";
 import { answered, refused, sent, waited } from "./saving";
 
 function refusal(code: AxError["code"]): AxError {
-  return { action: "replace a document", code, nearby: [], recovery: "read the file again", retry: "no", subject: "MAYOR.md" };
+  return {
+    action: "replace a document",
+    code,
+    nearby: [],
+    recovery: "read the file again",
+    retry: "no",
+    subject: "MAYOR.md",
+  };
 }
 
 describe("a settings card's save", () => {

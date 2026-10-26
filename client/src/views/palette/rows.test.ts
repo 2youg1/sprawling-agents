@@ -42,17 +42,35 @@ describe("the palette's list", () => {
 
   test("a section is a group named by its own heading", () => {
     expect(
-      verbs.sections.map((section) => [section.wire, section.heading?.wire.id, section.heading?.text]),
+      verbs.sections.map((section) => [
+        section.wire,
+        section.heading?.wire.id,
+        section.heading?.text,
+      ]),
     ).toEqual([
-      [{ role: "group", "aria-labelledby": "l-actions" }, "l-actions", say("en", "palette_group_actions")],
-      [{ role: "group", "aria-labelledby": "l-sessions" }, "l-sessions", say("en", "palette_group_sessions")],
+      [
+        { role: "group", "aria-labelledby": "l-actions" },
+        "l-actions",
+        say("en", "palette_group_actions"),
+      ],
+      [
+        { role: "group", "aria-labelledby": "l-sessions" },
+        "l-sessions",
+        say("en", "palette_group_sessions"),
+      ],
     ]);
   });
 
   test("a row's id is its place in the flat list, and the cursor may stand on a refused verb", () => {
     const rows = verbs.sections.flatMap((section) => section.rows);
     expect(
-      rows.map((row) => [row.wire.id, row.wire["aria-selected"], row.wire["aria-disabled"], row.active, row.refused]),
+      rows.map((row) => [
+        row.wire.id,
+        row.wire["aria-selected"],
+        row.wire["aria-disabled"],
+        row.active,
+        row.refused,
+      ]),
     ).toEqual([
       ["l-0", false, false, false, false],
       ["l-1", true, true, true, true],
@@ -73,7 +91,13 @@ describe("the palette's list", () => {
     const hovered: number[] = [];
     const picked: Entry[] = [];
     const look = rowsLookOf(
-      { listing: { kind: "places" }, shown: [halt, entry("city", { action: "go.city" })], cursor: 0, id: "l", lang: "en" },
+      {
+        listing: { kind: "places" },
+        shown: [halt, entry("city", { action: "go.city" })],
+        cursor: 0,
+        id: "l",
+        lang: "en",
+      },
       { hover: (at) => hovered.push(at), pick: (each) => picked.push(each) },
     );
     const [section] = look.sections;

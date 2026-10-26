@@ -21,7 +21,10 @@
 
   // What stands behind the keys: a page of words, which is the hardest
   // thing glass has to keep apart from what it carries.
-  const BEHIND = Array.from({ length: 9 }, (_, n) => `crates/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`);
+  const BEHIND = Array.from(
+    { length: 9 },
+    (_, n) => `crates/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
+  );
 
   const CORNERS: readonly { readonly box: string; readonly size: string }[] = [
     { box: "rounded-panel", size: "h-[96px] w-[160px]" },
@@ -46,7 +49,10 @@
 
 {#snippet keysOver(glass: "on" | "off")}
   <div class="relative h-[200px] overflow-hidden bg-page" data-glass={glass}>
-    <div class="flex flex-col gap-tight p-snug font-mono text-note text-text-quiet" aria-hidden="true">
+    <div
+      class="flex flex-col gap-tight p-snug font-mono text-note text-text-quiet"
+      aria-hidden="true"
+    >
       {#each BEHIND as line (line)}
         <span>{line}</span>
       {/each}
@@ -84,7 +90,10 @@
   </div>
 </Case>
 
-<Case label="surfaces · the appearance group, where glass and the blend opacity are chosen" width={1280}>
+<Case
+  label="surfaces · the appearance group, where glass and the blend opacity are chosen"
+  width={1280}
+>
   <Setup
     group="appearance"
     endpoints={ENDPOINTS}

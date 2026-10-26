@@ -123,12 +123,7 @@ export function backoffMs(attempt: number): number {
   return LADDER_MS[Math.min(Math.max(attempt, 0), last)] ?? 10000;
 }
 
-function refusal(
-  lang: Lang,
-  action: Key,
-  subject: string,
-  recovery: Key,
-): AxError {
+function refusal(lang: Lang, action: Key, subject: string, recovery: Key): AxError {
   return {
     code: "E_WIRE_MISMATCH",
     action: say(lang, action),
@@ -237,9 +232,7 @@ function welcomed(link: Link, welcome: Welcome): [Link, LinkAction] {
 // that ends the link: every later frame is at risk of the same
 // disagreement, and a page that keeps asking only repeats it.
 function refused(link: Link, error: AxError): [Link, LinkAction] {
-  return error.code === "E_WIRE_MISMATCH"
-    ? refuse(link, error)
-    : [link, { kind: "report", error }];
+  return error.code === "E_WIRE_MISMATCH" ? refuse(link, error) : [link, { kind: "report", error }];
 }
 
 function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
@@ -249,9 +242,7 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   // drops before saying anything is a link that never worked, and
   // clearing the count there holds the ladder at its first rung.
   const link =
-    source.failures === 0 || source.state.kind !== "live"
-      ? source
-      : { ...source, failures: 0 };
+    source.failures === 0 || source.state.kind !== "live" ? source : { ...source, failures: 0 };
   if (link.state.kind === "handshaking") {
     if ("welcome" in frame) {
       return welcomed(link, frame.welcome);
@@ -341,13 +332,13 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
     case "undecodable":
       return refuse(link, unreadable(link.lang));
     case "closed":
-      return link.closing === null ? retreat(link) : [{ ...link, state: { kind: "closed" } }, { kind: "nothing" }];
+      return link.closing === null
+        ? retreat(link)
+        : [{ ...link, state: { kind: "closed" } }, { kind: "nothing" }];
     case "closing":
       return [{ ...link, closing: event.mode }, { kind: "nothing" }];
     case "wait_elapsed":
-      return state.kind === "backoff"
-        ? connect(link)
-        : [link, { kind: "nothing" }];
+      return state.kind === "backoff" ? connect(link) : [link, { kind: "nothing" }];
     case "retry":
       return connect({ ...link, failures: 0 });
   }

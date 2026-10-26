@@ -46,8 +46,7 @@
   // banners, tables and composer all live.
   const TALK = 760;
 
-  const FRAME =
-    "min-w-0 rounded-card border border-dashed border-edge-input p-snug";
+  const FRAME = "min-w-0 rounded-card border border-dashed border-edge-input p-snug";
 
   interface CaseProps {
     readonly label: string;
@@ -73,7 +72,9 @@
     <div class="w-full {FRAME}" style:max-width="{String(TALK)}px">{@render children()}</div>
   {:else}
     <div class="w-max max-w-full {FRAME}">
-      <div class="@container" style:width="{String(width)}px" style:max-width="100%">{@render children()}</div>
+      <div class="@container" style:width="{String(width)}px" style:max-width="100%">
+        {@render children()}
+      </div>
     </div>
   {/if}
 </section>

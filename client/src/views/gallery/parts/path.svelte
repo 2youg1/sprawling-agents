@@ -17,11 +17,7 @@
 <Case label="path · revealable, and opening in the page">
   <div class="flex flex-col gap-tight">
     <Path path="city/lab/notes.md" />
-    <Path
-      path="city/lab/west/experiments/report.md"
-      base="city/lab"
-      onOpen={() => undefined}
-    />
+    <Path path="city/lab/west/experiments/report.md" base="city/lab" onOpen={() => undefined} />
   </div>
 </Case>
 

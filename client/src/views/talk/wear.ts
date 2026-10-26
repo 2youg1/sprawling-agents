@@ -25,8 +25,12 @@ export interface Mark {
 // The handlers the track carries, spread onto it as they are: pressing
 // moves the view there and dragging follows the pointer.
 export interface TrackWire {
-  readonly onpointerdown: (event: PointerEvent & { currentTarget: EventTarget & HTMLElement }) => void;
-  readonly onpointermove: (event: PointerEvent & { currentTarget: EventTarget & HTMLElement }) => void;
+  readonly onpointerdown: (
+    event: PointerEvent & { currentTarget: EventTarget & HTMLElement },
+  ) => void;
+  readonly onpointermove: (
+    event: PointerEvent & { currentTarget: EventTarget & HTMLElement },
+  ) => void;
 }
 
 // Everything the bar's look is given: the words a resting pointer is

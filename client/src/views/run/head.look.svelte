@@ -24,18 +24,28 @@ the arriving curve and settles on the leaving one
 
 {#snippet line(each: LineLook)}
   {#if each.kind === "text"}
-    <dd class={["truncate", FACE[each.face], each.rank === "value" ? "text-text" : "text-note text-text-quiet"]}>
+    <dd
+      class={[
+        "truncate",
+        FACE[each.face],
+        each.rank === "value" ? "text-text" : "text-note text-text-quiet",
+      ]}
+    >
       {each.text}
     </dd>
   {:else if each.kind === "time"}
-    <dd class="figure truncate text-note text-text-quiet"><time datetime={each.at}>{each.text}</time></dd>
+    <dd class="figure truncate text-note text-text-quiet">
+      <time datetime={each.at}>{each.text}</time>
+    </dd>
   {:else}
     <dd class="truncate font-mono">
       <a
         {...each.building.wire}
         class="text-text-quiet transition-colors ease-leave still:transition-none hover:text-text hover:ease-arrive"
         >{each.building.text}</a
-      ><span class="text-text-faint">/</span><a {...each.room.wire} class="text-text">{each.room.text}</a>
+      ><span class="text-text-faint">/</span><a {...each.room.wire} class="text-text"
+        >{each.room.text}</a
+      >
     </dd>
   {/if}
 {/snippet}

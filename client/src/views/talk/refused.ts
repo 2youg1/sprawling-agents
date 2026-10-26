@@ -65,7 +65,11 @@ export function settledBySettings(error: AxError): boolean {
 }
 
 function toSettings(lang: Lang): Way {
-  return { kind: "link", text: say(lang, "talk_open_settings"), href: toFragment({ kind: "setup" }) };
+  return {
+    kind: "link",
+    text: say(lang, "talk_open_settings"),
+    href: toFragment({ kind: "setup" }),
+  };
 }
 
 // One refusal a turn came to. A failed model call names its kind, said
@@ -83,7 +87,10 @@ export function refusedLook(lang: Lang, error: AxError): CardLook {
       provider === null
         ? said.map((text) => ({ text, ink: "faint" }))
         : [{ text: providerClause(lang, provider, error.retry), ink: "faint" }],
-    fold: provider === null || error.recovery === "" ? undefined : { summary: say(lang, "notices_detail"), text: error.recovery },
+    fold:
+      provider === null || error.recovery === ""
+        ? undefined
+        : { summary: say(lang, "notices_detail"), text: error.recovery },
     ways: settledBySettings(error) ? [toSettings(lang)] : [],
   };
 }
@@ -105,7 +112,8 @@ export function failedLook(
 ): CardLook {
   const next = error === undefined ? "" : recoveryWords(lang, error.code, error.recovery);
   const settings =
-    hands.settings === "offered" || (hands.settings === "decided" && error !== undefined && settledBySettings(error));
+    hands.settings === "offered" ||
+    (hands.settings === "decided" && error !== undefined && settledBySettings(error));
   const again = hands.onRetry;
   return {
     role: "alert",
@@ -124,7 +132,9 @@ export function failedLook(
         : { summary: say(lang, "notices_detail"), text: error.recovery },
     ways: [
       ...(settings ? [toSettings(lang)] : []),
-      ...(again === undefined ? [] : [{ kind: "press", label: say(lang, "talk_send_again"), onPress: again } as const]),
+      ...(again === undefined
+        ? []
+        : [{ kind: "press", label: say(lang, "talk_send_again"), onPress: again } as const]),
     ],
   };
 }
@@ -139,6 +149,12 @@ export function unreadableLook(lang: Lang, at: number, cause: string): CardLook 
     after: cause,
     lines: [],
     fold: undefined,
-    ways: [{ kind: "link", text: say(lang, "talk_unreadable_read"), href: toFragment({ kind: "record", lens: "ledger" }) }],
+    ways: [
+      {
+        kind: "link",
+        text: say(lang, "talk_unreadable_read"),
+        href: toFragment({ kind: "record", lens: "ledger" }),
+      },
+    ],
   };
 }

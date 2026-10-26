@@ -175,6 +175,12 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with:
           tool: just
+      # `fmt-check` includes `bun fmt --check`, so Bun has to be present
+      # before the early verdicts rather than only inside client-artifacts
+      # below, which prepares the later bundle gates.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: client/package.json
       - name: native payloads in system channel validation
         if: ${{ !cancelled() }}
         env:
@@ -532,6 +538,18 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
+      # eslint's own cache, which is what makes this lane cost seconds
+      # instead of the two minutes the type-aware rules take: every rule
+      # that wants a type rebuilds the TypeScript program, and a file the
+      # cache says is unchanged is not linted again. A pull request
+      # restores `main`'s entry and lints only what it changed; the key
+      # moves with the linter's own inputs, so a rule or a version change
+      # starts from nothing rather than from a stale verdict.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: client/node_modules/.cache/eslint
+          key: eslint-${{ runner.os }}-${{ hashFiles('client/eslint.config.ts', 'client/tsconfig.json', 'client/bun.lock') }}
+          restore-keys: eslint-${{ runner.os }}-
       - name: lint, typecheck and test the client
         run: just check-client
 

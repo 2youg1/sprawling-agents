@@ -77,8 +77,12 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   const pinnedNow = (): PickerHeld["pinned"] => {
     const offers = offersOf(picker.endpoints);
     const order = orderOf(offers);
-    const offer = offers.find((each) => each.endpoint === picker.chosen?.endpoint && each.model === picker.chosen.model);
-    return offer === undefined ? { first: undefined, second: undefined } : { first: parentOf(order, offer), second: childOf(order, offer) };
+    const offer = offers.find(
+      (each) => each.endpoint === picker.chosen?.endpoint && each.model === picker.chosen.model,
+    );
+    return offer === undefined
+      ? { first: undefined, second: undefined }
+      : { first: parentOf(order, offer), second: childOf(order, offer) };
   };
   let pinned = $state<PickerHeld["pinned"]>(untrack(pinnedNow));
   let opened = $state<Combination | null>(untrack(() => inForce(picker)));
@@ -95,13 +99,20 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     permission: undefined,
     policyFrame: undefined,
   };
-  const keep = (slot: keyof typeof drawn): Attachment<HTMLElement> => (node) => {
-    drawn[slot] = node;
-    return () => {
-      if (drawn[slot] === node) drawn[slot] = undefined;
+  const keep =
+    (slot: keyof typeof drawn): Attachment<HTMLElement> =>
+    (node) => {
+      drawn[slot] = node;
+      return () => {
+        if (drawn[slot] === node) drawn[slot] = undefined;
+      };
     };
+  const hold = {
+    token: keep("token"),
+    frame: keep("frame"),
+    permission: keep("permission"),
+    policyFrame: keep("policyFrame"),
   };
-  const hold = { token: keep("token"), frame: keep("frame"), permission: keep("permission"), policyFrame: keep("policyFrame") };
   // The two elements an opened panel gives the focus to, held as state,
   // because the panel's content is drawn after it opens and the focus
   // waits for it.
@@ -157,7 +168,19 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
         ? pickerOf(
             $lang,
             picker,
-            { open: menu === "model", segment, pick, parent, pinned, opened, query, whole, kept: RECENT_COMBINATIONS.kept, binding, active },
+            {
+              open: menu === "model",
+              segment,
+              pick,
+              parent,
+              pinned,
+              opened,
+              query,
+              whole,
+              kept: RECENT_COMBINATIONS.kept,
+              binding,
+              active,
+            },
             {
               open: (from) => {
                 preview = false;
@@ -186,7 +209,13 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
                 if (untrack(() => sameBinding(binding, next))) return;
                 const initial = untrack(() => binding === null);
                 binding = next;
-                if (initial) next.pointColumn(startOf(picker, untrack(() => segment)));
+                if (initial)
+                  next.pointColumn(
+                    startOf(
+                      picker,
+                      untrack(() => segment),
+                    ),
+                  );
               },
               cursor: (id) => {
                 active = id;
@@ -212,7 +241,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
               menu = null;
               if (focus === "opener") drawn.permission?.focus();
             },
-            inside: (target) => target instanceof Node && drawn.policyFrame?.contains(target) === true,
+            inside: (target) =>
+              target instanceof Node && drawn.policyFrame?.contains(target) === true,
             hold: { frame: hold.policyFrame, trigger: hold.permission, first: holdFirst },
           })
         : undefined,

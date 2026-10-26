@@ -30,8 +30,13 @@ const postQuantum = () => import("@noble/post-quantum/ml-kem.js");
 // A fresh ephemeral pair and its public half, X25519 then the ML-KEM
 // encapsulation key, as a hello carries them; null when this browser
 // has no X25519.
-export async function ephemeral(): Promise<{ readonly ephemeral: Ephemeral; readonly public: Uint8Array<ArrayBuffer> } | null> {
-  const pair = await crypto.subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]).catch(() => null);
+export async function ephemeral(): Promise<{
+  readonly ephemeral: Ephemeral;
+  readonly public: Uint8Array<ArrayBuffer>;
+} | null> {
+  const pair = await crypto.subtle
+    .generateKey({ name: "X25519" }, false, ["deriveBits"])
+    .catch(() => null);
   if (pair === null || !("privateKey" in pair)) return null;
   const xPublic = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
   const { ml_kem768 } = await postQuantum();
@@ -45,22 +50,43 @@ export async function ephemeral(): Promise<{ readonly ephemeral: Ephemeral; read
 // The handshake's record: SHA-256 of the label, what the device opened
 // with, and the city's answer without its signature. SHA-256 rather than
 // the city's BLAKE3 because WebCrypto has the one and not the other.
-export async function record(label: Uint8Array<ArrayBuffer>, opening: Uint8Array<ArrayBuffer>, unsignedAnswer: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array([...label, ...opening, ...unsignedAnswer])));
+export async function record(
+  label: Uint8Array<ArrayBuffer>,
+  opening: Uint8Array<ArrayBuffer>,
+  unsignedAnswer: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(
+    await crypto.subtle.digest(
+      "SHA-256",
+      new Uint8Array([...label, ...opening, ...unsignedAnswer]),
+    ),
+  );
 }
 
 // What one side signs: the label, its role, the record. The role keeps
 // one side's signature from ever standing in for the other's.
-export function signed(label: Uint8Array<ArrayBuffer>, role: "city" | "device", transcript: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+export function signed(
+  label: Uint8Array<ArrayBuffer>,
+  role: "city" | "device",
+  transcript: Uint8Array<ArrayBuffer>,
+): Uint8Array<ArrayBuffer> {
   return new Uint8Array([...label, ...new TextEncoder().encode(role), ...transcript]);
 }
 
 // The two session keys: HKDF-SHA256, the record as salt, the X25519
 // secret then the ML-KEM secret as input.
-export async function derive(transcript: Uint8Array<ArrayBuffer>, xSecret: Uint8Array<ArrayBuffer>, kemSecret: Uint8Array<ArrayBuffer>): Promise<SessionKeys> {
-  const material = await crypto.subtle.importKey("raw", new Uint8Array([...xSecret, ...kemSecret]), "HKDF", false, [
-    "deriveBits",
-  ]);
+export async function derive(
+  transcript: Uint8Array<ArrayBuffer>,
+  xSecret: Uint8Array<ArrayBuffer>,
+  kemSecret: Uint8Array<ArrayBuffer>,
+): Promise<SessionKeys> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new Uint8Array([...xSecret, ...kemSecret]),
+    "HKDF",
+    false,
+    ["deriveBits"],
+  );
   const expand = async (label: string) =>
     new Uint8Array(
       await crypto.subtle.deriveBits(
@@ -69,7 +95,10 @@ export async function derive(transcript: Uint8Array<ArrayBuffer>, xSecret: Uint8
         256,
       ),
     );
-  return { deviceToCity: await expand("device to city"), cityToDevice: await expand("city to device") };
+  return {
+    deviceToCity: await expand("device to city"),
+    cityToDevice: await expand("city to device"),
+  };
 }
 
 // The session keys the device reaches from the city's answer; null when
@@ -82,9 +111,15 @@ export async function agreed(
 ): Promise<SessionKeys | null> {
   const xSecret = await crypto.subtle
     .importKey("raw", xPeer, { name: "X25519" }, false, [])
-    .then((peer) => crypto.subtle.deriveBits({ name: "X25519", public: peer }, mine.x25519, X25519_BITS))
+    .then((peer) =>
+      crypto.subtle.deriveBits({ name: "X25519", public: peer }, mine.x25519, X25519_BITS),
+    )
     .catch(() => null);
   const { ml_kem768 } = await postQuantum();
-  const kemSecret = Result.getOrNull(Result.try(() => ml_kem768.decapsulate(ciphertext, mine.mlKem)));
-  return xSecret === null || kemSecret === null ? null : derive(transcript, new Uint8Array(xSecret), kemSecret);
+  const kemSecret = Result.getOrNull(
+    Result.try(() => ml_kem768.decapsulate(ciphertext, mine.mlKem)),
+  );
+  return xSecret === null || kemSecret === null
+    ? null
+    : derive(transcript, new Uint8Array(xSecret), kemSecret);
 }

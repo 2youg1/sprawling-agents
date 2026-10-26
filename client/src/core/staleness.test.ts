@@ -23,8 +23,18 @@ describe("a write reaches the answer that reads it back", () => {
   });
 
   test("a prompt step or a page's save makes the room's layers answer stale", () => {
-    const kinds: EventKind[] = ["governed_document_written", "document_written", "checkpoint_committed", "model_returned"];
-    expect(kinds.map((kind) => reachOf("layers", kind))).toEqual(["every", "every", "every", "none"]);
+    const kinds: EventKind[] = [
+      "governed_document_written",
+      "document_written",
+      "checkpoint_committed",
+      "model_returned",
+    ];
+    expect(kinds.map((kind) => reachOf("layers", kind))).toEqual([
+      "every",
+      "every",
+      "every",
+      "none",
+    ]);
   });
 
   test("a record that writes none of them leaves them held", () => {
@@ -38,7 +48,10 @@ describe("a write reaches the answer that reads it back", () => {
 // session opened, a run started in one, or a run ended has to reach it.
 test("a session opened or a run starting or ending makes the sessions answers stale", () => {
   const kinds: EventKind[] = ["session_opened", "run_started", "run_frozen", "model_returned"];
-  expect(kinds.map((kind) => reachOf("sessions", kind))).toEqual(
-    ["every", "every", "every", "none"],
-  );
+  expect(kinds.map((kind) => reachOf("sessions", kind))).toEqual([
+    "every",
+    "every",
+    "every",
+    "none",
+  ]);
 });

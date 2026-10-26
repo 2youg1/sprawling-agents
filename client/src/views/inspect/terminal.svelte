@@ -56,14 +56,21 @@
 
   let raw = $state(false);
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
-  const rawQuestion = $derived.by((): Query | null => (raw && printed.pinned !== null ? { content: { locator: printed.pinned } } : null));
+  const rawQuestion = $derived.by((): Query | null =>
+    raw && printed.pinned !== null ? { content: { locator: printed.pinned } } : null,
+  );
   const rawAsked = $derived(rawQuestion === null ? NOTHING : u.conn.asking.ask(rawQuestion));
-  const original = $derived(readAnswer($rawAsked, (held) => ("content" in held ? held.content : undefined)));
+  const original = $derived(
+    readAnswer($rawAsked, (held) => ("content" in held ? held.content : undefined)),
+  );
 
   function ended(ending: Ending): { readonly word: string; readonly ink: string } {
     switch (ending.kind) {
       case "code":
-        return { word: fill(say($lang, "mon_exited"), { code: String(ending.code) }), ink: ending.code === 0 ? "text-accent" : "text-alert" };
+        return {
+          word: fill(say($lang, "mon_exited"), { code: String(ending.code) }),
+          ink: ending.code === 0 ? "text-accent" : "text-alert",
+        };
       case "stopped":
         return { word: fill(say($lang, "mon_stopped"), { why: ending.why }), ink: "text-alert" };
       case "running":
@@ -95,14 +102,20 @@
         />
       </div>
     {/if}
-    <p class="col-start-1 flex gap-pane overflow-hidden font-mono text-note leading-[calc(2*var(--spacing-baseline))] whitespace-nowrap text-text-faint">
-      {#if printed.took !== null}<span class="figure">{fill(say($lang, "inspect_took"), { ms: count(printed.took) })}</span>{/if}
+    <p
+      class="col-start-1 flex gap-pane overflow-hidden font-mono text-note leading-[calc(2*var(--spacing-baseline))] whitespace-nowrap text-text-faint"
+    >
+      {#if printed.took !== null}<span class="figure"
+          >{fill(say($lang, "inspect_took"), { ms: count(printed.took) })}</span
+        >{/if}
       {#if printed.ending !== null}
         {@const end = ended(printed.ending)}
         <span class={end.ink}>{end.word}</span>
       {/if}
       {#if printed.finished !== null}
-        <time class="figure" datetime={isoInstant(printed.finished)}>{hhmmss(printed.finished)}</time>
+        <time class="figure" datetime={isoInstant(printed.finished)}
+          >{hhmmss(printed.finished)}</time
+        >
       {/if}
       {#if printed.cut > 0}
         <span>{fill(say($lang, "inspect_cut"), { n: count(printed.cut) })}</span>
@@ -119,12 +132,18 @@
     {#if rawQuestion !== null}
       {#if original.kind === "held"}
         {#if original.value.binary}
-          <p class="px-wide py-snug text-note text-text-faint">{fill(say($lang, "inspect_not_text"), { bytes: kib(original.value.bytes) })}</p>
+          <p class="px-wide py-snug text-note text-text-faint">
+            {fill(say($lang, "inspect_not_text"), { bytes: kib(original.value.bytes) })}
+          </p>
         {:else}
           {#if original.value.truncated}
-            <p class="px-wide pt-snug text-note text-text-faint">{fill(say($lang, "inspect_raw_head"), { bytes: kib(original.value.bytes) })}</p>
+            <p class="px-wide pt-snug text-note text-text-faint">
+              {fill(say($lang, "inspect_raw_head"), { bytes: kib(original.value.bytes) })}
+            </p>
           {/if}
-          <pre class="w-max min-w-full px-wide py-snug font-mono text-note leading-[calc(3*var(--spacing-baseline))] text-text-quiet">{original.value.text}</pre>
+          <pre
+            class="w-max min-w-full px-wide py-snug font-mono text-note leading-[calc(3*var(--spacing-baseline))] text-text-quiet">{original
+              .value.text}</pre>
         {/if}
       {:else if original.kind === "unavailable"}
         <div class="px-wide py-snug"><Unanswered query={original.query} asked={rawQuestion} /></div>
@@ -132,11 +151,18 @@
         <p class="px-wide py-snug text-note text-text-faint">…</p>
       {/if}
     {:else}
-      <div class="w-max min-w-full px-wide py-snug font-mono text-note leading-[calc(3*var(--spacing-baseline))] text-text-quiet" aria-live="off">
+      <div
+        class="w-max min-w-full px-wide py-snug font-mono text-note leading-[calc(3*var(--spacing-baseline))] text-text-quiet"
+        aria-live="off"
+      >
         {#each drawn as line, r (r)}
-          <div class="min-h-[1lh] whitespace-pre">{#each line.row as piece, p (p)}<span
-                class="{line.alert ? 'text-alert' : INK[piece.tone]} {piece.bold ? 'font-semibold' : ''}">{piece.text}</span
-              >{/each}</div>
+          <div class="min-h-[1lh] whitespace-pre">
+            {#each line.row as piece, p (p)}<span
+                class="{line.alert ? 'text-alert' : INK[piece.tone]} {piece.bold
+                  ? 'font-semibold'
+                  : ''}">{piece.text}</span
+              >{/each}
+          </div>
         {/each}
       </div>
     {/if}

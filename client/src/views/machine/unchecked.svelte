@@ -1,15 +1,15 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The city has not answered about this machine. Not a grey word: a
-// state with the one action that leaves it.
+  // The city has not answered about this machine. Not a grey word: a
+  // state with the one action that leaves it.
 
-export interface UncheckedProps {
-  readonly onRecheck: () => void;
-}
+  export interface UncheckedProps {
+    readonly onRecheck: () => void;
+  }
 </script>
 
 <script lang="ts">

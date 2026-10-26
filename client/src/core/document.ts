@@ -46,6 +46,11 @@ function documentText(document: DocumentAnswer): Answered<DocumentText> {
   const body = held.body.text;
   return {
     kind: "held",
-    value: { text: body.head.text, bytes: held.bytes, binary: false, truncated: body.coverage === "head" },
+    value: {
+      text: body.head.text,
+      bytes: held.bytes,
+      binary: false,
+      truncated: body.coverage === "head",
+    },
   };
 }

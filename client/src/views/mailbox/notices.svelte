@@ -81,7 +81,11 @@
     <h4 class="pt-snug text-note text-text-faint">{day.label}</h4>
     <ul>
       {#each day.items as notice (notice.key)}
-        <li class="flex min-w-0 items-start gap-snug rounded-card focus-visible:wash" data-entry tabindex="-1">
+        <li
+          class="flex min-w-0 items-start gap-snug rounded-card focus-visible:wash"
+          data-entry
+          tabindex="-1"
+        >
           <div class="min-w-0 flex-1">
             <Notice
               seat="drawer"

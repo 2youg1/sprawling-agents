@@ -22,7 +22,8 @@ import type {
 } from "../../../wire";
 
 // What the page says about each control, one phrase per field.
-export type ControlField = "title" | "does" | "benefit" | "affects" | "overlooked" | "undo" | "editions";
+export type ControlField =
+  "title" | "does" | "benefit" | "affects" | "overlooked" | "undo" | "editions";
 
 export function controlWord(control: PrivacyControl, field: ControlField): Key {
   const key: `privacy_control_${PrivacyControl}_${ControlField}` = `privacy_control_${control}_${field}`;

@@ -32,19 +32,25 @@
   const { members, newest, walking, onInstall }: Props = $props();
   const { lang } = ui();
 
-  const pressable = $derived(members.filter((each) => offerOf(each) === "press").map((each) => each.name));
+  const pressable = $derived(
+    members.filter((each) => offerOf(each) === "press").map((each) => each.name),
+  );
   const wanting = $derived(
     members.some((each) => !("present" in each.state) && each.need === "required"),
   );
   // The pack is complete when every member this city can install here
   // is here; a member only a person can install (kani on Windows) says
   // so on its own line rather than keeping the whole pack "absent".
-  const complete = $derived(members.every((each) => "present" in each.state || offerOf(each) === "by_hand"));
+  const complete = $derived(
+    members.every((each) => "present" in each.state || offerOf(each) === "by_hand"),
+  );
 </script>
 
 <li class="col-span-full flex min-w-0 flex-col gap-snug border-t border-edge pt-snug pb-base">
   <div class="flex min-w-0 flex-wrap items-center gap-snug">
-    <span class="shrink-0 text-label font-label text-text">{say($lang, "machine_pack_rust_tools")}</span>
+    <span class="shrink-0 text-label font-label text-text"
+      >{say($lang, "machine_pack_rust_tools")}</span
+    >
     <Badge
       text={say($lang, complete ? "machine_present" : "machine_absent")}
       weight={wanting ? "alert" : "quiet"}

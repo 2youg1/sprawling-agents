@@ -47,15 +47,27 @@ export interface Tick {
 
 // What stands at the key's top right corner: how many things need the
 // person, a dot for something new that has no number, or nothing.
-export type Corner = { readonly kind: "none" } | { readonly kind: "count"; readonly text: string } | { readonly kind: "fresh" };
+export type Corner =
+  | { readonly kind: "none" }
+  | { readonly kind: "count"; readonly text: string }
+  | { readonly kind: "fresh" };
 
 // A key is a button, or a link when it goes to a page, so a middle click
 // and a new tab work as they do on every other link.
-export type KeyWire = { readonly as: "button"; readonly wire: ButtonWire } | { readonly as: "link"; readonly wire: LinkWire };
+export type KeyWire =
+  | { readonly as: "button"; readonly wire: ButtonWire }
+  | { readonly as: "link"; readonly wire: LinkWire };
 
 export type ButtonWire = Pick<
   HTMLButtonAttributes,
-  "type" | "aria-label" | "aria-expanded" | "aria-controls" | "onclick" | "onpointerdown" | "onpointerup" | "onpointerleave"
+  | "type"
+  | "aria-label"
+  | "aria-expanded"
+  | "aria-controls"
+  | "onclick"
+  | "onpointerdown"
+  | "onpointerup"
+  | "onpointerleave"
 > &
   // The seat's hold on the drawn element, when it moves the focus there.
   Readonly<Record<symbol, Attachment<HTMLElement>>>;

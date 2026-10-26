@@ -22,7 +22,9 @@
   {#if look.unavailable !== undefined}
     <p class="flex basis-full flex-col gap-tight text-note text-text-faint wrap-anywhere">
       <span>{look.unavailable.said}</span>
-      {#if look.unavailable.reason !== undefined}<span class="font-mono">{look.unavailable.reason}</span>{/if}
+      {#if look.unavailable.reason !== undefined}<span class="font-mono"
+          >{look.unavailable.reason}</span
+        >{/if}
     </p>
   {/if}
 </div>

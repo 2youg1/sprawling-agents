@@ -42,7 +42,11 @@
     const files = new SvelteMap<string, number>();
     for (const turn of round) {
       for (const call of turn.calls) {
-        if ((call.tool === "read" || call.tool === "search") && call.subject !== null && call.subject !== undefined) {
+        if (
+          (call.tool === "read" || call.tool === "search") &&
+          call.subject !== null &&
+          call.subject !== undefined
+        ) {
           files.set(call.subject, (files.get(call.subject) ?? 0) + 1);
         }
       }
@@ -79,17 +83,24 @@
       <ul class="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-x-snug text-note">
         {#each turns as turn (turn.number)}
           <li class="col-span-full my-tight grid grid-cols-subgrid items-center">
-            <span class="whitespace-nowrap text-text-faint">{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span>
+            <span class="whitespace-nowrap text-text-faint"
+              >{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span
+            >
             <!-- The legend under the list names the three colours, so a
                  hint on each segment would say a second time what the
                  page already says once. -->
-            <span class="flex h-dot flex-1 overflow-hidden rounded-pill bg-track" aria-hidden="true">
+            <span
+              class="flex h-dot flex-1 overflow-hidden rounded-pill bg-track"
+              aria-hidden="true"
+            >
               <span class="bg-mark" style:width="{barOf(turn.used, 'cached')}%"></span>
               <span class="bg-accent" style:width="{barOf(turn.used, 'input')}%"></span>
               <span class="bg-accent-solid" style:width="{barOf(turn.used, 'output')}%"></span>
             </span>
             <span class="figure min-w-figure text-right text-text-faint">
-              {turn.used !== null && turn.used !== undefined ? count(turn.used.input + turn.used.output) : "—"}
+              {turn.used !== null && turn.used !== undefined
+                ? count(turn.used.input + turn.used.output)
+                : "—"}
             </span>
           </li>
         {/each}
@@ -102,7 +113,10 @@
           ><span class="size-dot rounded-pill bg-accent"></span>{say($lang, "run_input")}</span
         >
         <span class="inline-flex items-center gap-tight"
-          ><span class="size-dot rounded-pill bg-accent-solid"></span>{say($lang, "run_output")}</span
+          ><span class="size-dot rounded-pill bg-accent-solid"></span>{say(
+            $lang,
+            "run_output",
+          )}</span
         >
       </p>
     {:else}

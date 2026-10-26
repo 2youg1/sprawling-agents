@@ -26,14 +26,24 @@ describe("a note's row", () => {
   test("an open wait says the time left, and once it is due says so in the alert ink", () => {
     expect(replyWaitLook("en", ROOM, 90_000, null)).toEqual({
       role: undefined,
-      pieces: [{ kind: "words", text: "waiting for a reply from", ink: "faint" }, ROOM, { kind: "words", text: "· 1m 30s left", ink: "quiet" }],
+      pieces: [
+        { kind: "words", text: "waiting for a reply from", ink: "faint" },
+        ROOM,
+        { kind: "words", text: "· 1m 30s left", ink: "quiet" },
+      ],
     });
-    expect(replyWaitLook("en", ROOM, 0, undefined).pieces[2]).toEqual({ kind: "words", text: "· past the deadline", ink: "alert" });
+    expect(replyWaitLook("en", ROOM, 0, undefined).pieces[2]).toEqual({
+      kind: "words",
+      text: "· past the deadline",
+      ink: "alert",
+    });
   });
 
   test("each of the three endings of a wait is drawn in its own ink", () => {
     expect(
-      (["reply", "timeout", "left"] as const).map((by) => replyWaitLook("en", ROOM, -1, { by, t: AT }).pieces[2]),
+      (["reply", "timeout", "left"] as const).map(
+        (by) => replyWaitLook("en", ROOM, -1, { by, t: AT }).pieces[2],
+      ),
     ).toEqual([
       { kind: "words", text: "· replied", ink: "accent" },
       { kind: "words", text: "· no reply before the deadline", ink: "alert" },
@@ -42,7 +52,9 @@ describe("a note's row", () => {
   });
 
   test("a handback says how it ended: finished in the accent ink, stopped in the alert ink", () => {
-    expect(handbackLook("en", ROOM, { finished: { verified_by: "cargo nextest" } }, "12:00")).toEqual({
+    expect(
+      handbackLook("en", ROOM, { finished: { verified_by: "cargo nextest" } }, "12:00"),
+    ).toEqual({
       role: "note",
       pieces: [
         ROOM,
@@ -51,7 +63,9 @@ describe("a note's row", () => {
         { kind: "words", text: "· 12:00", ink: "faint" },
       ],
     });
-    expect(handbackLook("en", ROOM, { stopped: { because: "refused" } }, "12:00").pieces[2]).toEqual({
+    expect(
+      handbackLook("en", ROOM, { stopped: { because: "refused" } }, "12:00").pieces[2],
+    ).toEqual({
       kind: "words",
       text: "stopped, because refused",
       ink: "alert",

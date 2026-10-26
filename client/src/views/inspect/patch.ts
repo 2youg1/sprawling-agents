@@ -14,7 +14,11 @@ import { numbered } from "../changes";
 import type { CodeLine } from "../changes";
 
 // The patch's own marks for the three kinds of code line.
-const SIGN: Readonly<Record<CodeLine["kind"], string>> = { added: "+", removed: "\u2212", context: "" };
+const SIGN: Readonly<Record<CodeLine["kind"], string>> = {
+  added: "+",
+  removed: "\u2212",
+  context: "",
+};
 
 // The patch's words, already in the person's language.
 export interface PatchWords {
@@ -42,7 +46,12 @@ export interface QuoteWire {
 export type PatchRow =
   | { readonly kind: "withheld"; readonly key: number; readonly text: string }
   | { readonly kind: "head"; readonly key: number; readonly text: string }
-  | { readonly kind: "hunk"; readonly key: number; readonly folded: string | undefined; readonly text: string }
+  | {
+      readonly kind: "hunk";
+      readonly key: number;
+      readonly folded: string | undefined;
+      readonly text: string;
+    }
   | {
       readonly kind: "code";
       readonly key: number;
@@ -64,13 +73,22 @@ export interface PatchLook {
 }
 
 // The whole value a look draws.
-export function lookOf(patch: HunksAnswer, cursor: number | null, words: PatchWords, hands: PatchHands): PatchLook {
+export function lookOf(
+  patch: HunksAnswer,
+  cursor: number | null,
+  words: PatchWords,
+  hands: PatchHands,
+): PatchLook {
   return {
     source: patch.path,
     rows: numbered(patch).map((line): PatchRow => {
       switch (line.kind) {
         case "withheld":
-          return { kind: "withheld", key: line.number, text: words.withheld(String(line.number), line.reason) };
+          return {
+            kind: "withheld",
+            key: line.number,
+            text: words.withheld(String(line.number), line.reason),
+          };
         case "head":
           return { kind: "head", key: line.number, text: line.text };
         case "hunk":
@@ -89,7 +107,12 @@ export function lookOf(patch: HunksAnswer, cursor: number | null, words: PatchWo
   };
 }
 
-function codeRow(line: CodeLine, cursor: number | null, words: PatchWords, hands: PatchHands): PatchRow {
+function codeRow(
+  line: CodeLine,
+  cursor: number | null,
+  words: PatchWords,
+  hands: PatchHands,
+): PatchRow {
   const place = line.kind === "removed" ? line.old : line.new;
   const { href } = hands;
   return {

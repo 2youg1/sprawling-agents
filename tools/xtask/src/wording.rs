@@ -62,9 +62,13 @@
 //!
 //! **A proper noun cannot go in the table**, because `web::lang`'s own
 //! test refuses a phrase whose two languages are equal, and `openai` is
-//! `openai` in both. Those sites carry `wording-ok: <reason>` on the
-//! line or the line above - the same mark, the same two-line rule and
-//! the same trade as `lexicon-ok:`.
+//! `openai` in both. Those sites carry `wording-ok: <reason>`, which
+//! waives the block the marker stands in. That is stated in indentation
+//! rather than in "this line or the line above" because a formatter
+//! decides where the line breaks fall: `bun fmt` wraps a start tag or an
+//! object entry eight columns deeper and leaves the marker where it was,
+//! so a marker counted in lines names a line that no longer holds the
+//! word it was written for.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -195,14 +199,34 @@ fn drawn(body: &str) -> &str {
     }
 }
 
-/// A waiver on the line itself or the line above it.
+/// A waiver covers the block the marker stands in: its own line, and
+/// every line below it that is indented at least as far, until a line
+/// outdents past it.
+///
+/// Indentation rather than a count of lines is what a formatter keeps.
+/// `bun fmt` wraps a `placeholder` attribute or an object entry onto its
+/// own line eight columns in, and moves no comment, so a marker counted
+/// in lines ends up above a line that no longer holds the word it was
+/// written for. A marker at the top level therefore covers the module,
+/// which is the same rule read at the outermost block.
 fn waived(lines: &[&str], line: usize) -> bool {
-    let here = line.checked_sub(1).and_then(|at| lines.get(at));
-    let above = line.checked_sub(2).and_then(|at| lines.get(at));
-    [here, above]
-        .into_iter()
-        .flatten()
-        .any(|text| text.contains(EXEMPT_MARK))
+    let mut floor = usize::MAX;
+    for text in lines.iter().take(line).rev() {
+        if text.trim().is_empty() {
+            continue;
+        }
+        let depth = indent(text);
+        if text.contains(EXEMPT_MARK) && floor >= depth {
+            return true;
+        }
+        floor = floor.min(depth);
+    }
+    false
+}
+
+/// How far a line is indented, in bytes of leading whitespace.
+fn indent(text: &str) -> usize {
+    text.len().saturating_sub(text.trim_start().len())
 }
 
 /// The first 60 characters, so a report of forty findings stays

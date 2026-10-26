@@ -41,6 +41,7 @@ import client.spec.Views.Workspace
 - 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏；以及图标集 `@lucide/svelte`，只经 `parts/glyph.svelte` 一处出口、按图标单独导入（`docs/frontend-method.md` §4-34）；以及 RefRain 的五个 `@codemirror` 包，只由 `views/refrain/` 读，是懒加载的一块（7N、D23）；以及 `pdfjs-dist` 与 `docx-preview`，只由 `views/refrain/formats/` 读，各是一块懒加载的分块，pdf.js 的 worker、CMap、两种符号字体与三个 WebAssembly 解码器是 bundle 里单独的文件（4-54、D32）。hash 路由手写，不引路由库；组件库按 §9 的判定逐个引入。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。
 - `trustedDependencies` 留空：bun 默认不跑生命周期脚本，任何包的 postinstall 都不执行。
+- 格式化的家是仓库根 `bunfig.toml` 的 `[fmt]`：折在 rustfmt 的 100 列，`.md` 与 `.toml` 不归它（散文与清单按读的人折行），生成的文件归各自的生成器（`client/src/wire.ts` 由 `cargo xtask wire-ts` 写，`crates/agent_protocols/catalog/registry.json` 由 `cargo xtask acp-catalog` 写，`lake-manifest.json` 由 lake 写，`crates/city/skills/playback/` 由它的 `assemble.js` 逐字节拼出）。`just fmt` 写、`just fmt-check` 判，后者是 `just check` 的第二个阶段。
 
 | 分部 | 规定什么 | 标签 |
 |---|---|---|
@@ -68,7 +69,7 @@ import client.spec.Views.Workspace
 
 /-! ## 2 验收标准
 
-`bun run lint`、`bun run typecheck`、`bun run test` 三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
+`bun run lint`、`bun check`、`bun run typecheck`、`bun run test` 四样绿，`bun fmt --check` 与 `cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这四条脚本与那一道格式检查的一条线。`bun check` 只读 `.ts`（583 个文件，零点几秒），`bun run typecheck` 的 `svelte-check` 才读 `.svelte`，所以后者仍是类型车道，前者只让一个 `.ts` 错误早些红。
 
 在一座真城加一个说 OpenAI 形的假供应方上走得通的：连接与握手、上手指南的五步与「开始对话」（§7G）、从 composer 派活、工具调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与文件原文、run 页的统计栏与透镜、记录的三种读法（时间线与它的三个来源、归档、回收站；`#/record/log` 打开只留日志的时间线）、成本页、设置页 attach 与 select、`#/mcp` 三扇门加删（写进 `CONFIG.toml`）、楼页提交列表与 session 跳转、草稿留存。
 

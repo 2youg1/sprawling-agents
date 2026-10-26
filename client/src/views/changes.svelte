@@ -54,7 +54,9 @@
 
   const question = $derived<Query>({ changes: { base, head } });
   const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($asked, (held) => ("changes" in held ? held.changes.files : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) => ("changes" in held ? held.changes.files : undefined)),
+  );
   const files = $derived(read.kind === "held" ? read.value : undefined);
 
   // The patch under the open row. The question exists only while a row
@@ -65,7 +67,9 @@
     return at === null || head === null ? null : { hunks: { oid_a: base, oid_b: head, path: at } };
   });
   const patchStore = $derived(patchQuestion === null ? NOTHING : u.conn.asking.ask(patchQuestion));
-  const patchRead = $derived(readAnswer($patchStore, (held) => ("hunks" in held ? held.hunks : undefined)));
+  const patchRead = $derived(
+    readAnswer($patchStore, (held) => ("hunks" in held ? held.hunks : undefined)),
+  );
   const patch = $derived(patchRead.kind === "held" ? patchRead.value : undefined);
 
   function toggle(path: string): void {

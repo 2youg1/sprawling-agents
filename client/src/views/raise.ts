@@ -52,6 +52,9 @@ export function waiting(buildings: readonly BuildingProgress[]): readonly Addres
 
 // The waiting folders the page offers to fill in: the one already in the
 // box is not offered again, since the box says it.
-export function fillable(buildings: readonly BuildingProgress[], typed: string): readonly Address[] {
+export function fillable(
+  buildings: readonly BuildingProgress[],
+  typed: string,
+): readonly Address[] {
   return waiting(buildings).filter((folder) => folder !== typed.trim());
 }

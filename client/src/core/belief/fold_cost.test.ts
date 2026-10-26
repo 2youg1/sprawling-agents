@@ -87,7 +87,9 @@ describe("fold cost", () => {
       }
       const perFrameUs = ((performance.now() - start) * 1000) / FRAMES;
       stop();
-      console.log(`client_fold R=${String(size)} per-frame-us=${perFrameUs.toFixed(1)} read=${String(read)}`);
+      console.log(
+        `client_fold R=${String(size)} per-frame-us=${perFrameUs.toFixed(1)} read=${String(read)}`,
+      );
       expect(read).toBe(size);
     }
   });

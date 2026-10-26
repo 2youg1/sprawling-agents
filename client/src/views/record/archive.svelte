@@ -28,7 +28,9 @@
 
   const question = $derived<Query>({ archive_search: { needle } });
   const search = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($search, (held) => ("archive" in held ? held.archive.hits : undefined)));
+  const read = $derived(
+    readAnswer($search, (held) => ("archive" in held ? held.archive.hits : undefined)),
+  );
   const hits = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 

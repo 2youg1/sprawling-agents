@@ -69,7 +69,9 @@ const ORDER: readonly Answer[] = ["yes", "edit", "no"];
 // The choices the card offers: at most one per answer, in the order
 // yes, edit, no, whatever order the caller handed them in.
 export function ordered(choices: readonly Choice[]): readonly Choice[] {
-  return ORDER.flatMap((answer) => choices.filter((choice) => choice.answer === answer).slice(0, 1));
+  return ORDER.flatMap((answer) =>
+    choices.filter((choice) => choice.answer === answer).slice(0, 1),
+  );
 }
 
 // The choice a chord answers: the one the card offers on that chord's

@@ -30,10 +30,15 @@
   const stale = $derived("version" in upstream && behind(installed, upstream.version));
   // The newest column's text, and what the network said when the
   // source could not be read.
-  const reading = $derived.by((): { readonly version: string | null; readonly phrase: string | null; readonly said: string | null } =>
-    "version" in upstream
-      ? { version: upstream.version, phrase: null, said: null }
-      : { version: null, phrase: say($lang, upstream.key), said: upstream.said },
+  const reading = $derived.by(
+    (): {
+      readonly version: string | null;
+      readonly phrase: string | null;
+      readonly said: string | null;
+    } =>
+      "version" in upstream
+        ? { version: upstream.version, phrase: null, said: null }
+        : { version: null, phrase: say($lang, upstream.key), said: upstream.said },
   );
 </script>
 

@@ -78,14 +78,27 @@ export const SESSIONS_AT_REST = 5;
 
 // `lines` newest first, as `Query::Sessions` answers them; the first is
 // the room's current session.
-export function sessionPlaces(at: SessionsAt, lines: readonly SessionLine[], lang: Lang, now: number): SessionPlace[] {
+export function sessionPlaces(
+  at: SessionsAt,
+  lines: readonly SessionLine[],
+  lang: Lang,
+  now: number,
+): SessionPlace[] {
   return lines.map((line, index) => {
     const named = line.name ?? line.preview ?? "";
-    const kind = index === 0 ? "palette_session_current" : line.began === at.viewing ? "palette_session_shown" : "palette_session";
+    const kind =
+      index === 0
+        ? "palette_session_current"
+        : line.began === at.viewing
+          ? "palette_session_shown"
+          : "palette_session";
     return {
       label: named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`,
       hint: index === 0 ? say(lang, kind) : `${say(lang, kind)} · ${ago(lang, line.at, now)}`,
-      to: index === 0 ? { kind: "talk", address: at.room } : { kind: "talk", address: at.room, session: line.began },
+      to:
+        index === 0
+          ? { kind: "talk", address: at.room }
+          : { kind: "talk", address: at.room, session: line.began },
     };
   });
 }
@@ -112,7 +125,10 @@ export interface CarryPlace {
 }
 
 export function carryPlaces(reach: CarryReach): CarryPlace[] {
-  const rooms = reach.typed === null || reach.rooms.includes(reach.typed) ? reach.rooms : [...reach.rooms, reach.typed];
+  const rooms =
+    reach.typed === null || reach.rooms.includes(reach.typed)
+      ? reach.rooms
+      : [...reach.rooms, reach.typed];
   return rooms.map((to) => ({ to, why: carryWhy(reach, to) }));
 }
 

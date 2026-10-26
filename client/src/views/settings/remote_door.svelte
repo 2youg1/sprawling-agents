@@ -77,7 +77,8 @@
       return;
     }
     told = toldOf(before, next);
-    if (next.focus !== before.focus) void tick().then(() => {
+    if (next.focus !== before.focus)
+      void tick().then(() => {
         focus(next);
       });
   }
@@ -85,7 +86,8 @@
   // Whether the command left the page; a closed link sends nothing.
   function send(sent: DoorSent): boolean {
     if (!u.send(doorCommand(sent, lastingMs()))) return false;
-    if (sent.kind === "confirm") patience = setTimeout(() => {
+    if (sent.kind === "confirm")
+      patience = setTimeout(() => {
         move({ kind: "settled" });
       }, RECEIPT_MS);
     return true;
@@ -96,9 +98,13 @@
   }
 
   function toldOf(before: Door, next: Door): { readonly key: Key; readonly code: string } | null {
-    if (next.phase.kind === "refused") return { key: refusedKey(next.phase.code), code: next.phase.code };
+    if (next.phase.kind === "refused")
+      return { key: refusedKey(next.phase.code), code: next.phase.code };
     if (before.phase.kind === "confirming" && next.phase.kind === "idle")
-      return { key: before.phase.opener === "door" ? "remote_door_done_door" : "remote_door_done_key", code: "" };
+      return {
+        key: before.phase.opener === "door" ? "remote_door_done_door" : "remote_door_done_key",
+        code: "",
+      };
     return next.phase.kind === "idle" ? told : null;
   }
 
@@ -115,14 +121,22 @@
   }
 
   function close(): void {
-    told = u.send(doorCommand("close", 0)) ? { key: "remote_door_closing", code: "" } : { key: "remote_door_unsent", code: "" };
+    told = u.send(doorCommand("close", 0))
+      ? { key: "remote_door_closing", code: "" }
+      : { key: "remote_door_unsent", code: "" };
   }
 
   const asking = $derived(door.phase.kind === "awaiting" || door.phase.kind === "confirming");
   const busy = $derived(door.phase.kind === "requesting" || door.phase.kind === "confirming");
 
   // One door control; a press on a disabled one is dropped here.
-  function doorKey(glyph: GlyphName, name: Key, note: Key, disabled: boolean, onPress: () => void): DoorKeyLook {
+  function doorKey(
+    glyph: GlyphName,
+    name: Key,
+    note: Key,
+    disabled: boolean,
+    onPress: () => void,
+  ): DoorKeyLook {
     return {
       glyph,
       label: say($lang, name),
@@ -180,7 +194,9 @@
       }}
     >
       <div class="flex min-w-0 flex-col gap-tight">
-        <label class="text-note text-text-quiet" for={`${uid}-code`}>{say($lang, "remote_door_code")}</label>
+        <label class="text-note text-text-quiet" for={`${uid}-code`}
+          >{say($lang, "remote_door_code")}</label
+        >
         <input
           id={`${uid}-code`}
           bind:this={input}
@@ -208,8 +224,12 @@
         note={say($lang, "remote_door_confirm_note")}
         wire={{ type: "submit", "aria-disabled": door.phase.kind === "confirming" }}
       />
-      <p id={`${uid}-code-help`} class="basis-full text-note text-text-faint">{say($lang, "remote_door_code_help")}</p>
+      <p id={`${uid}-code-help`} class="basis-full text-note text-text-faint">
+        {say($lang, "remote_door_code_help")}
+      </p>
     </form>
   {/if}
-  <p role="status" class="text-body text-text-quiet empty:hidden">{told === null ? "" : fill(say($lang, told.key), { code: told.code })}</p>
+  <p role="status" class="text-body text-text-quiet empty:hidden">
+    {told === null ? "" : fill(say($lang, told.key), { code: told.code })}
+  </p>
 </section>

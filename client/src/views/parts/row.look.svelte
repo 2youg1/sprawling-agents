@@ -1,24 +1,24 @@
 <script lang="ts">
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How one row is drawn, and nothing else: the words arrive translated
-// and the wiring arrives built (`./row`, `RowLook`), so a look taken
-// from a component library draws the same row by spreading the same two
-// bags.
-//
-// A row lights with the ink wash, never with a lifted surface: the
-// shell's rows sit on the page, and a lifted surface would draw a card
-// where there is only a row (docs/frontend-method.md §7A-5). The wash
-// arrives in `short` and leaves on the leaving curve, and it stays
-// while anything inside the row holds the focus ring, because a ring
-// around one word in a wide row is a position a person has to hunt for.
+  // How one row is drawn, and nothing else: the words arrive translated
+  // and the wiring arrives built (`./row`, `RowLook`), so a look taken
+  // from a component library draws the same row by spreading the same two
+  // bags.
+  //
+  // A row lights with the ink wash, never with a lifted surface: the
+  // shell's rows sit on the page, and a lifted surface would draw a card
+  // where there is only a row (docs/frontend-method.md §7A-5). The wash
+  // arrives in `short` and leaves on the leaving curve, and it stays
+  // while anything inside the row holds the focus ring, because a ring
+  // around one word in a wide row is a position a person has to hunt for.
 
-import type { RowLook } from "./row";
+  import type { RowLook } from "./row";
 
-const look: RowLook = $props();
+  const look: RowLook = $props();
 </script>
 
 {#snippet texts()}

@@ -22,11 +22,7 @@ describe("watching the monitor", () => {
     first();
     second();
     watching.reconnected();
-    expect(sent).toEqual([
-      '{"monitor":"watch"}',
-      '{"monitor":"watch"}',
-      '{"monitor":"release"}',
-    ]);
+    expect(sent).toEqual(['{"monitor":"watch"}', '{"monitor":"watch"}', '{"monitor":"release"}']);
   });
 
   test("the city hears the most any watcher wants: the page over the summary", () => {

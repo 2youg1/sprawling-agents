@@ -15,7 +15,16 @@ import type { GlyphName, Weight } from "../parts/glyph";
 import { phaseOf } from "./lineage";
 import type { Phase } from "./lineage";
 
-export const PHASES: readonly Phase[] = ["model", "tool", "person", "reply", "idle", "done", "stopped", "capped"];
+export const PHASES: readonly Phase[] = [
+  "model",
+  "tool",
+  "person",
+  "reply",
+  "idle",
+  "done",
+  "stopped",
+  "capped",
+];
 
 // The mark a run's row carries: each ending its own drawing, because a
 // forced-colours mode repaints the ink and leaves only the shape.

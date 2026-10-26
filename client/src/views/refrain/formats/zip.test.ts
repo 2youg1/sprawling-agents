@@ -25,13 +25,22 @@ describe("unpack", () => {
   });
 
   test("refuses unopened an archive that promises more than a page holds", async () => {
-    const archive = zipOf([{ name: "big.bin", bytes: utf8("x"), packed: await deflated(utf8("x")), stated: UNPACKED_MAX + 1 }]);
+    const archive = zipOf([
+      {
+        name: "big.bin",
+        bytes: utf8("x"),
+        packed: await deflated(utf8("x")),
+        stated: UNPACKED_MAX + 1,
+      },
+    ]);
     expect(await unpack(archive)).toEqual({ kind: "refused", why: "too_large" });
   });
 
   test("stops a part that inflates past the size it promised", async () => {
     const bomb = new Uint8Array(1024 * 1024);
-    const archive = zipOf([{ name: "word/document.xml", bytes: bomb, packed: await deflated(bomb), stated: 1024 }]);
+    const archive = zipOf([
+      { name: "word/document.xml", bytes: bomb, packed: await deflated(bomb), stated: 1024 },
+    ]);
     expect(await unpack(archive)).toEqual({ kind: "refused", why: "shape" });
   });
 
@@ -42,7 +51,9 @@ describe("unpack", () => {
   });
 
   test("refuses deflated bytes that do not inflate", async () => {
-    const archive = zipOf([{ name: "a.txt", bytes: utf8("stored"), packed: utf8("\u00ff\u00ff not deflate") }]);
+    const archive = zipOf([
+      { name: "a.txt", bytes: utf8("stored"), packed: utf8("\u00ff\u00ff not deflate") },
+    ]);
     expect(await unpack(archive)).toEqual({ kind: "refused", why: "shape" });
   });
 });

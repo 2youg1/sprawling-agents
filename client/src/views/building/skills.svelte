@@ -80,7 +80,8 @@
   // newest run was frozen with: admitted, and not pinned by that run at
   // the hash the shelf holds now.
   function changed(skill: SkillLine): string | undefined {
-    if (newest === undefined || !skill.admitted || skill.pinned_by.includes(newest)) return undefined;
+    if (newest === undefined || !skill.admitted || skill.pinned_by.includes(newest))
+      return undefined;
     return say($lang, "skills_changed");
   }
 
@@ -119,7 +120,9 @@
               summary={skill.disclosure}
               shelf={place.word}
               at={place.at ?? ""}
-              admitted={skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
+              admitted={skill.admitted
+                ? say($lang, "skills_admitted")
+                : say($lang, "skills_not_admitted")}
               used={skill.pinned_by.length > 0
                 ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
                 : say($lang, "skills_used_never")}

@@ -96,7 +96,9 @@ export async function enter(origin: string, open: string | null, label: string):
   }
   const credential = credentialOf(origin, device);
   const renewed = await credential.renew();
-  return renewed === "forgotten" ? { kind: "pair", why: "session_lost" } : { kind: "enter", credential };
+  return renewed === "forgotten"
+    ? { kind: "pair", why: "session_lost" }
+    : { kind: "enter", credential };
 }
 
 // One pairing with a code the person typed, or the open code. The key

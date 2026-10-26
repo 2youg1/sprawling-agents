@@ -65,7 +65,10 @@
   const base = $derived(rounds?.opened_at ?? null);
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_session")}>
+<section
+  class="flex min-h-0 flex-1 flex-col overflow-hidden"
+  aria-label={say($lang, "world_session")}
+>
   {@render head()}
   {#if title !== undefined}
     <h3 class="truncate text-heading font-heading text-text">{title}</h3>
@@ -77,18 +80,24 @@
       <!-- A long worktree name gives way; the base commit, seven
       characters, stays whole. -->
       {#if worktree !== null}
-        <span class="min-w-0 truncate">{fill(say($lang, "world_worktree"), { name: worktree })}</span>
+        <span class="min-w-0 truncate"
+          >{fill(say($lang, "world_worktree"), { name: worktree })}</span
+        >
       {/if}
       {#if worktree !== null && base !== null}
         <!-- wording-ok: a separator glyph between two facts, hidden from screen readers -->
         <span aria-hidden="true">·</span>
       {/if}
       {#if base !== null}
-        <span class="shrink-0">{fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}</span>
+        <span class="shrink-0">{fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}</span
+        >
       {/if}
     </p>
     {#if run !== null}
-      <a class="shrink-0 text-note text-accent hover:text-accent-hover" href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a>
+      <a
+        class="shrink-0 text-note text-accent hover:text-accent-hover"
+        href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a
+      >
     {/if}
   </div>
   {#if run === null}

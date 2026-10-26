@@ -19,7 +19,8 @@ spans the row's height beside whatever control follows. -->
 
 <div class="relative flex min-w-0 flex-1">
   {#if look.current}
-    <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
+    <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"
+    ></span>
   {/if}
   <button
     {...look.wire}

@@ -19,7 +19,16 @@
   // minute apart - rather than a random one, so the render gate sees
   // the same table every time.
 
-  import type { Answer, DayCount, McpServerUsage, McpUse, Query, SkillAudit, SkillUsageLine, SkillUse } from "../../wire";
+  import type {
+    Answer,
+    DayCount,
+    McpServerUsage,
+    McpUse,
+    Query,
+    SkillAudit,
+    SkillUsageLine,
+    SkillUse,
+  } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
   const START = 1_790_000_000_000;
@@ -42,11 +51,18 @@
   // `count` uses spread over `days` days, one minute apart within a day,
   // with every seventh one refused and every eleventh unrecorded, and
   // the per-day counts that fold them.
-  function spread(count: number, days: number): { readonly at: readonly number[]; readonly perDay: readonly DayCount[] } {
-    const at = Array.from({ length: count }, (_, n) => START + (n % days) * DAY + Math.floor(n / days) * MINUTE).sort((a, b) => a - b);
+  function spread(
+    count: number,
+    days: number,
+  ): { readonly at: readonly number[]; readonly perDay: readonly DayCount[] } {
+    const at = Array.from(
+      { length: count },
+      (_, n) => START + (n % days) * DAY + Math.floor(n / days) * MINUTE,
+    ).sort((a, b) => a - b);
     const perDay = Array.from({ length: Math.min(count, days) }, (_, n) => ({
       day: dayOf(n),
-      count: at.filter((moment) => moment >= START + n * DAY && moment < START + (n + 1) * DAY).length,
+      count: at.filter((moment) => moment >= START + n * DAY && moment < START + (n + 1) * DAY)
+        .length,
     }));
     return { at, perDay };
   }
@@ -57,7 +73,13 @@
 
   const RESIDENTS = [Address.make("release/ledger"), Address.make("memory/gate"), null] as const;
 
-  function skill(name: string, count: number, days: number, audit: SkillAudit, part: string): SkillUsageLine {
+  function skill(
+    name: string,
+    count: number,
+    days: number,
+    audit: SkillAudit,
+    part: string,
+  ): SkillUsageLine {
     const { at, perDay } = spread(count, days);
     const uses: SkillUse[] = at.map((moment, n) => ({
       at: TimeMs.make(moment),
@@ -70,10 +92,26 @@
     }));
     return {
       name,
-      held: [{ audit, digest: digest(name.length), shelf: { library: Address.make(`.sprawling/library/engineering/${name}.md`) } }],
+      held: [
+        {
+          audit,
+          digest: digest(name.length),
+          shelf: { library: Address.make(`.sprawling/library/engineering/${name}.md`) },
+        },
+      ],
       per_day: perDay,
       uses,
-      versions: count === 0 ? [] : [{ at: TimeMs.make(START), digest: digest(name.length), run: run(1), seq: Seq.make(1_000) }],
+      versions:
+        count === 0
+          ? []
+          : [
+              {
+                at: TimeMs.make(START),
+                digest: digest(name.length),
+                run: run(1),
+                seq: Seq.make(1_000),
+              },
+            ],
     };
   }
 
@@ -106,10 +144,22 @@
   // a copy no shelf holds any more, and a long list of skills nobody
   // has read.
   const SKILLS_LONG: readonly SkillUsageLine[] = [
-    skill("apostle-opusmethodology-karatani-origins", 240, 30, WARNED, "references/kernels-in-japanese.md"),
+    skill(
+      "apostle-opusmethodology-karatani-origins",
+      240,
+      30,
+      WARNED,
+      "references/kernels-in-japanese.md",
+    ),
     skill("rust-coverage-meaningful-tests", 61, 21, PASSED, "SKILL.md"),
     { ...skill("workflow-authoring", 12, 6, STALE, "SKILL.md"), held: [] },
-    skill("diagnosing-bugs", 9, 4, { state: "audited", at: Seq.make(902), verdict: "fail" }, "SKILL.md"),
+    skill(
+      "diagnosing-bugs",
+      9,
+      4,
+      { state: "audited", at: Seq.make(902), verdict: "fail" },
+      "SKILL.md",
+    ),
     ...[
       "authority-review",
       "blast-radius",
@@ -133,7 +183,11 @@
   // A week: one server with two tools in use, one a building names and
   // nobody has called.
   const SERVERS_TYPICAL: readonly McpServerUsage[] = [
-    { server: "github", configured: true, tools: [tool("create_issue", 4, 3), tool("search_code", 17, 5)] },
+    {
+      server: "github",
+      configured: true,
+      tools: [tool("create_issue", 4, 3), tool("search_code", 17, 5)],
+    },
     { server: "filesystem", configured: true, tools: [] },
   ];
 
@@ -153,15 +207,25 @@
     { server: "postgres-analytics-read-replica", configured: false, tools: [tool("query", 27, 9)] },
     { server: "filesystem", configured: true, tools: [] },
     { server: "browser-automation", configured: true, tools: [] },
-    { server: null, configured: false, tools: [tool("mcp__retired-wiki__page_history_with_revisions", 6, 3)] },
+    {
+      server: null,
+      configured: false,
+      tools: [tool("mcp__retired-wiki__page_history_with_revisions", 6, 3)],
+    },
   ];
 
   function skills(lines: readonly SkillUsageLine[]): (query: Query) => Answer | undefined {
-    return (query) => (typeof query === "object" && "skill_usage" in query ? { skill_usage: { skills: lines } } : undefined);
+    return (query) =>
+      typeof query === "object" && "skill_usage" in query
+        ? { skill_usage: { skills: lines } }
+        : undefined;
   }
 
   function servers(lines: readonly McpServerUsage[]): (query: Query) => Answer | undefined {
-    return (query) => (typeof query === "object" && "mcp_usage" in query ? { mcp_usage: { servers: lines } } : undefined);
+    return (query) =>
+      typeof query === "object" && "mcp_usage" in query
+        ? { mcp_usage: { servers: lines } }
+        : undefined;
   }
 
   // The right column of the MCP page at a 1440 window.
@@ -182,13 +246,23 @@
 </Case>
 
 <Case label="skill usage · a week: read, audit stale, never read">
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={skills(SKILLS_TYPICAL)}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={skills(SKILLS_TYPICAL)}
+  >
     <SkillUsage />
   </Stand>
 </Case>
 
 <Case label="skill usage · long names, a month of reads, many never read">
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={skills(SKILLS_LONG)}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={skills(SKILLS_LONG)}
+  >
     <SkillUsage />
   </Stand>
 </Case>
@@ -200,13 +274,23 @@
 </Case>
 
 <Case label="mcp usage · a week: two tools called, one server never" width={MCP_COLUMN}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={servers(SERVERS_TYPICAL)}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={servers(SERVERS_TYPICAL)}
+  >
     <McpUsage />
   </Stand>
 </Case>
 
 <Case label="mcp usage · long names, unconfigured and removed servers" width={MCP_COLUMN}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={servers(SERVERS_LONG)}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={servers(SERVERS_LONG)}
+  >
     <McpUsage />
   </Stand>
 </Case>

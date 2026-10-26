@@ -51,11 +51,15 @@
   // What is in force here and which layer said it, once the city has
   // answered; a city that could not answer is said so, not drawn as a
   // rung nobody set.
-  const read = $derived(readAnswer($config, (answer) => ("config" in answer ? answer.config.second : undefined)));
+  const read = $derived(
+    readAnswer($config, (answer) => ("config" in answer ? answer.config.second : undefined)),
+  );
   const settled = $derived(read.kind === "held" ? read.value : undefined);
   // What a file says, or an empty box where no file states the rung -
   // which is the default in force rather than a gap.
-  const onDisk = $derived(settled === undefined || settled.from === "default" ? "" : String(settled.percent));
+  const onDisk = $derived(
+    settled === undefined || settled.from === "default" ? "" : String(settled.percent),
+  );
 
   let was: Address | undefined = undefined;
   $effect(() => {
@@ -106,7 +110,7 @@
     step={1}
     suffix={say($lang, "context_second_unit")}
     mono
-    {...(settled?.from === "default" ? { placeholder: String(settled.percent) } : {})}
+    {...settled?.from === "default" ? { placeholder: String(settled.percent) } : {}}
     value={box}
     onInput={(next: string) => {
       box = next;
@@ -123,7 +127,7 @@
       <Button
         label={say($lang, "context_second_save")}
         tone="primary"
-        {...(edited ? {} : { why: say($lang, "context_second_unchanged") })}
+        {...edited ? {} : { why: say($lang, "context_second_unchanged") }}
         onPress={save}
       />
     </div>

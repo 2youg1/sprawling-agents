@@ -27,34 +27,102 @@ const RECORD: EventRecord = {
   data: {},
 };
 
-const LINE: LogLine = { seq: Seq.make(7), t: null, level: "decide", module: "runtime", line: "no offload", run: null };
+const LINE: LogLine = {
+  seq: Seq.make(7),
+  t: null,
+  level: "decide",
+  module: "runtime",
+  line: "no offload",
+  run: null,
+};
 
 describe("a row of the record's timeline", () => {
   test("a ledger row opens to the record as written and hands its position to the press", () => {
     const toggled: number[] = [];
-    const entry = { kind: "record", key: "r7", seq: RECORD.seq, t: RECORD.t, record: RECORD } as const;
-    const closed = lookOf({ entry, day: null, open: false, onToggle: (seq) => toggled.push(seq) }, "en");
-    const opened = lookOf({ entry, day: "2026-10-02", open: true, onToggle: () => undefined }, "en");
-    expect(closed.row).toMatchObject({ kind: "record", open: false, wire: { type: "button", "aria-expanded": false }, raw: undefined });
-    expect(opened.row).toMatchObject({ kind: "record", open: true, wire: { type: "button", "aria-expanded": true }, raw: JSON.stringify(RECORD, null, 2) });
-    expect([closed.day, opened.day]).toEqual([undefined, { day: "2026-10-02", zone: "local time · ledger position" }]);
+    const entry = {
+      kind: "record",
+      key: "r7",
+      seq: RECORD.seq,
+      t: RECORD.t,
+      record: RECORD,
+    } as const;
+    const closed = lookOf(
+      { entry, day: null, open: false, onToggle: (seq) => toggled.push(seq) },
+      "en",
+    );
+    const opened = lookOf(
+      { entry, day: "2026-10-02", open: true, onToggle: () => undefined },
+      "en",
+    );
+    expect(closed.row).toMatchObject({
+      kind: "record",
+      open: false,
+      wire: { type: "button", "aria-expanded": false },
+      raw: undefined,
+    });
+    expect(opened.row).toMatchObject({
+      kind: "record",
+      open: true,
+      wire: { type: "button", "aria-expanded": true },
+      raw: JSON.stringify(RECORD, null, 2),
+    });
+    expect([closed.day, opened.day]).toEqual([
+      undefined,
+      { day: "2026-10-02", zone: "local time · ledger position" },
+    ]);
     const row = closed.row;
     if (row.kind === "record") row.wire.onclick();
     expect(toggled).toEqual([7]);
   });
 
   test("a record with no room says who wrote it, and a log line held without a time writes none", () => {
-    const record = lookOf({ entry: { kind: "record", key: "r7", seq: RECORD.seq, t: RECORD.t, record: RECORD }, day: null, open: false, onToggle: () => undefined }, "en");
-    const line = lookOf({ entry: { kind: "log", key: "l7", seq: LINE.seq, t: null, line: LINE }, day: null, open: false, onToggle: () => undefined }, "en");
-    expect(record.row).toMatchObject({ kind: "record", when: { text: "00:00:01.250", at: new Date(RECORD.t).toISOString() }, seq: "#7", where: "by hall/mayor" });
-    expect(line.row).toEqual({ kind: "log", when: undefined, seq: "#7", level: "decide", line: "no offload", module: "runtime" });
+    const record = lookOf(
+      {
+        entry: { kind: "record", key: "r7", seq: RECORD.seq, t: RECORD.t, record: RECORD },
+        day: null,
+        open: false,
+        onToggle: () => undefined,
+      },
+      "en",
+    );
+    const line = lookOf(
+      {
+        entry: { kind: "log", key: "l7", seq: LINE.seq, t: null, line: LINE },
+        day: null,
+        open: false,
+        onToggle: () => undefined,
+      },
+      "en",
+    );
+    expect(record.row).toMatchObject({
+      kind: "record",
+      when: { text: "00:00:01.250", at: new Date(RECORD.t).toISOString() },
+      seq: "#7",
+      where: "by hall/mayor",
+    });
+    expect(line.row).toEqual({
+      kind: "log",
+      when: undefined,
+      seq: "#7",
+      level: "decide",
+      line: "no offload",
+      module: "runtime",
+    });
   });
 });
 
 describe("a narrowing choice", () => {
   test("offers every one first, holds the empty value for it, and hands a pick on as null", () => {
     const picked: (string | null)[] = [];
-    const look = narrowingOf({ label: "runs", options: [{ value: "a", label: "a" }], current: null, onPick: (value) => picked.push(value) }, "en");
+    const look = narrowingOf(
+      {
+        label: "runs",
+        options: [{ value: "a", label: "a" }],
+        current: null,
+        onPick: (value) => picked.push(value),
+      },
+      "en",
+    );
     expect([look.options, look.wire.value]).toEqual([
       [
         { value: "", label: "all" },

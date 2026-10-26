@@ -43,10 +43,26 @@ export function shortOid(oid: string): string {
 // place in the patch text and is what keys it on the page.
 export type Numbered =
   | { readonly kind: "head"; readonly number: number; readonly text: string }
-  | { readonly kind: "hunk"; readonly number: number; readonly text: string; readonly folded: number }
-  | { readonly kind: "context"; readonly number: number; readonly text: string; readonly old: Place; readonly new: Place }
+  | {
+      readonly kind: "hunk";
+      readonly number: number;
+      readonly text: string;
+      readonly folded: number;
+    }
+  | {
+      readonly kind: "context";
+      readonly number: number;
+      readonly text: string;
+      readonly old: Place;
+      readonly new: Place;
+    }
   | { readonly kind: "added"; readonly number: number; readonly text: string; readonly new: Place }
-  | { readonly kind: "removed"; readonly number: number; readonly text: string; readonly old: Place }
+  | {
+      readonly kind: "removed";
+      readonly number: number;
+      readonly text: string;
+      readonly old: Place;
+    }
   | { readonly kind: "withheld"; readonly number: number; readonly reason: string };
 
 // A line's number in one of the two files, or `null` once a withheld
@@ -62,8 +78,15 @@ const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u;
 // leaves both counts unknown until the next header restores them, and
 // the page draws a blank rather than a number that may be one off.
 export function numbered(patch: HunksAnswer): Numbered[] {
-  const withheld: Numbered[] = patch.withheld.map((each) => ({ kind: "withheld", number: each.number, reason: each.reason }));
-  const shown: readonly (Numbered | { readonly number: number; readonly text: string })[] = [...patch.lines, ...withheld];
+  const withheld: Numbered[] = patch.withheld.map((each) => ({
+    kind: "withheld",
+    number: each.number,
+    reason: each.reason,
+  }));
+  const shown: readonly (Numbered | { readonly number: number; readonly text: string })[] = [
+    ...patch.lines,
+    ...withheld,
+  ];
   const walk = [...shown].sort((a, b) => a.number - b.number);
   const drawn: Numbered[] = [];
   let old: Place = null;
@@ -109,9 +132,17 @@ export function quoteLine(patch: HunksAnswer, line: CodeLine): string {
   switch (line.kind) {
     case "added":
     case "context":
-      return quoted(line.new === null ? patch.path : `${patch.path}:${String(line.new)}`, line.text);
+      return quoted(
+        line.new === null ? patch.path : `${patch.path}:${String(line.new)}`,
+        line.text,
+      );
     case "removed":
-      return quoted(line.old === null ? patch.path : `${patch.path}@${shortOid(patch.oid_a)}:${String(line.old)}`, line.text);
+      return quoted(
+        line.old === null
+          ? patch.path
+          : `${patch.path}@${shortOid(patch.oid_a)}:${String(line.old)}`,
+        line.text,
+      );
   }
 }
 

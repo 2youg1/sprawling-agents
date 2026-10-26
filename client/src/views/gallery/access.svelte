@@ -50,7 +50,11 @@
   const CATALOG: AgentCatalogAnswer = {
     detected: [KIMI, PI],
     catalog: [
-      offer("gemini", "Gemini CLI", { version: "0.9.0", licence: "Apache-2.0", env_names: ["GEMINI_API_KEY"] }),
+      offer("gemini", "Gemini CLI", {
+        version: "0.9.0",
+        licence: "Apache-2.0",
+        env_names: ["GEMINI_API_KEY"],
+      }),
       offer("goose", "Goose", { version: "1.9.0", licence: "Apache-2.0" }),
       offer("opencode", "OpenCode", { version: "0.15.2", licence: "MIT" }),
       offer("auggie", "Auggie", { version: "0.5.10" }),
@@ -77,7 +81,7 @@
         seated_in: [],
       },
     ],
-    snapshot: { date: "2026-10-09", etag: "W/\"fixture\"" },
+    snapshot: { date: "2026-10-09", etag: 'W/"fixture"' },
   };
 
   const BARE: AgentCatalogAnswer = { ...CATALOG, detected: [], added: [] };
@@ -90,9 +94,22 @@
   });
 
   const DEVICES: readonly DeviceLine[] = [
-    { id: DeviceId.make("d-one"), label: "Firefox · Windows", paired_at: TimeMs.make(NOW - 86_400_000 * 3), last_seen: TimeMs.make(NOW - 120_000) },
-    { id: DeviceId.make("d-two"), label: "Safari · macOS", paired_at: TimeMs.make(NOW - 3_600_000) },
-    { id: DeviceId.make("d-three"), label: "Firefox · Windows", paired_at: TimeMs.make(NOW - 86_400_000 * 9) },
+    {
+      id: DeviceId.make("d-one"),
+      label: "Firefox · Windows",
+      paired_at: TimeMs.make(NOW - 86_400_000 * 3),
+      last_seen: TimeMs.make(NOW - 120_000),
+    },
+    {
+      id: DeviceId.make("d-two"),
+      label: "Safari · macOS",
+      paired_at: TimeMs.make(NOW - 3_600_000),
+    },
+    {
+      id: DeviceId.make("d-three"),
+      label: "Firefox · Windows",
+      paired_at: TimeMs.make(NOW - 86_400_000 * 9),
+    },
   ];
 </script>
 
@@ -155,13 +172,34 @@
   />
 </Case>
 <Case label="pairing · a first browser">
-  <Pairing why="first" {lang} label="Firefox · Windows" pair={never} onPaired={still} seat="specimen" />
+  <Pairing
+    why="first"
+    {lang}
+    label="Firefox · Windows"
+    pair={never}
+    onPaired={still}
+    seat="specimen"
+  />
 </Case>
 <Case label="pairing · after a used link">
-  <Pairing why="open_used" lang={readable<Lang>("zh")} label="Edge · Windows" pair={never} onPaired={still} seat="specimen" />
+  <Pairing
+    why="open_used"
+    lang={readable<Lang>("zh")}
+    label="Edge · Windows"
+    pair={never}
+    onPaired={still}
+    seat="specimen"
+  />
 </Case>
 <Case label="pairing · a browser with no device keys">
-  <Pairing why="keyless" {lang} label="Safari · Windows" pair={never} onPaired={still} seat="specimen" />
+  <Pairing
+    why="keyless"
+    {lang}
+    label="Safari · Windows"
+    pair={never}
+    onPaired={still}
+    seat="specimen"
+  />
 </Case>
 <Case label="paired browsers · on this machine, this browser marked">
   <Devices devices={DEVICES} here="d-one" now={NOW} local onForget={still} />
@@ -173,11 +211,29 @@
   <Devices devices={[]} here={null} now={NOW} local onForget={still} />
 </Case>
 <Case label="quit · no run going">
-  <QuitSheet look={quitOf({ runs: 0, here: "http://127.0.0.1:8787" })} seat="specimen" open onCancel={still} onClose={still} />
+  <QuitSheet
+    look={quitOf({ runs: 0, here: "http://127.0.0.1:8787" })}
+    seat="specimen"
+    open
+    onCancel={still}
+    onClose={still}
+  />
 </Case>
 <Case label="quit · three runs going">
-  <QuitSheet look={quitOf({ runs: 3, here: "http://127.0.0.1:8787" })} seat="specimen" open onCancel={still} onClose={still} />
+  <QuitSheet
+    look={quitOf({ runs: 3, here: "http://127.0.0.1:8787" })}
+    seat="specimen"
+    open
+    onCancel={still}
+    onClose={still}
+  />
 </Case>
 <Case label="quit · from the remote door">
-  <QuitSheet look={quitOf({ runs: 3, here: "https://city.example" })} seat="specimen" open onCancel={still} onClose={still} />
+  <QuitSheet
+    look={quitOf({ runs: 3, here: "https://city.example" })}
+    seat="specimen"
+    open
+    onCancel={still}
+    onClose={still}
+  />
 </Case>

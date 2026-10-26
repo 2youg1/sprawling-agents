@@ -40,7 +40,9 @@
   const { lang } = u;
 
   const asked = $derived(u.conn.asking.ask({ proposals: doc }));
-  const read = $derived(readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)));
+  const read = $derived(
+    readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)),
+  );
   const building = $derived(buildingOf(doc));
   const path = $derived(doc.slice(building.length + 1));
 </script>
@@ -56,7 +58,9 @@
           a hint on words nobody can focus reaches only a pointer. -->
           <p class="font-mono text-note wrap-anywhere text-text-quiet">{doc}</p>
           <div class="flex min-w-0 items-center gap-snug">
-            <span class="min-w-0 flex-1 text-note text-text-faint">{at === null ? "" : ago($lang, at, u.now())}</span>
+            <span class="min-w-0 flex-1 text-note text-text-faint"
+              >{at === null ? "" : ago($lang, at, u.now())}</span
+            >
             <span data-letter={card.id} class="contents">
               <Button
                 tone="quiet"

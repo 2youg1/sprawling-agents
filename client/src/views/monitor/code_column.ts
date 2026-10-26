@@ -33,8 +33,18 @@ export interface OpenWire {
 }
 
 export type ActionLook =
-  | { readonly key: "comment" | "revert"; readonly label: string; readonly kind: "press"; readonly wire: PressWire }
-  | { readonly key: "open"; readonly label: string; readonly kind: "open"; readonly wire: OpenWire };
+  | {
+      readonly key: "comment" | "revert";
+      readonly label: string;
+      readonly kind: "press";
+      readonly wire: PressWire;
+    }
+  | {
+      readonly key: "open";
+      readonly label: string;
+      readonly kind: "open";
+      readonly wire: OpenWire;
+    };
 
 export interface LineLook {
   readonly sign: Sign;
@@ -83,12 +93,37 @@ export function lookOf(state: ColumnState, lang: Lang, hands: Hands): CodeColumn
   const actionsOf = (path: string, hunk: Hunk): ActionLook[] => {
     const presses: ActionLook[] = state.live
       ? [
-          { key: "comment", label: say(lang, "mon_comment"), kind: "press", wire: { type: "button", onclick: () => { hands.draft(steerOf("mon_comment_draft", lang, path, hunk)); } } },
-          { key: "revert", label: say(lang, "mon_revert"), kind: "press", wire: { type: "button", onclick: () => { hands.steer(steerOf("mon_revert_steer", lang, path, hunk)); } } },
+          {
+            key: "comment",
+            label: say(lang, "mon_comment"),
+            kind: "press",
+            wire: {
+              type: "button",
+              onclick: () => {
+                hands.draft(steerOf("mon_comment_draft", lang, path, hunk));
+              },
+            },
+          },
+          {
+            key: "revert",
+            label: say(lang, "mon_revert"),
+            kind: "press",
+            wire: {
+              type: "button",
+              onclick: () => {
+                hands.steer(steerOf("mon_revert_steer", lang, path, hunk));
+              },
+            },
+          },
         ]
       : [];
     const opening = editorLink({ ...state.editor, path, line: lineOf(hunk) });
-    return opening === null ? presses : [...presses, { key: "open", label: say(lang, "setup_editor"), kind: "open", wire: { href: opening } }];
+    return opening === null
+      ? presses
+      : [
+          ...presses,
+          { key: "open", label: say(lang, "setup_editor"), kind: "open", wire: { href: opening } },
+        ];
   };
   return {
     empty: state.files.length === 0 ? say(lang, "mon_nothing_changed") : undefined,
@@ -97,7 +132,12 @@ export function lookOf(state: ColumnState, lang: Lang, hands: Hands): CodeColumn
       how: say(lang, file.how === "added" ? "change_added" : "change_modified"),
       hunks: file.hunks.map((hunk) => ({
         actions: actionsOf(file.path, hunk),
-        lines: hunk.lines.map((line) => ({ sign: line.sign, old: line.old?.toString() ?? "", new: line.new?.toString() ?? "", text: line.text })),
+        lines: hunk.lines.map((line) => ({
+          sign: line.sign,
+          old: line.old?.toString() ?? "",
+          new: line.new?.toString() ?? "",
+          text: line.text,
+        })),
       })),
     })),
   };
@@ -106,7 +146,15 @@ export function lookOf(state: ColumnState, lang: Lang, hands: Hands): CodeColumn
 // The steer a comment or a revert carries, filled in one pass with a
 // function, so a hunk's own text is never read as a placeholder or as a
 // `$&` replacement pattern.
-export function steerOf(key: "mon_comment_draft" | "mon_revert_steer", lang: Lang, path: string, hunk: Hunk): string {
+export function steerOf(
+  key: "mon_comment_draft" | "mon_revert_steer",
+  lang: Lang,
+  path: string,
+  hunk: Hunk,
+): string {
   const slots: Record<string, string> = { path, line: String(lineOf(hunk)), ...reverseOf(hunk) };
-  return say(lang, key).replace(/\{(path|line|now|was|fence)\}/g, (spelled, name: string) => slots[name] ?? spelled);
+  return say(lang, key).replace(
+    /\{(path|line|now|was|fence)\}/g,
+    (spelled, name: string) => slots[name] ?? spelled,
+  );
 }

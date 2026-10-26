@@ -81,7 +81,12 @@ export interface CommitsLook {
   readonly rows: readonly CommitRow[];
   // The words of the facts' four labels, already in the person's
   // language.
-  readonly labels: { readonly oid: string; readonly b3: string; readonly parents: string; readonly at: string };
+  readonly labels: {
+    readonly oid: string;
+    readonly b3: string;
+    readonly parents: string;
+    readonly at: string;
+  };
   // The link to the building's page while older commits are left out.
   readonly more: { readonly href: string; readonly word: string } | undefined;
 }

@@ -89,7 +89,9 @@ export interface SearchHands {
 // A path drawn as its name, then the directory it sits in.
 export function partsOf(path: string): { readonly name: string; readonly dir: string } {
   const slash = path.lastIndexOf("/");
-  return slash < 0 ? { name: path, dir: "" } : { name: path.slice(slash + 1), dir: path.slice(0, slash) };
+  return slash < 0
+    ? { name: path, dir: "" }
+    : { name: path.slice(slash + 1), dir: path.slice(0, slash) };
 }
 
 export function optionId(uid: string, at: number): string {
@@ -106,7 +108,10 @@ export function searchLookOf(state: SearchState, hands: SearchHands): SearchLook
   }
   if (found?.walked === "cut") notes.push(say(lang, "finder_cut"));
   return {
-    title: { text: fill(say(lang, "finder_title"), { building: state.under }), wire: { id: titleId } },
+    title: {
+      text: fill(say(lang, "finder_title"), { building: state.under }),
+      wire: { id: titleId },
+    },
     box: {
       role: "combobox",
       "aria-autocomplete": "list",

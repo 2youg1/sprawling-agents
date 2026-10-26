@@ -56,12 +56,14 @@
 
   function boardOf(total: number, waiting: readonly number[]): readonly BoardRun[] {
     return Array.from({ length: total }, (_, n): BoardRun => {
-      const doing: Doing = waiting.includes(n) ? { kind: "waiting" } : DOINGS[n % DOINGS.length] ?? { kind: "unknown" };
+      const doing: Doing = waiting.includes(n)
+        ? { kind: "waiting" }
+        : (DOINGS[n % DOINGS.length] ?? { kind: "unknown" });
       const started = NOW - ((n * 7) % 80) * MINUTE - (n % 5) * 11_000;
       return {
         run: idOf(n + 1),
         addr: `${BUILDINGS[n % BUILDINGS.length] ?? "atlas"}/${ROOMS[(n >> 1) % ROOMS.length] ?? "api"}`,
-        task: n % 9 === 4 ? null : TASKS[n % TASKS.length] ?? null,
+        task: n % 9 === 4 ? null : (TASKS[n % TASKS.length] ?? null),
         // Half the runs with no task written down carry a goal, which
         // titles them; the other half fall back to their room.
         goal: n % 18 === 4 ? "every clippy warning in the gate crate fixed" : null,
@@ -77,14 +79,23 @@
 
   // The small board's buildings, and City Hall, which has no runs yet
   // and still has its row.
-  const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
+  const IDLE = {
+    unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+  };
   const CITY: CityAnswer = {
     active: 0,
     frozen: 0,
     halted: [],
     pursuits: [],
     runs: [],
-    buildings: ["hall", ...BUILDINGS].map((addr) => ({ addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 })),
+    buildings: ["hall", ...BUILDINGS].map((addr) => ({
+      addr: Address.make(addr),
+      adoptable: false,
+      blocked: [],
+      problems: [],
+      progress: IDLE,
+      ready: 0,
+    })),
   };
 
   // The small board's runs as the belief holds them, for the drawing
@@ -112,18 +123,44 @@
   const SKYLINE: CityAnswer = {
     ...CITY,
     pursuits: [
-      { addr: Address.make("orders"), goal: "every order total reconciled", state: "running", verdict: { kind: "waiting", in_flight: 1 } },
-      { addr: Address.make("web"), goal: "the bundle under its budget", state: "paused", verdict: { kind: "paused" } },
+      {
+        addr: Address.make("orders"),
+        goal: "every order total reconciled",
+        state: "running",
+        verdict: { kind: "waiting", in_flight: 1 },
+      },
+      {
+        addr: Address.make("web"),
+        goal: "the bundle under its budget",
+        state: "paused",
+        verdict: { kind: "paused" },
+      },
     ],
     buildings: CITY.buildings.map((each) =>
       each.addr === "docs"
         ? {
             ...each,
             blocked: [
-              { source: NodeId.make("docs/zh"), line: "waiting for a glossary decision", waiting: 1 },
-              { source: NodeId.make("docs/api"), line: "the schema is not published yet", waiting: 1 },
+              {
+                source: NodeId.make("docs/zh"),
+                line: "waiting for a glossary decision",
+                waiting: 1,
+              },
+              {
+                source: NodeId.make("docs/api"),
+                line: "the schema is not published yet",
+                waiting: 1,
+              },
             ],
-            progress: { planned: { blocked: 2, blocked_ppb: 250_000_000, done: 3, done_ppb: 375_000_000, total: 8 } },
+            progress: {
+              planned: {
+                blocked: 2,
+                blocked_ppb: 250_000_000,
+                done: 3,
+                done_ppb: 375_000_000,
+                total: 8,
+              },
+            },
           }
         : each,
     ),
@@ -135,14 +172,31 @@
     ...SKYLINE,
     pursuits: [
       ...SKYLINE.pursuits,
-      { addr: Address.make("docs"), goal: "every page translated", state: "running", verdict: { kind: "waiting", in_flight: 1 } },
+      {
+        addr: Address.make("docs"),
+        goal: "every page translated",
+        state: "running",
+        verdict: { kind: "waiting", in_flight: 1 },
+      },
     ],
-    buildings: SKYLINE.buildings.map((each) => (each.addr === "docs" ? { ...each, ready: 1, problems: ["the glossary file does not parse"] } : each)),
+    buildings: SKYLINE.buildings.map((each) =>
+      each.addr === "docs"
+        ? { ...each, ready: 1, problems: ["the glossary file does not parse"] }
+        : each,
+    ),
   };
 
   // The bar's figures: two queues hold something, so two figures are in
   // the alert tone.
-  const METRICS = { approvals_waiting: 2, buildings: 7, discards_outstanding: 0, events: 18_204, runs_active: 6, runs_frozen: 16, signals_waiting: 1 };
+  const METRICS = {
+    approvals_waiting: 2,
+    buildings: 7,
+    discards_outstanding: 0,
+    events: 18_204,
+    runs_active: 6,
+    runs_frozen: 16,
+    signals_waiting: 1,
+  };
 </script>
 
 <script lang="ts">
@@ -170,7 +224,13 @@
   const power = cornerPower(document.documentElement);
   const skyline = $derived(
     lookOf(
-      { city: SKYLINE, picked, runsIn: (addr) => HELD.filter((run) => run.addr?.split("/")[0] === addr), lang: $lang, power },
+      {
+        city: SKYLINE,
+        picked,
+        runsIn: (addr) => HELD.filter((run) => run.addr?.split("/")[0] === addr),
+        lang: $lang,
+        power,
+      },
       (addr) => {
         picked = addr;
       },
@@ -178,9 +238,17 @@
   );
   const bar = $derived(barLookOf(METRICS, 12_340_000, $lang));
   const panel = $derived(
-    panelLookOf({ addr: Address.make("docs"), city: PANEL, held: HELD.filter((run) => run.addr?.startsWith("docs/") === true), lang: $lang }, () => {
-      picked = null;
-    }),
+    panelLookOf(
+      {
+        addr: Address.make("docs"),
+        city: PANEL,
+        held: HELD.filter((run) => run.addr?.startsWith("docs/") === true),
+        lang: $lang,
+      },
+      () => {
+        picked = null;
+      },
+    ),
   );
 </script>
 
@@ -191,12 +259,31 @@
   <Board runs={MANY} now={NOW} level={2} />
 </Case>
 <Case label={say($lang, "gallery_city_table")} width={1200}>
-  <Table city={CITY} runs={SMALL} now={NOW} {picked} onPick={(addr) => { picked = addr; }} />
+  <Table
+    city={CITY}
+    runs={SMALL}
+    now={NOW}
+    {picked}
+    onPick={(addr) => {
+      picked = addr;
+    }}
+  />
 </Case>
 <Case label={say($lang, "gallery_city_table_narrow")} width={390}>
-  <Table city={CITY} runs={SMALL} now={NOW} {picked} onPick={(addr) => { picked = addr; }} />
+  <Table
+    city={CITY}
+    runs={SMALL}
+    now={NOW}
+    {picked}
+    onPick={(addr) => {
+      picked = addr;
+    }}
+  />
 </Case>
-<Case label="city · skyline with runs at work, a stuck building, two pursuits and one picked" width={1200}>
+<Case
+  label="city · skyline with runs at work, a stuck building, two pursuits and one picked"
+  width={1200}
+>
   <Skyline {...skyline} />
   <Legend {...legendOf($lang)} />
 </Case>

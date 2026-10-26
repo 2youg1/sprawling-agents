@@ -80,14 +80,19 @@
   function barsOf(plot: Plot, points: number): string {
     const first = points - plot.bars.length;
     return plot.bars
-      .map((height, at) => `M${String(first + at)} ${String(FULL - height)}h0.7V${String(FULL)}h-0.7Z`)
+      .map(
+        (height, at) => `M${String(first + at)} ${String(FULL - height)}h0.7V${String(FULL)}h-0.7Z`,
+      )
       .join("");
   }
 
   const held = $derived(beatOf(samples.at(-1)));
-  const beats = $derived(BEATS.map((value) => ({ value, label: fill(say($lang, "monitor_beat_ms"), { n: value }) })));
+  const beats = $derived(
+    BEATS.map((value) => ({ value, label: fill(say($lang, "monitor_beat_ms"), { n: value }) })),
+  );
 
-  const PLOT = "col-span-full block h-plot w-full min-w-0 pt-tight @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
+  const PLOT =
+    "col-span-full block h-plot w-full min-w-0 pt-tight @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
 </script>
 
 {#snippet beatControl()}
@@ -105,42 +110,52 @@
 {/snippet}
 
 <Page title={say($lang, "monitor_title")} aside={beatControl} {rank}>
-<section
-  class="@container relative flex min-w-0 flex-col"
-  aria-label={say($lang, "monitor_title")}
->
-  {#if shown.length === 0}
-    <p class="text-note text-text-faint">{say($lang, "monitor_waiting")}</p>
-  {:else}
-    <!-- One counter a row, ruled like a table: its name over its band,
+  <section
+    class="@container relative flex min-w-0 flex-col"
+    aria-label={say($lang, "monitor_title")}
+  >
+    {#if shown.length === 0}
+      <p class="text-note text-text-faint">{say($lang, "monitor_waiting")}</p>
+    {:else}
+      <!-- One counter a row, ruled like a table: its name over its band,
          its latest reading set right on the figure column, then its
          bars to the end of the line. Under 40rem the bars take a line
          of their own. -->
-    <ul>
-      {#each shown as row (row.label)}
-        {@const across = Math.max(points, row.plot.bars.length, 1)}
-        <li
-          class="grid grid-cols-[minmax(0,1fr)_14ch] items-center gap-x-gutter border-b border-edge py-snug @min-[40rem]:grid-cols-[minmax(0,28ch)_14ch_minmax(0,1fr)]"
-        >
-          <span class="flex min-w-0 flex-col">
-            <span class="truncate text-note text-text-quiet">{say($lang, row.label)}</span>
-            <span class="figure truncate text-note text-text-faint"
-              >{fill(say($lang, "monitor_band"), { p50: row.p50, p99: row.p99 })}</span
-            >
-          </span>
-          <span class="figure text-right text-text">{row.reading}</span>
-          <!-- Every plot has the same room, so whichever measures it
+      <ul>
+        {#each shown as row (row.label)}
+          {@const across = Math.max(points, row.plot.bars.length, 1)}
+          <li
+            class="grid grid-cols-[minmax(0,1fr)_14ch] items-center gap-x-gutter border-b border-edge py-snug @min-[40rem]:grid-cols-[minmax(0,28ch)_14ch_minmax(0,1fr)]"
+          >
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate text-note text-text-quiet">{say($lang, row.label)}</span>
+              <span class="figure truncate text-note text-text-faint"
+                >{fill(say($lang, "monitor_band"), { p50: row.p50, p99: row.p99 })}</span
+              >
+            </span>
+            <span class="figure text-right text-text">{row.reading}</span>
+            <!-- Every plot has the same room, so whichever measures it
                last tells the panel how many points one line holds. -->
-          <span class={PLOT} bind:clientWidth={panel}>
-            <svg aria-hidden="true" class="block h-full w-full" viewBox="0 0 {String(across)} {String(FULL)}" preserveAspectRatio="none">
-              <rect x="0" y={FULL - row.plot.p99} width={across} height={Math.max(row.plot.p99 - row.plot.p50, 1)} class="fill-accent/15" />
-              <path d={barsOf(row.plot, across)} class="fill-accent" />
-            </svg>
-          </span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</section>
+            <span class={PLOT} bind:clientWidth={panel}>
+              <svg
+                aria-hidden="true"
+                class="block h-full w-full"
+                viewBox="0 0 {String(across)} {String(FULL)}"
+                preserveAspectRatio="none"
+              >
+                <rect
+                  x="0"
+                  y={FULL - row.plot.p99}
+                  width={across}
+                  height={Math.max(row.plot.p99 - row.plot.p50, 1)}
+                  class="fill-accent/15"
+                />
+                <path d={barsOf(row.plot, across)} class="fill-accent" />
+              </svg>
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
 </Page>
-

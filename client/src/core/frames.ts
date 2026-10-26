@@ -108,7 +108,6 @@ function isDelta(u: unknown): u is Delta {
   const increment = u.increment;
   return (
     isRecord(increment) &&
-    (typeof increment.said === "string" ||
-      typeof increment.thought === "string")
+    (typeof increment.said === "string" || typeof increment.thought === "string")
   );
 }

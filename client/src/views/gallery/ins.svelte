@@ -107,14 +107,20 @@ impl Document {
     tool: "exec",
     effect: "egress",
     render: "terminal",
-    arguments: { head: JSON.stringify({ command: "cargo clippy -p city --all-targets -- -D warnings" }), cut: 0 },
+    arguments: {
+      head: JSON.stringify({ command: "cargo clippy -p city --all-targets -- -D warnings" }),
+      cut: 0,
+    },
   });
   const SHOT = call(23, 880, {
     tool: "browser",
     subject: "screenshot",
     effect: "egress",
     render: "generic",
-    output: { head: JSON.stringify({ image: PICTURE, width: 1280, height: 720, media_type: "image/png" }), cut: 0 },
+    output: {
+      head: JSON.stringify({ image: PICTURE, width: 1280, height: 720, media_type: "image/png" }),
+      cut: 0,
+    },
   });
   const SEARCH = call(24, 9, {
     tool: "search",
@@ -122,12 +128,22 @@ impl Document {
     effect: "read",
     render: "generic",
     outcome: "failed",
-    arguments: { head: JSON.stringify({ pattern: "edit_against", path: "crates/nowhere" }, null, 2), cut: 0 },
+    arguments: {
+      head: JSON.stringify({ pattern: "edit_against", path: "crates/nowhere" }, null, 2),
+      cut: 0,
+    },
     output: { head: "no such directory: crates/nowhere", cut: 0 },
   });
 
   function turn(number: number, calls: readonly Call[], notes: Turn["notes"]): Turn {
-    return { calls, notes, number, opened: Seq.make(number * 10), t: TimeMs.make(START + number * 10_000), timing: "measured" };
+    return {
+      calls,
+      notes,
+      number,
+      opened: Seq.make(number * 10),
+      t: TimeMs.make(START + number * 10_000),
+      timing: "measured",
+    };
   }
 
   const ROUNDS: RoundsAnswer = {
@@ -164,11 +180,25 @@ impl Document {
       if ("rounds" in query) return { rounds: ROUNDS };
       if ("hunks" in query) {
         return {
-          hunks: { oid_a: OPENED, oid_b: CHECKED, path: PATH, lines: PATCH.map((text, at) => ({ number: at + 1, text })), withheld: [] },
+          hunks: {
+            oid_a: OPENED,
+            oid_b: CHECKED,
+            path: PATH,
+            lines: PATCH.map((text, at) => ({ number: at + 1, text })),
+            withheld: [],
+          },
         };
       }
       if ("changes" in query) {
-        return { changes: { base: CHECKED, head: null, files: moved ? [{ path: PATH, how: "modified", lines: { counted: { added: 2, removed: 1 } } }] : [] } };
+        return {
+          changes: {
+            base: CHECKED,
+            head: null,
+            files: moved
+              ? [{ path: PATH, how: "modified", lines: { counted: { added: 2, removed: 1 } } }]
+              : [],
+          },
+        };
       }
       if ("document" in query) {
         return {
@@ -176,7 +206,13 @@ impl Document {
             at: query.document.at,
             state: {
               held: {
-                body: { text: { coverage: "whole", encoding: "utf8", head: { span: { start: 0, end: FILE.length }, text: FILE } } },
+                body: {
+                  text: {
+                    coverage: "whole",
+                    encoding: "utf8",
+                    head: { span: { start: 0, end: FILE.length }, text: FILE },
+                  },
+                },
                 bytes: FILE.length,
                 format: "plain",
                 version: B3Hash.make("b3".repeat(32)),
@@ -186,7 +222,15 @@ impl Document {
         };
       }
       if ("content" in query) {
-        return { content: { locator: query.content.locator, binary: false, bytes: 48_211, truncated: true, text: "    Starting 41 tests across 3 binaries\n" } };
+        return {
+          content: {
+            locator: query.content.locator,
+            binary: false,
+            bytes: 48_211,
+            truncated: true,
+            text: "    Starting 41 tests across 3 binaries\n",
+          },
+        };
       }
       return undefined;
     };
@@ -212,16 +256,61 @@ impl Document {
   const NOTHING = (): undefined => undefined;
   const STRIP = stripOf(
     [
-      { key: "a", label: "document.rs", terminal: false, unsaved: false, front: false, href: "#/talk/release/ledger", controls: "fixture-editor" },
-      { key: "b", label: "notes.md", terminal: false, unsaved: true, front: true, href: "#/talk/release/ledger", controls: "fixture-editor" },
-      { key: "c", label: "cargo nextest -p city", terminal: true, unsaved: false, front: false, href: "#/talk/release/ledger", controls: "fixture-terminal" },
-      { key: "d", label: "7c41e09", terminal: false, unsaved: false, front: false, href: null, controls: "fixture-editor" },
+      {
+        key: "a",
+        label: "document.rs",
+        terminal: false,
+        unsaved: false,
+        front: false,
+        href: "#/talk/release/ledger",
+        controls: "fixture-editor",
+      },
+      {
+        key: "b",
+        label: "notes.md",
+        terminal: false,
+        unsaved: true,
+        front: true,
+        href: "#/talk/release/ledger",
+        controls: "fixture-editor",
+      },
+      {
+        key: "c",
+        label: "cargo nextest -p city",
+        terminal: true,
+        unsaved: false,
+        front: false,
+        href: "#/talk/release/ledger",
+        controls: "fixture-terminal",
+      },
+      {
+        key: "d",
+        label: "7c41e09",
+        terminal: false,
+        unsaved: false,
+        front: false,
+        href: null,
+        controls: "fixture-editor",
+      },
     ],
-    { tabs: "open in the inspector", unsaved: "unsaved", closeAll: "close the inspector", closeItem: (name) => `close ${name}` },
+    {
+      tabs: "open in the inspector",
+      unsaved: "unsaved",
+      closeAll: "close the inspector",
+      closeItem: (name) => `close ${name}`,
+    },
     { pick: NOTHING, close: NOTHING, closeAll: NOTHING, focus: NOTHING, hold: () => NOTHING },
   );
   const LINE = splitOf(
-    { lines: 12, least: 6, most: 30, controls: "fixture-editor", step: 24, onLines: NOTHING, onReset: NOTHING },
+    {
+      lines: 12,
+      least: 6,
+      most: 30,
+      controls: "fixture-editor",
+      step: 24,
+      onLines: NOTHING,
+      onReset: NOTHING,
+    },
     "move the line between the editor and the terminal",
     { capture: NOTHING, hold: NOTHING, grip: { from: null } },
   );
@@ -233,17 +322,43 @@ impl Document {
     { label: "original", wire: { type: "button", "aria-pressed": true, onclick: NOTHING } },
   ];
   const CHOSEN = patchOf(
-    { oid_a: OPENED, oid_b: CHECKED, path: PATH, lines: PATCH.map((text, at) => ({ number: at + 1, text })), withheld: [{ number: 99, reason: "a key-shaped value" }] },
+    {
+      oid_a: OPENED,
+      oid_b: CHECKED,
+      path: PATH,
+      lines: PATCH.map((text, at) => ({ number: at + 1, text })),
+      withheld: [{ number: 99, reason: "a key-shaped value" }],
+    },
     7,
-    { withheld: (n, reason) => `line ${n} withheld: ${reason}`, folded: (n) => `${n} lines folded`, quote: (n) => `quote line ${n}` },
+    {
+      withheld: (n, reason) => `line ${n} withheld: ${reason}`,
+      folded: (n) => `${n} lines folded`,
+      quote: (n) => `quote line ${n}`,
+    },
     { href: "#/gallery", choose: NOTHING },
   );
 
   const SHOWN: readonly Shown[] = [
-    { label: "inspector · a diff above the command that tested it", following: [item(EDIT), item(TESTS)], moved: false },
-    { label: "inspector · a diff the worktree has moved past", following: [item(EDIT)], moved: true },
-    { label: "inspector · the file a call read, above a command still running", following: [item(READ), item(CLIPPY)], moved: false },
-    { label: "inspector · a screenshot, above a search that failed", following: [item(SHOT), item(SEARCH)], moved: false },
+    {
+      label: "inspector · a diff above the command that tested it",
+      following: [item(EDIT), item(TESTS)],
+      moved: false,
+    },
+    {
+      label: "inspector · a diff the worktree has moved past",
+      following: [item(EDIT)],
+      moved: true,
+    },
+    {
+      label: "inspector · the file a call read, above a command still running",
+      following: [item(READ), item(CLIPPY)],
+      moved: false,
+    },
+    {
+      label: "inspector · a screenshot, above a search that failed",
+      following: [item(SHOT), item(SEARCH)],
+      moved: false,
+    },
   ];
 </script>
 
@@ -259,7 +374,12 @@ impl Document {
 
 {#each SHOWN as shown (shown.label)}
   <Case label={shown.label} width={720}>
-    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(shown.moved)}>
+    <Stand
+      link={{ kind: "live", city: "sprawling" }}
+      unread={[]}
+      waiting={[]}
+      answers={answering(shown.moved)}
+    >
       <div class="flex h-[720px] border-l border-edge-panel">
         <Right following={shown.following} current={undefined} talk={ROOM} />
       </div>

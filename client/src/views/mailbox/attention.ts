@@ -32,7 +32,11 @@ function composerBox(): HTMLTextAreaElement | null {
 
 // `changed` is called whenever a moment may have opened: a send, a box
 // emptied or filled, the tab shown again.
-export function attending(conversing: Readable<Conversing>, now: () => number, changed: () => void): Attending {
+export function attending(
+  conversing: Readable<Conversing>,
+  now: () => number,
+  changed: () => void,
+): Attending {
   // The box as last heard, and which textarea it was heard from: a
   // composer that mounts after a navigation is a new box, read afresh.
   let heard: Box = { kind: "absent" };

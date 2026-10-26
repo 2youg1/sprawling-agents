@@ -13,14 +13,21 @@
   // drawing the editor with it proves the wiring and the focus returns
   // live in `accounts.ts` and the seat, not in the shipped markup
   // (client D93).
-  import type { AccountsLook, ControlLook, FieldLook } from "../../../../src/views/setup/providers/accounts";
+  import type {
+    AccountsLook,
+    ControlLook,
+    FieldLook,
+  } from "../../../../src/views/setup/providers/accounts";
 
   const look: AccountsLook = $props();
   const uid = $props.id();
   const standing = $derived(look.fields.filter((field) => !field.folded));
   const folded = $derived(look.fields.filter((field) => field.folded));
 
-  function pressed(control: { readonly why: string | undefined; readonly press: () => void }): void {
+  function pressed(control: {
+    readonly why: string | undefined;
+    readonly press: () => void;
+  }): void {
     if (control.why === undefined) control.press();
   }
 </script>
@@ -142,13 +149,16 @@
         type="submit"
         class="control"
         aria-busy={look.save.loading}
-        aria-disabled={look.save.why === undefined && !look.save.loading ? undefined : "true"}>{look.save.label}</button
+        aria-disabled={look.save.why === undefined && !look.save.loading ? undefined : "true"}
+        >{look.save.label}</button
       >
       {#if look.save.why !== undefined}
         <span class="why">{look.save.why}</span>
       {/if}
       {#if look.cancel !== undefined}
-        <button type="button" class="control" onclick={look.cancel.press}>{look.cancel.label}</button>
+        <button type="button" class="control" onclick={look.cancel.press}
+          >{look.cancel.label}</button
+        >
       {/if}
     </span>
   </form>

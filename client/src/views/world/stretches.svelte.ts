@@ -53,7 +53,8 @@ export function askStretches(u: Ui): Stretches {
       u.conn.asking.ask({ sessions: { room } }).subscribe((answer) => {
         // Read without following: the store answers inside this effect,
         // and the effect must not wait on what it writes.
-        if (answer !== undefined && "sessions" in answer) answers = { ...untrack(() => answers), [room]: answer.sessions };
+        if (answer !== undefined && "sessions" in answer)
+          answers = { ...untrack(() => answers), [room]: answer.sessions };
       }),
     );
     return () => {

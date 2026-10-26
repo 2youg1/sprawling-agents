@@ -36,7 +36,10 @@ const exec = turn(1, [
     called: 1000,
     answered: 1250,
     exit_code: 101,
-    arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }, null, 2) },
+    arguments: {
+      cut: 0,
+      head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }, null, 2),
+    },
     output: {
       cut: 0,
       head: JSON.stringify({ arm: "shell", stdout: "ok\n", stderr: "warn\n", exit_code: 101 }),
@@ -47,10 +50,25 @@ const exec = turn(1, [
     called: 1020,
     tool: "exec",
     outcome: "waiting",
-    arguments: { cut: 0, head: JSON.stringify({ arm: { program: { path: "git", args: ["status"] } } }) },
+    arguments: {
+      cut: 0,
+      head: JSON.stringify({ arm: { program: { path: "git", args: ["status"] } } }),
+    },
   },
-  { at: 13, called: 1030, tool: "exec", outcome: "waiting", arguments: { cut: 0, head: JSON.stringify({ command: "cargo fmt --check", where: "host" }) } },
-  { at: 14, called: 1040, tool: "exec", outcome: "waiting", arguments: { cut: 0, head: JSON.stringify({ python: "print(1)" }) } },
+  {
+    at: 13,
+    called: 1030,
+    tool: "exec",
+    outcome: "waiting",
+    arguments: { cut: 0, head: JSON.stringify({ command: "cargo fmt --check", where: "host" }) },
+  },
+  {
+    at: 14,
+    called: 1040,
+    tool: "exec",
+    outcome: "waiting",
+    arguments: { cut: 0, head: JSON.stringify({ python: "print(1)" }) },
+  },
 ]);
 
 const edit = turn(2, [
@@ -69,17 +87,64 @@ const edit = turn(2, [
       }),
     },
   },
-  { at: 22, called: 2020, tool: "read", subject: "src/main.rs", outcome: "answered", arguments: { cut: 0, head: '{"path":"src/main.rs"}' } },
+  {
+    at: 22,
+    called: 2020,
+    tool: "read",
+    subject: "src/main.rs",
+    outcome: "answered",
+    arguments: { cut: 0, head: '{"path":"src/main.rs"}' },
+  },
 ]);
 
 describe("a run's turns read as a terminal record and a code column", () => {
   test("an exec call is its command, both streams, its exit code and how long it took", () => {
     const { entries } = traceOf([exec]);
     expect(entries).toEqual([
-      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250, ceilings: [] },
-      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
-      { kind: "command", at: at(13), text: "cargo fmt --check", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
-      { kind: "command", at: at(14), text: "print(1)", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
+      {
+        kind: "command",
+        at: at(11),
+        text: "cargo test",
+        stdout: "ok\n",
+        stderr: "warn\n",
+        ending: { kind: "code", code: 101 },
+        cut: 0,
+        took: 250,
+        ceilings: [],
+      },
+      {
+        kind: "command",
+        at: at(12),
+        text: "git status",
+        stdout: "",
+        stderr: "",
+        ending: { kind: "running" },
+        cut: 0,
+        took: null,
+        ceilings: [],
+      },
+      {
+        kind: "command",
+        at: at(13),
+        text: "cargo fmt --check",
+        stdout: "",
+        stderr: "",
+        ending: { kind: "running" },
+        cut: 0,
+        took: null,
+        ceilings: [],
+      },
+      {
+        kind: "command",
+        at: at(14),
+        text: "print(1)",
+        stdout: "",
+        stderr: "",
+        ending: { kind: "running" },
+        cut: 0,
+        took: null,
+        ceilings: [],
+      },
     ]);
   });
 
@@ -92,7 +157,11 @@ describe("a run's turns read as a terminal record and a code column", () => {
       stdout: "",
       stderr: "memory allocation failed",
       exit_code: 101,
-      memory_ceiling: { state: "hit", limit_bytes: 1073741824, detail: "an allocation was refused" },
+      memory_ceiling: {
+        state: "hit",
+        limit_bytes: 1073741824,
+        detail: "an allocation was refused",
+      },
       background: [
         { handle: "bg-4", what: "cargo build", exit_code: 0, stdout: "", stderr: "" },
         {
@@ -101,7 +170,12 @@ describe("a run's turns read as a terminal record and a code column", () => {
           exit_code: 0,
           stdout: "",
           stderr: "",
-          memory_ceiling: { state: "unapplied", why: "not_delegated", limit_bytes: 1073741824, detail: "not applied" },
+          memory_ceiling: {
+            state: "unapplied",
+            why: "not_delegated",
+            limit_bytes: 1073741824,
+            detail: "not applied",
+          },
         },
       ],
     });
@@ -117,10 +191,15 @@ describe("a run's turns read as a terminal record and a code column", () => {
         output: { cut: 0, head },
       },
     ]);
-    expect(traceOf([hit]).entries.map((entry) => (entry.kind === "command" ? entry.ceilings : null))).toEqual([
+    expect(
+      traceOf([hit]).entries.map((entry) => (entry.kind === "command" ? entry.ceilings : null)),
+    ).toEqual([
       [
         { handle: null, ceiling: { state: "hit", limit: 1073741824 } },
-        { handle: "bg-5", ceiling: { state: "unapplied", limit: 1073741824, why: "not_delegated" } },
+        {
+          handle: "bg-5",
+          ceiling: { state: "unapplied", limit: 1073741824, why: "not_delegated" },
+        },
       ],
     ]);
   });
@@ -140,9 +219,9 @@ describe("a run's turns read as a terminal record and a code column", () => {
         output: { cut: 40, head: '{"stdout":"error[E0308]' },
       },
     ]);
-    expect(traceOf([cut]).entries.map((entry) => (entry.kind === "command" ? entry.ending : null))).toEqual([
-      { kind: "code", code: 2 },
-    ]);
+    expect(
+      traceOf([cut]).entries.map((entry) => (entry.kind === "command" ? entry.ending : null)),
+    ).toEqual([{ kind: "code", code: 2 }]);
   });
 
   test("an edit's hunk carries both line numbers, and following lands on the newest touch", () => {
@@ -165,13 +244,19 @@ describe("a run's turns read as a terminal record and a code column", () => {
     ]);
     expect(trace.latest).toEqual({ kind: "entry", at: at(22) });
     expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: at(14) });
-    expect(traceOf([turn(2, edit.calls.slice(0, 1))]).latest).toEqual({ kind: "file", path: "src/lib.rs" });
+    expect(traceOf([turn(2, edit.calls.slice(0, 1))]).latest).toEqual({
+      kind: "file",
+      path: "src/lib.rs",
+    });
   });
 
   test("a no-newline marker is neither a line nor a step of either counter", () => {
-    const diff = "@@ -1,1 +1,2 @@\n-end\n\\ No newline at end of file\n+end\n+tail\n\\ No newline at end of file\n";
+    const diff =
+      "@@ -1,1 +1,2 @@\n-end\n\\ No newline at end of file\n+end\n+tail\n\\ No newline at end of file\n";
     const output = { cut: 0, head: JSON.stringify({ path: "a.txt", diff }) };
-    const marked = turn(3, [{ at: 31, tool: "edit", outcome: "answered", arguments: { cut: 0, head: "{}" }, output }]);
+    const marked = turn(3, [
+      { at: 31, tool: "edit", outcome: "answered", arguments: { cut: 0, head: "{}" }, output },
+    ]);
     expect(traceOf([marked]).files.flatMap((file) => file.hunks)).toEqual([
       {
         lines: [

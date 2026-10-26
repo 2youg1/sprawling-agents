@@ -42,6 +42,10 @@ describe("tokenOf", () => {
   test("with no override there is no way back, and an unresolved colour stays empty", () => {
     const { hands } = record();
     const look = tokenOf({ name: "--color-edge", drawn: undefined, reset: undefined }, hands);
-    expect([look.reset, look.well.value, look.well["aria-label"]]).toEqual([undefined, "", "--color-edge"]);
+    expect([look.reset, look.well.value, look.well["aria-label"]]).toEqual([
+      undefined,
+      "",
+      "--color-edge",
+    ]);
   });
 });

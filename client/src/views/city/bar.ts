@@ -43,12 +43,27 @@ interface Figure {
 // of buildings, and a number repeating them would be a second home
 // for one fact.
 const FIGURES: readonly Figure[] = [
-  { label: "metric_events", of: (held) => held.events, to: { kind: "record", lens: "ledger" }, waits: false },
+  {
+    label: "metric_events",
+    of: (held) => held.events,
+    to: { kind: "record", lens: "ledger" },
+    waits: false,
+  },
   { label: "metric_runs_active", of: (held) => held.runs_active, to: null, waits: false },
   { label: "metric_runs_frozen", of: (held) => held.runs_frozen, to: null, waits: false },
-  { label: "metric_approvals", of: (held) => held.approvals_waiting, to: { kind: "talk", address: MAYOR }, waits: true },
+  {
+    label: "metric_approvals",
+    of: (held) => held.approvals_waiting,
+    to: { kind: "talk", address: MAYOR },
+    waits: true,
+  },
   { label: "metric_signals", of: (held) => held.signals_waiting, to: null, waits: true },
-  { label: "metric_discards", of: (held) => held.discards_outstanding, to: { kind: "record", lens: "bin" }, waits: true },
+  {
+    label: "metric_discards",
+    of: (held) => held.discards_outstanding,
+    to: { kind: "record", lens: "bin" },
+    waits: true,
+  },
 ];
 
 // One figure and its word. A figure somebody has to answer is in the
@@ -72,13 +87,25 @@ export interface BarLook {
 // `null` before the city has answered either question: an empty grid
 // would still draw its bottom rule, a second line under the page head
 // with nothing between the two.
-export function barLookOf(metrics: MetricsAnswer | null, spent: number | null, lang: Lang): BarLook | null {
+export function barLookOf(
+  metrics: MetricsAnswer | null,
+  spent: number | null,
+  lang: Lang,
+): BarLook | null {
   if (metrics === null && spent === null) return null;
   const figures = metrics === null ? [] : FIGURES.map((figure) => readingOf(figure, metrics, lang));
   const total: readonly ReadingLook[] =
     spent === null
       ? []
-      : [{ key: "cost_total", label: say(lang, "cost_total"), value: usd(spent), tone: "plain", wire: { href: toFragment({ kind: "cost" }) } }];
+      : [
+          {
+            key: "cost_total",
+            label: say(lang, "cost_total"),
+            value: usd(spent),
+            tone: "plain",
+            wire: { href: toFragment({ kind: "cost" }) },
+          },
+        ];
   return { label: say(lang, "city_bar"), readings: [...figures, ...total] };
 }
 

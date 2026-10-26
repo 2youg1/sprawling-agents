@@ -32,7 +32,12 @@ const line = (began: number): SessionLine => ({
   runs: 1,
   start: { opened: { carry: "nothing", from: null } },
 });
-const stretch = (room: Address, current: boolean, runs: readonly RunBelief[]): Stretch => ({ room, line: line(3), current, runs });
+const stretch = (room: Address, current: boolean, runs: readonly RunBelief[]): Stretch => ({
+  room,
+  line: line(3),
+  current,
+  runs,
+});
 
 const at = (over: Partial<RowContext>): RowContext => ({
   lang: "en",
@@ -69,7 +74,10 @@ describe("a row as the look draws it", () => {
 
   test("a pinned row names who pinned it, both ways, and draws no pin tag", () => {
     const mayor = rowOf(stretch(MAYOR, true, []), at({ pinning: "mayor" }));
-    const tagged = rowOf(stretch(LAB, true, []), at({ pinning: "tagged", tags: [PIN, Tag.make("parser")] }));
+    const tagged = rowOf(
+      stretch(LAB, true, []),
+      at({ pinning: "tagged", tags: [PIN, Tag.make("parser")] }),
+    );
     const none = rowOf(stretch(LAB, true, []), at({}));
     expect({
       mayor: mayor.pin?.wire,
@@ -115,9 +123,30 @@ describe("a row as the look draws it", () => {
       done: said(rowOf(stretch(LAB, false, [held]), at({ chosen: true }))),
       beside: said(rowOf(stretch(LAB, true, [held]), at({ tags }))),
     }).toEqual({
-      running: { dot: undefined, title: "room1", when: "1m 00s", about: undefined, context: undefined, tags },
-      done: { dot: undefined, title: "room1", when: undefined, about: undefined, context: undefined, tags: [] },
-      beside: { dot: "run", title: "room1", when: "1m 00s", about: "new", context: { room: LAB, run: held.run }, tags },
+      running: {
+        dot: undefined,
+        title: "room1",
+        when: "1m 00s",
+        about: undefined,
+        context: undefined,
+        tags,
+      },
+      done: {
+        dot: undefined,
+        title: "room1",
+        when: undefined,
+        about: undefined,
+        context: undefined,
+        tags: [],
+      },
+      beside: {
+        dot: "run",
+        title: "room1",
+        when: "1m 00s",
+        about: "new",
+        context: { room: LAB, run: held.run },
+        tags,
+      },
     });
   });
 });

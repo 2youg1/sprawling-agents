@@ -36,7 +36,11 @@ interface Record {
   readonly taken: string[];
 }
 
-function wired(layer: Layer, cursor: number, value: string | null = null): { look: ComboboxLook; record: Record } {
+function wired(
+  layer: Layer,
+  cursor: number,
+  value: string | null = null,
+): { look: ComboboxLook; record: Record } {
   const record: Record = { acted: [], typed: [], pointed: [], taken: [] };
   const hands: Hands = {
     toggle: () => undefined,
@@ -54,7 +58,14 @@ function wired(layer: Layer, cursor: number, value: string | null = null): { loo
     },
   };
   const view: ComboboxView = {
-    props: { label: "Model", placeholder: "Search", empty: "No match", choices: CHOICES, value, onPick: () => undefined },
+    props: {
+      label: "Model",
+      placeholder: "Search",
+      empty: "No match",
+      choices: CHOICES,
+      value,
+      onPick: () => undefined,
+    },
     uid: "c1",
     layer,
     query: "",
@@ -71,7 +82,12 @@ type Typing = "settled" | "composing";
 function pressing(
   key: string,
   typing: Typing = "settled",
-): { readonly key: string; readonly isComposing: boolean; readonly prevented: () => boolean; preventDefault(): void } {
+): {
+  readonly key: string;
+  readonly isComposing: boolean;
+  readonly prevented: () => boolean;
+  preventDefault(): void;
+} {
   let prevented = false;
   return {
     key,
@@ -99,7 +115,12 @@ describe("the key table", () => {
       for (let cursor = 0; cursor < count; cursor += 1)
         for (const key of MOVES) {
           const answered = answer(settled(key), "field", cursor, count);
-          if (answered.kind !== "cursor" || answered.at < 0 || answered.at >= count || !claims(answered))
+          if (
+            answered.kind !== "cursor" ||
+            answered.at < 0 ||
+            answered.at >= count ||
+            !claims(answered)
+          )
             wrong.push(`${key} at ${String(cursor)} of ${String(count)}`);
         }
     expect(wrong).toEqual([]);
@@ -125,7 +146,8 @@ describe("the key table", () => {
 
   test("the trigger answers Escape alone", () => {
     expect(answer(settled("Escape"), "trigger", 0, 3)).toEqual({ kind: "close", focus: "opener" });
-    for (const key of KEYS.filter((each) => each !== "Escape")) expect(answer(settled(key), "trigger", 0, 3)).toEqual({ kind: "pass" });
+    for (const key of KEYS.filter((each) => each !== "Escape"))
+      expect(answer(settled(key), "trigger", 0, 3)).toEqual({ kind: "pass" });
   });
 
   test("every key an input method is composing passes unclaimed, wherever it lands (only_settled_keys_act)", () => {
@@ -135,7 +157,8 @@ describe("the key table", () => {
         for (let cursor = 0; cursor < Math.max(1, count); cursor += 1)
           for (const key of KEYS) {
             const answered = answer({ key, isComposing: true }, origin, cursor, count);
-            if (answered.kind !== "pass" || claims(answered)) taken.push(`${key} on the ${origin} at ${String(cursor)} of ${String(count)}`);
+            if (answered.kind !== "pass" || claims(answered))
+              taken.push(`${key} on the ${origin} at ${String(cursor)} of ${String(count)}`);
           }
     expect(taken).toEqual([]);
   });
@@ -180,7 +203,9 @@ describe("the value a look is given", () => {
 
   test("aria-selected marks the value in force and the search box names the cursor", () => {
     const { look } = wired("open", 2, "glm-5");
-    expect(look.options.map((each) => [each.wire["aria-selected"], each.chosen, each.cursor])).toEqual([
+    expect(
+      look.options.map((each) => [each.wire["aria-selected"], each.chosen, each.cursor]),
+    ).toEqual([
       [false, false, false],
       [true, true, false],
       [false, false, true],
@@ -194,14 +219,17 @@ describe("the value a look is given", () => {
 
   test("a closed popup names no cursor, takes no focus, and is not built before it first opens", () => {
     const shut = wired("shut", 1).look;
-    expect([shut.search["aria-activedescendant"], shut.search["aria-expanded"], shut.layer?.inert]).toEqual([
-      undefined,
-      false,
-      true,
-    ]);
+    expect([
+      shut.search["aria-activedescendant"],
+      shut.search["aria-expanded"],
+      shut.layer?.inert,
+    ]).toEqual([undefined, false, true]);
     expect(shut.options.some((each) => each.cursor)).toBe(false);
     expect(wired("unopened", 0).look.layer).toBeUndefined();
-    expect([wired("unopened", 0).look.face, wired("unopened", 0).look.unset]).toEqual(["Search", true]);
+    expect([wired("unopened", 0).look.face, wired("unopened", 0).look.unset]).toEqual([
+      "Search",
+      true,
+    ]);
   });
 
   test("a pointer over a row moves the cursor there and a click takes it", () => {

@@ -51,7 +51,9 @@
         <li>
           <RoomRow
             name={roomOf(room)}
-            live={living(room) > 0 ? fill(say($lang, "city_active"), { n: String(living(room)) }) : undefined}
+            live={living(room) > 0
+              ? fill(say($lang, "city_active"), { n: String(living(room)) })
+              : undefined}
             wire={{
               type: "button",
               onclick: () => {

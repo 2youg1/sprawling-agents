@@ -20,7 +20,11 @@
 </script>
 
 <span class="copy">
-  <button {...look.key} class={["key", look.refused ? "refused" : ""]} aria-describedby={`${uid}-note`}>
+  <button
+    {...look.key}
+    class={["key", look.refused ? "refused" : ""]}
+    aria-describedby={`${uid}-note`}
+  >
     {look.form === "named" ? look.name : look.face === "check" ? "✓" : look.refused ? "×" : "⧉"}
   </button>
   <span id={`${uid}-note`} class="note">{look.note}</span>

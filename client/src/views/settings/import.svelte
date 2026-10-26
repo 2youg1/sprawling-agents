@@ -34,7 +34,11 @@
   let asked = $state.raw<Readable<Answer | undefined> | null>(null);
 
   const answer = $derived($asked);
-  const read = $derived(answer !== undefined && answer !== null && "github_login" in answer ? answer.github_login : null);
+  const read = $derived(
+    answer !== undefined && answer !== null && "github_login" in answer
+      ? answer.github_login
+      : null,
+  );
 
   function ask(): void {
     const query = githubLoginQuery(host.trim() === "" ? null : host.trim());
@@ -46,7 +50,8 @@
     if (reading === "no_cli") return say($lang, "you_import_no_cli");
     if (reading === "not_logged_in") return fill(say($lang, "you_import_signed_out"), { host: at });
     if (reading === "not_a_host") return fill(say($lang, "you_import_not_a_host"), { host: at });
-    if ("failed" in reading) return fill(say($lang, "you_import_failed"), { exit: String(reading.failed.exit ?? "—") });
+    if ("failed" in reading)
+      return fill(say($lang, "you_import_failed"), { exit: String(reading.failed.exit ?? "—") });
     if ("stuck" in reading) return fill(say($lang, "you_import_stuck"), { why: reading.stuck.why });
     return "";
   }
@@ -67,16 +72,25 @@
         }}
       />
     </div>
-    <Button label={say($lang, "you_import")} tone="secondary" loading={asked !== null && answer === undefined} onPress={ask} />
+    <Button
+      label={say($lang, "you_import")}
+      tone="secondary"
+      loading={asked !== null && answer === undefined}
+      onPress={ask}
+    />
   </div>
   {#if read !== null}
     <div class="flex items-center gap-snug text-note" role="status">
       {#if typeof read.reading === "object" && "found" in read.reading}
         {@const login = read.reading.found.login}
         <span class="min-w-0 flex-1 truncate font-mono text-text">{`${read.host} · ${login}`}</span>
-        <Button label={say($lang, "you_import_take")} tone="secondary" onPress={() => {
+        <Button
+          label={say($lang, "you_import_take")}
+          tone="secondary"
+          onPress={() => {
             onTake(login, read.host);
-          }} />
+          }}
+        />
       {:else}
         <span class="text-text-quiet">{why(read.reading, read.host)}</span>
       {/if}

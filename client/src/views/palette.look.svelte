@@ -28,7 +28,10 @@
   const { box, list, nothing, foot }: Props = $props();
 </script>
 
-<input {...box} class="w-full rounded-control bg-page px-base py-snug text-body placeholder:text-text-faint" />
+<input
+  {...box}
+  class="w-full rounded-control bg-page px-base py-snug text-body placeholder:text-text-faint"
+/>
 {@render list()}
 {#if nothing !== undefined}
   <Empty missing={nothing} />

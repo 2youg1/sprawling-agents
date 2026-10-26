@@ -38,8 +38,19 @@
   function answering(query: Query): Answer | undefined {
     if (typeof query !== "object") return undefined;
     if ("document" in query) {
-      const text = { coverage: "whole" as const, encoding: "utf8" as const, head: { span: { start: 0, end: PLAN.length }, text: PLAN } };
-      return { document: { at: query.document.at, state: { held: { body: { text }, bytes: PLAN.length, format: "markdown", version: VERSION } } } };
+      const text = {
+        coverage: "whole" as const,
+        encoding: "utf8" as const,
+        head: { span: { start: 0, end: PLAN.length }, text: PLAN },
+      };
+      return {
+        document: {
+          at: query.document.at,
+          state: {
+            held: { body: { text }, bytes: PLAN.length, format: "markdown", version: VERSION },
+          },
+        },
+      };
     }
     if ("changes" in query) {
       return {
@@ -54,14 +65,25 @@
       };
     }
     if ("hunks" in query) {
-      return { hunks: { oid_a: BASE, oid_b: HEAD, path: CHANGED, lines: PATCH.map((text, at) => ({ number: at + 1, text })), withheld: [] } };
+      return {
+        hunks: {
+          oid_a: BASE,
+          oid_b: HEAD,
+          path: CHANGED,
+          lines: PATCH.map((text, at) => ({ number: at + 1, text })),
+          withheld: [],
+        },
+      };
     }
     return undefined;
   }
 
   const DOCUMENT: RightItem = { kind: "document", building: LAB, path: PATH, version: null };
   const CHANGES: RightItem = { kind: "changes", base: BASE, head: HEAD };
-  const KEPT = writeDraft({ version: VERSION, changes: [{ from: PLAN.length, to: PLAN.length, insert: "\nA line not saved yet.\n" }] });
+  const KEPT = writeDraft({
+    version: VERSION,
+    changes: [{ from: PLAN.length, to: PLAN.length, insert: "\nA line not saved yet.\n" }],
+  });
 </script>
 
 <script lang="ts">
@@ -77,7 +99,10 @@
 </script>
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
-  <Case label="inspector · a document tab holding an unsaved draft, beside a commit's changes" width={720}>
+  <Case
+    label="inspector · a document tab holding an unsaved draft, beside a commit's changes"
+    width={720}
+  >
     <div class="flex h-[480px] border-l border-edge-panel">
       <Right following={[DOCUMENT, CHANGES]} current={undefined} talk={LAB} />
     </div>

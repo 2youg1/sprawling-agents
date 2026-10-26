@@ -72,7 +72,18 @@ describe("the run page's sheet", () => {
     const look = lookOf(KNOWN, "en");
     const started = look.cells.find((cell) => cell.key === "took")?.lines[1];
     const cached = look.cells.find((cell) => cell.key === "tokens")?.lines[1];
-    expect(started).toEqual({ kind: "time", key: "started", text: `started ${moment(1000)}`, at: "1970-01-01T00:00:01.000Z" });
-    expect(cached).toEqual({ kind: "text", key: "cached", rank: "more", face: "figure", text: "cache not reported" });
+    expect(started).toEqual({
+      kind: "time",
+      key: "started",
+      text: `started ${moment(1000)}`,
+      at: "1970-01-01T00:00:01.000Z",
+    });
+    expect(cached).toEqual({
+      kind: "text",
+      key: "cached",
+      rank: "more",
+      face: "figure",
+      text: "cache not reported",
+    });
   });
 });

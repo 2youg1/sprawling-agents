@@ -51,9 +51,10 @@ describe("numbered", () => {
 
   test("a withheld line stands in its place and leaves the count unknown until the next hunk", () => {
     const drawn = numbered(
-      patch(["@@ -1,2 +1,2 @@", "+key = hidden", " after", "@@ -9 +9 @@", " known"], [
-        { number: 2, reason: "secret" },
-      ]),
+      patch(
+        ["@@ -1,2 +1,2 @@", "+key = hidden", " after", "@@ -9 +9 @@", " known"],
+        [{ number: 2, reason: "secret" }],
+      ),
     );
     expect(drawn).toEqual([
       { kind: "hunk", number: 1, text: "@@ -1,2 +1,2 @@", folded: 0 },

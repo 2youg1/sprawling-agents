@@ -173,9 +173,5 @@
   --color-drawn-aside: var(--color-g7);
   --color-drawn-figure: var(--color-g9);
 
-  --background-image-progress-done: linear-gradient(
-    90deg,
-    var(--color-g10),
-    var(--color-accent)
-  );
+  --background-image-progress-done: linear-gradient(90deg, var(--color-g10), var(--color-accent));
 }

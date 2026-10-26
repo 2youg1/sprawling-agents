@@ -58,7 +58,9 @@ describe("client frames", () => {
   });
 
   test("a credential over the wire is refused, as it is on the server", () => {
-    const frame = { command: { put_secret: { realm: "anthropic", name: "api", value: "sk-nope" } } };
+    const frame = {
+      command: { put_secret: { realm: "anthropic", name: "api", value: "sk-nope" } },
+    };
     expect(refused(decodeClient(frame))).toContain("put_secret");
   });
 });
@@ -66,25 +68,48 @@ describe("client frames", () => {
 describe("server frames", () => {
   test("an Answered with nested values, an Event and a Delta decode to what was sent", () => {
     const answer = {
-      answered: { ask_id: 3, as_of: 7, outcome: { answer: {
-        city: {
-          runs: [{ run, who: "planner@acme.1", frozen: false, last_seq: 7, last_kind: "run_started" }],
-          active: 1,
-          frozen: 0,
-          buildings: [
-            {
-              addr: "acme",
-              progress: { planned: { done: 1, blocked: 0, total: 3, done_ppb: 333333333, blocked_ppb: 0 } },
-              problems: [],
-              blocked: [{ source: "2.3", line: "2.3 waits for 2.1", waiting: 2 }],
-              ready: 1,
-              adoptable: false,
+      answered: {
+        ask_id: 3,
+        as_of: 7,
+        outcome: {
+          answer: {
+            city: {
+              runs: [
+                {
+                  run,
+                  who: "planner@acme.1",
+                  frozen: false,
+                  last_seq: 7,
+                  last_kind: "run_started",
+                },
+              ],
+              active: 1,
+              frozen: 0,
+              buildings: [
+                {
+                  addr: "acme",
+                  progress: {
+                    planned: { done: 1, blocked: 0, total: 3, done_ppb: 333333333, blocked_ppb: 0 },
+                  },
+                  problems: [],
+                  blocked: [{ source: "2.3", line: "2.3 waits for 2.1", waiting: 2 }],
+                  ready: 1,
+                  adoptable: false,
+                },
+              ],
+              pursuits: [
+                {
+                  addr: "acme",
+                  goal: "ship it",
+                  state: "running",
+                  verdict: { kind: "work", next: "2.3" },
+                },
+              ],
+              halted: [],
             },
-          ],
-          pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: { kind: "work", next: "2.3" } }],
-          halted: [],
+          },
         },
-      } } },
+      },
     };
     const event = {
       event: {
@@ -115,7 +140,9 @@ describe("a malformed frame", () => {
   });
 
   test("with a kind the wire does not know is refused at the field, with the kinds it knows", () => {
-    const frame = { event: { v: 1, run, seq: 1, prev: hash, t: 0, who: "x", kind: "run_teleported", data: {} } };
+    const frame = {
+      event: { v: 1, run, seq: 1, prev: hash, t: 0, who: "x", kind: "run_teleported", data: {} },
+    };
     const message = refused(decodeServer(frame));
     expect(message).toContain('at ["event"]["kind"]');
     expect(message).toContain('Expected "city_initialized" | ');

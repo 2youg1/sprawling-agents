@@ -75,7 +75,11 @@ the following state the view is at the foot either way. -->
   // view does not pull it away.
   function selecting(): boolean {
     const selection = document.getSelection();
-    return selection !== null && !selection.isCollapsed && column?.contains(selection.anchorNode) === true;
+    return (
+      selection !== null &&
+      !selection.isCollapsed &&
+      column?.contains(selection.anchorNode) === true
+    );
   }
 
   function toFoot(): void {
@@ -185,7 +189,10 @@ the following state the view is at the foot either way. -->
       keepReading(place, anchoring === "hold" ? event.currentTarget.scrollTop : null);
     }}
   >
-    <div bind:this={column} class="flex min-h-full w-full flex-col justify-end pt-section pb-section">
+    <div
+      bind:this={column}
+      class="flex min-h-full w-full flex-col justify-end pt-section pb-section"
+    >
       {@render children()}
     </div>
   </div>

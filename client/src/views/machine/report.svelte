@@ -1,86 +1,95 @@
 <script lang="ts" module>
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One answer about this machine, drawn. Separate from the ask so the
-// gallery can show this machine in states nobody's own machine happens
-// to be in.
-//
-// **One section per tier, because the city judges each tier on its
-// own.** Running a city and developing sprawling are different people
-// with different lists; the progress bar and the "still missing" line of
-// a section are the city's verdict on that tier and nothing else (see
-// `standing` in `views/setup/dependencies`).
-//
-// **A row per program, and a row only as tall as what is left to do.**
-// A program this machine has is one line: its name, its state, its
-// version (`rowOf`). A state the badge alone does not explain
-// - a program that gave no version, a fault, where the city looked - adds
-// one line of reason. A missing one adds the command that gets it, the install or
-// copy control, and one line saying where the command gets it from and
-// why the page waits for a press before running it.
-//
-// Under each name, the three versions (`versions.svelte`): installed
-// here, pinned by this repository, newest upstream. The cargo tools this
-// repository calls are one row, the Rust tools pack (`pack.svelte`),
-// with one press for the members it is missing.
-//
-// Last, the scan in front of the city's directory (`scanning.svelte`): read
-// on Windows, and on macOS and Linux the reason there is nothing to read.
-//
-// The develop section carries the one press that installs everything
-// it is missing (`views/setup/installing`); the screen's `machine.svelte`
-// sends the installs, and this file only draws how far they have got.
+  // One answer about this machine, drawn. Separate from the ask so the
+  // gallery can show this machine in states nobody's own machine happens
+  // to be in.
+  //
+  // **One section per tier, because the city judges each tier on its
+  // own.** Running a city and developing sprawling are different people
+  // with different lists; the progress bar and the "still missing" line of
+  // a section are the city's verdict on that tier and nothing else (see
+  // `standing` in `views/setup/dependencies`).
+  //
+  // **A row per program, and a row only as tall as what is left to do.**
+  // A program this machine has is one line: its name, its state, its
+  // version (`rowOf`). A state the badge alone does not explain
+  // - a program that gave no version, a fault, where the city looked - adds
+  // one line of reason. A missing one adds the command that gets it, the install or
+  // copy control, and one line saying where the command gets it from and
+  // why the page waits for a press before running it.
+  //
+  // Under each name, the three versions (`versions.svelte`): installed
+  // here, pinned by this repository, newest upstream. The cargo tools this
+  // repository calls are one row, the Rust tools pack (`pack.svelte`),
+  // with one press for the members it is missing.
+  //
+  // Last, the scan in front of the city's directory (`scanning.svelte`): read
+  // on Windows, and on macOS and Linux the reason there is nothing to read.
+  //
+  // The develop section carries the one press that installs everything
+  // it is missing (`views/setup/installing`); the screen's `machine.svelte`
+  // sends the installs, and this file only draws how far they have got.
 
-import type { Key } from "../../core/lang";
-import type { DoctorCore, DoctorItem } from "../../wire";
-import type { Weight } from "../parts/glyph";
-import type { Absence } from "../setup/dependencies";
-import type { StepState } from "../setup/installing";
+  import type { Key } from "../../core/lang";
+  import type { DoctorCore, DoctorItem } from "../../wire";
+  import type { Weight } from "../parts/glyph";
+  import type { Absence } from "../setup/dependencies";
+  import type { StepState } from "../setup/installing";
 
-// What the badge beside the name weighs. The word is what states the
-// answer; the weight only decides how loudly, and a broken or required
-// missing item is the one a person has to act on - unless it is a spare
-// of a group another member already answers.
-function weightOf(item: DoctorItem, absence: Absence): Weight {
-  if ("present" in item.state) return "quiet";
-  if ("broken" in item.state) return "alert";
-  return item.need === "optional" || absence === "spare" ? "quiet" : "alert";
-}
-
-// The level the core's threads stand at, and the platform's own words
-// when it refused: those are the platform's to choose, not the page's.
-function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | null } {
-  if (typeof core !== "string") {
-    return "refused" in core
-      ? { key: "machine_core_refused", said: core.refused.said }
-      : { key: "machine_core_unasked", said: core.unasked.said };
+  // What the badge beside the name weighs. The word is what states the
+  // answer; the weight only decides how loudly, and a broken or required
+  // missing item is the one a person has to act on - unless it is a spare
+  // of a group another member already answers.
+  function weightOf(item: DoctorItem, absence: Absence): Weight {
+    if ("present" in item.state) return "quiet";
+    if ("broken" in item.state) return "alert";
+    return item.need === "optional" || absence === "spare" ? "quiet" : "alert";
   }
-  switch (core) {
-    case "raised":
-      return { key: "machine_core_raised", said: null };
-    case "held_by_setting":
-      return { key: "machine_core_held", said: null };
-    case "lowered_by_valve":
-      return { key: "machine_core_lowered", said: null };
-  }
-}
 
-const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = {
-  waiting: { key: "machine_step_waiting", weight: "quiet" },
-  running: { key: "machine_step_running", weight: "quiet" },
-  done: { key: "machine_step_done", weight: "quiet" },
-  failed: { key: "machine_step_failed", weight: "alert" },
-};
+  // The level the core's threads stand at, and the platform's own words
+  // when it refused: those are the platform's to choose, not the page's.
+  function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | null } {
+    if (typeof core !== "string") {
+      return "refused" in core
+        ? { key: "machine_core_refused", said: core.refused.said }
+        : { key: "machine_core_unasked", said: core.unasked.said };
+    }
+    switch (core) {
+      case "raised":
+        return { key: "machine_core_raised", said: null };
+      case "held_by_setting":
+        return { key: "machine_core_held", said: null };
+      case "lowered_by_valve":
+        return { key: "machine_core_lowered", said: null };
+    }
+  }
+
+  const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = {
+    waiting: { key: "machine_step_waiting", weight: "quiet" },
+    running: { key: "machine_step_running", weight: "quiet" },
+    done: { key: "machine_step_done", weight: "quiet" },
+    failed: { key: "machine_step_failed", weight: "alert" },
+  };
 </script>
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
   import type { DoctorAnswer, DoctorNewest, DoctorTier } from "../../wire";
   import { ui } from "../../ui";
-  import { absenceOf, enablesKey, ofTier, outstanding, rowOf, siteOf, sourceOf, standing } from "../setup/dependencies";
+  import {
+    absenceOf,
+    enablesKey,
+    ofTier,
+    outstanding,
+    rowOf,
+    siteOf,
+    sourceOf,
+    standing,
+  } from "../setup/dependencies";
   import { over, type Walk } from "../setup/installing";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
@@ -105,7 +114,15 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
     readonly onInstallPack?: (names: readonly string[]) => void;
   }
 
-  const { answer, onInstall, planned = [], onInstallAll, walk = null, newest = {}, onInstallPack }: Props = $props();
+  const {
+    answer,
+    onInstall,
+    planned = [],
+    onInstallAll,
+    walk = null,
+    newest = {},
+    onInstallPack,
+  }: Props = $props();
 
   const { lang } = ui();
 
@@ -125,7 +142,9 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       });
     }
     const site = siteOf(how);
-    return site === null ? say($lang, "machine_install_admin") : fill(say($lang, "machine_install_by_hand"), { site });
+    return site === null
+      ? say($lang, "machine_install_admin")
+      : fill(say($lang, "machine_install_by_hand"), { site });
   }
 </script>
 
@@ -139,25 +158,28 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
         <span class="shrink-0 whitespace-nowrap font-mono text-label text-text">{item.name}</span>
       {:else}
         {@const site = item.homepage}
-        <span class="shrink-0 whitespace-nowrap"><Tip text={site}>
-          {#snippet children(hint)}
-            <a
-              class="font-mono text-label text-text underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
-              href={site}
-              target="_blank"
-              rel="noreferrer"
-              aria-describedby={hint}
-            >
-              {item.name}
-            </a>
-          {/snippet}
-        </Tip></span>
+        <span class="shrink-0 whitespace-nowrap"
+          ><Tip text={site}>
+            {#snippet children(hint)}
+              <a
+                class="font-mono text-label text-text underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
+                href={site}
+                target="_blank"
+                rel="noreferrer"
+                aria-describedby={hint}
+              >
+                {item.name}
+              </a>
+            {/snippet}
+          </Tip></span
+        >
       {/if}
       <Badge text={say($lang, line.state)} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
         <span class="shrink-0 text-note text-text-faint">{say($lang, "machine_optional")}</span>
       {:else if absence === "spare"}
-        <span class="min-w-0 truncate text-note text-text-faint">{say($lang, "machine_spare")}</span>
+        <span class="min-w-0 truncate text-note text-text-faint">{say($lang, "machine_spare")}</span
+        >
       {/if}
     </div>
     <Versions {item} newest={newest[item.name]} />
@@ -181,16 +203,18 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
           <!-- A command cut at the row's edge cannot be typed: pre-wrap
           keeps every character in the row, and a line breaks between
           words, never at the hyphen inside `--locked`. -->
-          <code class="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
-            >{#each how.split(" ") as word, index (index)}{index > 0 ? " " : ""}<span class="inline-block max-w-full"
-                >{word}</span
+          <code
+            class="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+            >{#each how.split(" ") as word, index (index)}{index > 0 ? " " : ""}<span
+                class="inline-block max-w-full">{word}</span
               >{/each}</code
           >
           {#if line.offer === "press"}
             <Button
               label={say($lang, "machine_install")}
               tone="secondary"
-              loading={walk?.some((each) => each.name === item.name && each.state === "running") === true}
+              loading={walk?.some((each) => each.name === item.name && each.state === "running") ===
+                true}
               onPress={() => {
                 onInstall?.(item.name);
               }}

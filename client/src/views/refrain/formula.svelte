@@ -19,8 +19,12 @@
   const INLINE = "$";
 
   export function formulaOf(source: string): Formula | null {
-    const fence = source.startsWith(DISPLAY) && source.endsWith(DISPLAY) && source.length > 2 * DISPLAY.length ? DISPLAY : INLINE;
-    if (!source.startsWith(fence) || !source.endsWith(fence) || source.length <= 2 * fence.length) return null;
+    const fence =
+      source.startsWith(DISPLAY) && source.endsWith(DISPLAY) && source.length > 2 * DISPLAY.length
+        ? DISPLAY
+        : INLINE;
+    if (!source.startsWith(fence) || !source.endsWith(fence) || source.length <= 2 * fence.length)
+      return null;
     const tex = source.slice(fence.length, -fence.length);
     return tex.trim() === "" ? null : { tex, placed: fence === DISPLAY ? "display" : "inline" };
   }
@@ -74,4 +78,7 @@
 </script>
 
 <!-- One line, so no space is drawn between a formula and the comma after it. -->
-<span bind:this={host} class={drawn ? (formula?.placed === "display" ? "block overflow-x-auto" : "") : "hidden"}></span>{#if !drawn}<code class="font-mono text-note text-text-faint">{source}</code>{/if}
+<span
+  bind:this={host}
+  class={drawn ? (formula?.placed === "display" ? "block overflow-x-auto" : "") : "hidden"}
+></span>{#if !drawn}<code class="font-mono text-note text-text-faint">{source}</code>{/if}

@@ -26,22 +26,35 @@ describe("registryLineOf", () => {
     ];
     expect(lines.map(registryLineOf)).toEqual([
       { registry: "release_registry_npm", newest: NEWEST, reason: null },
-      { registry: "release_registry_npm", newest: null, reason: { key: "release_registry_refused", said: "check the network" } },
+      {
+        registry: "release_registry_npm",
+        newest: null,
+        reason: { key: "release_registry_refused", said: "check the network" },
+      },
     ]);
   });
-
-
 });
 
 describe("updateOf", () => {
   test("every channel has its sentence, and the command is the city's", () => {
     const channels: InstallChannel[] = ["npm", "cargo", "archive", "source"];
-    expect(channels.map((channel) => updateOf({ alternatives: [], channel, command: channel === "source" ? null : `update ${channel}` }))).toEqual([
+    expect(
+      channels.map((channel) =>
+        updateOf({
+          alternatives: [],
+          channel,
+          command: channel === "source" ? null : `update ${channel}`,
+        }),
+      ),
+    ).toEqual([
       { channel: "release_channel_npm", command: "update npm" },
       { channel: "release_channel_cargo", command: "update cargo" },
       { channel: "release_channel_archive", command: "update archive" },
       { channel: "release_channel_source", command: null },
     ]);
-    expect(updateOf({ alternatives: [], channel: "npm" })).toEqual({ channel: "release_channel_npm", command: null });
+    expect(updateOf({ alternatives: [], channel: "npm" })).toEqual({
+      channel: "release_channel_npm",
+      command: null,
+    });
   });
 });

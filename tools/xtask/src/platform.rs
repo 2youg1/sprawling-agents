@@ -214,25 +214,90 @@ fn matrix_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
 /// What the shim hands a machine: the key it looks the machine up by,
 /// the package it resolves, and the file it execs.
+///
+/// Read from the object rather than from its lines. `bun fmt` wraps an
+/// entry that outgrows the print width, and a reader that needed a key
+/// and both fields on one line would report every row of the table
+/// missing the moment the formatter widened one.
 fn shim(text: &str) -> Vec<(String, String, String)> {
+    let Some(body) = object_body(text, "PLATFORMS = {") else {
+        return Vec::new();
+    };
+    entries(body).into_iter().filter_map(entry).collect()
+}
+
+/// The text between the brace `header` ends with and the brace that
+/// closes it, with strings left alone.
+fn object_body<'a>(text: &'a str, header: &str) -> Option<&'a str> {
+    let body = text.split_once(header)?.1;
+    let mut depth = 1_usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    for (at, mark) in body.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match mark {
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '{' if !quoted => depth = depth.saturating_add(1),
+            '}' if !quoted => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return body.get(..at);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// One entry per comma that sits at the object's own depth.
+fn entries(body: &str) -> Vec<&str> {
     let mut out = Vec::new();
-    for line in text.lines() {
-        let trimmed = line.trim();
-        let Some((key, rest)) = trimmed.strip_prefix('"').and_then(|l| l.split_once("\":")) else {
+    let mut from = 0_usize;
+    let mut depth = 0_usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    for (at, mark) in body.char_indices() {
+        if escaped {
+            escaped = false;
             continue;
-        };
-        let Some(package) = field(rest, "package:") else {
-            continue;
-        };
-        let Some(binary) = field(rest, "binary:") else {
-            continue;
-        };
-        out.push((key.to_owned(), package, binary));
+        }
+        match mark {
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '{' if !quoted => depth = depth.saturating_add(1),
+            '}' if !quoted => depth = depth.saturating_sub(1),
+            ',' if !quoted && depth == 0 => {
+                out.extend(body.get(from..at));
+                from = at.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+    if let Some(last) = body.get(from..)
+        && !last.trim().is_empty()
+    {
+        out.push(last);
     }
     out
 }
 
-/// One `name: "value"` out of an object literal written on one line.
+/// One `"key": { package: "…", binary: "…" }` of the table, however it
+/// is laid out.
+fn entry(entry: &str) -> Option<(String, String, String)> {
+    let key = entry.trim_start().strip_prefix('"')?;
+    let (key, _) = key.split_once('"')?;
+    let package = field(entry, "package:")?;
+    let binary = field(entry, "binary:")?;
+    Some((key.to_owned(), package, binary))
+}
+
+/// One `name: "value"` out of an entry, whatever whitespace separates
+/// the name from the value.
 fn field(text: &str, key: &str) -> Option<String> {
     let after = text.split_once(key)?.1.trim_start();
     let inner = after.strip_prefix('"')?;

@@ -196,8 +196,11 @@
           <span class="font-mono text-text">{tool.name}</span>
           <span class="text-text-faint">{tool.disclosure}</span>
           <pre
-            class="min-w-0 overflow-x-auto rounded-control bg-raised px-base py-snug font-mono text-text-quiet"
-          >{JSON.stringify(tool.input_schema, null, 2)}</pre>
+            class="min-w-0 overflow-x-auto rounded-control bg-raised px-base py-snug font-mono text-text-quiet">{JSON.stringify(
+              tool.input_schema,
+              null,
+              2,
+            )}</pre>
         </li>
       {/each}
     </ul>

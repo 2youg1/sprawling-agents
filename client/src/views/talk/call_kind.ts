@@ -25,16 +25,27 @@ import type { Call, Landing } from "../../wire";
 // their own arguments (client D85); every other call reads its subject.
 export type CallLine =
   | { readonly kind: "subject"; readonly subject: string }
-  | { readonly kind: "worded"; readonly word: Key; readonly fills: Readonly<Record<string, string>> };
+  | {
+      readonly kind: "worded";
+      readonly word: Key;
+      readonly fills: Readonly<Record<string, string>>;
+    };
 
-export type CallKind = { readonly kind: "registered"; readonly word: Key } | { readonly kind: "unregistered"; readonly tool: string };
+export type CallKind =
+  | { readonly kind: "registered"; readonly word: Key }
+  | { readonly kind: "unregistered"; readonly tool: string };
 
 export function kindOf(call: Call): CallKind {
   const render = call.render ?? null;
   if (render === "terminal") return { kind: "registered", word: "talk_kind_exec" };
-  if (render === "signal") return { kind: "registered", word: Option.isSome(decoded(call.arguments, Pull)) ? "talk_kind_pull" : "talk_kind_send" };
+  if (render === "signal")
+    return {
+      kind: "registered",
+      word: Option.isSome(decoded(call.arguments, Pull)) ? "talk_kind_pull" : "talk_kind_send",
+    };
   if (render === "delegate") return { kind: "registered", word: "talk_kind_delegate" };
-  if (render !== null && render !== "generic") return { kind: "registered", word: "talk_kind_edit" };
+  if (render !== null && render !== "generic")
+    return { kind: "registered", word: "talk_kind_edit" };
   const effect = call.effect ?? null;
   if (effect === null) return { kind: "unregistered", tool: call.tool };
   if (effect === "read") return { kind: "registered", word: "talk_kind_read" };
@@ -58,13 +69,21 @@ export function lineOf(call: Call): CallLine {
   if (call.render === "signal") {
     return Option.match(decoded(call.arguments, Asked), {
       onNone: () => fallback,
-      onSome: (sent): CallLine => ({ kind: "worded", word: "talk_send_line", fills: { to: sent.to, text: firstLine(sent.text) } }),
+      onSome: (sent): CallLine => ({
+        kind: "worded",
+        word: "talk_send_line",
+        fills: { to: sent.to, text: firstLine(sent.text) },
+      }),
     });
   }
   if (call.render === "delegate") {
     return Option.match(decoded(call.arguments, Handed), {
       onNone: () => fallback,
-      onSome: (handed): CallLine => ({ kind: "worded", word: "talk_delegate_line", fills: { room: handed.room, task: firstLine(handed.task) } }),
+      onSome: (handed): CallLine => ({
+        kind: "worded",
+        word: "talk_delegate_line",
+        fills: { room: handed.room, task: firstLine(handed.task) },
+      }),
     });
   }
   return fallback;
@@ -77,7 +96,8 @@ export function lineOf(call: Call): CallLine {
 // Ledger older than the landing line, or a landing outside the window.
 // `null` while the call runs and for every other tool.
 export function outcomeOf(call: Call): Key | null {
-  const landing = call.render === "signal" && call.outcome !== "failed" ? (call.landing ?? null) : null;
+  const landing =
+    call.render === "signal" && call.outcome !== "failed" ? (call.landing ?? null) : null;
   if (landing !== null) return LANDED[landing];
   if (call.outcome !== "answered") return null;
   if (call.render === "signal") {
@@ -86,7 +106,8 @@ export function outcomeOf(call: Call): Key | null {
       onSome: (sent): Key => (sent.waiting === undefined ? "talk_send_sent" : "talk_send_waiting"),
     });
   }
-  if (call.render === "delegate") return Option.isSome(decoded(call.output, Started)) ? "talk_delegate_starts" : null;
+  if (call.render === "delegate")
+    return Option.isSome(decoded(call.output, Started)) ? "talk_delegate_starts" : null;
   return null;
 }
 
@@ -100,7 +121,11 @@ const LANDED: Readonly<Record<Landing, Key>> = {
 // wording-ok: an argument value the tool reads, never shown to a reader
 const Pull = Schema.Struct({ action: Schema.Literal("pull") });
 // wording-ok: an argument value the tool reads, never shown to a reader
-const Asked = Schema.Struct({ action: Schema.Literal("send"), to: Schema.String, text: Schema.String });
+const Asked = Schema.Struct({
+  action: Schema.Literal("send"),
+  to: Schema.String,
+  text: Schema.String,
+});
 const Handed = Schema.Struct({ room: Schema.String, task: Schema.String });
 // The two fields of an `AxError` the line reads, and no more: a code this
 // build does not know yet is still a refusal, and its heading shows the
@@ -125,11 +150,19 @@ export type Failure =
 
 export function failureOf(call: Call): Failure {
   const refused = decoded(call.output, Refused);
-  if (Option.isSome(refused)) return { kind: "refused", code: refused.value.code, subject: refused.value.subject };
-  const text = (call.output?.head ?? "").split("\n").map((each) => each.trim()).find((each) => each !== "") ?? "";
+  if (Option.isSome(refused))
+    return { kind: "refused", code: refused.value.code, subject: refused.value.subject };
+  const text =
+    (call.output?.head ?? "")
+      .split("\n")
+      .map((each) => each.trim())
+      .find((each) => each !== "") ?? "";
   if (text === "") return { kind: "silent" };
   const kept = Array.from(text);
-  return { kind: "said", text: kept.length > SAID_CHARS ? `${kept.slice(0, SAID_CHARS).join("").trimEnd()}…` : text };
+  return {
+    kind: "said",
+    text: kept.length > SAID_CHARS ? `${kept.slice(0, SAID_CHARS).join("").trimEnd()}…` : text,
+  };
 }
 
 const SAID_CHARS = 160;

@@ -13,11 +13,11 @@ const labelled = (label: string) => encode({ ...EMPTY, label, command: "npx mcp-
 
 describe("a server label", () => {
   test("is judged by the city's grammar, not a page's", () => {
-    expect([labelled("9lives").kind, labelled("docs2").kind, labelled("my-docs").kind, labelled("my_docs").kind]).toEqual([
-      "ready",
-      "ready",
-      "blocked",
-      "blocked",
-    ]);
+    expect([
+      labelled("9lives").kind,
+      labelled("docs2").kind,
+      labelled("my-docs").kind,
+      labelled("my_docs").kind,
+    ]).toEqual(["ready", "ready", "blocked", "blocked"]);
   });
 });

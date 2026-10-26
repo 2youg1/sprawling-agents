@@ -23,5 +23,4 @@ addresses and names. A refused box takes the alert edge. -->
   {...look.wire}
   class="w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text aria-invalid:border-alert {ROOM[
     look.size
-  ]}"
-></textarea>
+  ]}"></textarea>

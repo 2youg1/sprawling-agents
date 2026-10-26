@@ -27,7 +27,7 @@ export function reaches(reach: Reach, key: string, run: string): boolean {
     // a seq already written, and a commit's lineage walks backwards
     // from the run that made it, so a later successor never changes it.
     case "newest_page":
-      return key.includes("\"before\":null");
+      return key.includes('"before":null');
   }
 }
 
@@ -40,41 +40,74 @@ function reached(moved: boolean): Reach {
 // set has a name a reader can hold, and the arm then states which
 // question it belongs to and nothing else.
 const PROVIDER_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "endpoint_attached", "endpoint_lost", "endpoint_probed",
-  "model_selected", "login_started", "provider_degraded",
+  "endpoint_attached",
+  "endpoint_lost",
+  "endpoint_probed",
+  "model_selected",
+  "login_started",
+  "provider_degraded",
 ]);
 
 const GOVERNANCE_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "approval_resolved", "autonomy_changed", "policy_created", "policy_revoked",
+  "approval_resolved",
+  "autonomy_changed",
+  "policy_created",
+  "policy_revoked",
 ]);
 
 const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished", "file_restored",
-  "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
-  "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
-  "pr_merged", "asset_archived", "governed_document_written", "document_written", "rules_changed",
+  "building_created",
+  "building_configured",
+  "building_removed",
+  "roadmap_claimed",
+  "roadmap_finished",
+  "file_restored",
+  "roadmap_released",
+  "roadmap_split",
+  "roadmap_blocked",
+  "pursuit_changed",
+  "checkpoint_committed",
+  "handoff_written",
+  "run_started",
+  "run_frozen",
+  "pr_merged",
+  "asset_archived",
+  "governed_document_written",
+  "document_written",
+  "rules_changed",
 ]);
 
 // What moves the proposal cards open on a document: a card offered,
 // decided or taken back, and a save that makes a card stale.
 const PROPOSALS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "proposal_offered", "proposal_decided", "proposal_withdrawn", "document_written",
+  "proposal_offered",
+  "proposal_decided",
+  "proposal_withdrawn",
+  "document_written",
 ]);
 
 // A room's prompt documents move when a page steps one (own, inherit,
 // restore) or saves one word by word, and when a run writes a convention
 // file in the room's chain, which every wave's checkpoint carries.
 const LAYERS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "governed_document_written", "document_written", "checkpoint_committed", "file_restored",
+  "governed_document_written",
+  "document_written",
+  "checkpoint_committed",
+  "file_restored",
 ]);
 
 // How far one record of this kind reaches into the answers held under
 // one question name.
 export function reachOf(name: string, kind: EventKind): Reach {
   switch (name) {
-    case "city_view": case "metrics": case "history":
+    case "city_view":
+    case "metrics":
+    case "history":
       return "every";
-    case "rounds": case "evidence": case "run_view": case "run_history":
+    case "rounds":
+    case "evidence":
+    case "run_view":
+    case "run_history":
       return "same_run";
     case "approval_queue":
       return reached(kind === "approval_requested" || kind === "approval_resolved");
@@ -82,7 +115,8 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(GOVERNANCE_MOVED.has(kind));
     // The model table's question reads the earlier registration of each
     // row's role, which a pick moves.
-    case "endpoint_view": case "model_figures":
+    case "endpoint_view":
+    case "model_figures":
       return reached(PROVIDER_MOVED.has(kind));
     case "inbox_view":
       return reached(kind === "signal_enqueued" || kind === "signal_consumed");
@@ -90,14 +124,21 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "file_discarded" || kind === "discard_restored");
     case "registry_view":
       return reached(kind === "asset_archived");
-    case "cost_view": case "cost_of":
+    case "cost_view":
+    case "cost_of":
       return reached(kind === "model_returned" || kind === "roadmap_claimed");
     // A prompt is frozen once for the life of a run and the object
     // behind a hash never changes, so none of these answers can go
     // stale: a range, a preview, bytes and an export are read from one
     // stored object, and a reply's blocks from the text the question
     // carries.
-    case "prefix": case "content": case "range": case "preview": case "reply": case "bytes": case "export":
+    case "prefix":
+    case "content":
+    case "range":
+    case "preview":
+    case "reply":
+    case "bytes":
+    case "export":
       return "none";
     // A shelf moves when somebody edits the building's rules, and a
     // pin appears when a run starts under them.
@@ -106,10 +147,17 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // The working tree moves whenever a wave writes, and every wave
     // ends in a checkpoint; a file taken back from one moves it too.
     case "git_status":
-      return reached(kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored");
+      return reached(
+        kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored",
+      );
     case "commits":
       return kind === "checkpoint_committed" || kind === "pr_merged" ? "newest_page" : "none";
-    case "building_view": case "listing": case "find": case "document": case "versions": case "archive_search":
+    case "building_view":
+    case "listing":
+    case "find":
+    case "document":
+    case "versions":
+    case "archive_search":
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));
@@ -118,7 +166,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // The city's list names cards and offer times, which a save does not
     // move: a stale card is still open.
     case "open_proposals":
-      return reached(kind === "proposal_offered" || kind === "proposal_decided" || kind === "proposal_withdrawn");
+      return reached(
+        kind === "proposal_offered" || kind === "proposal_decided" || kind === "proposal_withdrawn",
+      );
     // An identity card lands as a governed document written, and the
     // answer read back after it is the save's receipt.
     case "identity":
@@ -133,7 +183,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // newer table and new evidence of use. Not every turn, because the
     // answer folds the whole ledger.
     case "catalog":
-      return reached(kind === "rules_changed" || kind === "building_configured" || kind === "run_frozen");
+      return reached(
+        kind === "rules_changed" || kind === "building_configured" || kind === "run_frozen",
+      );
     // A room's stretches move when one opens and when a run in one starts
     // or ends, which is also when its last line and run count move.
     case "sessions":
@@ -141,7 +193,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // The usage tables fold the whole ledger, so they are asked again when
     // a run ends with its uses complete and when an audit lands, not on
     // every call; an export is asked on each press.
-    case "skill_usage": case "mcp_usage": case "shells":
+    case "skill_usage":
+    case "mcp_usage":
+    case "shells":
       return reached(kind === "run_frozen" || kind === "skill_audited");
     default:
       return "none";

@@ -108,12 +108,17 @@ export interface NoticeLook {
 export function noticeOf(props: NoticeProps, lang: Lang): NoticeLook {
   const weight = props.weight ?? "info";
   const next =
-    props.heading === undefined ? recoveryWords(lang, props.code, props.recovery) : say(lang, props.next);
+    props.heading === undefined
+      ? recoveryWords(lang, props.code, props.recovery)
+      : say(lang, props.next);
   return {
     seat: props.seat,
     weight,
     region: { role: weight === "alert" ? "alert" : "status" },
-    title: props.heading === undefined ? noticeTitle(lang, props.code, props.subject) : say(lang, props.heading),
+    title:
+      props.heading === undefined
+        ? noticeTitle(lang, props.code, props.subject)
+        : say(lang, props.heading),
     at: props.at,
     count: props.count !== undefined && props.count > 1 ? `×${String(props.count)}` : undefined,
     code: props.code,
@@ -124,7 +129,11 @@ export function noticeOf(props: NoticeProps, lang: Lang): NoticeLook {
             summary: say(lang, "notices_detail"),
             // The city's recovery is folded only when the page showed
             // its own sentence in its place.
-            lines: [props.action, props.subject, ...(props.recovery !== "" && props.recovery !== next ? [props.recovery] : [])],
+            lines: [
+              props.action,
+              props.subject,
+              ...(props.recovery !== "" && props.recovery !== next ? [props.recovery] : []),
+            ],
           }
         : undefined,
     actions: props.actions,

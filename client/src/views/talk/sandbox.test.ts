@@ -20,7 +20,9 @@ function building(sandbox: SandboxLimits | null): Answer {
       mcp: [],
       plan: [],
       problems: [],
-      progress: { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } },
+      progress: {
+        unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+      },
       rooms: [],
       sandbox,
     },
@@ -38,5 +40,7 @@ test("a sandbox is a fact only where it restricts a run", () => {
 });
 
 test("a room's sandbox is asked of its building", () => {
-  expect(sandboxQuery(Address.make("lab/fresh"))).toEqual({ building_view: { addr: Address.make("lab") } });
+  expect(sandboxQuery(Address.make("lab/fresh"))).toEqual({
+    building_view: { addr: Address.make("lab") },
+  });
 });

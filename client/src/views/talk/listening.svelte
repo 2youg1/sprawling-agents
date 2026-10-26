@@ -46,7 +46,9 @@
     });
   });
 
-  const look = $derived(listeningOf($lang, { city: $belief.city, room, segments, told: run !== undefined }));
+  const look = $derived(
+    listeningOf($lang, { city: $belief.city, room, segments, told: run !== undefined }),
+  );
 </script>
 
 <Look {...look} />

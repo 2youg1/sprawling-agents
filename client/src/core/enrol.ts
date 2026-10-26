@@ -33,34 +33,34 @@ export interface Enrolling {
 
 export function enrol(at: Enrolling): Promise<Enrolment> {
   const { origin, token, realm, name, value, lang } = at;
-  return fetch(`${origin}/enroll`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...bearing(token) },
-    body: JSON.stringify({ realm, name, value }),
-  })
-    .then((response) =>
-      // **The reference comes back from the city, never from here.**
-      // `kernel::SecretRef` is the grammar of a vault place and the
-      // route answers 201 with the text it parsed, so a realm or a
-      // name this page could spell but the city could not resolve is
-      // a refusal rather than a reference nothing answers to.
-      response.text().then((said): Enrolment =>
-        response.status === 201
-          ? { kind: "stored", reference: said }
-          : {
-              kind: "refused",
-              reason: said === "" ? say(lang, "enrol_city_said_nothing") : said,
-            },
-      ),
-    )
-    // A body that broke off half read is the same answer as no answer:
-    // the caller is told once, and nothing is left rejecting unheard.
-    .catch(
-      (): Enrolment => ({
+  return (
+    fetch(`${origin}/enroll`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...bearing(token) },
+      body: JSON.stringify({ realm, name, value }),
+    })
+      .then((response) =>
+        // **The reference comes back from the city, never from here.**
+        // `kernel::SecretRef` is the grammar of a vault place and the
+        // route answers 201 with the text it parsed, so a realm or a
+        // name this page could spell but the city could not resolve is
+        // a refusal rather than a reference nothing answers to.
+        response.text().then((said): Enrolment =>
+          response.status === 201
+            ? { kind: "stored", reference: said }
+            : {
+                kind: "refused",
+                reason: said === "" ? say(lang, "enrol_city_said_nothing") : said,
+              },
+        ),
+      )
+      // A body that broke off half read is the same answer as no answer:
+      // the caller is told once, and nothing is left rejecting unheard.
+      .catch((): Enrolment => ({
         kind: "refused",
         reason: say(lang, "enrol_unreachable"),
-      }),
-    );
+      }))
+  );
 }
 
 // Where one key is filed in the vault.
@@ -86,7 +86,10 @@ const SEARCH = "search";
 // account id is a `ServerLabel`, which has no `.`, so the last `.` of
 // the name always splits it back into the two ids.
 export function referenceFor(provider: string, account?: string): SecretAt {
-  return { realm: PROVIDERS, name: account === undefined ? provider : accountName(provider, account) };
+  return {
+    realm: PROVIDERS,
+    name: account === undefined ? provider : accountName(provider, account),
+  };
 }
 
 // The realm and name one account of a search supplier files its key

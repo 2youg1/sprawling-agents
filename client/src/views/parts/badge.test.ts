@@ -15,9 +15,17 @@ import { badgeOf, CAP } from "./badge";
 describe("a count badge", () => {
   test("draws nothing at zero, the number up to its cap, and cap+ past it", () => {
     expect(badgeOf({ count: 0 })).toBeUndefined();
-    expect(badgeOf({ count: 7 })).toEqual({ form: "count", text: "7", tier: "alert", quiet: { "aria-hidden": "true" } });
+    expect(badgeOf({ count: 7 })).toEqual({
+      form: "count",
+      text: "7",
+      tier: "alert",
+      quiet: { "aria-hidden": "true" },
+    });
     expect(badgeOf({ count: CAP + 1 })).toMatchObject({ text: `${String(CAP)}+` });
-    expect(badgeOf({ count: 10, cap: 9, weight: "live" })).toMatchObject({ text: "9+", tier: "live" });
+    expect(badgeOf({ count: 10, cap: 9, weight: "live" })).toMatchObject({
+      text: "9+",
+      tier: "live",
+    });
   });
 
   test("something new without a number is a lone dot, hidden like the number", () => {
@@ -32,8 +40,23 @@ describe("a count badge", () => {
 
 describe("a word badge", () => {
   test("a status takes its drawing and its tier from the status table, a tier its caller's", () => {
-    expect(badgeOf({ text: "refused", status: "refused" })).toEqual({ form: "word", text: "refused", mark: "cross", tier: "alert" });
-    expect(badgeOf({ text: "live", weight: "live", dot: true })).toEqual({ form: "word", text: "live", mark: "dot", tier: "live" });
-    expect(badgeOf({ text: "local" })).toEqual({ form: "word", text: "local", mark: undefined, tier: "quiet" });
+    expect(badgeOf({ text: "refused", status: "refused" })).toEqual({
+      form: "word",
+      text: "refused",
+      mark: "cross",
+      tier: "alert",
+    });
+    expect(badgeOf({ text: "live", weight: "live", dot: true })).toEqual({
+      form: "word",
+      text: "live",
+      mark: "dot",
+      tier: "live",
+    });
+    expect(badgeOf({ text: "local" })).toEqual({
+      form: "word",
+      text: "local",
+      mark: undefined,
+      tier: "quiet",
+    });
   });
 });

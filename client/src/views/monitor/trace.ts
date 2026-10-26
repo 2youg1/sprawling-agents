@@ -94,7 +94,8 @@ export interface Touched {
 
 // Where following lands: the file the agent changed last, or the call
 // it made last when that was not an edit.
-export type Target = { readonly kind: "file"; readonly path: string } | { readonly kind: "entry"; readonly at: Seq };
+export type Target =
+  { readonly kind: "file"; readonly path: string } | { readonly kind: "entry"; readonly at: Seq };
 
 export interface Trace {
   readonly entries: readonly Entry[];
@@ -122,7 +123,10 @@ const Asked = Schema.Union([
     arm: Schema.Union([
       Schema.Struct({ shell: Schema.Struct({ text: Schema.String }) }),
       Schema.Struct({
-        program: Schema.Struct({ path: Schema.String, args: Schema.optional(Schema.Array(Schema.String)) }),
+        program: Schema.Struct({
+          path: Schema.String,
+          args: Schema.optional(Schema.Array(Schema.String)),
+        }),
       }),
       Schema.Struct({ python: Schema.Struct({ code: Schema.String }) }),
     ]),
@@ -153,14 +157,22 @@ const Ran = Schema.Struct({
   outcome: Schema.optional(Schema.String),
   memory_ceiling: Schema.optional(MemoryCeiling),
   background: Schema.optional(
-    Schema.Array(Schema.Struct({ handle: Schema.String, memory_ceiling: Schema.optional(MemoryCeiling) })),
+    Schema.Array(
+      Schema.Struct({ handle: Schema.String, memory_ceiling: Schema.optional(MemoryCeiling) }),
+    ),
   ),
 });
 
-const Edited = Schema.Struct({ path: Schema.String, base_version: Schema.optional(Schema.String), diff: Schema.String });
+const Edited = Schema.Struct({
+  path: Schema.String,
+  base_version: Schema.optional(Schema.String),
+  diff: Schema.String,
+});
 
 const read = <A>(schema: Schema.Decoder<A>, text: string | undefined): Option.Option<A> =>
-  text === undefined ? Option.none() : Schema.decodeUnknownOption(Schema.fromJsonString(schema))(text);
+  text === undefined
+    ? Option.none()
+    : Schema.decodeUnknownOption(Schema.fromJsonString(schema))(text);
 
 export function traceOf(turns: readonly Turn[]): Trace {
   const calls = turns.flatMap((turn) => turn.calls);
@@ -168,13 +180,18 @@ export function traceOf(turns: readonly Turn[]): Trace {
   const entries: Entry[] = [];
   let latest: Target | null = null;
   for (const call of calls) {
-    const edited = call.tool === "edit" && call.outcome === "answered" ? read(Edited, call.output?.head) : Option.none();
+    const edited =
+      call.tool === "edit" && call.outcome === "answered"
+        ? read(Edited, call.output?.head)
+        : Option.none();
     if (Option.isSome(edited)) {
       const { path, base_version: base, diff } = edited.value;
       const before = files.get(path);
       files.set(path, {
         path,
-        how: before?.how ?? (base === CREATED_BASE || diff.startsWith(CREATED_FROM) ? "added" : "modified"),
+        how:
+          before?.how ??
+          (base === CREATED_BASE || diff.startsWith(CREATED_FROM) ? "added" : "modified"),
         at: call.at,
         hunks: [...(before?.hunks ?? []), ...hunksOf(diff)],
       });
@@ -206,9 +223,14 @@ export function commandOf(call: Call): Entry {
 }
 
 function ceilingsOf(ran: typeof Ran.Type): readonly CeilingNote[] {
-  const own = ran.memory_ceiling === undefined ? [] : [{ handle: null, ceiling: ceilingOf(ran.memory_ceiling) }];
+  const own =
+    ran.memory_ceiling === undefined
+      ? []
+      : [{ handle: null, ceiling: ceilingOf(ran.memory_ceiling) }];
   const rows = (ran.background ?? []).flatMap((row) =>
-    row.memory_ceiling === undefined ? [] : [{ handle: row.handle, ceiling: ceilingOf(row.memory_ceiling) }],
+    row.memory_ceiling === undefined
+      ? []
+      : [{ handle: row.handle, ceiling: ceilingOf(row.memory_ceiling) }],
   );
   return [...own, ...rows];
 }
@@ -221,7 +243,8 @@ function ceilingOf(read: typeof MemoryCeiling.Type): Ceiling {
 
 function endingOf(call: Call, ran: Option.Option<typeof Ran.Type>): Ending {
   if (call.outcome === "waiting") return { kind: "running" };
-  if (call.exit_code !== undefined && call.exit_code !== null) return { kind: "code", code: call.exit_code };
+  if (call.exit_code !== undefined && call.exit_code !== null)
+    return { kind: "code", code: call.exit_code };
   const why = Option.isSome(ran) ? ran.value.outcome : undefined;
   return why === undefined ? { kind: "unread" } : { kind: "stopped", why };
 }

@@ -24,7 +24,10 @@
 
   // A pick belongs to the answer it was made on: a new answer starts
   // with nothing picked.
-  let selection = $state<{ readonly answer: ReleaseAnswer | null; readonly command: string | null }>({ answer: null, command: null });
+  let selection = $state<{
+    readonly answer: ReleaseAnswer | null;
+    readonly command: string | null;
+  }>({ answer: null, command: null });
 
   const look = $derived(
     lookOf(answer, $lang, selection.answer === answer ? selection.command : null, {

@@ -72,7 +72,10 @@
   const u = ui();
   const lang = u.lang;
 
-  const PANELS: Readonly<Record<Region, string>> = { editor: "inspector-editor", terminal: "inspector-terminal" };
+  const PANELS: Readonly<Record<Region, string>> = {
+    editor: "inspector-editor",
+    terminal: "inspector-terminal",
+  };
 
   // The fewest lines either region keeps when the line between them moves.
   const LEAST = 6;
@@ -84,22 +87,40 @@
   // `asking` merges a question the thread beside it asks as well. One
   // store over all of them, read in the template, so an answer already
   // held draws in the same pass that opened the item.
-  const runs = $derived([...new Set(items.flatMap((item) => (item.kind === "call" ? [item.run] : [])))]);
+  const runs = $derived([
+    ...new Set(items.flatMap((item) => (item.kind === "call" ? [item.run] : []))),
+  ]);
   const asked = $derived(
     derived(
       runs.map((run) => u.conn.asking.ask({ rounds: { run } })),
-      (answers) => new Map(answers.flatMap((answer) => (answer !== undefined && "rounds" in answer ? [[answer.rounds.run, answer.rounds] as const] : []))),
+      (answers) =>
+        new Map(
+          answers.flatMap((answer) =>
+            answer !== undefined && "rounds" in answer
+              ? [[answer.rounds.run, answer.rounds] as const]
+              : [],
+          ),
+        ),
     ),
   );
-  const rounds = $derived(current === undefined || $asked.has(current.run) ? $asked : new Map([...$asked, [current.run, current]]));
+  const rounds = $derived(
+    current === undefined || $asked.has(current.run)
+      ? $asked
+      : new Map([...$asked, [current.run, current]]),
+  );
 
   // An open call as its run's rounds hold it: `null` until the rounds are
   // answered, and a `null` call when they hold no call at that place.
-  function callOf(item: RightItem): { readonly rounds: RoundsAnswer; readonly call: Call | null } | null {
+  function callOf(
+    item: RightItem,
+  ): { readonly rounds: RoundsAnswer; readonly call: Call | null } | null {
     if (item.kind !== "call") return null;
     const answer = rounds.get(item.run);
     if (answer === undefined) return null;
-    return { rounds: answer, call: answer.turns.flatMap((turn) => turn.calls).find((call) => call.at === item.at) ?? null };
+    return {
+      rounds: answer,
+      call: answer.turns.flatMap((turn) => turn.calls).find((call) => call.at === item.at) ?? null,
+    };
   }
 
   function regionOfItem(item: RightItem): Region {
@@ -122,7 +143,9 @@
     return path === "" ? call.tool : path.slice(path.lastIndexOf("/") + 1);
   }
 
-  const tabs = $derived(items.map((item): Tab => ({ item, label: labelOf(item), region: regionOfItem(item) })));
+  const tabs = $derived(
+    items.map((item): Tab => ({ item, label: labelOf(item), region: regionOfItem(item) })),
+  );
   const front = $derived(held.length > 0 ? rightItem() : (following[0] ?? null));
 
   // An item as a link to this conversation with it open on the right
@@ -130,9 +153,22 @@
   function linkOf(item: RightItem): string | null {
     switch (item.kind) {
       case "call":
-        return toFragment({ kind: "talk", address: talk, item: { kind: "call", run: item.run, at: item.at } });
+        return toFragment({
+          kind: "talk",
+          address: talk,
+          item: { kind: "call", run: item.run, at: item.at },
+        });
       case "document":
-        return toFragment({ kind: "talk", address: talk, item: { kind: "document", building: item.building, path: item.path, version: item.version } });
+        return toFragment({
+          kind: "talk",
+          address: talk,
+          item: {
+            kind: "document",
+            building: item.building,
+            path: item.path,
+            version: item.version,
+          },
+        });
       case "changes":
       case "letter":
         return null;
@@ -174,7 +210,9 @@
   // `null` until somebody moves it, and then the editor's own height.
   let step = $state(24);
   onMount(() => {
-    const baseline = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--spacing-baseline"));
+    const baseline = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--spacing-baseline"),
+    );
     if (Number.isFinite(baseline) && baseline > 0) step = 3 * baseline;
   });
   let chosen = $state<number | null>(null);
@@ -217,15 +255,29 @@
     closeAll();
   }}
 >
-  <Strip {tabs} {front} panels={PANELS} {linkOf} onPick={pick} onClose={close} onCloseAll={closeAll} />
+  <Strip
+    {tabs}
+    {front}
+    panels={PANELS}
+    {linkOf}
+    onPick={pick}
+    onClose={close}
+    onCloseAll={closeAll}
+  />
   <div class="side-in-then flex min-h-0 flex-1 flex-col" bind:clientHeight={room}>
     {#if editorTabs.length > 0}
       <div
         id={PANELS.editor}
         role="tabpanel"
         aria-label={say($lang, "inspect_editor")}
-        class={["flex min-h-0 flex-col bg-page", chosen === null && terminalTabs.length > 0 ? "flex-[3]" : "", terminalTabs.length === 0 ? "flex-1" : "shrink-0"]}
-        style:height={chosen === null || terminalTabs.length === 0 ? undefined : `${String(chosen * step)}px`}
+        class={[
+          "flex min-h-0 flex-col bg-page",
+          chosen === null && terminalTabs.length > 0 ? "flex-[3]" : "",
+          terminalTabs.length === 0 ? "flex-1" : "shrink-0",
+        ]}
+        style:height={chosen === null || terminalTabs.length === 0
+          ? undefined
+          : `${String(chosen * step)}px`}
         bind:clientHeight={editorHeight}
       >
         {#each editorTabs as tab (itemKey(tab.item))}
@@ -256,10 +308,15 @@
         id={PANELS.terminal}
         role="tabpanel"
         aria-label={say($lang, "inspect_terminal")}
-        class={["flex min-h-0 flex-col", chosen === null && editorTabs.length > 0 ? "flex-[2]" : "flex-1"]}
+        class={[
+          "flex min-h-0 flex-col",
+          chosen === null && editorTabs.length > 0 ? "flex-[2]" : "flex-1",
+        ]}
       >
         {#each terminalTabs as tab (itemKey(tab.item))}
-          <div class={sameItem(terminalFront, tab.item) ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+          <div
+            class={sameItem(terminalFront, tab.item) ? "flex min-h-0 flex-1 flex-col" : "hidden"}
+          >
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render itemView(tab.item)}
           </div>

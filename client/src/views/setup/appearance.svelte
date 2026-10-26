@@ -27,7 +27,15 @@
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { BLEND_PERCENT, CHROMAS, DENSITIES, GLASSES, LIGHTINGS, MOTIONS, blendOf } from "../../core/appearance";
+  import {
+    BLEND_PERCENT,
+    CHROMAS,
+    DENSITIES,
+    GLASSES,
+    LIGHTINGS,
+    MOTIONS,
+    blendOf,
+  } from "../../core/appearance";
   import type { Appearance } from "../../core/appearance";
   import { ui } from "../../ui";
   import Segmented from "../parts/segmented.svelte";
@@ -88,7 +96,8 @@
     write({ ...look, blend: percent }, "blend");
   };
 
-  const receipt = (name: Setting): ReceiptLook => receiptOf($saved === name, say($lang, "setup_saved"));
+  const receipt = (name: Setting): ReceiptLook =>
+    receiptOf($saved === name, say($lang, "setup_saved"));
 
   const blendRange = (): string =>
     fill(say($lang, "appearance_blend_range"), {
@@ -101,7 +110,11 @@
 <!-- The cards flow into the grid of the group that holds them, so the
 language card the settings page adds beside them takes the next cell. -->
 <div class="contents">
-  <Card title={say($lang, "appearance_lighting")} note={say($lang, "appearance_lighting_note")} receipt={receipt("lighting")}>
+  <Card
+    title={say($lang, "appearance_lighting")}
+    note={say($lang, "appearance_lighting_note")}
+    receipt={receipt("lighting")}
+  >
     <Segmented
       label={say($lang, "appearance_lighting")}
       options={cellsOf(LIGHTINGS, LIGHTING_WORDS, said)}
@@ -114,7 +127,11 @@ language card the settings page adds beside them takes the next cell. -->
 
   <AppearanceType {look} {write} {receipt} />
 
-  <Card title={say($lang, "appearance_density")} note={say($lang, "appearance_density_note")} receipt={receipt("density")}>
+  <Card
+    title={say($lang, "appearance_density")}
+    note={say($lang, "appearance_density_note")}
+    receipt={receipt("density")}
+  >
     <Segmented
       label={say($lang, "appearance_density")}
       options={cellsOf(DENSITIES, DENSITY_WORDS, said)}
@@ -125,7 +142,11 @@ language card the settings page adds beside them takes the next cell. -->
     />
   </Card>
 
-  <Card title={say($lang, "appearance_chroma")} note={say($lang, "appearance_chroma_note")} receipt={receipt("chroma")}>
+  <Card
+    title={say($lang, "appearance_chroma")}
+    note={say($lang, "appearance_chroma_note")}
+    receipt={receipt("chroma")}
+  >
     <Segmented
       label={say($lang, "appearance_chroma")}
       options={cellsOf(CHROMAS, CHROMA_WORDS, said)}
@@ -136,7 +157,11 @@ language card the settings page adds beside them takes the next cell. -->
     />
   </Card>
 
-  <Card title={say($lang, "appearance_motion")} note={say($lang, "appearance_motion_note")} receipt={receipt("motion")}>
+  <Card
+    title={say($lang, "appearance_motion")}
+    note={say($lang, "appearance_motion_note")}
+    receipt={receipt("motion")}
+  >
     <Segmented
       label={say($lang, "appearance_motion")}
       options={cellsOf(MOTIONS, MOTION_WORDS, said)}
@@ -149,7 +174,11 @@ language card the settings page adds beside them takes the next cell. -->
 
   <Tier />
 
-  <Card title={say($lang, "appearance_glass")} note={say($lang, "appearance_glass_note")} receipt={receipt("glass")}>
+  <Card
+    title={say($lang, "appearance_glass")}
+    note={say($lang, "appearance_glass_note")}
+    receipt={receipt("glass")}
+  >
     <Segmented
       label={say($lang, "appearance_glass")}
       options={cellsOf(GLASSES, GLASS_WORDS, said)}
@@ -160,7 +189,12 @@ language card the settings page adds beside them takes the next cell. -->
     />
   </Card>
 
-  <Card title={say($lang, "appearance_blend")} note={say($lang, "appearance_blend_note")} constraint={blendRange()} receipt={receipt("blend")}>
+  <Card
+    title={say($lang, "appearance_blend")}
+    note={say($lang, "appearance_blend_note")}
+    constraint={blendRange()}
+    receipt={receipt("blend")}
+  >
     <Slider
       {...sliderOf({
         label: say($lang, "appearance_blend"),

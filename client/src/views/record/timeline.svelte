@@ -69,17 +69,27 @@
 
   const question = $derived<Query>({ history: { before, limit: 100 } });
   const history = $derived(u.conn.asking.ask(question));
-  const read = $derived(readAnswer($history, (held) => ("history" in held ? held.history : undefined)));
+  const read = $derived(
+    readAnswer($history, (held) => ("history" in held ? held.history : undefined)),
+  );
   const records = $derived(read.kind === "held" ? read.value.records : []);
   const earlier = $derived(read.kind === "held" ? (read.value.earlier ?? null) : null);
   const lines = $derived($belief.logs);
   const entries = $derived(
-    entriesOf({ records, head: before === null }, lines, source, { run, level, module: moduleName }),
+    entriesOf({ records, head: before === null }, lines, source, {
+      run,
+      level,
+      module: moduleName,
+    }),
   );
   const days = $derived(daysOf(entries));
-  const runs = $derived([...new Set([...records.map((each) => each.run), ...lines.flatMap((each) => each.run ?? [])])]);
+  const runs = $derived([
+    ...new Set([...records.map((each) => each.run), ...lines.flatMap((each) => each.run ?? [])]),
+  ]);
   const modules = $derived(modulesIn(lines));
-  const sources = $derived(SOURCES.map((value) => ({ value, label: say($lang, SOURCE_NAMES[value]) })));
+  const sources = $derived(
+    SOURCES.map((value) => ({ value, label: say($lang, SOURCE_NAMES[value]) })),
+  );
 
   function toggle(seq: Seq): void {
     open = open === seq ? null : seq;
@@ -129,7 +139,12 @@
   {:else}
     {#snippet rows()}
       {#each entries as entry, at (entry.key)}
-        <Entry {entry} day={days[at] ?? null} open={entry.kind === "record" && open === entry.seq} onToggle={toggle} />
+        <Entry
+          {entry}
+          day={days[at] ?? null}
+          open={entry.kind === "record" && open === entry.seq}
+          onToggle={toggle}
+        />
       {/each}
     {/snippet}
     <!-- eslint-disable-next-line @typescript-eslint/no-unsafe-call (RowList is the keyboard walk `parts/row` exports as a snippet; svelte-check resolves its type where the lint's type graph does not) -->

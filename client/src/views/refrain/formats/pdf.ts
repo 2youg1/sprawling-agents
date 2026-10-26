@@ -39,9 +39,14 @@ const SHIPPED: ReadonlyMap<string, string> = new Map(
 class Shipped {
   fetch({ filename }: { readonly kind: string; readonly filename: string }): Promise<Uint8Array> {
     const url = SHIPPED.get(filename);
-    if (url === undefined) return Promise.reject(new Error(`${filename} is not part of this bundle`));
+    if (url === undefined)
+      return Promise.reject(new Error(`${filename} is not part of this bundle`));
     return fetch(url)
-      .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(`${filename}: ${String(response.status)}`))))
+      .then((response) =>
+        response.ok
+          ? response.arrayBuffer()
+          : Promise.reject(new Error(`${filename}: ${String(response.status)}`)),
+      )
       .then((buffer) => new Uint8Array(buffer));
   }
 }
@@ -77,7 +82,9 @@ export function openPdf(bytes: Uint8Array): Opening {
     opened: task.promise.then(
       (pdf): Opened => ({ kind: "open", pdf }),
       (reason: unknown): Opened =>
-        reason instanceof PasswordException ? { kind: "locked" } : { kind: "broken", reason: String(reason) },
+        reason instanceof PasswordException
+          ? { kind: "locked" }
+          : { kind: "broken", reason: String(reason) },
     ),
     close: () => {
       void task.destroy();
@@ -135,7 +142,9 @@ export function pagesText(pdf: PDFDocumentProxy): Promise<readonly string[]> {
         .getPage(number)
         .then((page) => page.getTextContent())
         .then((content) =>
-          content.items.map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : "") : "")).join(""),
+          content.items
+            .map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : "") : ""))
+            .join(""),
         ),
     ),
   );

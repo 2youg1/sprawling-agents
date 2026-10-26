@@ -50,9 +50,12 @@ open, so the record under it reads as that row's. -->
       <span class="{WHERE} font-mono text-text-quiet">{row.where}</span>
     </button>
     {#if row.raw !== undefined}
-      <div class="flex flex-col gap-tight pt-tight pb-base pl-[calc(20ch+2*var(--spacing-base))] @max-[30rem]:pl-0">
+      <div
+        class="flex flex-col gap-tight pt-tight pb-base pl-[calc(20ch+2*var(--spacing-base))] @max-[30rem]:pl-0"
+      >
         <span class="text-note text-text-faint">{row.rawLabel}</span>
-        <pre class="max-h-output overflow-auto rounded-card border border-edge p-base text-note text-text-quiet">{row.raw}</pre>
+        <pre
+          class="max-h-output overflow-auto rounded-card border border-edge p-base text-note text-text-quiet">{row.raw}</pre>
       </div>
     {/if}
   </li>

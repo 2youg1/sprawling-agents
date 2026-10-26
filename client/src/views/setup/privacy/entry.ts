@@ -59,7 +59,11 @@ export function pressable<I>(stage: Stage<I>): boolean {
   }
 }
 
-export function step<I>(offered: (action: Action) => boolean, stage: Stage<I>, event: Event<I>): Step<I> {
+export function step<I>(
+  offered: (action: Action) => boolean,
+  stage: Stage<I>,
+  event: Event<I>,
+): Step<I> {
   const still: Step<I> = { stage, send: null };
   switch (event.kind) {
     case "press":

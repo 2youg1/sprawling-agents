@@ -48,11 +48,18 @@
         <span class="whitespace-pre">{row.text}</span>
       </div>
     {:else}
-      <div class={["code grid pr-wide", WASH[row.tone], row.chosen && "chosen"]} data-line={row.key}>
+      <div
+        class={["code grid pr-wide", WASH[row.tone], row.chosen && "chosen"]}
+        data-line={row.key}
+      >
         {#if row.quote === undefined}
           <span class="pr-pane text-right select-none {MARK[row.tone]}">{row.place}</span>
         {:else}
-          <a {...row.quote} class="number pr-pane text-right select-none hover:text-text {MARK[row.tone]}">{row.place}</a>
+          <a
+            {...row.quote}
+            class="number pr-pane text-right select-none hover:text-text {MARK[row.tone]}"
+            >{row.place}</a
+          >
         {/if}
         <!-- wording-ok: the diff format's own marks, not words. -->
         <span class="select-none {MARK[row.tone]}" aria-hidden="true">{row.sign}</span>

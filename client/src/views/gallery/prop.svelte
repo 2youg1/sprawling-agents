@@ -17,7 +17,18 @@
   // into: an edit that leaves a removal out and rewrites a sentence, a
   // decision on its way to the city, and one the city refused.
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
-  import type { Answer, AxError, Call, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, RoundsAnswer, Slice } from "../../wire";
+  import type {
+    Answer,
+    AxError,
+    Call,
+    DocumentState,
+    EventRecord,
+    ProposalCard,
+    ProposalsAnswer,
+    Query,
+    RoundsAnswer,
+    Slice,
+  } from "../../wire";
   import { decideProposals } from "../../core/commands";
   import { editOf, rejectionOf, retaken } from "../refrain/proposals";
   import type { Deciding, Edit } from "../refrain/proposals";
@@ -68,7 +79,10 @@
     run: RUN,
     baseline: V0,
     span: { start: 77, end: 105 },
-    slices: [slice("delete", "Drafts are kept for a while.", ""), slice("insert", "Drafts are kept until the save lands.", "")],
+    slices: [
+      slice("delete", "Drafts are kept for a while.", ""),
+      slice("insert", "Drafts are kept until the save lands.", ""),
+    ],
   };
 
   const PROPOSALS: ProposalsAnswer = { doc: DOC, version: V1, open: [CURRENT, STALE] };
@@ -78,13 +92,23 @@
       version: V1,
       format: "markdown",
       bytes: bytes(TEXT),
-      body: { text: { encoding: "utf8", coverage: "whole", head: { span: { start: 0, end: bytes(TEXT) }, text: TEXT } } },
+      body: {
+        text: {
+          encoding: "utf8",
+          coverage: "whole",
+          head: { span: { start: 0, end: bytes(TEXT) }, text: TEXT },
+        },
+      },
     },
   };
 
   const NOW = Date.now();
 
-  function record(seq: number, kind: EventRecord["kind"], data: Record<string, unknown>): EventRecord {
+  function record(
+    seq: number,
+    kind: EventRecord["kind"],
+    data: Record<string, unknown>,
+  ): EventRecord {
     return {
       addr: EAST,
       data,
@@ -104,8 +128,22 @@
     record(1, "run_started", { task: "tighten the plan's wording" }),
     record(2, "model_called", { model: "claude-opus-4" }),
     record(3, "tool_called", { name: "read", subject: PATH }),
-    record(4, "proposal_offered", { doc: DOC, baseline: V0, start: 77, end: 105, before: "", after: "" }),
-    record(5, "proposal_offered", { doc: DOC, baseline: V1, start: 8, end: 75, before: "", after: "" }),
+    record(4, "proposal_offered", {
+      doc: DOC,
+      baseline: V0,
+      start: 77,
+      end: 105,
+      before: "",
+      after: "",
+    }),
+    record(5, "proposal_offered", {
+      doc: DOC,
+      baseline: V1,
+      start: 8,
+      end: 75,
+      before: "",
+      after: "",
+    }),
   ];
 
   // The sender's four rounds: it read the plan, weighed it, offered the
@@ -121,8 +159,21 @@
     answered: TimeMs.make(NOW - 8 * 60_000 + 40),
     timing: "measured",
   };
-  function round(number: number, opened: number, said: string, calls: readonly Call[]): RoundsAnswer["turns"][number] {
-    return { calls, notes: [], number, opened: Seq.make(opened), said, t: TimeMs.make(NOW - (10 - number) * 60_000), timing: "measured" };
+  function round(
+    number: number,
+    opened: number,
+    said: string,
+    calls: readonly Call[],
+  ): RoundsAnswer["turns"][number] {
+    return {
+      calls,
+      notes: [],
+      number,
+      opened: Seq.make(opened),
+      said,
+      t: TimeMs.make(NOW - (10 - number) * 60_000),
+      timing: "measured",
+    };
   }
   const ROUNDS: RoundsAnswer = {
     run: RUN,
@@ -130,7 +181,12 @@
       round(1, 2, "I read the plan before changing anything.", [READ]),
       round(2, 6, "The reader section says nothing about drafts; that is the gap.", []),
       round(3, 8, "I offered one card on the reader's three sentences.", []),
-      round(4, 12, "The card is waiting for the User; nothing else in the plan needs a change.", []),
+      round(
+        4,
+        12,
+        "The card is waiting for the User; nothing else in the plan needs a change.",
+        [],
+      ),
     ],
   };
 
@@ -154,7 +210,8 @@
     code: "E_VERSION_CONFLICT",
     gate: null,
     nearby: [],
-    recovery: "The plan moved to a new version while this card was open; read the card again before deciding.",
+    recovery:
+      "The plan moved to a new version while this card was open; read the card again before deciding.",
     retry: "no",
     subject: DOC,
   };
@@ -164,8 +221,10 @@
     if (typeof query !== "object") return undefined;
     if ("rounds" in query) return query.rounds.run === RUN ? { rounds: ROUNDS } : undefined;
     if ("proposals" in query) return query.proposals === DOC ? { proposals: PROPOSALS } : undefined;
-    if ("document" in query) return query.document.at === DOC ? { document: { at: DOC, state: DOCUMENT } } : undefined;
-    if ("sessions" in query) return { sessions: { room: query.sessions.room, sessions: [], earlier: 0 } };
+    if ("document" in query)
+      return query.document.at === DOC ? { document: { at: DOC, state: DOCUMENT } } : undefined;
+    if ("sessions" in query)
+      return { sessions: { room: query.sessions.room, sessions: [], earlier: 0 } };
     return undefined;
   }
 </script>
@@ -201,7 +260,9 @@
     const host = editedHost;
     if (host === undefined) return;
     const edit = say($lang, "proposal_edit");
-    const button = [...host.querySelectorAll("button")].find((each) => each.textContent.trim() === edit);
+    const button = [...host.querySelectorAll("button")].find(
+      (each) => each.textContent.trim() === edit,
+    );
     button?.click();
   });
 </script>
@@ -217,14 +278,38 @@
     <div bind:this={editedHost}><Card doc={DOC} card={CURRENT} version={V1} /></div>
   </Case>
   <Case label="proposal card body · a removal left out and an inserted sentence rewritten">
-    <Body {...cardLookOf(CURRENT, { standing: current, deciding: { kind: "idle" }, edit: EDITED, lead: undefined }, $lang, hands)} />
+    <Body
+      {...cardLookOf(
+        CURRENT,
+        { standing: current, deciding: { kind: "idle" }, edit: EDITED, lead: undefined },
+        $lang,
+        hands,
+      )}
+    />
   </Case>
   <Case label="proposal card body · a decision on its way to the city">
-    <Body {...cardLookOf(CURRENT, { standing: current, deciding: SENT, edit: null, lead: undefined }, $lang, hands)} />
+    <Body
+      {...cardLookOf(
+        CURRENT,
+        { standing: current, deciding: SENT, edit: null, lead: undefined },
+        $lang,
+        hands,
+      )}
+    />
   </Case>
   <Case label="proposal card body · a decision the city refused, its recovery on the card">
     <Body
-      {...cardLookOf(CURRENT, { standing: current, deciding: { kind: "refused", error: REFUSED }, edit: null, lead: undefined }, $lang, hands)}
+      {...cardLookOf(
+        CURRENT,
+        {
+          standing: current,
+          deciding: { kind: "refused", error: REFUSED },
+          edit: null,
+          lead: undefined,
+        },
+        $lang,
+        hands,
+      )}
     />
   </Case>
   <Case label="proposal cards · the band, one card shown in the text and one not" width={600}>
@@ -250,7 +335,10 @@
       <Letter doc={DOC} card={CURRENT.id} opening="talk" />
     </div>
   </Case>
-  <Case label="letter · a card whose offering line was not found, read as the whole conversation" width={600}>
+  <Case
+    label="letter · a card whose offering line was not found, read as the whole conversation"
+    width={600}
+  >
     <div class="flex h-[640px] flex-col overflow-hidden bg-page">
       <Letter doc={DOC} card={STALE.id} opening="talk" />
     </div>

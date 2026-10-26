@@ -45,12 +45,16 @@ describe("the URL the city calls, under the box", () => {
 
   test("a probe under messages, then chat: the box keeps the address the face moved it to, with no line", () => {
     const pending: Sent = { id: "deepseek", baseUrl: ANTHROPIC, wireApi: "messages", before: null };
-    expect(normalisedFrom(answer(ANTHROPIC), pending, { baseUrl: ROOT, wireApi: "chat" })).toBeNull();
+    expect(
+      normalisedFrom(answer(ANTHROPIC), pending, { baseUrl: ROOT, wireApi: "chat" }),
+    ).toBeNull();
   });
 
   test("a probe, then a typed path: the typed path stands, with no line", () => {
     const pending: Sent = { id: "deepseek", baseUrl: ROOT, wireApi: "chat", before: null };
-    expect(normalisedFrom(answer(ROOT), pending, { baseUrl: `${ROOT}/v2`, wireApi: "chat" })).toBeNull();
+    expect(
+      normalisedFrom(answer(ROOT), pending, { baseUrl: `${ROOT}/v2`, wireApi: "chat" }),
+    ).toBeNull();
   });
 
   test("a second probe does not act on the answer that stood when it left, nor on another endpoint's", () => {
@@ -66,7 +70,12 @@ describe("the URL the city calls, under the box", () => {
   });
 
   test("an answer that recorded another spelling shows the line until the text or the face moves", () => {
-    const pending: Sent = { id: "deepseek", baseUrl: "api.deepseek.com", wireApi: "chat", before: null };
+    const pending: Sent = {
+      id: "deepseek",
+      baseUrl: "api.deepseek.com",
+      wireApi: "chat",
+      before: null,
+    };
     const recorded = answer(ROOT);
     expect([
       normalisedFrom(recorded, pending, { baseUrl: "api.deepseek.com", wireApi: "chat" }),

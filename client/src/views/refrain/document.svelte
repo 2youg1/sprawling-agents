@@ -60,7 +60,9 @@
   let top = 0;
 
   const name = $derived(at.slice(at.lastIndexOf("/") + 1));
-  const markdown = $derived(session.file?.kind === "text" && session.file.gathering.format === "markdown");
+  const markdown = $derived(
+    session.file?.kind === "text" && session.file.gathering.format === "markdown",
+  );
   // An HTML text is previewed by this browser rather than by the city
   // (client/Spec.lean §4-54).
   const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
@@ -104,9 +106,15 @@
   function lockedLine(locked: Locked): string {
     switch (locked.kind) {
       case "gathering":
-        return fill(say($lang, "refrain_gathering"), { through: kib(locked.through), total: kib(locked.total) });
+        return fill(say($lang, "refrain_gathering"), {
+          through: kib(locked.through),
+          total: kib(locked.total),
+        });
       case "too_large":
-        return fill(say($lang, "refrain_too_large"), { through: kib(locked.through), total: kib(locked.total) });
+        return fill(say($lang, "refrain_too_large"), {
+          through: kib(locked.through),
+          total: kib(locked.total),
+        });
       case "recorded":
         return fill(say($lang, "refrain_recorded"), { version: short(locked.version) });
       case "lost":
@@ -135,13 +143,7 @@
 </script>
 
 <div class="refrain flex min-h-0 flex-1 flex-col bg-page">
-  <Head
-    {at}
-    {session}
-    {reading}
-    previewed={markdown || html}
-    onPick={pick}
-  />
+  <Head {at} {session} {reading} previewed={markdown || html} onPick={pick} />
   {#if session.locked !== null && session.file?.kind === "text"}
     <Line tone="faint">{lockedLine(session.locked)}</Line>
   {/if}
@@ -184,7 +186,9 @@
   {:else if session.file?.kind === "missing"}
     <Empty missing="file_missing" />
   {:else if session.file?.kind === "unreadable"}
-    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_unreadable"), { reason: session.file.reason })}</p>
+    <p class="p-pane text-note text-text-quiet">
+      {fill(say($lang, "refrain_unreadable"), { reason: session.file.reason })}
+    </p>
   {:else if session.file?.kind === "opaque"}
     <Opaque path={at} version={session.file.version} bytes={session.file.bytes} />
   {:else if session.opening === null}
@@ -196,11 +200,7 @@
       {/await}
     </div>
     {#if reading === "preview" && html && session.positions !== null}
-      <HtmlPreview
-        text={session.editing?.text() ?? session.positions.editor}
-        {drafted}
-        {name}
-      />
+      <HtmlPreview text={session.editing?.text() ?? session.positions.editor} {drafted} {name} />
     {:else if reading === "preview" && session.positions !== null}
       <Preview
         positions={session.positions}

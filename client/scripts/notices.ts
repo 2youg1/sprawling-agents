@@ -67,7 +67,9 @@ export function thirdPartyNotices(): Plugin {
         item.type === "chunk" ? item.moduleIds : [],
       );
       const assets = Object.values(bundle).flatMap((item) =>
-        item.type === "asset" ? item.originalFileNames.map((name) => resolve(root, name).replaceAll("\\", "/")) : [],
+        item.type === "asset"
+          ? item.originalFileNames.map((name) => resolve(root, name).replaceAll("\\", "/"))
+          : [],
       );
       const read = packagesIn([...moduleIds, ...assets]).map((installed) => ({
         installed,

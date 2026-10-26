@@ -39,7 +39,12 @@ describe("path wiring", () => {
     const key = keyOf(look.reveal);
     const wire = key.wire("tip");
     wire.onclick();
-    expect({ hint: key.hint, name: wire["aria-label"], disabled: wire["aria-disabled"], revealed }).toEqual({
+    expect({
+      hint: key.hint,
+      name: wire["aria-label"],
+      disabled: wire["aria-disabled"],
+      revealed,
+    }).toEqual({
       hint: "this build cannot open it",
       name: "show in the file manager",
       disabled: true,

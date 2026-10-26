@@ -60,7 +60,12 @@
   const waiting = $derived(runs.filter((run) => phaseOf(run.doing) === "person"));
   const shown = $derived(windowOf(rows.length, scrolled, viewport, rowPx, MARGIN));
   let cursorKey = $state<string | null>(null);
-  const cursor = $derived(Math.max(0, rows.findIndex((row) => row.key === (cursorKey ?? waiting[0]?.run))));
+  const cursor = $derived(
+    Math.max(
+      0,
+      rows.findIndex((row) => row.key === (cursorKey ?? waiting[0]?.run)),
+    ),
+  );
 
   // Measured here rather than bound: a bound height observes the list,
   // and the padding that stands in for undrawn rows resizes it, which
@@ -166,7 +171,9 @@
     pick,
   };
 
-  const look = $derived(lookOf({ runs, now, lang: $lang, level, rows, folded, cursor, shown, rowPx }, hands));
+  const look = $derived(
+    lookOf({ runs, now, lang: $lang, level, rows, folded, cursor, shown, rowPx }, hands),
+  );
 </script>
 
 <Look {...look} />

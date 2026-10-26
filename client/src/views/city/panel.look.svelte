@@ -38,7 +38,12 @@
   </a>
   {#if look.pursuit !== null}
     <p class="flex items-baseline gap-snug text-note">
-      <span class={["inline-block size-dot shrink-0 rounded-pill", look.pursuit.running ? "bg-accent" : "bg-mark"]}></span>
+      <span
+        class={[
+          "inline-block size-dot shrink-0 rounded-pill",
+          look.pursuit.running ? "bg-accent" : "bg-mark",
+        ]}
+      ></span>
       <span class="min-w-0 flex-1 text-text-quiet">{look.pursuit.goal}</span>
     </p>
   {/if}
@@ -53,7 +58,8 @@
     <ul class="text-note text-text-quiet">
       {#each look.blocked as line (line.key)}
         <li class="my-tight">
-          <span class="text-alert">{line.source}</span> <span class="text-text-faint">{line.line}</span>
+          <span class="text-alert">{line.source}</span>
+          <span class="text-text-faint">{line.line}</span>
         </li>
       {/each}
     </ul>
@@ -65,8 +71,16 @@
         {#each look.runs.rows as run (run.key)}
           <li class="border-b border-edge py-snug">
             <a {...run.wire} class="group flex items-center gap-snug">
-              <span class={["inline-block size-dot shrink-0 rounded-pill", run.moving ? "bg-accent" : "bg-mark"]}></span>
-              <span class="min-w-0 flex-1 truncate text-text-quiet transition-colors ease-leave group-hover:text-text group-hover:ease-arrive">{run.title}</span>
+              <span
+                class={[
+                  "inline-block size-dot shrink-0 rounded-pill",
+                  run.moving ? "bg-accent" : "bg-mark",
+                ]}
+              ></span>
+              <span
+                class="min-w-0 flex-1 truncate text-text-quiet transition-colors ease-leave group-hover:text-text group-hover:ease-arrive"
+                >{run.title}</span
+              >
               {#if run.at !== null}
                 <span class="shrink-0 text-text-faint">{run.at}</span>
               {/if}

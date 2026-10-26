@@ -25,7 +25,9 @@ export interface ListWire {
 
 // A section of verbs is a group named by its heading; the places are
 // one section with no heading, drawn as the list itself.
-export type SectionWire = { readonly role: "group"; readonly "aria-labelledby": string } | { readonly role: "presentation" };
+export type SectionWire =
+  | { readonly role: "group"; readonly "aria-labelledby": string }
+  | { readonly role: "presentation" };
 
 export interface RowWire {
   readonly id: string;
@@ -42,7 +44,9 @@ export interface RowLook {
   // What stands at the row's end: the chord of the key that reaches
   // the same page, or a short line - the address, the verb's purpose,
   // or the reason it cannot run here.
-  readonly end: { readonly kind: "chord"; readonly action: Action } | { readonly kind: "hint"; readonly text: string };
+  readonly end:
+    | { readonly kind: "chord"; readonly action: Action }
+    | { readonly kind: "hint"; readonly text: string };
   // The row Enter would take.
   readonly active: boolean;
   // A verb this place cannot run; the cursor may still stand on it, so
@@ -53,7 +57,12 @@ export interface RowLook {
 
 export interface SectionLook {
   readonly key: string;
-  readonly heading: { readonly text: string; readonly wire: { readonly id: string; readonly role: "presentation" } } | undefined;
+  readonly heading:
+    | {
+        readonly text: string;
+        readonly wire: { readonly id: string; readonly role: "presentation" };
+      }
+    | undefined;
   readonly wire: SectionWire;
   readonly rows: readonly RowLook[];
 }
@@ -113,12 +122,22 @@ export function rowsLookOf(state: RowsState, hands: RowsHands): RowsLook {
           const heading = `${id}-${group.section}`;
           return {
             key: group.section,
-            heading: { text: say(lang, SECTION_WORD[group.section]), wire: { id: heading, role: "presentation" } },
+            heading: {
+              text: say(lang, SECTION_WORD[group.section]),
+              wire: { id: heading, role: "presentation" },
+            },
             wire: { role: "group", "aria-labelledby": heading },
             rows: group.entries.map(rowOf),
           };
         })
-      : [{ key: "places", heading: undefined, wire: { role: "presentation" }, rows: shown.map(rowOf) }];
+      : [
+          {
+            key: "places",
+            heading: undefined,
+            wire: { role: "presentation" },
+            rows: shown.map(rowOf),
+          },
+        ];
   return { list: { id, role: "listbox", "aria-label": say(lang, "nav_palette") }, sections };
 }
 

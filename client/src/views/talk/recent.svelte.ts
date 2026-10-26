@@ -21,7 +21,10 @@ class Recent {
   // A combination ended on moves to the front; the oldest beyond the
   // picker's recent section and the one in force is let go.
   keep(combination: Combination): void {
-    this.#kept = [combination, ...this.#kept.filter((each) => !sameCombination(each, combination))].slice(0, RECENT + 1);
+    this.#kept = [
+      combination,
+      ...this.#kept.filter((each) => !sameCombination(each, combination)),
+    ].slice(0, RECENT + 1);
   }
 }
 

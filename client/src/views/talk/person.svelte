@@ -42,17 +42,22 @@ action. -->
 </script>
 
 <NotePlace rhythm="shape">
-<div class="group flex flex-col items-end">
-  <div
-    class="max-w-[83%] rounded-panel bg-speech px-pane py-base font-read text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
-  >
-    {text}
+  <div class="group flex flex-col items-end">
+    <div
+      class="max-w-[83%] rounded-panel bg-speech px-pane py-base font-read text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
+    >
+      {text}
+    </div>
+    <div class="mt-tight flex items-center gap-snug text-note text-text-faint">
+      {#if entry !== null && onFork !== undefined}
+        <ForkButton {entry} {run} {onFork} {onHover} />
+      {/if}
+      <span
+        >{#if labelHref === undefined}{label}{:else}<a
+            href={labelHref}
+            class="text-text-quiet hover:text-text">{label}</a
+          >{/if}{#if at !== undefined}&nbsp;· {clock($lang, at)}{/if}</span
+      >
+    </div>
   </div>
-  <div class="mt-tight flex items-center gap-snug text-note text-text-faint">
-    {#if entry !== null && onFork !== undefined}
-      <ForkButton {entry} {run} {onFork} {onHover} />
-    {/if}
-    <span>{#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined}&nbsp;· {clock($lang, at)}{/if}</span>
-  </div>
-</div>
 </NotePlace>

@@ -29,7 +29,15 @@
   import Skeleton from "../../parts/skeleton.svelte";
   import type { Action } from "./entry";
   import Entry from "./entry.svelte";
-  import { confirmOf, entryId, hostFacts, sectionWord, sectionsOf, standingOf, type EntryModel } from "./page";
+  import {
+    confirmOf,
+    entryId,
+    hostFacts,
+    sectionWord,
+    sectionsOf,
+    standingOf,
+    type EntryModel,
+  } from "./page";
   import { privacyPage, type Source } from "./state.svelte";
   import { controlWord, originalReason, PAGE_FACTS, reasonWord } from "./words";
 
@@ -68,8 +76,12 @@
   const sections = $derived(answer === undefined ? [] : sectionsOf(answer));
   const models = $derived(sections.flatMap((section) => section.entries));
   const standing = $derived(answer === undefined ? "open" : standingOf(answer.history));
-  const restorable = $derived(models.filter((model) => model.offers.some((offer) => offer.action === "restore")));
-  const confirming = $derived(models.find((model) => page.heldOf(model.row.control).stage.kind === "confirming"));
+  const restorable = $derived(
+    models.filter((model) => model.offers.some((offer) => offer.action === "restore")),
+  );
+  const confirming = $derived(
+    models.find((model) => page.heldOf(model.row.control).stage.kind === "confirming"),
+  );
   const confirmLook = $derived.by(() => {
     if (confirming === undefined) return undefined;
     const stage = page.heldOf(confirming.row.control).stage;
@@ -106,7 +118,11 @@
           <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-base gap-y-tight text-note">
             {#each facts as fact (fact.label)}
               <dt class="text-text-quiet">{fact.label}</dt>
-              <dd class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}>{fact.value}</dd>
+              <dd
+                class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}
+              >
+                {fact.value}
+              </dd>
             {/each}
           </dl>
         {/if}
@@ -119,13 +135,24 @@
     </ul>
     {#if standing !== "open"}
       <p class="text-note text-alert">
-        {say($lang, standing === "withheld" ? "privacy_history_withheld" : standing === "unreadable" ? "privacy_history_unreadable" : "privacy_unresolved")}
+        {say(
+          $lang,
+          standing === "withheld"
+            ? "privacy_history_withheld"
+            : standing === "unreadable"
+              ? "privacy_history_unreadable"
+              : "privacy_unresolved",
+        )}
       </p>
     {/if}
     <div class="flex flex-wrap items-center gap-snug">
       <Button label={say($lang, "privacy_refresh")} tone="quiet" onPress={source.refresh} />
       {#if restorable.length > 0}
-        <Button label={say($lang, "privacy_restore_all")} tone="secondary" onPress={() => (restoringAll = true)} />
+        <Button
+          label={say($lang, "privacy_restore_all")}
+          tone="secondary"
+          onPress={() => (restoringAll = true)}
+        />
       {/if}
     </div>
   </section>
@@ -134,13 +161,23 @@
     <Skeleton label={say($lang, "privacy_reading")} rows={4} />
   {:else}
     {#each sections as section (section.category)}
-      <section aria-labelledby="{uid}-section-{section.category}" class="flex min-w-0 flex-col gap-base">
+      <section
+        aria-labelledby="{uid}-section-{section.category}"
+        class="flex min-w-0 flex-col gap-base"
+      >
         <h3 id="{uid}-section-{section.category}" class="text-heading font-heading text-text">
           {say($lang, sectionWord(section.category))}
         </h3>
         <div class="grid grid-fit items-start gap-base">
           {#each section.entries as model (model.row.control)}
-            <Entry {model} root={uid} held={page.heldOf(model.row.control)} onPress={(action: Action) => { page.press(model, action); }} />
+            <Entry
+              {model}
+              root={uid}
+              held={page.heldOf(model.row.control)}
+              onPress={(action: Action) => {
+                page.press(model, action);
+              }}
+            />
           {/each}
         </div>
       </section>
@@ -148,21 +185,29 @@
 
     {#if answer.not_written.length > 0}
       <section aria-labelledby="{uid}-not-written" class="flex min-w-0 flex-col gap-base">
-        <h3 id="{uid}-not-written" class="text-heading font-heading text-text">{say($lang, "privacy_not_written_title")}</h3>
+        <h3 id="{uid}-not-written" class="text-heading font-heading text-text">
+          {say($lang, "privacy_not_written_title")}
+        </h3>
         <p class="text-note text-text-quiet">{say($lang, "privacy_not_written_hint")}</p>
         <div class="grid grid-fit items-start gap-base">
           {#each answer.not_written as entry (entry.line.item)}
             {@const why = originalReason(entry.line.item)}
-            <div class="flex min-w-0 flex-col gap-tight rounded-card bg-raised px-base py-snug text-note">
+            <div
+              class="flex min-w-0 flex-col gap-tight rounded-card bg-raised px-base py-snug text-note"
+            >
               <span class="font-mono text-text [overflow-wrap:anywhere]">{entry.line.text}</span>
-              <span class="text-label font-label text-text-quiet">{say($lang, reasonWord(entry.reason))}</span>
+              <span class="text-label font-label text-text-quiet"
+                >{say($lang, reasonWord(entry.reason))}</span
+              >
               {#if why !== null}
                 <p class="text-text">{say($lang, why)}</p>
               {/if}
               <div class="flex flex-wrap items-center gap-snug">
                 {#each entry.alternatives as control (control)}
                   <Button
-                    label={fill(say($lang, "privacy_see"), { title: say($lang, controlWord(control, "title")) })}
+                    label={fill(say($lang, "privacy_see"), {
+                      title: say($lang, controlWord(control, "title")),
+                    })}
                     tone="quiet"
                     onPress={() => {
                       reach(control);
@@ -196,7 +241,9 @@
     <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-base gap-y-tight text-note">
       {#each confirmLook.facts as fact (fact.label)}
         <dt class="text-text-quiet">{fact.label}</dt>
-        <dd class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}>{fact.value}</dd>
+        <dd class={["min-w-0 text-text [overflow-wrap:anywhere]", fact.figure && "font-mono"]}>
+          {fact.value}
+        </dd>
       {/each}
     </dl>
     {#each confirmLook.notes as note (note.label)}

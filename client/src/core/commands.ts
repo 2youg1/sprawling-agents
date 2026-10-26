@@ -77,9 +77,15 @@ export const MODES: readonly Mode[] = ModeSchema.members.map((member) => member.
 // mode: a person's first request is usually to get something done, and
 // chat - which refuses `edit` and `exec` at the call - is the read-only
 // mode they switch to (client/Spec.lean 4-60).
-export const WRITE_LIMITS: readonly WriteLimit[] = WriteLimitSchema.members.map((member) => member.literal);
-export const ADMISSIONS: readonly AdmissionRequirement[] = AdmissionSchema.members.map((member) => member.literal);
-export const LANDINGS: readonly LandingPolicy[] = LandingSchema.members.map((member) => member.literal);
+export const WRITE_LIMITS: readonly WriteLimit[] = WriteLimitSchema.members.map(
+  (member) => member.literal,
+);
+export const ADMISSIONS: readonly AdmissionRequirement[] = AdmissionSchema.members.map(
+  (member) => member.literal,
+);
+export const LANDINGS: readonly LandingPolicy[] = LandingSchema.members.map(
+  (member) => member.literal,
+);
 export const FIRST_POLICY: RunPolicy = {
   mode: "work",
   write: WRITE_LIMITS[0] ?? "full",
@@ -151,7 +157,6 @@ export function halt(scope: HaltScope): Command {
 export function release(scope: HaltScope): Command {
   return { release: { scope, idem: mintIdem() } };
 }
-
 
 // Show a path where the person keeps their files. The address grammar is
 // the guard on the other side: nothing outside the city can be spelled.
@@ -303,14 +308,18 @@ export const UNSTATED: Stated = { contextTokens: null, maxOutputTokens: null, in
 // the catalogue's": a zero would reach the provider as `max_tokens: 0`,
 // which answers with nothing.
 export function wireCeiling(stated: number | null): Ceiling | null {
-  return stated !== null && Number.isInteger(stated) && stated > 0 ? CeilingSchema.make(stated) : null;
+  return stated !== null && Number.isInteger(stated) && stated > 0
+    ? CeilingSchema.make(stated)
+    : null;
 }
 
 // A window reaches the wire only as a whole positive number, and zero
 // is not one: a window nobody stated and a window of zero used to be
 // the same byte, and the context reminder read every session as full.
 export function wireWindow(stated: number | null): Window | null {
-  return stated !== null && Number.isInteger(stated) && stated > 0 ? WindowSchema.make(stated) : null;
+  return stated !== null && Number.isInteger(stated) && stated > 0
+    ? WindowSchema.make(stated)
+    : null;
 }
 
 export function selectModel(
@@ -340,7 +349,13 @@ export function connectToolkit(toolkit: ToolkitSlug): Command {
   return { connect_toolkit: { toolkit, idem: mintIdem() } };
 }
 
-export { configureCatalog, configureContext, configureDesktop, configureMcp, configureSandbox } from "./commands/building";
+export {
+  configureCatalog,
+  configureContext,
+  configureDesktop,
+  configureMcp,
+  configureSandbox,
+} from "./commands/building";
 
 // One of the three governed documents, whole. `base` is the text the
 // box started from: the raw editor and the identity cards both write
@@ -379,7 +394,12 @@ export function restoreFile(at: Address, point: GitOid): Command {
 }
 
 export { putGuide } from "./commands/guide";
-export { closeRemoteDoor, confirmRemoteDoor, openRemoteDoor, replaceCityKey } from "./commands/door";
+export {
+  closeRemoteDoor,
+  confirmRemoteDoor,
+  openRemoteDoor,
+  replaceCityKey,
+} from "./commands/door";
 export { decideProposals, putRange } from "./commands/document";
 export { privacyOperation, type PrivacyOperation } from "./commands/privacy";
 

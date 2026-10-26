@@ -12,14 +12,30 @@ import type { BuildingProgress, CityAnswer } from "../../wire";
 import { lookOf } from "./skyline";
 import type { SkylineSeat } from "./skyline";
 
-const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
+const IDLE = {
+  unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+};
 
 function building(addr: string): BuildingProgress {
-  return { addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0 };
+  return {
+    addr: Address.make(addr),
+    adoptable: false,
+    blocked: [],
+    problems: [],
+    progress: IDLE,
+    ready: 0,
+  };
 }
 
 function cityOf(...addrs: readonly string[]): CityAnswer {
-  return { active: 0, frozen: 0, halted: [], pursuits: [], runs: [], buildings: addrs.map(building) };
+  return {
+    active: 0,
+    frozen: 0,
+    halted: [],
+    pursuits: [],
+    runs: [],
+    buildings: addrs.map(building),
+  };
 }
 
 function run(index: number, addr: string, doing: Doing): RunBelief {
@@ -40,7 +56,10 @@ function run(index: number, addr: string, doing: Doing): RunBelief {
   };
 }
 
-function seatOf(city: CityAnswer, runs: Readonly<Record<string, readonly RunBelief[]>> = {}): SkylineSeat {
+function seatOf(
+  city: CityAnswer,
+  runs: Readonly<Record<string, readonly RunBelief[]>> = {},
+): SkylineSeat {
   return { city, picked: null, runsIn: (addr) => runs[addr] ?? [], lang: "en", power: 2 };
 }
 
@@ -64,7 +83,13 @@ describe("the skyline", () => {
   // right and left in name order.
   test("City Hall stands in the middle, the others alternating outward by name", () => {
     const look = lookOf(seatOf(cityOf("docs", "hall", "atlas", "web", "billing")), () => undefined);
-    expect(look.towers.map((tower) => tower.key)).toEqual(["web", "billing", "hall", "atlas", "docs"]);
+    expect(look.towers.map((tower) => tower.key)).toEqual([
+      "web",
+      "billing",
+      "hall",
+      "atlas",
+      "docs",
+    ]);
     expect(look.towers.map((tower) => tower.hall)).toEqual([false, false, true, false, false]);
   });
 
@@ -82,9 +107,26 @@ describe("the skyline", () => {
     };
     const look = lookOf(seatOf(cityOf("docs"), runs), () => undefined);
     const docs = look.towers[0];
-    expect(docs?.cells.map((cell) => cell.pane)).toEqual(["calling", "waiting", "lit", "ended", "dark", "dark", "dark", "dark", "dark", "dark", "dark", "dark"]);
+    expect(docs?.cells.map((cell) => cell.pane)).toEqual([
+      "calling",
+      "waiting",
+      "lit",
+      "ended",
+      "dark",
+      "dark",
+      "dark",
+      "dark",
+      "dark",
+      "dark",
+      "dark",
+      "dark",
+    ]);
     expect(docs?.lit).toBe(true);
-    expect(docs?.marks.map((mark) => mark.kind === "figure" && mark.posture)).toEqual(["thinking", "waiting", "calling"]);
+    expect(docs?.marks.map((mark) => mark.kind === "figure" && mark.posture)).toEqual([
+      "thinking",
+      "waiting",
+      "calling",
+    ]);
     expect(docs?.wire["aria-label"]).toBe("docs · 3 at work");
   });
 

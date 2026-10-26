@@ -27,8 +27,10 @@
   const MODEL = "anthropic/claude-sonnet-5";
   const PARENT_RUN = RunId.make("0199c0de-a9e0-4000-8000-000000000001");
   const CHILD_RUN = RunId.make("0199c0de-a9e0-4000-8000-000000000002");
-  const PARENT_TASK = "Split the parser work: keep the grammar here, hand the error positions to a room of their own.";
-  const CHILD_TASK = "Report every parse error as a byte offset from the start of the input, and say when the tests pass.";
+  const PARENT_TASK =
+    "Split the parser work: keep the grammar here, hand the error positions to a room of their own.";
+  const CHILD_TASK =
+    "Report every parse error as a byte offset from the start of the input, and say when the tests pass.";
   const CHILD_GOAL = "The parser's errors carry byte offsets and its tests pass.";
   const SENT = "The grammar keeps `Span` as two byte offsets; build the error positions on it.";
 
@@ -39,8 +41,25 @@
     [CHILD_RUN, CHILD, 20, CHILD_TASK, PARENT],
   ];
 
-  function record(run: RunId, room: Address, seq: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
-    return { run, seq: Seq.make(seq), kind, t: TimeMs.make(at), who: "city", addr: room, prev: B3Hash.make("0".repeat(64)), v: 1, data };
+  function record(
+    run: RunId,
+    room: Address,
+    seq: number,
+    at: number,
+    kind: EventKind,
+    data: Record<string, unknown>,
+  ): EventRecord {
+    return {
+      run,
+      seq: Seq.make(seq),
+      kind,
+      t: TimeMs.make(at),
+      who: "city",
+      addr: room,
+      prev: B3Hash.make("0".repeat(64)),
+      v: 1,
+      data,
+    };
   }
 
   function startOf(seq: number, now: number): number {
@@ -98,7 +117,14 @@
     const calls =
       run === PARENT_RUN
         ? [signal(seq * 10 + 1, t + 2_000, "send", JSON.stringify({ sent: true, to: CHILD }))]
-        : [signal(seq * 10 + 1, t + 2_000, "pull", JSON.stringify([{ from: PARENT, kind: "thread", text: SENT, sender: "running" }]))];
+        : [
+            signal(
+              seq * 10 + 1,
+              t + 2_000,
+              "pull",
+              JSON.stringify([{ from: PARENT, kind: "thread", text: SENT, sender: "running" }]),
+            ),
+          ];
     const said =
       run === PARENT_RUN
         ? "The error positions are with lab/parser now; I told it which span type to build on and kept the grammar."
@@ -135,7 +161,12 @@
       if (typeof query !== "object") return undefined;
       if ("rounds" in query) return rounds(query.rounds.run, now);
       if ("inbox_view" in query) {
-        return { inbox: { addr: query.inbox_view.addr, waiting: query.inbox_view.addr === CHILD ? queued(now) : [] } };
+        return {
+          inbox: {
+            addr: query.inbox_view.addr,
+            waiting: query.inbox_view.addr === CHILD ? queued(now) : [],
+          },
+        };
       }
       return undefined;
     };
@@ -155,7 +186,10 @@
   const answers = answering(now);
 </script>
 
-<Case label="agent messages · a child room opened by a resident, a pulled signal, two signals queued" width={760}>
+<Case
+  label="agent messages · a child room opened by a resident, a pulled signal, two signals queued"
+  width={760}
+>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[640px] px-wide">
       <Talk address={CHILD} band={false} seat={SPECIMEN} />
@@ -170,4 +204,3 @@
     </div>
   </Stand>
 </Case>
-

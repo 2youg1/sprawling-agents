@@ -21,7 +21,12 @@ function state(found: FindAnswer | undefined, cursor = 0): SearchState {
   return { under: LAB, titleId: "t", uid: "f", text: "ma", cursor, found, lang: "en" };
 }
 
-function record(): { readonly typed: string[]; readonly pointed: number[]; readonly opened: string[]; readonly hands: SearchHands } {
+function record(): {
+  readonly typed: string[];
+  readonly pointed: number[];
+  readonly opened: string[];
+  readonly hands: SearchHands;
+} {
   const typed: string[] = [];
   const pointed: number[] = [];
   const opened: string[] = [];
@@ -54,12 +59,14 @@ describe("the file finder", () => {
 
   test("the box names the active option and the list it controls", () => {
     const look = searchLookOf(state(FOUND, 1), record().hands);
-    expect([look.box["aria-activedescendant"], look.box["aria-controls"], look.box["aria-expanded"]]).toEqual([
-      optionId("f", 1),
-      look.list.id,
-      true,
-    ]);
-    expect(look.options.map((option) => [option.wire.id, option.wire["aria-selected"], option.active])).toEqual([
+    expect([
+      look.box["aria-activedescendant"],
+      look.box["aria-controls"],
+      look.box["aria-expanded"],
+    ]).toEqual([optionId("f", 1), look.list.id, true]);
+    expect(
+      look.options.map((option) => [option.wire.id, option.wire["aria-selected"], option.active]),
+    ).toEqual([
       ["f-0", false, false],
       ["f-1", true, true],
     ]);
@@ -80,7 +87,11 @@ describe("the file finder", () => {
     at(0).onkeydown(press("ArrowUp"));
     at(1).onkeydown(press("Enter"));
     at(1).onkeydown(press("m"));
-    expect([seen.pointed, seen.opened, prevented]).toEqual([[1, 0], ["Makefile"], ["ArrowDown", "ArrowUp", "Enter"]]);
+    expect([seen.pointed, seen.opened, prevented]).toEqual([
+      [1, 0],
+      ["Makefile"],
+      ["ArrowDown", "ArrowUp", "Enter"],
+    ]);
   });
 
   test("a key pressed while an input method composes is the input method's: the confirming Enter opens no path", () => {
@@ -100,10 +111,20 @@ describe("the file finder", () => {
 
   test("with no paths the box names no option, and Enter opens nothing", () => {
     const seen = record();
-    const look = searchLookOf(state({ under: LAB, text: "zz", paths: [], walked: "cut" }), seen.hands);
+    const look = searchLookOf(
+      state({ under: LAB, text: "zz", paths: [], walked: "cut" }),
+      seen.hands,
+    );
     look.box.onkeydown({ key: "Enter", isComposing: false, preventDefault: () => undefined });
-    expect([look.box["aria-activedescendant"], look.box["aria-expanded"], seen.opened]).toEqual([undefined, false, []]);
-    expect(look.notes).toEqual([fill(say("en", "finder_none"), { text: "zz" }), say("en", "finder_cut")]);
+    expect([look.box["aria-activedescendant"], look.box["aria-expanded"], seen.opened]).toEqual([
+      undefined,
+      false,
+      [],
+    ]);
+    expect(look.notes).toEqual([
+      fill(say("en", "finder_none"), { text: "zz" }),
+      say("en", "finder_cut"),
+    ]);
   });
 
   test("the pointer moves the cursor and a click opens the path under it", () => {

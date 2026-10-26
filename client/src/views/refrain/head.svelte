@@ -61,14 +61,19 @@
   // Why the save cannot be pressed, when it cannot.
   const blocked = $derived.by((): { readonly why?: string } => {
     const kind = session.receipt.kind;
-    if (session.locked !== null || session.positions === null) return { why: say($lang, "refrain_save_locked") };
+    if (session.locked !== null || session.positions === null)
+      return { why: say($lang, "refrain_save_locked") };
     if (kind === "saving" || kind === "pending") return { why: say($lang, "refrain_save_wait") };
-    return kind === "draft" || kind === "refused" ? {} : { why: say($lang, "refrain_save_nothing") };
+    return kind === "draft" || kind === "refused"
+      ? {}
+      : { why: say($lang, "refrain_save_nothing") };
   });
   const version = $derived(session.positions === null ? null : short(session.positions.version));
 
   const u = ui();
-  const markdown = $derived(session.file?.kind === "text" && session.file.gathering.format === "markdown");
+  const markdown = $derived(
+    session.file?.kind === "text" && session.file.gathering.format === "markdown",
+  );
   let exporting = $state<"asking" | "refused" | null>(null);
 
   // Asks the city once for the export of the version the editor stands
@@ -103,7 +108,9 @@
       <Segmented label={say($lang, "refrain_reading")} {options} held={reading} {onPick} />
     {/if}
     {#if exporting === "refused"}
-      <span class="text-note text-text-quiet" role="status">{say($lang, "refrain_export_refused")}</span>
+      <span class="text-note text-text-quiet" role="status"
+        >{say($lang, "refrain_export_refused")}</span
+      >
     {/if}
     {#if markdown}
       <Button

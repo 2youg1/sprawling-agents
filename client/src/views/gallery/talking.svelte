@@ -12,7 +12,6 @@
   // have been.
   import type { AxError } from "../../wire";
 
-
   const NO_MODEL: AxError = {
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     action: "choose the main model",

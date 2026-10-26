@@ -116,7 +116,10 @@
 
   // Each list decoded line by line; the first line its schema refuses
   // is named, so the person knows which one to fix.
-  function decoded<T>(text: string, schema: Schema.Codec<T, string>): { ok: T[] } | { bad: string } {
+  function decoded<T>(
+    text: string,
+    schema: Schema.Codec<T, string>,
+  ): { ok: T[] } | { bad: string } {
     const ok: T[] = [];
     for (const line of lines(text)) {
       const one = Schema.decodeOption(schema)(line);
@@ -130,13 +133,15 @@
   const trusted = $derived(decoded(draft.lists.trusted, ServerLabel));
   const fuel = $derived(/^[1-9][0-9]*$/.test(draft.fuel.trim()) ? Number(draft.fuel.trim()) : null);
 
-  const container = $derived(Schema.decodeOption(ContainerLimits)({
-    image: draft.containerFields.image.trim(),
-    user: Number(draft.containerFields.user),
-    cpu_millis: Number(draft.containerFields.cpu_millis),
-    memory_bytes: Number(draft.containerFields.memory_bytes),
-    pids: Number(draft.containerFields.pids),
-  }));
+  const container = $derived(
+    Schema.decodeOption(ContainerLimits)({
+      image: draft.containerFields.image.trim(),
+      user: Number(draft.containerFields.user),
+      cpu_millis: Number(draft.containerFields.cpu_millis),
+      memory_bytes: Number(draft.containerFields.memory_bytes),
+      pids: Number(draft.containerFields.pids),
+    }),
+  );
   const containerReady = $derived(draft.arm !== "container" || Option.isSome(container));
 
   const limits = $derived.by((): SandboxLimits | null =>
@@ -145,8 +150,10 @@
       : {
           shell: draft.shell === "on",
           interpreter: draft.interpreter,
-          ...draft.arm === "default" ? {} : { arm: draft.arm },
-          ...draft.arm === "container" && Option.isSome(container) ? { container: container.value } : {},
+          ...(draft.arm === "default" ? {} : { arm: draft.arm }),
+          ...(draft.arm === "container" && Option.isSome(container)
+            ? { container: container.value }
+            : {}),
           fuel,
           mounts: mounts.ok,
           env_passthrough: lines(draft.lists.env).map((name) => EnvVarName.make(name)),
@@ -181,9 +188,19 @@
   // The three lists in the order the card draws them, each with the
   // line its schema refused, if any.
   const LISTS = $derived([
-    { key: "mounts", label: "sandbox_mounts", help: "sandbox_mounts_help", bad: "bad" in mounts ? mounts.bad : null },
+    {
+      key: "mounts",
+      label: "sandbox_mounts",
+      help: "sandbox_mounts_help",
+      bad: "bad" in mounts ? mounts.bad : null,
+    },
     { key: "env", label: "sandbox_env", help: "sandbox_env_help", bad: null },
-    { key: "trusted", label: "sandbox_trusted", help: "sandbox_trusted_help", bad: "bad" in trusted ? trusted.bad : null },
+    {
+      key: "trusted",
+      label: "sandbox_trusted",
+      help: "sandbox_trusted_help",
+      bad: "bad" in trusted ? trusted.bad : null,
+    },
   ] satisfies readonly { key: ListKey; label: Key; help: Key; bad: string | null }[]);
 
   function save(): void {
@@ -198,7 +215,9 @@
   <p class="max-w-measure text-note text-text-quiet">
     {held === null && known ? say($lang, "sandbox_inherited") : say($lang, "sandbox_what")}
   </p>
-  <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,var(--container-measure)),1fr))] gap-x-gutter gap-y-wide border-y border-edge py-wide">
+  <div
+    class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,var(--container-measure)),1fr))] gap-x-gutter gap-y-wide border-y border-edge py-wide"
+  >
     <div class="flex min-w-0 flex-col gap-snug">
       <span class="text-note text-text-quiet">{say($lang, "sandbox_shell")}</span>
       <Segmented
@@ -227,10 +246,16 @@
     </div>
     {#if draft.arm === "container"}
       {#each CONTAINER_FIELDS as field (field)}
-        <Field label={say($lang, `sandbox_container_${field}`)} mono
-          kind={field === "image" ? "text" : "number"} step={1}
+        <Field
+          label={say($lang, `sandbox_container_${field}`)}
+          mono
+          kind={field === "image" ? "text" : "number"}
+          step={1}
           value={draft.containerFields[field]}
-          onInput={(value) => { edit({ containerFields: { ...draft.containerFields, [field]: value } }); }} />
+          onInput={(value) => {
+            edit({ containerFields: { ...draft.containerFields, [field]: value } });
+          }}
+        />
       {/each}
     {/if}
     <Field
@@ -256,13 +281,21 @@
         {#if list.bad === null}
           <span class="text-note text-text-faint">{say($lang, list.help)}</span>
         {:else}
-          <span class="text-note text-alert" role="alert">{fill(say($lang, "sandbox_bad_line"), { line: list.bad })}</span>
+          <span class="text-note text-alert" role="alert"
+            >{fill(say($lang, "sandbox_bad_line"), { line: list.bad })}</span
+          >
         {/if}
       </label>
     {/each}
   </div>
   <div class="flex items-center gap-base">
-    <Button label={say($lang, "sandbox_save")} tone="primary" loading={sent !== null} {...why === undefined ? {} : { why }} onPress={save} />
+    <Button
+      label={say($lang, "sandbox_save")}
+      tone="primary"
+      loading={sent !== null}
+      {...why === undefined ? {} : { why }}
+      onPress={save}
+    />
     {#if sent === null && !edited && held !== null}
       <span class="text-note text-text-faint" role="status">{say($lang, "sandbox_saved")}</span>
     {/if}

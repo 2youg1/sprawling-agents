@@ -26,4 +26,10 @@
   const shown = $derived(framed(page, scheme));
 </script>
 
-<iframe class="min-h-0 w-full flex-1 border-0" sandbox="" referrerpolicy="no-referrer" {title} srcdoc={shown}></iframe>
+<iframe
+  class="min-h-0 w-full flex-1 border-0"
+  sandbox=""
+  referrerpolicy="no-referrer"
+  {title}
+  srcdoc={shown}
+></iframe>

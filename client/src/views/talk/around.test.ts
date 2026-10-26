@@ -9,7 +9,14 @@ import { Seq, TimeMs, type Turn } from "../../wire";
 import { turnsAround } from "./around";
 
 function turn(opened: number): Turn {
-  return { calls: [], notes: [], number: opened, opened: Seq.make(opened), t: TimeMs.make(opened), timing: "measured" };
+  return {
+    calls: [],
+    notes: [],
+    number: opened,
+    opened: Seq.make(opened),
+    t: TimeMs.make(opened),
+    timing: "measured",
+  };
 }
 
 const FIVE = [10, 20, 30, 40, 50].map(turn);

@@ -38,7 +38,8 @@
   import { shownOf, snapshotDay, standingOf, signsInElsewhere } from "./agents";
   import Consent from "./consent.svelte";
 
-  const { answer, text, reading, parsed, room, adding, onText, onPaste, onAdd }: AgentsLookProps = $props();
+  const { answer, text, reading, parsed, room, adding, onText, onPaste, onAdd }: AgentsLookProps =
+    $props();
   const { lang } = ui();
   const uid = $props.id();
 
@@ -63,15 +64,23 @@
         }}
       >
         <span class="min-w-0 flex-1 truncate">
-          {fill(say($lang, "acp_added_summary"), { names: answer.added.map((line) => line.name).join(", ") })}
+          {fill(say($lang, "acp_added_summary"), {
+            names: answer.added.map((line) => line.name).join(", "),
+          })}
         </span>
-        <Glyph name="chevron" size="sm" class={["shrink-0 text-text-faint", summaryOpen && "rotate-90"]} />
+        <Glyph
+          name="chevron"
+          size="sm"
+          class={["shrink-0 text-text-faint", summaryOpen && "rotate-90"]}
+        />
       </button>
       {#if summaryOpen}
         <ul class="flex flex-col border-t border-edge">
           {#each answer.added as line (line.id)}
             {@const standing = standingOf(line)}
-            <li class="flex min-h-touch flex-wrap items-center gap-base border-b border-edge py-tight pl-snug">
+            <li
+              class="flex min-h-touch flex-wrap items-center gap-base border-b border-edge py-tight pl-snug"
+            >
               <span class="w-[9rem] shrink-0 text-label font-label text-text">{line.name}</span>
               <span class="flex flex-1 flex-wrap items-center gap-snug">
                 <Badge text={say($lang, standing.key)} weight={standing.weight} dot />
@@ -83,7 +92,9 @@
               </span>
             </li>
             {#if signsInElsewhere(line)}
-              <li class="px-snug py-tight text-note text-text-quiet">{say($lang, "acp_subscription_elsewhere")}</li>
+              <li class="px-snug py-tight text-note text-text-quiet">
+                {say($lang, "acp_subscription_elsewhere")}
+              </li>
             {/if}
           {/each}
         </ul>
@@ -93,22 +104,31 @@
 
   <div class="flex min-w-0 flex-col gap-tight">
     <label for={`${uid}-box`} class="text-note text-text-quiet">{say($lang, "acp_search")}</label>
-    <div class="box-content flex h-touch min-w-0 items-center gap-snug rounded-control border border-edge-input bg-raised pl-base">
+    <div
+      class="box-content flex h-touch min-w-0 items-center gap-snug rounded-control border border-edge-input bg-raised pl-base"
+    >
       <Glyph name="search" size="sm" class="shrink-0 text-text-faint" />
       <input
         id={`${uid}-box`}
         value={text}
         spellcheck="false"
         autocomplete="off"
-        class={["h-full min-w-0 flex-1 bg-transparent text-body text-text", reading.kind === "paste" && "font-mono"]}
+        class={[
+          "h-full min-w-0 flex-1 bg-transparent text-body text-text",
+          reading.kind === "paste" && "font-mono",
+        ]}
         oninput={(event) => {
           onText(event.currentTarget.value);
         }}
       />
       {#if text !== ""}
-        <button type="button" class="h-full shrink-0 px-base text-label text-text-quiet hover:bg-raised-hover" onclick={() => {
+        <button
+          type="button"
+          class="h-full shrink-0 px-base text-label text-text-quiet hover:bg-raised-hover"
+          onclick={() => {
             onText("");
-          }}>
+          }}
+        >
           {say($lang, "acp_clear")}
         </button>
       {:else}
@@ -125,7 +145,13 @@
     <section class="flex flex-col gap-snug">
       <h3 class="text-note text-text-quiet">{say($lang, "acp_pasted")}</h3>
       {#if parsed !== null}
-        <Consent offer={parsed} named seats={room !== null} adding={adding.has(parsed.id)} {onAdd} />
+        <Consent
+          offer={parsed}
+          named
+          seats={room !== null}
+          adding={adding.has(parsed.id)}
+          {onAdd}
+        />
       {/if}
     </section>
   {:else}
@@ -144,7 +170,9 @@
 
     <section class="flex flex-col gap-tight">
       <h3 class="text-note text-text-quiet">
-        {say($lang, "acp_catalog")} · {fill(say($lang, "acp_catalog_snapshot"), { date: snapshotDay($lang, answer.snapshot.date) })}
+        {say($lang, "acp_catalog")} · {fill(say($lang, "acp_catalog_snapshot"), {
+          date: snapshotDay($lang, answer.snapshot.date),
+        })}
       </h3>
       <ul class="flex flex-col border-t border-edge">
         {#each shown.catalog as offer (offer.id)}
@@ -153,7 +181,10 @@
             <button
               type="button"
               aria-expanded={open}
-              class={["flex min-h-touch items-center gap-base px-snug text-left hover:wash", open && "wash-strong"]}
+              class={[
+                "flex min-h-touch items-center gap-base px-snug text-left hover:wash",
+                open && "wash-strong",
+              ]}
               onclick={() => {
                 opened = open ? null : offer.id;
               }}
@@ -161,14 +192,26 @@
               <span class="flex-1 text-label font-label text-text">{offer.name}</span>
               {#if !open}
                 <span class="text-note text-text-faint">
-                  {[offer.version, offer.licence].filter((part) => part !== undefined && part !== null).join(" · ")}
+                  {[offer.version, offer.licence]
+                    .filter((part) => part !== undefined && part !== null)
+                    .join(" · ")}
                 </span>
               {/if}
-              <Glyph name="chevron" size="sm" class={["shrink-0 text-text-faint", open && "rotate-90"]} />
+              <Glyph
+                name="chevron"
+                size="sm"
+                class={["shrink-0 text-text-faint", open && "rotate-90"]}
+              />
             </button>
             {#if open}
               <div class="pt-snug">
-                <Consent {offer} named={false} seats={room !== null} adding={adding.has(offer.id)} {onAdd} />
+                <Consent
+                  {offer}
+                  named={false}
+                  seats={room !== null}
+                  adding={adding.has(offer.id)}
+                  {onAdd}
+                />
               </div>
             {/if}
           </li>

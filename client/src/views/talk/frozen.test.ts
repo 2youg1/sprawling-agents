@@ -11,11 +11,20 @@ import { firstHeadSaid, frozenSaid } from "./frozen";
 import { policyFace } from "./policy";
 
 test("the first head keeps the opening write limit and trial policy", () => {
-  const policy = { ...FIRST_POLICY, write: "create", admit: "tested", landing: "experiment" } as const;
+  const policy = {
+    ...FIRST_POLICY,
+    write: "create",
+    admit: "tested",
+    landing: "experiment",
+  } as const;
   const opening = { at: TimeMs.make(1), task: "review", goal: "", effort: "high", policy } as const;
-  expect(firstHeadSaid(opening, "en")).toBe([
-    say("en", "effort_high"), say("en", `mode_${policy.mode}`), policyFace("en", policy),
-  ].join(" · "));
-  expect(frozenSaid(opening, "en")).toBe([say("en", "effort_high"), say("en", `mode_${policy.mode}`)].join(" · "));
+  expect(firstHeadSaid(opening, "en")).toBe(
+    [say("en", "effort_high"), say("en", `mode_${policy.mode}`), policyFace("en", policy)].join(
+      " · ",
+    ),
+  );
+  expect(frozenSaid(opening, "en")).toBe(
+    [say("en", "effort_high"), say("en", `mode_${policy.mode}`)].join(" · "),
+  );
   expect(firstHeadSaid({ at: opening.at, task: opening.task, goal: opening.goal }, "en")).toBe("");
 });

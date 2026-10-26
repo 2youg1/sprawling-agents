@@ -32,7 +32,13 @@
   const lang = ui().lang;
 
   const line = $derived(
-    [tool, ...settings, ...(version === null ? [] : [fill(say($lang, "format_version"), { version: short(version) })])].join(" · "),
+    [
+      tool,
+      ...settings,
+      ...(version === null
+        ? []
+        : [fill(say($lang, "format_version"), { version: short(version) })]),
+    ].join(" · "),
   );
 </script>
 

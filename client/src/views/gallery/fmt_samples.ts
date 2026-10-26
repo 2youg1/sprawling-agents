@@ -74,7 +74,9 @@ export function zipOf(
 }
 
 export function deflated(bytes: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([bytes.slice()]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  const stream = new Blob([bytes.slice()])
+    .stream()
+    .pipeThrough(new CompressionStream("deflate-raw"));
   return new Response(stream).arrayBuffer().then((buffer) => new Uint8Array(buffer));
 }
 
@@ -151,7 +153,9 @@ function contentOf(page: Page): string {
   });
   const chinese = page.chinese.map((line, index) => {
     // UCS-2: one four-digit code unit per character of the BMP.
-    const hex = Array.from({ length: line.length }, (_, at) => line.charCodeAt(at).toString(16).padStart(4, "0")).join("");
+    const hex = Array.from({ length: line.length }, (_, at) =>
+      line.charCodeAt(at).toString(16).padStart(4, "0"),
+    ).join("");
     return `BT /F2 14 Tf 64 ${String(700 - index * 26)} Td <${hex}> Tj ET`;
   });
   return ["0.5 w 64 748 m 531 748 l S", ...latin, ...chinese].join("\n");
@@ -167,17 +171,25 @@ const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
 // A relationship's type URI, assembled once from its segments: written
 // out whole, its path reads to `xtask secret` as one long token.
-const RELATION = ["http://schemas.openxmlformats.org", "officeDocument", "2006", "relationships"].join("/");
+const RELATION = [
+  "http://schemas.openxmlformats.org",
+  "officeDocument",
+  "2006",
+  "relationships",
+].join("/");
 
 // A DOCX with these paragraphs, the first a heading. A paragraph may
 // carry one tracked insertion, and the first paragraph a comment, so the
 // preview has a revision and a comment to account for.
-export function docxOf(paragraphs: readonly { readonly text: string; readonly inserted?: string }[]): Uint8Array {
+export function docxOf(
+  paragraphs: readonly { readonly text: string; readonly inserted?: string }[],
+): Uint8Array {
   const body = paragraphs
     .map((each, index) => {
       const style = index === 0 ? '<w:pPr><w:pStyle w:val="Title"/></w:pPr>' : "";
       const remark = index === 0 ? '<w:commentRangeStart w:id="0"/>' : "";
-      const after = index === 0 ? '<w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r>' : "";
+      const after =
+        index === 0 ? '<w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r>' : "";
       const inserted =
         each.inserted === undefined
           ? ""

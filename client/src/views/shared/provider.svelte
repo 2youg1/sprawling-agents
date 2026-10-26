@@ -37,7 +37,9 @@
   const u = ui();
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
-  const read = $derived(readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)));
+  const read = $derived(
+    readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)),
+  );
 </script>
 
 <div class="flex flex-col gap-base">
@@ -46,5 +48,5 @@
   {:else if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.endpoints} />
   {/if}
-  <AttachForm {...(onAttached === undefined ? {} : { onAttached })} />
+  <AttachForm {...onAttached === undefined ? {} : { onAttached }} />
 </div>

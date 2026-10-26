@@ -224,8 +224,7 @@
       <Button label={say($lang, "mcp_shelf_again")} tone="quiet" onPress={shelf.recheck} />
     </div>
   {:else if "shelf" in answer}
-    <ul class="flex flex-col gap-tight" aria-label={say($lang, "mcp_toolkits")}
-    >
+    <ul class="flex flex-col gap-tight" aria-label={say($lang, "mcp_toolkits")}>
       {#each answer.shelf.toolkits as line (line.slug)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
         {@render toolkit(line)}
@@ -237,7 +236,9 @@
   console. Kept because it costs one collapsed section and answers the
   one case the directory cannot: a server this city did not open. -->
   <details class="text-note">
-    <summary class="cursor-pointer text-text-faint transition-colors ease-leave hover:text-text-quiet hover:ease-arrive">
+    <summary
+      class="cursor-pointer text-text-faint transition-colors ease-leave hover:text-text-quiet hover:ease-arrive"
+    >
       {say($lang, "mcp_by_id")}
     </summary>
     <div class="mt-base flex flex-col gap-base">
@@ -312,7 +313,11 @@ has none. -->
   {:else if "refused" in line.standing}
     <div class="flex min-w-0 items-center gap-snug">
       <span class="min-w-0 truncate text-note text-alert">
-        {recoveryWords($lang, line.standing.refused.refusal.code, line.standing.refused.refusal.recovery)}
+        {recoveryWords(
+          $lang,
+          line.standing.refused.refusal.code,
+          line.standing.refused.refusal.recovery,
+        )}
       </span>
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render again(say($lang, "mcp_connect_again"), line)}

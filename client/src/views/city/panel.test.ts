@@ -11,10 +11,20 @@ import { Address, NodeId, RunId, Seq, Tokens, UsdMicros } from "../../wire";
 import type { BuildingProgress, CityAnswer } from "../../wire";
 import { panelLookOf } from "./panel";
 
-const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
+const IDLE = {
+  unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+};
 
 function building(addr: string, more: Partial<BuildingProgress> = {}): BuildingProgress {
-  return { addr: Address.make(addr), adoptable: false, blocked: [], problems: [], progress: IDLE, ready: 0, ...more };
+  return {
+    addr: Address.make(addr),
+    adoptable: false,
+    blocked: [],
+    problems: [],
+    progress: IDLE,
+    ready: 0,
+    ...more,
+  };
 }
 
 function city(buildings: readonly BuildingProgress[]): CityAnswer {
@@ -44,16 +54,30 @@ describe("the picked building's panel", () => {
   // and nothing "ready to start", only what is stuck, rather than a
   // 0/0 that reads as a plan nobody began.
   test("progress and readiness are said only of a planned building, stuck lines always", () => {
-    const blocked = [{ source: NodeId.make("docs/zh"), line: "waiting for a glossary decision", waiting: 1 }];
+    const blocked = [
+      { source: NodeId.make("docs/zh"), line: "waiting for a glossary decision", waiting: 1 },
+    ];
     const unplanned = panelLookOf(
-      { addr: Address.make("docs"), city: city([building("docs", { blocked, ready: 2 })]), held: [], lang: "en" },
+      {
+        addr: Address.make("docs"),
+        city: city([building("docs", { blocked, ready: 2 })]),
+        held: [],
+        lang: "en",
+      },
       () => undefined,
     );
     expect(unplanned.badges).toEqual([{ key: "stuck", text: "1 stuck", weight: "alert" }]);
 
-    const progress = { planned: { blocked: 1, blocked_ppb: 125_000_000, done: 3, done_ppb: 375_000_000, total: 8 } };
+    const progress = {
+      planned: { blocked: 1, blocked_ppb: 125_000_000, done: 3, done_ppb: 375_000_000, total: 8 },
+    };
     const planned = panelLookOf(
-      { addr: Address.make("docs"), city: city([building("docs", { blocked, progress, ready: 2 })]), held: [], lang: "en" },
+      {
+        addr: Address.make("docs"),
+        city: city([building("docs", { blocked, progress, ready: 2 })]),
+        held: [],
+        lang: "en",
+      },
       () => undefined,
     );
     expect(planned.badges).toEqual([
@@ -65,7 +89,12 @@ describe("the picked building's panel", () => {
 
   test("a folder nobody has adopted is said to be one, and its link opens the raise page with its address filled in", () => {
     const look = panelLookOf(
-      { addr: Address.make("notes"), city: city([building("notes", { adoptable: true })]), held: [], lang: "en" },
+      {
+        addr: Address.make("notes"),
+        city: city([building("notes", { adoptable: true })]),
+        held: [],
+        lang: "en",
+      },
       () => undefined,
     );
     expect([look.badges, look.enter]).toEqual([
@@ -75,11 +104,16 @@ describe("the picked building's panel", () => {
   });
 
   test("the panel lists the building's eight newest runs, newest first, and closes through its seat", () => {
-    const held = Array.from({ length: 10 }, (_, n) => run(n, n === 9 ? { kind: "waiting" } : { kind: "frozen", completion: "done" }));
+    const held = Array.from({ length: 10 }, (_, n) =>
+      run(n, n === 9 ? { kind: "waiting" } : { kind: "frozen", completion: "done" }),
+    );
     let closed = 0;
-    const look = panelLookOf({ addr: Address.make("docs"), city: city([building("docs")]), held, lang: "en" }, () => {
-      closed += 1;
-    });
+    const look = panelLookOf(
+      { addr: Address.make("docs"), city: city([building("docs")]), held, lang: "en" },
+      () => {
+        closed += 1;
+      },
+    );
     expect(look.runs.rows.map((row) => [row.title, row.moving])).toEqual([
       ["task 9", true],
       ["task 8", false],

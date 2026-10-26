@@ -43,13 +43,17 @@
     >
       <Copy {...look.copy} />
     </span>
-    {#if look.aside !== undefined}<span class="flex shrink-0 items-center">{@render look.aside()}</span>{/if}
+    {#if look.aside !== undefined}<span class="flex shrink-0 items-center"
+        >{@render look.aside()}</span
+      >{/if}
   </div>
   <!-- The code scrolls sideways and never folds a line in half: the
   gutter stays put at the left while the text runs under it. -->
   <div class="min-h-0 flex-1 overflow-auto" {@attach look.scroller}>
     <div class="relative flex min-w-max font-mono text-note leading-relaxed">
-      <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint" aria-hidden="true">{look.gutter}</pre>
+      <pre
+        class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint"
+        aria-hidden="true">{look.gutter}</pre>
       <pre class="px-snug text-text-quiet"><Inked text={look.text} source={look.path} /></pre>
       {#if look.cited !== undefined && look.cited >= 1}
         <div

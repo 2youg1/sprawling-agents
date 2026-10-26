@@ -53,7 +53,10 @@
     return encoded.kind === "blocked" ? say($lang, WHY[encoded.blocker]) : null;
   });
   const transports = $derived(
-    TRANSPORTS.map((each): Choice<Transport> => ({ value: each, label: say($lang, SPELLED[each]) })),
+    TRANSPORTS.map((each): Choice<Transport> => ({
+      value: each,
+      label: say($lang, SPELLED[each]),
+    })),
   );
 
   function send(): void {

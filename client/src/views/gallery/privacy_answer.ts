@@ -20,7 +20,14 @@ import type {
 } from "../../wire";
 import { IdemKey } from "../../wire";
 
-const ALL_EDITIONS = ["home", "pro", "enterprise", "education", "iot_enterprise", "server"] as const;
+const ALL_EDITIONS = [
+  "home",
+  "pro",
+  "enterprise",
+  "education",
+  "iot_enterprise",
+  "server",
+] as const;
 const POLICY_EDITIONS = ["pro", "enterprise", "education", "iot_enterprise"] as const;
 
 const ONE: PrivacyValue = { value: "dword", number: 1 };
@@ -40,7 +47,10 @@ function read(value: PrivacyValue): PrivacyControlEntry["current"] {
   return { read: { value } };
 }
 
-function policy(category: PrivacyCategory, row: Partial<PrivacyControlEntry> & Pick<PrivacyControlEntry, "control" | "target">): PrivacyControlEntry {
+function policy(
+  category: PrivacyCategory,
+  row: Partial<PrivacyControlEntry> & Pick<PrivacyControlEntry, "control" | "target">,
+): PrivacyControlEntry {
   return {
     category,
     build_effect: "documented",
@@ -76,7 +86,11 @@ const CONTROLS: readonly PrivacyControlEntry[] = [
     host_fit: "honoured",
     originals: [{ item: "k07", text: "UsbCeip" }],
     scope: "machine",
-    target: { kind: "scheduled_task_enabled", path: "\\Microsoft\\Windows\\Customer Experience Improvement Program\\", name: "UsbCeip" },
+    target: {
+      kind: "scheduled_task_enabled",
+      path: "\\Microsoft\\Windows\\Customer Experience Improvement Program\\",
+      name: "UsbCeip",
+    },
     written: null,
   },
   policy("diagnostics", {
@@ -97,7 +111,11 @@ const CONTROLS: readonly PrivacyControlEntry[] = [
     host_fit: "honoured",
     originals: [],
     scope: "machine",
-    target: { kind: "scheduled_task_enabled", path: "\\Microsoft\\Windows\\Device Information\\", name: "Device" },
+    target: {
+      kind: "scheduled_task_enabled",
+      path: "\\Microsoft\\Windows\\Device Information\\",
+      name: "Device",
+    },
     written: { value: "task_disabled", definition_sha256: DIGEST },
   },
   {
@@ -117,14 +135,20 @@ const CONTROLS: readonly PrivacyControlEntry[] = [
   },
   policy("location_sensors", {
     control: "location_provider",
-    target: hklm("SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors", "DisableWindowsLocationProvider"),
+    target: hklm(
+      "SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors",
+      "DisableWindowsLocationProvider",
+    ),
     originals: [{ item: "k14", text: "DisableWindowsLocationProvider=1" }],
     build_effect: "uncertain",
   }),
   policy("content", {
     control: "tailored_experiences",
     scope: "user",
-    target: hkcu("SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent", "DisableTailoredExperiencesWithDiagnosticData"),
+    target: hkcu(
+      "SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent",
+      "DisableTailoredExperiencesWithDiagnosticData",
+    ),
     originals: [{ item: "k18", text: "TailoredExperiencesWithDiagnosticDataEnabled=0" }],
   }),
   policy("activity_sync", {
@@ -147,7 +171,12 @@ const CONTROLS: readonly PrivacyControlEntry[] = [
   }),
 ];
 
-const RECALL: PrivacyIntent = { control: "recall_snapshots", operation: 1, original: ABSENT, modified: ONE };
+const RECALL: PrivacyIntent = {
+  control: "recall_snapshots",
+  operation: 1,
+  original: ABSENT,
+  modified: ONE,
+};
 
 const NOT_WRITTEN: PrivacyAnswer["not_written"] = [
   {
@@ -157,7 +186,11 @@ const NOT_WRITTEN: PrivacyAnswer["not_written"] = [
     alternatives: ["device_census_task", "device_census_user_task"],
   },
   // wording-ok: the wire name of a reason, which lang.json words
-  { line: { item: "k49", text: "LetAppsAccessDocumentsFolder=2" }, reason: "absent", alternatives: [] },
+  {
+    line: { item: "k49", text: "LetAppsAccessDocumentsFolder=2" },
+    reason: "absent",
+    alternatives: [],
+  },
 ];
 
 export const REFUSAL: AxError = {
@@ -176,7 +209,14 @@ export const IDEM = IdemKey.make("idem1-0123456789abcdef0123456789abcdef");
 
 function answer(history: PrivacyHistory): PrivacyAnswer {
   return {
-    host: { windows: { edition_id: "CoreCountrySpecific", edition: "home", build: "26100.4061", display_version: "24H2" } },
+    host: {
+      windows: {
+        edition_id: "CoreCountrySpecific",
+        edition: "home",
+        build: "26100.4061",
+        display_version: "24H2",
+      },
+    },
     controls: CONTROLS,
     not_written: NOT_WRITTEN,
     history,
@@ -190,13 +230,21 @@ export const HOME: PrivacyAnswer = answer({ disclosed: { owned: [RECALL] } });
 // The same host with one change that has no conclusion: only its check
 // is offered, on its own entry.
 export const UNRESOLVED: PrivacyAnswer = answer({
-  disclosed: { owned: [RECALL], unresolved: { control: "tailored_experiences", operation: 2, original: ABSENT, modified: ONE } },
+  disclosed: {
+    owned: [RECALL],
+    unresolved: { control: "tailored_experiences", operation: 2, original: ABSENT, modified: ONE },
+  },
 });
 
 // A city on another system: nothing read, nothing offered.
 export const ELSEWHERE: PrivacyAnswer = {
   host: "not_windows",
-  controls: CONTROLS.slice(0, 3).map((row) => ({ ...row, current: "not_read", written: null, host_fit: "not_stated" })),
+  controls: CONTROLS.slice(0, 3).map((row) => ({
+    ...row,
+    current: "not_read",
+    written: null,
+    host_fit: "not_stated",
+  })),
   not_written: [],
   history: { disclosed: { owned: [] } },
   outcomes: [],

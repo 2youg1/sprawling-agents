@@ -1,8 +1,6 @@
 {
   "face": "open_ai",
-  "models": [
-    "stand-in-1"
-  ],
+  "models": ["stand-in-1"],
   "runs": [
     [
       {

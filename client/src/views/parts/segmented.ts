@@ -288,7 +288,8 @@ export function lookOf<V extends string>(
   };
 
   const cellOf = (choice: Choice<V>, at: number): CellLook => {
-    const why = choice.why === undefined ? undefined : { id: `${uid}-why-${String(at)}`, text: choice.why };
+    const why =
+      choice.why === undefined ? undefined : { id: `${uid}-why-${String(at)}`, text: choice.why };
     return {
       key: choice.value,
       label: choice.label,

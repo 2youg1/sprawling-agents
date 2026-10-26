@@ -124,14 +124,26 @@ function options(args: readonly string[]): Options {
         return fail(`a lighting is dark or light, not ${named}`);
     }
   });
-  return { keep: args.includes("--keep"), only: after("--only") ?? "", frames, lightings, webDir: after("--web-dir") };
+  return {
+    keep: args.includes("--keep"),
+    only: after("--only") ?? "",
+    frames,
+    lightings,
+    webDir: after("--web-dir"),
+  };
 }
 
 function frameOf(spelled: string): Frame {
   const read = /^(\d+)x(\d+)@([\d.]+)(:touch)?$/.exec(spelled);
   if (read === null) return fail(`a frame is <width>x<height>@<ratio>[:touch], not ${spelled}`);
   const [, width = "", height = "", dpr = "", touch] = read;
-  return { name: `${width}x${height}`, width: Number(width), height: Number(height), dpr: Number(dpr), touch: touch !== undefined };
+  return {
+    name: `${width}x${height}`,
+    width: Number(width),
+    height: Number(height),
+    dpr: Number(dpr),
+    touch: touch !== undefined,
+  };
 }
 
 // --------------------------------------------------------------- the city
@@ -143,11 +155,16 @@ const binary = (name: string): string => {
 };
 
 // Where the stand-in listens, read from the line it prints before it answers.
-async function standIn(record: string): Promise<{ readonly url: string; readonly process: ReturnType<typeof Bun.spawn> }> {
-  const provider = Bun.spawn([binary("provider"), join(import.meta.dir, "walk_provider.json"), record], {
-    stdout: "pipe",
-    stderr: "inherit",
-  });
+async function standIn(
+  record: string,
+): Promise<{ readonly url: string; readonly process: ReturnType<typeof Bun.spawn> }> {
+  const provider = Bun.spawn(
+    [binary("provider"), join(import.meta.dir, "walk_provider.json"), record],
+    {
+      stdout: "pipe",
+      stderr: "inherit",
+    },
+  );
   const reader = provider.stdout.getReader();
   let said = "";
   while (!said.includes("\n")) {
@@ -156,7 +173,9 @@ async function standIn(record: string): Promise<{ readonly url: string; readonly
     said += decoder.decode(chunk.value);
   }
   const url = /^SPRAWLING_PROVIDER=(\S+)/m.exec(said)?.[1];
-  return url === undefined ? fail(`the stand-in provider said ${said}`) : { url, process: provider };
+  return url === undefined
+    ? fail(`the stand-in provider said ${said}`)
+    : { url, process: provider };
 }
 
 // What a terminal is told about colour and the cursor, taken out before
@@ -193,9 +212,23 @@ async function serve(
 
 // Sends one command through `sprawling call` and hands back every frame
 // that came back, or the city's refusal.
-function call(command: Command, env: Record<string, string | undefined>, until: string): Outcome<readonly unknown[]> {
+function call(
+  command: Command,
+  env: Record<string, string | undefined>,
+  until: string,
+): Outcome<readonly unknown[]> {
   const ran = Bun.spawnSync(
-    [binary("sprawling"), "call", encodeFrame({ command }), "--at", AT, "--quiet-ms", "5000", "--until", until],
+    [
+      binary("sprawling"),
+      "call",
+      encodeFrame({ command }),
+      "--at",
+      AT,
+      "--quiet-ms",
+      "5000",
+      "--until",
+      until,
+    ],
     { env },
   );
   const frames = ran.stdout
@@ -203,7 +236,9 @@ function call(command: Command, env: Record<string, string | undefined>, until: 
     .split("\n")
     .filter((line) => line.trim() !== "")
     .map((line): unknown => JSON.parse(line));
-  const refusal = frames.find((frame) => typeof frame === "object" && frame !== null && "refusal" in frame);
+  const refusal = frames.find(
+    (frame) => typeof frame === "object" && frame !== null && "refusal" in frame,
+  );
   if (refusal !== undefined) return { ok: false, why: JSON.stringify(refusal) };
   if (ran.exitCode !== 0) return { ok: false, why: ran.stderr.toString() };
   return { ok: true, value: frames };
@@ -213,7 +248,14 @@ function runStarted(frames: readonly unknown[]): string {
   for (const frame of frames) {
     if (typeof frame !== "object" || frame === null || !("event" in frame)) continue;
     const event: unknown = frame.event;
-    if (typeof event === "object" && event !== null && "kind" in event && event.kind === "run_started" && "run" in event && typeof event.run === "string") {
+    if (
+      typeof event === "object" &&
+      event !== null &&
+      "kind" in event &&
+      event.kind === "run_started" &&
+      "run" in event &&
+      typeof event.run === "string"
+    ) {
       return event.run;
     }
   }
@@ -225,7 +267,10 @@ function runStarted(frames: readonly unknown[]): string {
 // the stand-in's replies in this order.
 function settle(env: Record<string, string | undefined>, city: string): string {
   for (const building of ["atlas", "garden"]) {
-    held(call(createBuilding(Address.make(building), "minimal", null), env, "building_created"), `raise ${building}`);
+    held(
+      call(createBuilding(Address.make(building), "minimal", null), env, "building_created"),
+      `raise ${building}`,
+    );
   }
   const ran = (room: string, mode: Mode, task: string, goal: string): string =>
     runStarted(
@@ -250,17 +295,34 @@ function settle(env: Record<string, string | undefined>, city: string): string {
     "Write a short README for the Atlas field notes: what the folders hold and the next three steps.",
     "a README a new team member can read in one minute",
   );
-  ran("atlas/review", "chat", "Review the building: where does each room stand, and what would you change in the README?", "");
-  ran("garden/sensors", "chat", "Sketch how the garden sensors should be read and stored. Do not write files yet.", "");
+  ran(
+    "atlas/review",
+    "chat",
+    "Review the building: where does each room stand, and what would you change in the README?",
+    "",
+  );
+  ran(
+    "garden/sensors",
+    "chat",
+    "Sketch how the garden sensors should be read and stored. Do not write files yet.",
+    "",
+  );
   mkdirSync(join(city, "lab-notes"), { recursive: true });
-  writeFileSync(join(city, "lab-notes", "notes.md"), "# Lab notes\n\nLoose notes from the bench, not yet a building.\n");
+  writeFileSync(
+    join(city, "lab-notes", "notes.md"),
+    "# Lab notes\n\nLoose notes from the bench, not yet a building.\n",
+  );
   return first;
 }
 
 // ------------------------------------------------------------- the shots
 
 function shots(run: string): readonly Shot[] {
-  const at = (name: string, fragment: string, ...steps: Step[]): Shot => ({ name, fragment, steps });
+  const at = (name: string, fragment: string, ...steps: Step[]): Shot => ({
+    name,
+    fragment,
+    steps,
+  });
   const palette: Step = { select: "form button[aria-haspopup=dialog]" };
   const shown = new Set(["talk", "city", "raise", "setup", "record", "gallery"]);
   return [
@@ -278,7 +340,9 @@ function shots(run: string): readonly Shot[] {
     // room with no file, where all three panes stand over the conversation.
     at("talk-panorama", "#/talk/atlas/notes", { tier: "panorama" }),
     at("talk-panorama-bench", "#/talk/atlas/review", { tier: "panorama" }, { sheet: "session" }),
-    at("talk-file-beside", "#/talk/atlas/notes?building=atlas&path=notes/README.md", { tier: "zen" }),
+    at("talk-file-beside", "#/talk/atlas/notes?building=atlas&path=notes/README.md", {
+      tier: "zen",
+    }),
     at("talk-palette", "#/talk/atlas/notes", palette),
     at("talk-palette-carry", "#/talk/atlas/notes", palette, { press: "palette_carry" }),
     at("city", "#/city"),
@@ -290,7 +354,9 @@ function shots(run: string): readonly Shot[] {
     at("run", `#/run/${run}`),
     ...RUN_LENSES.map((lens) => at(`run-${lens}`, `#/run/${run}/${lens}`)),
     at("record", "#/record"),
-    ...LENSES.filter((lens) => lens !== "ledger").map((lens) => at(`record-${lens}`, `#/record/${lens}`)),
+    ...LENSES.filter((lens) => lens !== "ledger").map((lens) =>
+      at(`record-${lens}`, `#/record/${lens}`),
+    ),
     ...PAGES.filter((page) => !shown.has(page)).map((page) => at(page, `#/${page}`)),
     ...SETUP_GROUPS.map((group) => at(`setup-${group}`, `#/setup/${group}`)),
   ];
@@ -329,8 +395,10 @@ const NO_HANDS = { press: () => undefined, release: () => undefined, click: () =
 function stepScript(step: Step): string {
   if ("press" in step) return `(${PRESS})(${JSON.stringify(phrase(step.press))})`;
   if ("select" in step) return `document.querySelector(${JSON.stringify(step.select)}).click()`;
-  if ("sheet" in step) return `document.querySelector(${JSON.stringify(`[role=tab][id$="-tab-${step.sheet}"]`)})?.click()`;
-  const wanted = layersKey(step.tier, "en", (words) => words, NO_HANDS).key.wire["aria-label"] ?? "";
+  if ("sheet" in step)
+    return `document.querySelector(${JSON.stringify(`[role=tab][id$="-tab-${step.sheet}"]`)})?.click()`;
+  const wanted =
+    layersKey(step.tier, "en", (words) => words, NO_HANDS).key.wire["aria-label"] ?? "";
   return `(${TIERED})(${JSON.stringify(wanted)}, ${JSON.stringify(phrase("edge_layers"))})`;
 }
 
@@ -342,7 +410,9 @@ async function pair(tools: DevTools, code: string): Promise<void> {
   await tools.type(code);
   held(await tools.run(`(${PRESS})(${JSON.stringify(phrase("pair_action"))})`), "press pair");
   await tools.settle(3000);
-  const still = await tools.run(`document.body.innerText.includes(${JSON.stringify(phrase("pair_title"))})`);
+  const still = await tools.run(
+    `document.body.innerText.includes(${JSON.stringify(phrase("pair_title"))})`,
+  );
   if (!still.ok || still.value === true) fail("the browser is still on the pairing page");
 }
 
@@ -369,7 +439,10 @@ async function photograph(tools: DevTools, wanted: Options, run: string): Promis
         }
         const file = `${frame.name}-${lighting}/${shot.name}.png`;
         const kept = why === "" ? await tools.keep(join(out, file)) : { ok: false as const, why };
-        appendFileSync(index, `| ${frame.name} | ${lighting} | ${shot.name} | \`${shot.fragment}\` | ${kept.ok ? `[${file}](${file})` : kept.why} |\n`);
+        appendFileSync(
+          index,
+          `| ${frame.name} | ${lighting} | ${shot.name} | \`${shot.fragment}\` | ${kept.ok ? `[${file}](${file})` : kept.why} |\n`,
+        );
         if (!kept.ok) {
           missed += 1;
           console.error(`walk: ${file}: ${kept.why}`);

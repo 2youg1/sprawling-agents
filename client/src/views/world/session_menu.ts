@@ -27,7 +27,9 @@ export interface FieldWire {
   readonly "aria-describedby": string;
   readonly maxlength: number;
   readonly value: string;
-  readonly oninput: (event: Event & { readonly currentTarget: EventTarget & HTMLInputElement }) => void;
+  readonly oninput: (
+    event: Event & { readonly currentTarget: EventTarget & HTMLInputElement },
+  ) => void;
   readonly onkeydown: (event: KeyPress & Pick<KeyboardEvent, "isComposing">) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
@@ -85,7 +87,10 @@ export interface SessionMenuHands extends MenuHands {
   readonly hold: (key: string) => Attachment<HTMLElement>;
 }
 
-export function sessionMenuLookOf(state: SessionMenuState, hands: SessionMenuHands): SessionMenuLook {
+export function sessionMenuLookOf(
+  state: SessionMenuState,
+  hands: SessionMenuHands,
+): SessionMenuLook {
   const popup = `${state.uid}-menu`;
   const hint = `${state.uid}-hint`;
   const naming = state.naming;
@@ -112,7 +117,13 @@ export function sessionMenuLookOf(state: SessionMenuState, hands: SessionMenuHan
       key: item.id,
       word: item.word,
       holder: { role: "none" },
-      wire: { type: "button", role: "menuitem", disabled: false, onclick: item.act, [HOLD]: hands.hold(item.id) },
+      wire: {
+        type: "button",
+        role: "menuitem",
+        disabled: false,
+        onclick: item.act,
+        [HOLD]: hands.hold(item.id),
+      },
     })),
     naming:
       naming === null

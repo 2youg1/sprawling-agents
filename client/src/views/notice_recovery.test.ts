@@ -57,9 +57,9 @@ describe("a notice's way out", () => {
   test("opens the new session in the composer's room, not the subject", () => {
     const { u, sent } = standingIn(COMPOSER);
     recover(u, NEW, REFUSED);
-    expect(sent.map((command) => ("open_session" in command ? command.open_session.addr : null))).toEqual([
-      COMPOSER,
-    ]);
+    expect(
+      sent.map((command) => ("open_session" in command ? command.open_session.addr : null)),
+    ).toEqual([COMPOSER]);
   });
 
   test("is offered where there is a composer, whatever the subject says", () => {

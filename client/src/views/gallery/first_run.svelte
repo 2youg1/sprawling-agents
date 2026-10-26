@@ -64,7 +64,8 @@
     return (query) => {
       if (query === QUERIES.endpoints) return { endpoints: state.endpoints };
       if (query === QUERIES.guide) return { guide: state.guide };
-      if (query === QUERIES.identity && state.identity !== undefined) return { identity: state.identity };
+      if (query === QUERIES.identity && state.identity !== undefined)
+        return { identity: state.identity };
       return undefined;
     };
   }
@@ -80,7 +81,12 @@
 {#each STATES as state (state.name)}
   {#each WIDTHS as width (width)}
     <Case label={`guide · ${state.name} at ${String(width)}`} {width}>
-      <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(state)}>
+      <Stand
+        link={{ kind: "live", city: "sprawling" }}
+        unread={[]}
+        waiting={[]}
+        answers={answering(state)}
+      >
         <Welcome rank="section" />
       </Stand>
     </Case>

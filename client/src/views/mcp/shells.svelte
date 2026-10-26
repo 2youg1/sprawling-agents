@@ -28,7 +28,11 @@
   }
 
   export function lineOf(row: ShellCalls): ShellLine {
-    return { interpreter: row.interpreter, calls: row.calls, failures: Object.entries(row.failures) };
+    return {
+      interpreter: row.interpreter,
+      calls: row.calls,
+      failures: Object.entries(row.failures),
+    };
   }
 
   export function classKey(spelled: string): Key | undefined {
@@ -48,10 +52,19 @@
   const lang = u.lang;
   const question: Query = "shells";
   const asked = u.conn.asking.ask(question);
-  const read = $derived(readAnswer($asked, (held) => ("shells" in held ? held.shells.interpreters.map(lineOf) : undefined)));
+  const read = $derived(
+    readAnswer($asked, (held) =>
+      "shells" in held ? held.shells.interpreters.map(lineOf) : undefined,
+    ),
+  );
 
   const columns: readonly Column<ShellLine>[] = $derived([
-    { key: "interpreter", header: say($lang, "shells_interpreter"), render: renderInterpreter, min: "12ch" },
+    {
+      key: "interpreter",
+      header: say($lang, "shells_interpreter"),
+      render: renderInterpreter,
+      min: "12ch",
+    },
     {
       key: "calls",
       header: say($lang, "shells_calls"),
@@ -78,7 +91,10 @@
     <span class="flex flex-wrap gap-base">
       {#each row.failures as [spelled, times] (spelled)}
         {@const key = classKey(spelled)}
-        <span><span class="text-text-faint">{key === undefined ? spelled : say($lang, key)}</span> <span class="tabular-nums">{times}</span></span>
+        <span
+          ><span class="text-text-faint">{key === undefined ? spelled : say($lang, key)}</span>
+          <span class="tabular-nums">{times}</span></span
+        >
       {/each}
     </span>
   {/if}
@@ -95,6 +111,12 @@
   {:else if read.kind === "asking"}
     <p class="text-text-faint">…</p>
   {:else}
-    <Table caption={say($lang, "shells_title")} {columns} rows={read.value} keyOf={(row: ShellLine) => row.interpreter} empty={noRows} />
+    <Table
+      caption={say($lang, "shells_title")}
+      {columns}
+      rows={read.value}
+      keyOf={(row: ShellLine) => row.interpreter}
+      empty={noRows}
+    />
   {/if}
 </section>

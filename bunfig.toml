@@ -1,0 +1,36 @@
+# The formatter's one home. `just fmt` and the `bun fmt --check` lane of
+# `client-checks` run here, at the repository root, and this is the bunfig
+# bun reads from there.
+#
+# `printWidth` is rustfmt's 100, so the TypeScript, CSS and Svelte next to
+# the Rust wrap where the Rust wraps. The default 80 re-wraps a third of the
+# client a second time and puts every line of `tools/xtask/src/channel/shim.js`
+# on three.
+#
+# Markdown and TOML are written, not formatted: prose is line-broken where a
+# reader's eye needs the break, and the manifests are laid out to show their
+# groups. `docnum` compares a document's generated spans byte for byte, so a
+# formatter that re-wraps a table turns that gate red for a reason nobody
+# changed.
+[fmt]
+printWidth = 100
+ignorePatterns = [
+  "**/*.md",
+  "**/*.toml",
+  # A file a generator writes is the generator's. Formatting one makes the
+  # producer's next `--write` run a diff, and `wire-ts` would then judge code
+  # against a shape it cannot emit.
+  "client/src/wire.ts", # `cargo xtask wire-ts`
+  "crates/agent_protocols/catalog/registry.json", # `cargo xtask acp-catalog`
+  "lake-manifest.json", # lake
+  # The offline playback page: `assemble.js` builds `template.html` out of
+  # these fragments byte for byte, and `client-checks` compares the result.
+  "**/playback/**",
+  # A record is evidence, not code: a response an endpoint answered, a
+  # registry index, a city as one version wrote it, a reading taken once.
+  # Re-wrapping one rewrites what was recorded without saying so.
+  "crates/*/tests/**/*.json",
+  "crates/agent_protocols/src/harness/catalog/recorded-index.json",
+  "crates/sprawling/tests/cities/**",
+  "docs/benchmarks/**",
+]

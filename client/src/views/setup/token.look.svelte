@@ -10,7 +10,10 @@
 </script>
 
 <li class="flex items-center gap-tight">
-  <input {...well} class="h-control w-control shrink-0 rounded-control border border-edge-input bg-raised" />
+  <input
+    {...well}
+    class="h-control w-control shrink-0 rounded-control border border-edge-input bg-raised"
+  />
   <span class="min-w-0 flex-1 truncate font-mono text-note text-text-quiet">{name}</span>
   {#if reset !== undefined}
     <!-- A control's hover lifts it from the card it stands on, the one

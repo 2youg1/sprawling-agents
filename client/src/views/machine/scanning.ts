@@ -26,23 +26,35 @@ export interface ScanLine {
 export function scanningOf(scanning: DoctorScanning): readonly ScanLine[] {
   if (typeof scanning === "object") {
     return [
-      { subject: "machine_scan_city", found: { key: "machine_scan_city_read", said: scanning.read.city } },
+      {
+        subject: "machine_scan_city",
+        found: { key: "machine_scan_city_read", said: scanning.read.city },
+      },
       { subject: "machine_scan_drive", found: driveOf(scanning.read.drive) },
       { subject: "machine_scan_exclusion", found: exclusionOf(scanning.read.exclusion) },
     ];
   }
   switch (scanning) {
     case "does_not_apply":
-      return [{ subject: "machine_scan_realtime", found: { key: "machine_scan_not_windows", said: null } }];
+      return [
+        {
+          subject: "machine_scan_realtime",
+          found: { key: "machine_scan_not_windows", said: null },
+        },
+      ];
     case "stopped":
-      return [{ subject: "machine_scan_realtime", found: { key: "machine_scan_stopped", said: null } }];
+      return [
+        { subject: "machine_scan_realtime", found: { key: "machine_scan_stopped", said: null } },
+      ];
   }
 }
 
 function driveOf(drive: DoctorDrive): Reason {
   if (typeof drive === "string") return { key: "machine_scan_drive_trusted", said: null };
-  if ("untrusted" in drive) return { key: "machine_scan_drive_untrusted", said: drive.untrusted.volume };
-  if ("not" in drive) return { key: "machine_scan_drive_not", said: `${drive.not.volume} ${drive.not.file_system}` };
+  if ("untrusted" in drive)
+    return { key: "machine_scan_drive_untrusted", said: drive.untrusted.volume };
+  if ("not" in drive)
+    return { key: "machine_scan_drive_not", said: `${drive.not.volume} ${drive.not.file_system}` };
   return untoldOf(drive.untold.why);
 }
 
@@ -66,7 +78,10 @@ export function untoldOf(why: DoctorUntold): Reason {
   if ("unread" in why) return { key: "machine_untold_unread", said: why.unread.command };
   if ("failed" in why) {
     const code = why.failed.code ?? null;
-    return { key: "machine_untold_failed", said: code === null ? why.failed.command : `${why.failed.command} (${String(code)})` };
+    return {
+      key: "machine_untold_failed",
+      said: code === null ? why.failed.command : `${why.failed.command} (${String(code)})`,
+    };
   }
   if ("unstarted" in why) return { key: "machine_untold_unstarted", said: why.unstarted.command };
   const stopping = why.unanswered.stopping ?? null;

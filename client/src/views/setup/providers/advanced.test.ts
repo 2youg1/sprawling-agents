@@ -45,13 +45,16 @@ function rig() {
   return { writes, renamed: () => renamed, look: lookOf(DRAFT, undefined, "en", hands) };
 }
 
-const headers = (look: ReturnType<typeof rig>["look"]) => look.tables.find((each) => each.key === "headers");
+const headers = (look: ReturnType<typeof rig>["look"]) =>
+  look.tables.find((each) => each.key === "headers");
 
 describe("a key-value table", () => {
   test("typing into one row replaces that row alone, by its key", () => {
     const { writes, look } = rig();
     headers(look)?.rows[1]?.value.input("silver");
-    expect(writes).toEqual([{ part: "headers", value: [line("a", "x-team", "blue"), line("b", "x-tier", "silver")] }]);
+    expect(writes).toEqual([
+      { part: "headers", value: [line("a", "x-team", "blue"), line("b", "x-tier", "silver")] },
+    ]);
   });
 
   test("removing a row keeps the others with their keys, and adding opens a blank one", () => {

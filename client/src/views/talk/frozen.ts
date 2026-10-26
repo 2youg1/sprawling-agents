@@ -18,13 +18,19 @@ import { policyFace } from "./policy";
 export function frozenSaid(opening: Opening | null | undefined, lang: Lang): string {
   const effort = opening?.effort ?? null;
   const mode = opening?.policy?.mode ?? null;
-  return [effort === null ? "" : say(lang, `effort_${effort}`), mode === null ? "" : say(lang, `mode_${mode}`)]
+  return [
+    effort === null ? "" : say(lang, `effort_${effort}`),
+    mode === null ? "" : say(lang, `mode_${mode}`),
+  ]
     .filter((part) => part !== "")
     .join(" · ");
 }
 
 export function firstHeadSaid(opening: Opening | null | undefined, lang: Lang): string {
-  return [frozenSaid(opening, lang), opening?.policy == null ? "" : policyFace(lang, opening.policy)]
+  return [
+    frozenSaid(opening, lang),
+    opening?.policy == null ? "" : policyFace(lang, opening.policy),
+  ]
     .filter((part) => part !== "")
     .join(" · ");
 }

@@ -29,7 +29,12 @@
       role="status"
       pieces={[
         { kind: "words", text: say($lang, "talk_landed"), ink: "faint" },
-        { kind: "link", text: landing.addr, href: toFragment({ kind: "talk", address: landing.addr }), face: "mono" },
+        {
+          kind: "link",
+          text: landing.addr,
+          href: toFragment({ kind: "talk", address: landing.addr }),
+          face: "mono",
+        },
       ]}
     />
   </div>

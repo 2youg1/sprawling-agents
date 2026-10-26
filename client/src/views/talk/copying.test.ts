@@ -16,6 +16,9 @@ describe("copying a reply", () => {
   });
 
   test("words chosen inside the reply are the browser's to copy", () => {
-    expect([copiedSource("a\nb", DRAWN, SOURCE), copiedSource("", "", SOURCE)]).toEqual([null, null]);
+    expect([copiedSource("a\nb", DRAWN, SOURCE), copiedSource("", "", SOURCE)]).toEqual([
+      null,
+      null,
+    ]);
   });
 });

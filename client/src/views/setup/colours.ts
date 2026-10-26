@@ -99,7 +99,8 @@ export function declaredNames(document: Document): string[] {
 
 function namesIn(rules: CSSRuleList): string[] {
   return [...rules].flatMap((rule) => {
-    const own = rule instanceof CSSStyleRule ? [...rule.style].filter((name) => name.startsWith("--")) : [];
+    const own =
+      rule instanceof CSSStyleRule ? [...rule.style].filter((name) => name.startsWith("--")) : [];
     const nested = rule instanceof CSSGroupingRule ? namesIn(rule.cssRules) : [];
     return [...own, ...nested];
   });
@@ -170,7 +171,9 @@ export function shortfalls(judged: Claims, resolve: (token: string) => Rgb | nul
     const text = resolve(claim.token);
     if (text === null) return [];
     const reached = apcaLc(text, surface);
-    return reached + judged.slack < claim.tier ? [{ token: claim.token, claimed: claim.tier, reached }] : [];
+    return reached + judged.slack < claim.tier
+      ? [{ token: claim.token, claimed: claim.tier, reached }]
+      : [];
   });
 }
 
@@ -190,7 +193,11 @@ export function apcaLc(text: Rgb, surface: Rgb): number {
 }
 
 function luminance([red, green, blue]: Rgb): number {
-  return 0.2126729 * (red / 255) ** 2.4 + 0.7151522 * (green / 255) ** 2.4 + 0.072175 * (blue / 255) ** 2.4;
+  return (
+    0.2126729 * (red / 255) ** 2.4 +
+    0.7151522 * (green / 255) ** 2.4 +
+    0.072175 * (blue / 255) ** 2.4
+  );
 }
 
 // APCA lifts the darkest values so near-black pairs do not report more
@@ -202,7 +209,9 @@ function softClamp(y: number): number {
 // The colour a token draws now, as displayed sRGB: painted once onto a
 // one-pixel canvas, which resolves every colour syntax the engine knows.
 export function drawnRgb(root: HTMLElement): (token: string) => Rgb | null {
-  const pen = root.ownerDocument.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  const pen = root.ownerDocument
+    .createElement("canvas")
+    .getContext("2d", { willReadFrequently: true });
   const computed = window.getComputedStyle(root);
   return (token) => {
     const value = computed.getPropertyValue(token).trim();
@@ -211,6 +220,8 @@ export function drawnRgb(root: HTMLElement): (token: string) => Rgb | null {
     pen.fillStyle = value;
     pen.fillRect(0, 0, 1, 1);
     const [red, green, blue] = pen.getImageData(0, 0, 1, 1).data;
-    return red === undefined || green === undefined || blue === undefined ? null : [red, green, blue];
+    return red === undefined || green === undefined || blue === undefined
+      ? null
+      : [red, green, blue];
   };
 }

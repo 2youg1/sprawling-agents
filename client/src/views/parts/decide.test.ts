@@ -48,7 +48,9 @@ describe("a chord answers only what the card offers", () => {
       const offered = ordered(card);
       for (const action of REACHED) {
         const chosen = answering(offered, action);
-        const wanted = offered.find((choice) => KEY[choice.answer] === action && choice.why === undefined);
+        const wanted = offered.find(
+          (choice) => KEY[choice.answer] === action && choice.why === undefined,
+        );
         expect(chosen).toBe(wanted);
         if (chosen !== undefined) expect<Action | null>(KEY[chosen.answer]).toBe(action);
       }

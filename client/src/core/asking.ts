@@ -25,7 +25,16 @@ import type { Readable, Writable } from "svelte/store";
 import type { Key } from "./lang";
 import { reachOf, reaches } from "./staleness";
 import { Query } from "../wire";
-import type { Address, Answer, AskId, AskOutcome, AxCode, AxError, EventRecord, Seq } from "../wire";
+import type {
+  Address,
+  Answer,
+  AskId,
+  AskOutcome,
+  AxCode,
+  AxError,
+  EventRecord,
+  Seq,
+} from "../wire";
 
 const PACE_MS = 250;
 
@@ -195,7 +204,8 @@ export function createAsking(
   // One patience timer for the whole queue, set for the first question
   // due: the clock says which questions are late, so a timer each would
   // only be one more thing to cancel.
-  let patience: { readonly timer: ReturnType<typeof setTimeout>; readonly due: number } | null = null;
+  let patience: { readonly timer: ReturnType<typeof setTimeout>; readonly due: number } | null =
+    null;
 
   // A question due before the timer set for a slower one moves the timer
   // forward, so a fast question is never judged at a slow one's deadline.
@@ -225,7 +235,10 @@ export function createAsking(
       slot.stale = true;
       if (!slot.reported) {
         slot.reported = true;
-        noticed("ask_late", minted("E_TIMEOUT", `answer the ${nameOf(entry.query)} this page asked`, entry.key));
+        noticed(
+          "ask_late",
+          minted("E_TIMEOUT", `answer the ${nameOf(entry.query)} this page asked`, entry.key),
+        );
       }
       if (slot.watchers > 0) schedule(entry.key, entry.query, slot);
     }
@@ -304,7 +317,10 @@ export function createAsking(
       subscribe(run) {
         slot.watchers += 1;
         const off = slot.value.subscribe(run);
-        return () => { slot.watchers -= 1; off(); };
+        return () => {
+          slot.watchers -= 1;
+          off();
+        };
       },
     };
   }

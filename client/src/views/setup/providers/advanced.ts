@@ -13,7 +13,16 @@
 import { say } from "../../../core/lang";
 import type { Key, Lang } from "../../../core/lang";
 import type { Proxying, TuningDefaults } from "../../../wire";
-import { ID_SHAPE, PROXYINGS, blankLine, boxed, idOf, naming, proxyingNote, tuningHints } from "./draft";
+import {
+  ID_SHAPE,
+  PROXYINGS,
+  blankLine,
+  boxed,
+  idOf,
+  naming,
+  proxyingNote,
+  tuningHints,
+} from "./draft";
 import type { Draft, Line, TuningField } from "./draft";
 
 export type SetDraft = <K extends keyof Draft>(part: K, value: Draft[K]) => void;
@@ -91,11 +100,21 @@ export interface AdvancedLook {
 
 // One row's name or value, replaced in the list by the row's own key,
 // so the box a person is typing in never becomes somebody else's row.
-export function retyped(rows: readonly Line[], key: string, part: "name" | "value", text: string): Line[] {
+export function retyped(
+  rows: readonly Line[],
+  key: string,
+  part: "name" | "value",
+  text: string,
+): Line[] {
   return rows.map((each) => (each.key === key ? { ...each, [part]: text } : each));
 }
 
-export function lookOf(draft: Draft, defaults: TuningDefaults | undefined, lang: Lang, hands: Hands): AdvancedLook {
+export function lookOf(
+  draft: Draft,
+  defaults: TuningDefaults | undefined,
+  lang: Lang,
+  hands: Hands,
+): AdvancedLook {
   const hints = tuningHints(draft, defaults, say(lang, "setup_retries_until_halted"));
   const ruleNote = proxyingNote(draft.proxying);
   const rename = (part: "id" | "label", typed: string): void => {
@@ -159,8 +178,16 @@ export function lookOf(draft: Draft, defaults: TuningDefaults | undefined, lang:
       note: ruleNote === undefined ? undefined : say(lang, ruleNote),
     },
     tables: [
-      pairTable("headers", draft.headers, lang, hands, ["setup_headers", "setup_header_name", "setup_header_value"]),
-      pairTable("overrides", draft.overrides, lang, hands, ["setup_overrides", "setup_pointer", "setup_override_value"]),
+      pairTable("headers", draft.headers, lang, hands, [
+        "setup_headers",
+        "setup_header_name",
+        "setup_header_value",
+      ]),
+      pairTable("overrides", draft.overrides, lang, hands, [
+        "setup_overrides",
+        "setup_pointer",
+        "setup_override_value",
+      ]),
     ],
   };
 }

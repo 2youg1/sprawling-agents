@@ -13,9 +13,7 @@ import type { Answered } from "../core/answered";
 import type { CostAnswer, Renewals, RunId } from "../wire";
 
 export type CostReading =
-  | { readonly kind: "idle" }
-  | { readonly kind: "unpriced" }
-  | { readonly kind: "priced" };
+  { readonly kind: "idle" } | { readonly kind: "unpriced" } | { readonly kind: "priced" };
 
 export function costReading(answer: CostAnswer): CostReading {
   if (answer.total > 0) return { kind: "priced" };

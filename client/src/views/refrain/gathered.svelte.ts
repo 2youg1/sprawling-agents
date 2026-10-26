@@ -29,7 +29,8 @@ export class Gathered {
       return asking.ask({ range: { version: at.version, range: span } }).subscribe((answer) => {
         const read = readAnswer(answer, (held) => ("range" in held ? held.range : undefined));
         untrack(() => {
-          if (read.kind === "held" && this.value !== null) this.value = joined(this.value, read.value);
+          if (read.kind === "held" && this.value !== null)
+            this.value = joined(this.value, read.value);
           else if (read.kind === "unavailable") this.lost = read.query;
         });
       });

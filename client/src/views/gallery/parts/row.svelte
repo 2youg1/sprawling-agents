@@ -37,8 +37,13 @@
       <Button label={say($lang, "mcp_check")} tone="quiet" />
     {/snippet}
   </Row>
-  <Row primary="anthropic/claude-lattice" secondary={say($lang, "tree_no_runs")} onOpen={() => undefined} chosen />
-  <Row primary="zenmux/local-mirror" secondary={say($lang, "tree_no_runs")}>
+  <Row
+    primary="anthropic/claude-lattice"
+    secondary={say($lang, "tree_no_runs")}
+    onOpen={() => undefined}
+    chosen
+  />
+  <Row primary="example/local-mirror" secondary={say($lang, "tree_no_runs")}>
     {#snippet status()}
       <Badge text={say($lang, "city_quiet")} dot />
     {/snippet}

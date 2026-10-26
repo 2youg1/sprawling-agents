@@ -40,7 +40,12 @@ question is what this turn did or waits on. -->
 
 {#if "arrived" in note}
   {#if note.arrived.handback !== undefined && note.arrived.handback !== null}
-    <HandbackNote from={note.arrived.from} handback={note.arrived.handback} session={note.arrived.session ?? null} t={note.arrived.t} />
+    <HandbackNote
+      from={note.arrived.from}
+      handback={note.arrived.handback}
+      session={note.arrived.session ?? null}
+      t={note.arrived.t}
+    />
   {:else if note.arrived.by === "resident"}
     <LetterNote
       from={note.arrived.from}
@@ -61,18 +66,31 @@ question is what this turn did or waits on. -->
     />
   {/if}
 {:else if "awaiting_reply" in note}
-  <ReplyWaitNote on={note.awaiting_reply.on} until={note.awaiting_reply.until} ended={note.awaiting_reply.ended} />
+  <ReplyWaitNote
+    on={note.awaiting_reply.on}
+    until={note.awaiting_reply.until}
+    ended={note.awaiting_reply.ended}
+  />
 {:else if "refused" in note}
   <RefusedNote error={note.refused.error} />
 {:else if "waiting" in note}
   <NotePlace rhythm="line">
-    <NoteRow role={undefined} pieces={[{ kind: "words", text: say($lang, "talk_waiting_you"), ink: "alert" }]} />
+    <NoteRow
+      role={undefined}
+      pieces={[{ kind: "words", text: say($lang, "talk_waiting_you"), ink: "alert" }]}
+    />
   </NotePlace>
 {:else if "discarded" in note}
   <NotePlace rhythm="line">
     <NoteRow
       role={undefined}
-      pieces={[{ kind: "words", text: fill(say($lang, "talk_discarded"), { n: String(note.discarded.count) }), ink: "faint" }]}
+      pieces={[
+        {
+          kind: "words",
+          text: fill(say($lang, "talk_discarded"), { n: String(note.discarded.count) }),
+          ink: "faint",
+        },
+      ]}
     />
   </NotePlace>
 {:else if "unreadable" in note}

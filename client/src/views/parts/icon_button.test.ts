@@ -14,7 +14,10 @@ import { describe, expect, test } from "bun:test";
 
 import { lookOf, type IconButtonProps } from "./icon_button";
 
-function counted(props: Omit<IconButtonProps, "onPress">): { readonly props: IconButtonProps; readonly presses: () => number } {
+function counted(props: Omit<IconButtonProps, "onPress">): {
+  readonly props: IconButtonProps;
+  readonly presses: () => number;
+} {
   let presses = 0;
   return {
     props: {
@@ -48,7 +51,11 @@ describe("icon button wiring", () => {
   });
 
   test("a refused key keeps its name, hints the reason, points at it, and swallows the press", () => {
-    const hand = counted({ glyph: "reveal", label: "show in the file manager", why: "this build cannot open it" });
+    const hand = counted({
+      glyph: "reveal",
+      label: "show in the file manager",
+      why: "this build cannot open it",
+    });
     const look = lookOf(hand.props);
     const wire = look.wire("tip-2");
     expect({

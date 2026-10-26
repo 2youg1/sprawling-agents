@@ -106,7 +106,9 @@
   // its opening is read against the working tree, which is where its
   // edits are; a closed run stops at its last checkpoint, or at its opening
   // when it never checkpointed, so edits made after it ended are not counted.
-  const changedTo = $derived(live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint));
+  const changedTo = $derived(
+    live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint),
+  );
 
   // The lens a run opens on (client D28): a run still going is
   // watched where its time goes; a run that is over and checkpointed
@@ -190,7 +192,13 @@
     </div>
   {:else if eye.id === "monitor"}
     <div class="flex h-[70vh] min-h-0 flex-col rounded-card border border-edge">
-      <Monitor {turns} tail={$tails[run] ?? NO_TAIL} {live} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
+      <Monitor
+        {turns}
+        tail={$tails[run] ?? NO_TAIL}
+        {live}
+        onDraft={draftSteer}
+        onSteer={(text: string) => u.send(steer(run, text))}
+      />
     </div>
   {:else if eye.id === "prompt"}
     <Prompt {run} />
@@ -238,11 +246,5 @@
     {from}
     {to}
   />
-  <Tabs
-    label={say($lang, "run_lenses")}
-    {lenses}
-    current={current}
-    onPick={pick}
-    {panel}
-  />
+  <Tabs label={say($lang, "run_lenses")} {lenses} {current} onPick={pick} {panel} />
 </div>

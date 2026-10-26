@@ -34,13 +34,17 @@
 
 {#if read.kind === "held"}
   <div class="flex min-w-0 flex-col gap-snug">
-    <p class="grid h-control grid-cols-[8ch_minmax(0,1fr)_auto_auto] items-center gap-x-base text-note">
+    <p
+      class="grid h-control grid-cols-[8ch_minmax(0,1fr)_auto_auto] items-center gap-x-base text-note"
+    >
       <CommitLine commit={read.value} />
     </p>
     <CommitFacts commit={read.value} />
   </div>
 {:else if read.kind === "unavailable"}
-  <p class="text-note text-text-faint">{fill(say($lang, "whose_unknown"), { oid: shortOid(oid) })}</p>
+  <p class="text-note text-text-faint">
+    {fill(say($lang, "whose_unknown"), { oid: shortOid(oid) })}
+  </p>
 {:else}
   <p class="text-note text-text-faint">…</p>
 {/if}

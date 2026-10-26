@@ -50,8 +50,13 @@ function handOver(covered: string, blocks: readonly Block[]): void {
 function takenOver(text: string): Laying | null {
   const longest = streamed
     .filter((each) => each.covered !== "" && text.startsWith(each.covered))
-    .reduce<Streamed | null>((best, each) => (best === null || each.covered.length > best.covered.length ? each : best), null);
-  return longest === null ? null : { ...UNLAID, blocks: longest.blocks, reached: longest.covered.length };
+    .reduce<Streamed | null>(
+      (best, each) => (best === null || each.covered.length > best.covered.length ? each : best),
+      null,
+    );
+  return longest === null
+    ? null
+    : { ...UNLAID, blocks: longest.blocks, reached: longest.covered.length };
 }
 
 // Called while a component initialises, with the text it draws read

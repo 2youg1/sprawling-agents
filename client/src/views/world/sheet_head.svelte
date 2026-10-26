@@ -45,7 +45,12 @@
 
   const look: SheetHeadLook = $derived(
     sheetHeadOf(
-      { tabs, shown, prefix, words: { back: say($lang, "world_back"), strip: say($lang, "world_panes") } },
+      {
+        tabs,
+        shown,
+        prefix,
+        words: { back: say($lang, "world_back"), strip: say($lang, "world_panes") },
+      },
       {
         leave: () => {
           leaveSheet("world");

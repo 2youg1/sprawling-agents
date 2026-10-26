@@ -83,7 +83,12 @@ export interface Lesson {
   readonly chord: string;
 }
 
-export function addressLineOf(lang: Lang, address: string, session: Seq | null, open: (arrival: Arrival) => void): AddressLineLook {
+export function addressLineOf(
+  lang: Lang,
+  address: string,
+  session: Seq | null,
+  open: (arrival: Arrival) => void,
+): AddressLineLook {
   let pressed: Arrival = "keys";
   const cut = address.lastIndexOf("/") + 1;
   const number = session === null ? undefined : `#${String(session)}`;

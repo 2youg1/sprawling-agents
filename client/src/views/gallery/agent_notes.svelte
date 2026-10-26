@@ -20,7 +20,8 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
     code: "E_PROVIDER",
     nearby: [],
     provider: { kind: "overflow", status: 400 },
-    recovery: "the request is longer than the model's context window; start a new session with /new",
+    recovery:
+      "the request is longer than the model's context window; start a new session with /new",
     retry: "no",
     subject: "gallery/model",
   };
@@ -130,7 +131,10 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <Case label="agent messages · a reply still arriving with motion off, the caret lit" width={760}>
   <div class="px-wide" data-motion="off">
-    <Saying who="shop/main" text="The rename is done. Next I will read the two callers that still" />
+    <Saying
+      who="shop/main"
+      text="The rename is done. Next I will read the two callers that still"
+    />
   </div>
 </Case>
 
@@ -138,12 +142,40 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 a head with both measured figures, a letter with its kind and session,
 a wait still open, the page's echo whose standing is unknown, and a
 message that got no reply with both ways out. -->
-<Case label="agent messages · a head, a letter, a wait, an echo and a failed message, seated alone" width={760}>
+<Case
+  label="agent messages · a head, a letter, a wait, an echo and a failed message, seated alone"
+  width={760}
+>
   <div class="flex flex-col gap-snug px-wide">
-    <Head who="shop/main" at={AT} model="gallery/model" ttft={{ unit: "ms", n: 412 }} tps={61} rhythm={null} />
-    <LetterNote from="shop/tests" said="Two tests read the alias." kind="mention" session={CHILD} t={AT} />
+    <Head
+      who="shop/main"
+      at={AT}
+      model="gallery/model"
+      ttft={{ unit: "ms", n: 412 }}
+      tps={61}
+      rhythm={null}
+    />
+    <LetterNote
+      from="shop/tests"
+      said="Two tests read the alias."
+      kind="mention"
+      session={CHILD}
+      t={AT}
+    />
     <NoteRow {...replyWaitLook($lang, named("shop/tests", null), 95_000, null)} />
-    <Delivered delivery={{ kind: "unknown", words: "Keep the old name as an alias.", refusal: null, mark: 0 }} />
-    <Card {...failedLook($lang, say($lang, "talk_failed_model"), BUSY, { settings: "offered", onRetry: ignore })} />
+    <Delivered
+      delivery={{
+        kind: "unknown",
+        words: "Keep the old name as an alias.",
+        refusal: null,
+        mark: 0,
+      }}
+    />
+    <Card
+      {...failedLook($lang, say($lang, "talk_failed_model"), BUSY, {
+        settings: "offered",
+        onRetry: ignore,
+      })}
+    />
   </div>
 </Case>

@@ -156,7 +156,6 @@ export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   finder: null,
 };
 
-
 // The word each action is called by, which is a phrase key rather than
 // a phrase: this file holds no words.
 export const LABELS: Readonly<Record<Action, Key>> = {

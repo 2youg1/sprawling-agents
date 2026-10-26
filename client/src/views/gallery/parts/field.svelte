@@ -16,9 +16,9 @@
 
   const { lang } = ui();
 
-  let host = $state("api.zenmux.ai");
+  let host = $state("api.example.test");
   let bad = $state("api_gateway.internal");
-  let key = $state(referenceText(referenceFor("zenmux")));
+  let key = $state(referenceText(referenceFor("example")));
   let measured = $state("a million");
   let stepped = $state("200000");
 </script>

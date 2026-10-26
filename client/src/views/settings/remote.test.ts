@@ -10,7 +10,13 @@ import { IDLE, answerOf, step, type Door, type DoorEvent, type DoorSent } from "
 
 describe("restartOf", () => {
   test("each vault lifetime says what a restart does to a pairing", () => {
-    const lifetimes: (DoctorCustodyLifetime | null)[] = [null, "across_reboots", "with_passphrase", "until_reboot", "this_process"];
+    const lifetimes: (DoctorCustodyLifetime | null)[] = [
+      null,
+      "across_reboots",
+      "with_passphrase",
+      "until_reboot",
+      "this_process",
+    ];
     expect(lifetimes.map(restartOf)).toEqual([
       "remote_restart_unknown",
       "remote_restart_kept",
@@ -54,7 +60,14 @@ describe("door step (client/spec/Views/Door.lean)", () => {
   });
 
   test("escape cancels and returns the focus to the control that was pressed", () => {
-    expect(run([{ kind: "press", opener: "key" }, { kind: "pending" }, { kind: "type", text: "ABCD" }, { kind: "escape" }])).toEqual({
+    expect(
+      run([
+        { kind: "press", opener: "key" },
+        { kind: "pending" },
+        { kind: "type", text: "ABCD" },
+        { kind: "escape" },
+      ]),
+    ).toEqual({
       door: { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "key" } },
       sent: [{ kind: "replace" }],
     });
@@ -70,15 +83,25 @@ describe("door step (client/spec/Views/Door.lean)", () => {
         answerOf("E_GATE_DENIED"),
       ]),
     ).toEqual({
-      door: { phase: { kind: "refused", opener: "door", code: "E_GATE_DENIED" }, typed: "", focus: { kind: "opener", opener: "door" } },
+      door: {
+        phase: { kind: "refused", opener: "door", code: "E_GATE_DENIED" },
+        typed: "",
+        focus: { kind: "opener", opener: "door" },
+      },
       sent: [{ kind: "open" }, { kind: "confirm", code: "ABCD EFGH" }],
     });
   });
 
   test("a code is sent only from the input, and an empty one is not sent", () => {
-    expect(run([{ kind: "submit" }, { kind: "press", opener: "door" }, { kind: "submit" }, { kind: "pending" }, { kind: "submit" }]).sent).toEqual([
-      { kind: "open" },
-    ]);
+    expect(
+      run([
+        { kind: "submit" },
+        { kind: "press", opener: "door" },
+        { kind: "submit" },
+        { kind: "pending" },
+        { kind: "submit" },
+      ]).sent,
+    ).toEqual([{ kind: "open" }]);
   });
 
   test("a refusal that arrives while nothing is in flight changes nothing", () => {
@@ -86,22 +109,25 @@ describe("door step (client/spec/Views/Door.lean)", () => {
   });
 
   test("a command that never left the page returns to the opener without a refusal", () => {
-    expect(
-      run([
-        { kind: "press", opener: "key" },
-        { kind: "unsent" },
-      ]),
-    ).toEqual({
+    expect(run([{ kind: "press", opener: "key" }, { kind: "unsent" }])).toEqual({
       door: { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "key" } },
       sent: [{ kind: "replace" }],
     });
     expect(
-      run([{ kind: "press", opener: "door" }, { kind: "pending" }, { kind: "type", text: "ABCD" }, { kind: "submit" }, { kind: "unsent" }]).door,
+      run([
+        { kind: "press", opener: "door" },
+        { kind: "pending" },
+        { kind: "type", text: "ABCD" },
+        { kind: "submit" },
+        { kind: "unsent" },
+      ]).door,
     ).toEqual({ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "door" } });
   });
 
   test("an unsent event while nothing is in flight changes nothing", () => {
-    expect(run([{ kind: "press", opener: "door" }, { kind: "pending" }, { kind: "unsent" }]).door).toEqual({
+    expect(
+      run([{ kind: "press", opener: "door" }, { kind: "pending" }, { kind: "unsent" }]).door,
+    ).toEqual({
       phase: { kind: "awaiting", opener: "door" },
       typed: "",
       focus: { kind: "input" },

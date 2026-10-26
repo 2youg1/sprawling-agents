@@ -118,7 +118,12 @@
         tier: "develop",
         need: "required",
         pinned: "1.97.1",
-        state: { present: { at: "/usr/bin/rustc", version: { said: { text: "rustc 1.97.1 (8bab26f4f 2026-07-14)" } } } },
+        state: {
+          present: {
+            at: "/usr/bin/rustc",
+            version: { said: { text: "rustc 1.97.1 (8bab26f4f 2026-07-14)" } },
+          },
+        },
         install: { command: { spelled: "rustup default stable" } },
       },
       {
@@ -126,7 +131,12 @@
         tier: "develop",
         need: "required",
         pack: "rust_tools",
-        state: { present: { at: "/usr/bin/cargo-nextest", version: { said: { text: "cargo-nextest 0.9.143" } } } },
+        state: {
+          present: {
+            at: "/usr/bin/cargo-nextest",
+            version: { said: { text: "cargo-nextest 0.9.143" } },
+          },
+        },
         install: { command: { spelled: "cargo install cargo-nextest --locked" } },
       },
       {
@@ -143,14 +153,21 @@
         need: "optional",
         pack: "rust_tools",
         state: { absent: { absence: "not_on_search_path" } },
-        install: { manual: { how: "kani runs on Linux; a WSL installation is where it goes here" } },
+        install: {
+          manual: { how: "kani runs on Linux; a WSL installation is where it goes here" },
+        },
       },
       {
         name: "elan",
         tier: "develop",
         need: "optional",
         state: { absent: { absence: "not_on_search_path" } },
-        install: { print: { spelled: "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh" } },
+        install: {
+          print: {
+            spelled:
+              "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh",
+          },
+        },
       },
     ],
     tiers: [
@@ -163,7 +180,11 @@
   // one item done, one failed with the city's recovery, one running.
   const WALK: Walk = [
     { name: "just", state: "done", why: null },
-    { name: "cargo-mutants", state: "failed", why: "read what it reported in the log, then run the line yourself in a terminal" },
+    {
+      name: "cargo-mutants",
+      state: "failed",
+      why: "read what it reported in the log, then run the line yourself in a terminal",
+    },
     { name: "cargo-deny", state: "running", why: null },
   ];
 
@@ -201,13 +222,21 @@
   }
   function performanceAnswer(query: Query): Answer | undefined {
     return query === QUERIES.preferences
-      ? { preferences: { core: { placement: "soft_shares", priority: "normal", memory_bytes: null } } }
+      ? {
+          preferences: {
+            core: { placement: "soft_shares", priority: "normal", memory_bytes: null },
+          },
+        }
       : undefined;
   }
   // The same group after the person entered an 8 GiB ceiling.
   function cappedAnswer(query: Query): Answer | undefined {
     return query === QUERIES.preferences
-      ? { preferences: { core: { placement: "soft_shares", priority: "raised", memory_bytes: 8_589_934_592 } } }
+      ? {
+          preferences: {
+            core: { placement: "soft_shares", priority: "raised", memory_bytes: 8_589_934_592 },
+          },
+        }
       : undefined;
   }
 
@@ -222,7 +251,15 @@
 the city; these two are the survey above and the state before anyone
 has asked. -->
 {#snippet cards()}
-  <MachineReport answer={MACHINE} onInstall={() => undefined} planned={["cargo-deny"]} onInstallAll={() => undefined} walk={WALK} newest={NEWEST} onInstallPack={() => undefined} />
+  <MachineReport
+    answer={MACHINE}
+    onInstall={() => undefined}
+    planned={["cargo-deny"]}
+    onInstallAll={() => undefined}
+    walk={WALK}
+    newest={NEWEST}
+    onInstallPack={() => undefined}
+  />
 {/snippet}
 
 {#snippet unchecked()}
@@ -321,8 +358,8 @@ turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · skills at 1280" width={1280}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
     <Setup
-        group="skills"
-        endpoints={undefined}
+      group="skills"
+      endpoints={undefined}
       autonomy={undefined}
       onAutonomy={() => undefined}
       dependency={unchecked}
@@ -333,8 +370,8 @@ turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · skills at 820" width={820}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
     <Setup
-        group="skills"
-        endpoints={undefined}
+      group="skills"
+      endpoints={undefined}
       autonomy={undefined}
       onAutonomy={() => undefined}
       dependency={unchecked}
@@ -355,7 +392,12 @@ turns into a row across the top and every grid is down to one column. -->
 </Case>
 
 <Case label="settings · performance, no memory ceiling" width={820}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={performanceAnswer}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={performanceAnswer}
+  >
     <Setup group="performance" />
   </Stand>
 </Case>
@@ -367,7 +409,12 @@ turns into a row across the top and every grid is down to one column. -->
 </Case>
 
 <Case label="settings · performance on one column" width={390}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={performanceAnswer}>
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={performanceAnswer}
+  >
     <Setup group="performance" />
   </Stand>
 </Case>

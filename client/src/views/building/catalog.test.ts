@@ -20,7 +20,14 @@ import type { Row, Table } from "./catalog";
 
 // The model's fixture, tool `n` spelled `t<n>` and namespace `n` spelled
 // `n<n>`.
-function row(name: number, ns: number, bytes: number, fixed: boolean, inherited: Exposure, nearer?: Exposure): Row {
+function row(
+  name: number,
+  ns: number,
+  bytes: number,
+  fixed: boolean,
+  inherited: Exposure,
+  nearer?: Exposure,
+): Row {
   return {
     tool: {
       name: `t${String(name)}`,
@@ -49,7 +56,8 @@ const ROWS: readonly Row[] = [
 
 const EMPTY: Table = { tools: {}, namespaces: {} };
 
-type Edit = { readonly row: readonly [number, Exposure] } | { readonly group: readonly [number, Exposure] };
+type Edit =
+  { readonly row: readonly [number, Exposure] } | { readonly group: readonly [number, Exposure] };
 
 function apply(table: Table, edit: Edit): Table {
   if ("row" in edit) {
@@ -64,7 +72,9 @@ function apply(table: Table, edit: Edit): Table {
 describe("the capabilities draft", () => {
   test("a fixed row stays core and a press on it changes nothing", () => {
     const fixed = ROWS.filter((each) => each.fixed);
-    expect(fixed.map((each) => [effectiveOf(EMPTY, each), pressRow(EMPTY, each, "off")])).toEqual([["core", EMPTY]]);
+    expect(fixed.map((each) => [effectiveOf(EMPTY, each), pressRow(EMPTY, each, "off")])).toEqual([
+      ["core", EMPTY],
+    ]);
   });
 
   test("the building's rows inherit the city's table, and the city's rows yield to the building's", () => {
@@ -78,9 +88,21 @@ describe("the capabilities draft", () => {
       city: { tools: { plan: "core" } },
       stated: { namespaces: { sprawling: "off" } },
     };
-    expect(rowsOf(answer, "building").map((each) => [effectiveOf(draftOf(answer, "building"), each), each.inherited])).toEqual([["off", "core"]]);
-    expect(rowsOf(answer, "city").map((each) => [effectiveOf(draftOf(answer, "city"), each), each.nearer])).toEqual([["off", "off"]]);
-    expect(sameTable(draftOf(answer, "city"), { tools: { plan: "core" }, namespaces: {} })).toBe(true);
+    expect(
+      rowsOf(answer, "building").map((each) => [
+        effectiveOf(draftOf(answer, "building"), each),
+        each.inherited,
+      ]),
+    ).toEqual([["off", "core"]]);
+    expect(
+      rowsOf(answer, "city").map((each) => [
+        effectiveOf(draftOf(answer, "city"), each),
+        each.nearer,
+      ]),
+    ).toEqual([["off", "off"]]);
+    expect(sameTable(draftOf(answer, "city"), { tools: { plan: "core" }, namespaces: {} })).toBe(
+      true,
+    );
   });
 
   // Each vector: the edits, the table they leave (keys and values, in no
@@ -93,10 +115,34 @@ describe("the capabilities draft", () => {
     readonly rows: readonly Exposure[];
     readonly meter: number;
   }[] = [
-    { edits: [{ row: [1, "core"] }], tools: { t1: "core" }, namespaces: {}, rows: ["core", "core", "dormant", "core", "off"], meter: 50 },
-    { edits: [{ row: [1, "core"] }, { row: [1, "dormant"] }], tools: {}, namespaces: {}, rows: ["core", "dormant", "dormant", "core", "off"], meter: 0 },
-    { edits: [{ row: [0, "off"] }, { row: [3, "off"] }], tools: { t0: "off" }, namespaces: {}, rows: ["off", "dormant", "dormant", "core", "off"], meter: -100 },
-    { edits: [{ group: [1, "core"] }], tools: {}, namespaces: { n1: "core" }, rows: ["core", "dormant", "core", "core", "off"], meter: 30 },
+    {
+      edits: [{ row: [1, "core"] }],
+      tools: { t1: "core" },
+      namespaces: {},
+      rows: ["core", "core", "dormant", "core", "off"],
+      meter: 50,
+    },
+    {
+      edits: [{ row: [1, "core"] }, { row: [1, "dormant"] }],
+      tools: {},
+      namespaces: {},
+      rows: ["core", "dormant", "dormant", "core", "off"],
+      meter: 0,
+    },
+    {
+      edits: [{ row: [0, "off"] }, { row: [3, "off"] }],
+      tools: { t0: "off" },
+      namespaces: {},
+      rows: ["off", "dormant", "dormant", "core", "off"],
+      meter: -100,
+    },
+    {
+      edits: [{ group: [1, "core"] }],
+      tools: {},
+      namespaces: { n1: "core" },
+      rows: ["core", "dormant", "core", "core", "off"],
+      meter: 30,
+    },
     {
       edits: [{ group: [1, "core"] }, { row: [2, "dormant"] }],
       tools: { t2: "dormant" },
@@ -111,7 +157,13 @@ describe("the capabilities draft", () => {
       rows: ["core", "off", "dormant", "core", "off"],
       meter: 0,
     },
-    { edits: [{ group: [1, "dormant"] }], tools: {}, namespaces: {}, rows: ["core", "dormant", "dormant", "core", "off"], meter: 0 },
+    {
+      edits: [{ group: [1, "dormant"] }],
+      tools: {},
+      namespaces: {},
+      rows: ["core", "dormant", "dormant", "core", "off"],
+      meter: 0,
+    },
   ];
 
   test("follows the model on every edit sequence it prints", () => {
@@ -122,7 +174,12 @@ describe("the capabilities draft", () => {
         namespaces: table.namespaces,
         rows: ROWS.map((each) => effectiveOf(table, each)),
         meter: meterOf(EMPTY, table, ROWS),
-      }).toEqual({ tools: vector.tools, namespaces: vector.namespaces, rows: [...vector.rows], meter: vector.meter });
+      }).toEqual({
+        tools: vector.tools,
+        namespaces: vector.namespaces,
+        rows: [...vector.rows],
+        meter: vector.meter,
+      });
     }
   });
 });

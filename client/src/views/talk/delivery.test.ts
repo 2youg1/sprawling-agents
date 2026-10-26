@@ -18,7 +18,11 @@ const refusal: AxError = {
   subject: "hall/mayor",
 };
 
-const live = (newest: number, refused: AxError | null = null): Heard => ({ live: true, newest, refusal: refused });
+const live = (newest: number, refused: AxError | null = null): Heard => ({
+  live: true,
+  newest,
+  refusal: refused,
+});
 const down = (newest: number): Heard => ({ live: false, newest, refusal: null });
 
 describe("where sent words stand", () => {
@@ -40,7 +44,12 @@ describe("where sent words stand", () => {
     const held = sent("fix it", down(10));
     expect(held).toEqual({ kind: "held", words: "fix it", refusal: null });
     expect(delivered(held, down(10))).toEqual(held);
-    expect(delivered(held, live(10))).toEqual({ kind: "pending", words: "fix it", refusal: null, mark: 10 });
+    expect(delivered(held, live(10))).toEqual({
+      kind: "pending",
+      words: "fix it",
+      refusal: null,
+      mark: 10,
+    });
   });
 
   test("a refusal newer than the send ends the echo; an older one does not", () => {

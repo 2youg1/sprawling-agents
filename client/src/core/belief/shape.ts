@@ -19,14 +19,7 @@
 import { Option, Schema } from "effect";
 
 import { Address } from "../../wire";
-import type {
-  AxError,
-  HaltScope,
-  LogLine,
-  RunId,
-  Seq,
-  TimeMs,
-} from "../../wire";
+import type { AxError, HaltScope, LogLine, RunId, Seq, TimeMs } from "../../wire";
 import type { Doing } from "../doing";
 import type { Probed } from "../probed";
 import type { PolicyChange } from "../reading";
@@ -174,7 +167,10 @@ export function merged(notices: readonly Notice[], error: AxError, at: TimeMs): 
   const key = noticeKey(error);
   const held = notices.find((each) => each.key === key);
   if (held === undefined) {
-    const out = [...notices, { error, seen: false, at, key, count: 1, about: about(error.subject) }];
+    const out = [
+      ...notices,
+      { error, seen: false, at, key, count: 1, about: about(error.subject) },
+    ];
     return out.length > NOTICE_WINDOW ? out.slice(out.length - NOTICE_WINDOW) : out;
   }
   return notices.map((each) =>

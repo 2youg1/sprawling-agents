@@ -14,7 +14,14 @@ import type { Pressed } from "./press";
 // Moving between the lines of a list: a tool line, a mailbox entry, a
 // row of the runs board. Each list answers only the moves it has a use
 // for, and spells none of the keys itself (refrain 3-12).
-export const LINE_MOVES = ["line.next", "line.previous", "line.first", "line.last", "line.open", "line.close"] as const;
+export const LINE_MOVES = [
+  "line.next",
+  "line.previous",
+  "line.first",
+  "line.last",
+  "line.open",
+  "line.close",
+] as const;
 
 export type LineMove = (typeof LINE_MOVES)[number];
 
@@ -46,7 +53,9 @@ function moveOf(typed: readonly string[]): LineMove | undefined {
 
 function begins(typed: readonly string[]): boolean {
   return LINE_MOVES.some((move) =>
-    LINE_KEYS[move].some((keys) => keys.length > typed.length && sameKeys(keys.slice(0, typed.length), typed)),
+    LINE_KEYS[move].some(
+      (keys) => keys.length > typed.length && sameKeys(keys.slice(0, typed.length), typed),
+    ),
   );
 }
 
@@ -60,7 +69,8 @@ export function lineWalker(): (pressed: Pressed, at: number) => LineMove | null 
   return (pressed, at) => {
     const was = held;
     held = [];
-    if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey) return null;
+    if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey)
+      return null;
     const continued = at - heldAt <= SEQUENCE_MS ? [...was, pressed.key] : [pressed.key];
     heldAt = at;
     for (const typed of [continued, [pressed.key]]) {
@@ -103,7 +113,8 @@ export function initialOf(name: string, slug: string): string {
 // The first letter a press asks for, or none when the press is not one
 // letter typed outside a field with no modifier.
 export function initialTyped(pressed: Pressed): string | null {
-  if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey) return null;
+  if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey)
+    return null;
   const letter = folded(pressed.key);
   return typeable(letter) ? letter : null;
 }

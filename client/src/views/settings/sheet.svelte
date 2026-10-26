@@ -47,36 +47,36 @@
   wide as the shell's left silver part, less half a gutter, so the group
   beside it starts on the line the conversation starts on (client D24). -->
 <div class="@container/sheet h-full min-h-0">
-<div class="flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
-  <div
-    class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
-  >
-    <div class="flex items-center justify-between px-snug">
-      <span class="text-label font-label text-text">{say($lang, "nav_settings")}</span>
-      <button
-        type="button"
-        class="-mr-tight flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"
-        aria-label={say($lang, "settings_close")}
-        onclick={onClose}
-      >
-        <Glyph name="cross" size="sm" />
-      </button>
-    </div>
-    <Tree {group} {beneath} {onPick} />
-  </div>
-  <!-- The group is the panel's second level: it arrives half a panel
-    later than the panel (`slide-then`, docs/frontend-method.md §4-43). -->
-  <section
-    bind:this={body}
-    class="slide-then @container/page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @max-lg/sheet:overflow-visible"
-    aria-labelledby={titleId}
-  >
-    <!-- Each group picked arrives with a short shift (docs/frontend-method.md §4-43). -->
-    {#key group}
-      <div class="shift">
-        <Setup {group} {titleId} />
+  <div class="flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
+    <div
+      class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
+    >
+      <div class="flex items-center justify-between px-snug">
+        <span class="text-label font-label text-text">{say($lang, "nav_settings")}</span>
+        <button
+          type="button"
+          class="-mr-tight flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"
+          aria-label={say($lang, "settings_close")}
+          onclick={onClose}
+        >
+          <Glyph name="cross" size="sm" />
+        </button>
       </div>
-    {/key}
-  </section>
-</div>
+      <Tree {group} {beneath} {onPick} />
+    </div>
+    <!-- The group is the panel's second level: it arrives half a panel
+    later than the panel (`slide-then`, docs/frontend-method.md §4-43). -->
+    <section
+      bind:this={body}
+      class="slide-then @container/page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @max-lg/sheet:overflow-visible"
+      aria-labelledby={titleId}
+    >
+      <!-- Each group picked arrives with a short shift (docs/frontend-method.md §4-43). -->
+      {#key group}
+        <div class="shift">
+          <Setup {group} {titleId} />
+        </div>
+      {/key}
+    </section>
+  </div>
 </div>

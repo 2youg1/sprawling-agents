@@ -11,7 +11,12 @@
 // goes back in `ConfirmRemoteDoor` (`crates/remote_access/Spec.lean` D4).
 // Closing needs no code and does not pass through this machine.
 
-import { closeRemoteDoor, confirmRemoteDoor, openRemoteDoor, replaceCityKey } from "../../core/commands";
+import {
+  closeRemoteDoor,
+  confirmRemoteDoor,
+  openRemoteDoor,
+  replaceCityKey,
+} from "../../core/commands";
 import type { Key } from "../../core/lang";
 import type { AxCode, Command } from "../../wire";
 import type { GlyphName } from "../parts/glyph";
@@ -25,7 +30,10 @@ export type Phase =
   | { readonly kind: "confirming"; readonly opener: Opener }
   | { readonly kind: "refused"; readonly opener: Opener; readonly code: AxCode };
 
-export type Focus = { readonly kind: "elsewhere" } | { readonly kind: "opener"; readonly opener: Opener } | { readonly kind: "input" };
+export type Focus =
+  | { readonly kind: "elsewhere" }
+  | { readonly kind: "opener"; readonly opener: Opener }
+  | { readonly kind: "input" };
 
 export interface Door {
   readonly phase: Phase;
@@ -35,7 +43,10 @@ export interface Door {
 
 export const IDLE: Door = { phase: { kind: "idle" }, typed: "", focus: { kind: "elsewhere" } };
 
-export type DoorSent = { readonly kind: "open" } | { readonly kind: "replace" } | { readonly kind: "confirm"; readonly code: string };
+export type DoorSent =
+  | { readonly kind: "open" }
+  | { readonly kind: "replace" }
+  | { readonly kind: "confirm"; readonly code: string };
 
 export type DoorEvent =
   | { readonly kind: "press"; readonly opener: Opener }
@@ -59,30 +70,73 @@ export function step(door: Door, event: DoorEvent): Stepped {
   switch (event.kind) {
     case "press":
       return phase.kind === "idle" || phase.kind === "refused"
-        ? [{ phase: { kind: "requesting", opener: event.opener }, typed: "", focus: { kind: "opener", opener: event.opener } }, asked(event.opener)]
+        ? [
+            {
+              phase: { kind: "requesting", opener: event.opener },
+              typed: "",
+              focus: { kind: "opener", opener: event.opener },
+            },
+            asked(event.opener),
+          ]
         : same;
     case "pending":
-      return phase.kind === "requesting" ? [{ phase: { kind: "awaiting", opener: phase.opener }, typed: "", focus: { kind: "input" } }, null] : same;
+      return phase.kind === "requesting"
+        ? [
+            {
+              phase: { kind: "awaiting", opener: phase.opener },
+              typed: "",
+              focus: { kind: "input" },
+            },
+            null,
+          ]
+        : same;
     case "type":
       return phase.kind === "awaiting" ? [{ ...door, typed: event.text }, null] : same;
     case "submit":
       return phase.kind === "awaiting" && door.typed !== ""
-        ? [{ phase: { kind: "confirming", opener: phase.opener }, typed: door.typed, focus: { kind: "input" } }, { kind: "confirm", code: door.typed }]
+        ? [
+            {
+              phase: { kind: "confirming", opener: phase.opener },
+              typed: door.typed,
+              focus: { kind: "input" },
+            },
+            { kind: "confirm", code: door.typed },
+          ]
         : same;
     case "escape":
-      return phase.kind === "awaiting" ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null] : same;
+      return phase.kind === "awaiting"
+        ? [
+            { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },
+            null,
+          ]
+        : same;
     case "refusal":
       return phase.kind === "requesting" || phase.kind === "confirming"
-        ? [{ phase: { kind: "refused", opener: phase.opener, code: event.code }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null]
+        ? [
+            {
+              phase: { kind: "refused", opener: phase.opener, code: event.code },
+              typed: "",
+              focus: { kind: "opener", opener: phase.opener },
+            },
+            null,
+          ]
         : same;
     case "unsent":
       // The command never left the page: the city said nothing, so the
       // machine goes back to rest rather than inventing a refusal code.
       return phase.kind === "requesting" || phase.kind === "confirming"
-        ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null]
+        ? [
+            { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },
+            null,
+          ]
         : same;
     case "settled":
-      return phase.kind === "confirming" ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null] : same;
+      return phase.kind === "confirming"
+        ? [
+            { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },
+            null,
+          ]
+        : same;
   }
 }
 

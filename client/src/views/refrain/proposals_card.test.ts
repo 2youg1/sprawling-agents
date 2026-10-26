@@ -45,7 +45,10 @@ const CURRENT: Standing = { kind: "current" };
 const IDLE: Deciding = { kind: "idle" };
 
 // A recorder for the seat's one hand.
-function recorder(): { readonly calls: [number, Partial<Take>][]; readonly retake: (place: number, change: Partial<Take>) => void } {
+function recorder(): {
+  readonly calls: [number, Partial<Take>][];
+  readonly retake: (place: number, change: Partial<Take>) => void;
+} {
   const calls: [number, Partial<Take>][] = [];
   return {
     calls,
@@ -56,7 +59,12 @@ function recorder(): { readonly calls: [number, Partial<Take>][]; readonly retak
 }
 
 function rowsOf(edit: Edit, hands = recorder()): readonly RowLook[] {
-  const { body } = cardLookOf(CARD, { standing: CURRENT, deciding: IDLE, edit, lead: undefined }, "en", hands);
+  const { body } = cardLookOf(
+    CARD,
+    { standing: CURRENT, deciding: IDLE, edit, lead: undefined },
+    "en",
+    hands,
+  );
   return body.kind === "edit" ? body.rows : [];
 }
 
@@ -76,8 +84,12 @@ describe("the card under edit", () => {
     const rows = rowsOf(editOf(CARD));
     expect(rows.map((row) => row.kind)).toEqual(["kept", "struck", "written"]);
     const { struck, written } = changed(rows);
-    expect(struck?.take["aria-label"]).toBe(fill(say("en", "proposal_take"), { words: "It edits in place." }));
-    expect(written?.take["aria-label"]).toBe(fill(say("en", "proposal_take"), { words: "It edits in the browser and…" }));
+    expect(struck?.take["aria-label"]).toBe(
+      fill(say("en", "proposal_take"), { words: "It edits in place." }),
+    );
+    expect(written?.take["aria-label"]).toBe(
+      fill(say("en", "proposal_take"), { words: "It edits in the browser and…" }),
+    );
     expect(written?.words["aria-label"]).toBe(say("en", "proposal_amend"));
     expect(written?.words.value).toBe("It edits in the browser and keeps a draft per version.");
   });
@@ -101,8 +113,19 @@ describe("the card under edit", () => {
 
 describe("the card as its diff", () => {
   test("each changed sentence is announced by its kind, and an insertion touching a removal stands apart", () => {
-    const { body } = cardLookOf(CARD, { standing: CURRENT, deciding: IDLE, edit: null, lead: undefined }, "en", recorder());
-    expect((body.kind === "diff" ? body.pieces : []).map(({ kind, said, abuts }) => ({ kind, said, abuts }))).toEqual([
+    const { body } = cardLookOf(
+      CARD,
+      { standing: CURRENT, deciding: IDLE, edit: null, lead: undefined },
+      "en",
+      recorder(),
+    );
+    expect(
+      (body.kind === "diff" ? body.pieces : []).map(({ kind, said, abuts }) => ({
+        kind,
+        said,
+        abuts,
+      })),
+    ).toEqual([
       { kind: "same", said: undefined, abuts: false },
       { kind: "delete", said: say("en", "proposal_removed"), abuts: false },
       { kind: "insert", said: say("en", "proposal_added"), abuts: true },
@@ -111,9 +134,22 @@ describe("the card as its diff", () => {
 
   test("where a sent decision stands is said in the card's live region", () => {
     const sent: Deciding = { kind: "sent", command: decideProposals(DOC, [rejectionOf(CARD)]) };
-    const error: AxError = { action: "decide proposals", code: "E_VERSION_CONFLICT", gate: null, nearby: [], recovery: "read it again", retry: "no", subject: DOC };
+    const error: AxError = {
+      action: "decide proposals",
+      code: "E_VERSION_CONFLICT",
+      gate: null,
+      nearby: [],
+      recovery: "read it again",
+      retry: "no",
+      subject: DOC,
+    };
     const statusOf = (deciding: Deciding): unknown =>
-      cardLookOf(CARD, { standing: CURRENT, deciding, edit: null, lead: undefined }, "en", recorder()).status;
+      cardLookOf(
+        CARD,
+        { standing: CURRENT, deciding, edit: null, lead: undefined },
+        "en",
+        recorder(),
+      ).status;
     expect(statusOf(IDLE)).toBeUndefined();
     expect(statusOf(sent)).toEqual({ tone: "faint", text: say("en", "proposal_deciding") });
     expect(statusOf({ kind: "refused", error })).toEqual({ tone: "alert", text: "read it again" });
@@ -123,7 +159,9 @@ describe("the card as its diff", () => {
 describe("why an answer cannot be given now", () => {
   test("a stale card can only be rejected, and says so on accept and edit", () => {
     const stale = say("en", "proposal_stale_why");
-    expect(refusalsOf({ standing: { kind: "stale", now: V2 }, deciding: IDLE, edit: null }, "en")).toEqual({
+    expect(
+      refusalsOf({ standing: { kind: "stale", now: V2 }, deciding: IDLE, edit: null }, "en"),
+    ).toEqual({
       accept: stale,
       edit: stale,
       reject: undefined,
@@ -133,12 +171,20 @@ describe("why an answer cannot be given now", () => {
   test("a card in flight answers nothing", () => {
     const busy = say("en", "proposal_busy_why");
     const sent: Deciding = { kind: "sent", command: decideProposals(DOC, [rejectionOf(CARD)]) };
-    expect(refusalsOf({ standing: CURRENT, deciding: sent, edit: null }, "en")).toEqual({ accept: busy, edit: busy, reject: busy });
+    expect(refusalsOf({ standing: CURRENT, deciding: sent, edit: null }, "en")).toEqual({
+      accept: busy,
+      edit: busy,
+      reject: busy,
+    });
   });
 
   test("an edit that takes nothing is not sent as an acceptance", () => {
     const none = retaken(retaken(editOf(CARD), 1, { taken: false }), 2, { taken: false });
-    expect(refusalsOf({ standing: CURRENT, deciding: IDLE, edit: none }, "en").accept).toBe(say("en", "proposal_nothing_taken"));
-    expect(refusalsOf({ standing: CURRENT, deciding: IDLE, edit: editOf(CARD) }, "en").accept).toBeUndefined();
+    expect(refusalsOf({ standing: CURRENT, deciding: IDLE, edit: none }, "en").accept).toBe(
+      say("en", "proposal_nothing_taken"),
+    );
+    expect(
+      refusalsOf({ standing: CURRENT, deciding: IDLE, edit: editOf(CARD) }, "en").accept,
+    ).toBeUndefined();
   });
 });

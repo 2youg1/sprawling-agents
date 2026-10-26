@@ -24,8 +24,18 @@ const WORDS: Record<
   Opening["kind"],
   { readonly opening: Key; readonly busy: Key; readonly refused: Key; readonly refusedThen: Key }
 > = {
-  branch: { opening: "branch_opening", busy: "branch_busy", refused: "branch_refused", refusedThen: "branch_refused_then" },
-  fresh: { opening: "session_opening", busy: "session_busy", refused: "session_refused", refusedThen: "session_refused_then" },
+  branch: {
+    opening: "branch_opening",
+    busy: "branch_busy",
+    refused: "branch_refused",
+    refusedThen: "branch_refused_then",
+  },
+  fresh: {
+    opening: "session_opening",
+    busy: "session_busy",
+    refused: "session_refused",
+    refusedThen: "session_refused_then",
+  },
 };
 
 export interface BranchNote {
@@ -43,7 +53,12 @@ export interface StopKey {
 
 // `stop` cancels the run working in the room now, or is `null` when
 // none is.
-export function noteOf(here: BranchHere, room: Address, lang: Lang, stop: (() => void) | null): BranchNote | null {
+export function noteOf(
+  here: BranchHere,
+  room: Address,
+  lang: Lang,
+  stop: (() => void) | null,
+): BranchNote | null {
   switch (here.kind) {
     case "none":
     case "elsewhere":
@@ -65,7 +80,10 @@ export function noteOf(here: BranchHere, room: Address, lang: Lang, stop: (() =>
       }
       return {
         said: say(lang, words.busy),
-        stop: stop === null ? null : { label: STOP, name: fill(say(lang, "branch_stop"), { room }), onPress: stop },
+        stop:
+          stop === null
+            ? null
+            : { label: STOP, name: fill(say(lang, "branch_stop"), { room }), onPress: stop },
       };
     }
   }

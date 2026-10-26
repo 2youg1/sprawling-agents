@@ -55,14 +55,19 @@ arriving curve and back on the leaving one. -->
   {#if look.live !== undefined}
     <Tip text={look.live}>
       {#snippet children(hint: string)}
-        <span class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent" role="img" aria-labelledby={hint}
+        <span
+          class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent"
+          role="img"
+          aria-labelledby={hint}
         ></span>
       {/snippet}
     </Tip>
   {/if}
   <span class="flex-1"></span>
   {#if look.size !== undefined}
-    <span class="hidden shrink-0 whitespace-nowrap font-mono text-text-faint group-hover/row:inline group-focus-visible/row:inline">
+    <span
+      class="hidden shrink-0 whitespace-nowrap font-mono text-text-faint group-hover/row:inline group-focus-visible/row:inline"
+    >
       {look.size}
     </span>
   {/if}

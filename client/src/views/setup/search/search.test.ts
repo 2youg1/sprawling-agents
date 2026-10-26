@@ -13,7 +13,13 @@ import { describe, expect, test } from "bun:test";
 import { enrol } from "../../../core/enrol";
 import { fill, say } from "../../../core/lang";
 import { ServerLabel } from "../../../wire";
-import type { AxError, Command, SearchConfiguration, SearchSupplier, SettledSearch } from "../../../wire";
+import type {
+  AxError,
+  Command,
+  SearchConfiguration,
+  SearchSupplier,
+  SettledSearch,
+} from "../../../wire";
 import * as accounts from "../providers/account_editor";
 import { lookOf as accountsLookOf } from "../providers/accounts";
 import { lookOf } from "./search";
@@ -55,12 +61,21 @@ function rig(settled: SettledSearch = SETTLED) {
       return true;
     },
   };
-  const values = () => sent.map((command) => ("configure_city" in command ? command.configure_city.search : null));
+  const values = () =>
+    sent.map((command) => ("configure_city" in command ? command.configure_city.search : null));
   return { editor, hands, world, sent, values };
 }
 
 const typed = (editor: SearchEditor, id: string, rest: Partial<wiring.SupplierDraft> = {}) => {
-  editor.draft = { id, url: `https://mcp.${id}.invalid/mcp`, remote: `${id}_search`, query: "query", count: "", objective: "", ...rest };
+  editor.draft = {
+    id,
+    url: `https://mcp.${id}.invalid/mcp`,
+    remote: `${id}_search`,
+    query: "query",
+    count: "",
+    objective: "",
+    ...rest,
+  };
 };
 
 describe("the choice of service", () => {
@@ -83,12 +98,19 @@ describe("the choice of service", () => {
     });
     typed(editor, "brave", { count: "count" });
     wiring.save(editor, hands);
-    expect(values()).toEqual([custom("brave", service("brave", { count_field: "count", objective_field: null }))]);
+    expect(values()).toEqual([
+      custom("brave", service("brave", { count_field: "count", objective_field: null })),
+    ]);
   });
 
   test("puts the last custom value back after a turn through off", () => {
     const listed = custom("brave", service("brave"));
-    const { editor, hands, values } = rig({ ...SETTLED, city: listed, configuration: listed, from: "city" });
+    const { editor, hands, values } = rig({
+      ...SETTLED,
+      city: listed,
+      configuration: listed,
+      from: "city",
+    });
     wiring.choose(editor, hands, "off");
     wiring.choose(editor, hands, "custom");
     expect(values()).toEqual(["off", listed]);
@@ -96,28 +118,63 @@ describe("the choice of service", () => {
 });
 
 describe("the list of services", () => {
-  const listed = custom("brave", service("tavily"), service("brave", { accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-key" }] }));
+  const listed = custom(
+    "brave",
+    service("tavily"),
+    service("brave", {
+      accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-key" }],
+    }),
+  );
   const settled: SettledSearch = { ...SETTLED, city: listed, configuration: listed, from: "city" };
 
   test("selects another service with the list as it stands", () => {
     const { editor, hands, values } = rig(settled);
     wiring.select(editor, hands, label("tavily"));
-    expect(values()).toEqual([custom("tavily", service("tavily"), service("brave", { accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-key" }] }))]);
+    expect(values()).toEqual([
+      custom(
+        "tavily",
+        service("tavily"),
+        service("brave", {
+          accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-key" }],
+        }),
+      ),
+    ]);
   });
 
   test("refuses to remove the service in use and the only service, and says why", () => {
     const { editor, hands, values } = rig(settled);
     wiring.remove(editor, hands, label("brave"));
-    const controls = lookOf(editor, hands).suppliers.map((row) => [row.id, row.controls.map((control) => [control.key, control.why])]);
+    const controls = lookOf(editor, hands).suppliers.map((row) => [
+      row.id,
+      row.controls.map((control) => [control.key, control.why]),
+    ]);
     expect({ values: values(), controls }).toEqual({
       values: [],
       controls: [
-        ["tavily", [["use", undefined], ["edit", undefined], ["remove", undefined]]],
-        ["brave", [["use", say("en", "search_in_use")], ["edit", undefined], ["remove", say("en", "search_remove_in_use")]]],
+        [
+          "tavily",
+          [
+            ["use", undefined],
+            ["edit", undefined],
+            ["remove", undefined],
+          ],
+        ],
+        [
+          "brave",
+          [
+            ["use", say("en", "search_in_use")],
+            ["edit", undefined],
+            ["remove", say("en", "search_remove_in_use")],
+          ],
+        ],
       ],
     });
     wiring.remove(editor, hands, label("tavily"));
-    expect(lookOf(editor, hands).suppliers.map((row) => row.controls.find((control) => control.key === "remove")?.why)).toEqual([say("en", "search_only")]);
+    expect(
+      lookOf(editor, hands).suppliers.map(
+        (row) => row.controls.find((control) => control.key === "remove")?.why,
+      ),
+    ).toEqual([say("en", "search_only")]);
   });
 
   test("keeps an edited service's place and its accounts", () => {
@@ -154,19 +211,33 @@ describe("the list of services", () => {
   test("draws the city's value again after a refusal, and keeps the draft when the frame cannot leave", () => {
     const { editor, hands, world, values } = rig(settled);
     wiring.select(editor, hands, label("tavily"));
-    const refusal: AxError = { action: "configure", code: "E_CONFIG_INVALID", subject: "[search]", recovery: "fix it", retry: "no", nearby: [] };
+    const refusal: AxError = {
+      action: "configure",
+      code: "E_CONFIG_INVALID",
+      subject: "[search]",
+      recovery: "fix it",
+      retry: "no",
+      nearby: [],
+    };
     wiring.refuse(editor, refusal);
     expect(wiring.shownSearch(editor, world.settled)).toEqual(listed);
     world.open = false;
     typed(editor, "exa");
     wiring.save(editor, hands);
-    expect({ sent: values().length, note: editor.note, draft: editor.draft.id }).toEqual({ sent: 1, note: say("en", "setup_account_not_sent"), draft: "exa" });
+    expect({ sent: values().length, note: editor.note, draft: editor.draft.id }).toEqual({
+      sent: 1,
+      note: say("en", "setup_account_not_sent"),
+      draft: "exa",
+    });
   });
 
   test("says that a file nearer the hall states its own [search], which the card does not change", () => {
     const { editor, hands } = rig({ ...settled, configuration: "off", from: "building" });
     expect(lookOf(editor, hands).override).toBe(
-      fill(say("en", "search_override"), { choice: say("en", "search_choice_off"), layer: say("en", "search_layer_building") }),
+      fill(say("en", "search_override"), {
+        choice: say("en", "search_choice_off"),
+        layer: say("en", "search_layer_building"),
+      }),
     );
   });
 });
@@ -200,18 +271,49 @@ describe("a service's account editor", () => {
       follow: () => undefined,
       focusHeading: () => undefined,
     };
-    const look = accountsLookOf(editor, hands, { heading: () => undefined, control: () => () => undefined });
-    expect({ header: look.fields.find((field) => field.name === "header")?.folded, order: look.order, retries: look.retries }).toEqual({
+    const look = accountsLookOf(editor, hands, {
+      heading: () => undefined,
+      control: () => () => undefined,
+    });
+    expect({
+      header: look.fields.find((field) => field.name === "header")?.folded,
+      order: look.order,
+      retries: look.retries,
+    }).toEqual({
       header: false,
       order: say("en", "setup_accounts_order_search"),
       retries: undefined,
     });
-    editor.draft = { id: "main", reference: "", header: "x-subscription-token", key: "fixture-key" };
+    editor.draft = {
+      id: "main",
+      reference: "",
+      header: "x-subscription-token",
+      key: "fixture-key",
+    };
     accounts.save(editor, hands);
     await new Promise((resolve) => setImmediate(resolve));
-    expect({ requests, sent: sent.map((command) => ("configure_city" in command ? command.configure_city.search : null)) }).toEqual({
+    expect({
+      requests,
+      sent: sent.map((command) =>
+        "configure_city" in command ? command.configure_city.search : null,
+      ),
+    }).toEqual({
       requests: [{ realm: "search", name: "brave.main", value: "fixture-key" }],
-      sent: [custom("brave", service("tavily"), service("brave", { accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-subscription-token" }] }))],
+      sent: [
+        custom(
+          "brave",
+          service("tavily"),
+          service("brave", {
+            accounts: [
+              {
+                id: label("main"),
+                reference: "secret:search/brave.main",
+                header: "x-subscription-token",
+              },
+            ],
+          }),
+        ),
+      ],
     });
   });
 });

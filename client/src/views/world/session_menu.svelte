@@ -72,7 +72,9 @@
     opened = null;
     if (!open || run === null) return;
     return u.conn.asking.ask({ rounds: { run } }).subscribe((answer) => {
-      const read = readAnswer(answer, (held) => ("rounds" in held ? held.rounds.opening?.policy ?? null : undefined));
+      const read = readAnswer(answer, (held) =>
+        "rounds" in held ? (held.rounds.opening?.policy ?? null) : undefined,
+      );
       opened = read.kind === "held" ? read.value : null;
     });
   });
@@ -92,24 +94,66 @@
     return [
       ...(mode === undefined
         ? []
-        : [{ id: "mode", word: fill(say($lang, "world_mode_to"), { mode: say($lang, `mode_${mode}`) }), act: () => { repolicy({ ...now, mode }); } }]),
+        : [
+            {
+              id: "mode",
+              word: fill(say($lang, "world_mode_to"), { mode: say($lang, `mode_${mode}`) }),
+              act: () => {
+                repolicy({ ...now, mode });
+              },
+            },
+          ]),
       ...(write === undefined
         ? []
-        : [{ id: "write", word: fill(say($lang, "world_write_to"), { limit: say($lang, `admission_value_${write}`) }), act: () => { repolicy({ ...now, write }); } }]),
+        : [
+            {
+              id: "write",
+              word: fill(say($lang, "world_write_to"), {
+                limit: say($lang, `admission_value_${write}`),
+              }),
+              act: () => {
+                repolicy({ ...now, write });
+              },
+            },
+          ]),
     ];
   }
 
   const items = $derived.by((): Item[] => [
     ...(pinning === "mayor"
       ? []
-      : [{ id: "pin", word: say($lang, pinning === "tagged" ? "world_unpin" : "world_pin"), act: () => { change(pinning === "tagged" ? stripped : given, PIN); } }]),
-    ...(named === null || !kept($held, named) ? [] : tags).filter((tag) => tag !== PIN).map((tag) => ({
-      id: `strip-${tag}`,
-      word: fill(say($lang, "world_tag_remove"), { tag }),
-      act: () => { change(stripped, tag); },
-    })),
-    { id: "add", word: say($lang, "world_tag_add"), act: () => { enter("tag", ""); } },
-    { id: "rename", word: say($lang, "world_rename"), act: () => { enter("name", session.name); } },
+      : [
+          {
+            id: "pin",
+            word: say($lang, pinning === "tagged" ? "world_unpin" : "world_pin"),
+            act: () => {
+              change(pinning === "tagged" ? stripped : given, PIN);
+            },
+          },
+        ]),
+    ...(named === null || !kept($held, named) ? [] : tags)
+      .filter((tag) => tag !== PIN)
+      .map((tag) => ({
+        id: `strip-${tag}`,
+        word: fill(say($lang, "world_tag_remove"), { tag }),
+        act: () => {
+          change(stripped, tag);
+        },
+      })),
+    {
+      id: "add",
+      word: say($lang, "world_tag_add"),
+      act: () => {
+        enter("tag", "");
+      },
+    },
+    {
+      id: "rename",
+      word: say($lang, "world_rename"),
+      act: () => {
+        enter("name", session.name);
+      },
+    },
     ...(policy === null ? [] : policyItems(policy)),
   ]);
 

@@ -75,16 +75,23 @@
       <p class="text-body text-alert">{say($lang, LACKS[standing.lack])}</p>
     {/if}
     <section class="flex flex-col gap-snug" aria-labelledby={`${uid}-steps`}>
-      <h3 id={`${uid}-steps`} class="text-label font-label text-text">{say($lang, "remote_steps")}</h3>
+      <h3 id={`${uid}-steps`} class="text-label font-label text-text">
+        {say($lang, "remote_steps")}
+      </h3>
       <ol class="flex flex-col">
         {#each STEPS as step, at (step.key)}
           <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug border-b border-edge py-snug">
-            <span class="font-mono text-label text-text-quiet" aria-hidden="true">{String(at + 1)}</span>
+            <span class="font-mono text-label text-text-quiet" aria-hidden="true"
+              >{String(at + 1)}</span
+            >
             <div class="flex min-w-0 flex-col gap-tight">
               <p class="text-note text-text">{say($lang, step.key)}</p>
               {#if step.spelling !== null}
                 <div class="flex min-w-0 items-start gap-tight">
-                  <code class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">{step.spelling}</code>
+                  <code
+                    class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+                    >{step.spelling}</code
+                  >
                   <Copy text={step.spelling} />
                 </div>
               {/if}
@@ -92,16 +99,22 @@
           </li>
         {/each}
         <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug py-snug">
-          <span class="font-mono text-label text-text-quiet" aria-hidden="true">{String(STEPS.length + 1)}</span>
+          <span class="font-mono text-label text-text-quiet" aria-hidden="true"
+            >{String(STEPS.length + 1)}</span
+          >
           <p class="text-note text-text">{say($lang, restartOf(keeps))}</p>
         </li>
       </ol>
     </section>
     <section class="flex flex-col" aria-labelledby={`${uid}-console`}>
-      <h3 id={`${uid}-console`} class="pb-tight text-label font-label text-text">{say($lang, "remote_console")}</h3>
+      <h3 id={`${uid}-console`} class="pb-tight text-label font-label text-text">
+        {say($lang, "remote_console")}
+      </h3>
       <dl class="flex flex-col">
         {#each VERBS as [spelling, does] (spelling)}
-          <div class="grid grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-x-base border-b border-edge py-snug @max-measure/page:grid-cols-1">
+          <div
+            class="grid grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-x-base border-b border-edge py-snug @max-measure/page:grid-cols-1"
+          >
             <dt><code class="font-mono text-note text-text">{spelling}</code></dt>
             <dd class="text-note text-text-quiet">{say($lang, does)}</dd>
           </div>
@@ -113,17 +126,33 @@
     {/if}
   {:else if standing.kind === "invited"}
     <section class="flex flex-col gap-base" aria-labelledby={`${uid}-invited`}>
-      <h3 id={`${uid}-invited`} class="text-label font-label text-text">{say($lang, "remote_invited")}</h3>
-      <p class={VALUE}>{fill(say($lang, "remote_invited_city"), { fingerprint: grouped(encode(standing.invitation.city).slice(0, 12)) })}</p>
+      <h3 id={`${uid}-invited`} class="text-label font-label text-text">
+        {say($lang, "remote_invited")}
+      </h3>
+      <p class={VALUE}>
+        {fill(say($lang, "remote_invited_city"), {
+          fingerprint: grouped(encode(standing.invitation.city).slice(0, 12)),
+        })}
+      </p>
       <p class="text-body text-text-quiet">{say($lang, "remote_invited_about")}</p>
       <div>
-        <Button label={say($lang, standing.busy ? "remote_pairing" : "remote_pair")} tone="primary" loading={standing.busy} onPress={onPair} />
+        <Button
+          label={say($lang, standing.busy ? "remote_pairing" : "remote_pair")}
+          tone="primary"
+          loading={standing.busy}
+          onPress={onPair}
+        />
       </div>
     </section>
   {:else if standing.kind === "seed"}
     <section class="flex flex-col gap-base" aria-labelledby={`${uid}-seed`}>
-      <h3 id={`${uid}-seed`} class="text-label font-label text-text">{say($lang, "remote_seed")}</h3>
-      <output class="asks rounded-card px-base py-snug font-mono text-heading text-text" aria-label={say($lang, "remote_seed")}>{grouped(standing.seed)}</output>
+      <h3 id={`${uid}-seed`} class="text-label font-label text-text">
+        {say($lang, "remote_seed")}
+      </h3>
+      <output
+        class="asks rounded-card px-base py-snug font-mono text-heading text-text"
+        aria-label={say($lang, "remote_seed")}>{grouped(standing.seed)}</output
+      >
       <p class="text-body text-text-quiet">{say($lang, "remote_seed_about")}</p>
       {#if !standing.persisted}
         <p class="text-note text-text-faint">{say($lang, "remote_persist_refused")}</p>
@@ -134,25 +163,44 @@
     </section>
   {:else if standing.kind === "paired"}
     <section class="flex flex-col gap-base" aria-labelledby={`${uid}-device`}>
-      <h3 id={`${uid}-device`} bind:this={deviceHeading} tabindex="-1" class="text-label font-label text-text">{say($lang, "remote_device")}</h3>
+      <h3
+        id={`${uid}-device`}
+        bind:this={deviceHeading}
+        tabindex="-1"
+        class="text-label font-label text-text"
+      >
+        {say($lang, "remote_device")}
+      </h3>
       <dl class="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-x-base gap-y-snug">
         <dt class={LABEL}>{say($lang, "remote_device_city")}</dt>
         <dd class={VALUE}>{grouped(encode(standing.device.fingerprint))}</dd>
         <dt class={LABEL}>{say($lang, "remote_device_id")}</dt>
         <dd class={VALUE}>{encode(standing.device.id)}</dd>
         <dt class={LABEL}>{say($lang, "remote_device_at")}</dt>
-        <dd class={VALUE}><time datetime={isoInstant(standing.device.at)}>{moment(standing.device.at)}</time></dd>
+        <dd class={VALUE}>
+          <time datetime={isoInstant(standing.device.at)}>{moment(standing.device.at)}</time>
+        </dd>
       </dl>
       <p class="text-note text-text-faint">{say($lang, restartOf(keeps))}</p>
       <div class="flex flex-wrap gap-snug">
-        <Button label={say($lang, standing.busy ? "remote_locking" : "remote_lock")} loading={standing.busy} onPress={onLock} />
+        <Button
+          label={say($lang, standing.busy ? "remote_locking" : "remote_lock")}
+          loading={standing.busy}
+          onPress={onLock}
+        />
         <span bind:this={forgetButton} class="contents">
-          <Button label={say($lang, "remote_forget")} tone="destructive" onPress={() => (forgetting = true)} />
+          <Button
+            label={say($lang, "remote_forget")}
+            tone="destructive"
+            onPress={() => (forgetting = true)}
+          />
         </span>
       </div>
     </section>
   {/if}
-  <p role="status" class="text-body text-text-quiet empty:hidden">{told === null ? "" : fill(say($lang, told.key), { code: told.code ?? "" })}</p>
+  <p role="status" class="text-body text-text-quiet empty:hidden">
+    {told === null ? "" : fill(say($lang, told.key), { code: told.code ?? "" })}
+  </p>
 </div>
 
 <Dialog

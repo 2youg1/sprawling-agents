@@ -25,11 +25,17 @@ const MAILS: readonly Mail[] = [
   { shown: false, focus: "elsewhere" },
   { shown: true, focus: "inside" },
 ];
-const STARTS: readonly LetterSide<string>[] = MAILS.map((mail) => ({ mail, opener: null, row: null }));
+const STARTS: readonly LetterSide<string>[] = MAILS.map((mail) => ({
+  mail,
+  opener: null,
+  row: null,
+}));
 
 function traces<T>(alphabet: readonly T[], length: number): T[][] {
   if (length === 0) return [[]];
-  return traces(alphabet, length - 1).flatMap((trace) => alphabet.map((input) => [...trace, input]));
+  return traces(alphabet, length - 1).flatMap((trace) =>
+    alphabet.map((input) => [...trace, input]),
+  );
 }
 
 function run(side: LetterSide<string>, inputs: readonly LetterInput<string>[]): LetterSide<string> {
@@ -41,9 +47,18 @@ describe("a letter on the right side", () => {
     const between = [0, 1, 2, 3].flatMap((length) => traces(MAIL, length));
     const wrong = STARTS.flatMap((start) =>
       between.filter((trace) => {
-        const inputs: LetterInput<string>[] = [{ kind: "open", row: "a" }, ...trace.map((input): LetterInput<string> => ({ kind: "mail", input })), { kind: "close" }];
+        const inputs: LetterInput<string>[] = [
+          { kind: "open", row: "a" },
+          ...trace.map((input): LetterInput<string> => ({ kind: "mail", input })),
+          { kind: "close" },
+        ];
         const end = run(start, inputs);
-        return !(end.mail.shown && end.mail.focus === "inside" && end.row === "a" && end.opener === null);
+        return !(
+          end.mail.shown &&
+          end.mail.focus === "inside" &&
+          end.row === "a" &&
+          end.opener === null
+        );
       }),
     );
     expect(wrong).toEqual([]);

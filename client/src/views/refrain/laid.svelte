@@ -57,7 +57,10 @@
   // One inline mark, read once into a shape the template can switch on.
   type Piece =
     | { readonly kind: "space" | "break" }
-    | { readonly kind: "text" | "code" | "image" | "note" | "formula" | "raw"; readonly text: string }
+    | {
+        readonly kind: "text" | "code" | "image" | "note" | "formula" | "raw";
+        readonly text: string;
+      }
     | { readonly kind: "emphasis" | "strong" | "strikethrough"; readonly parts: readonly Inline[] }
     | { readonly kind: "link"; readonly target: string; readonly parts: readonly Inline[] };
 
@@ -81,7 +84,12 @@
   // `Snippet` type, and the template renders that (as `parts/button.svelte`).
   const drawn: Snippet<[readonly Inline[]]> = inlines;
 
-  const ALIGN: Record<string, string> = { none: "text-left", left: "text-left", center: "text-center", right: "text-right" };
+  const ALIGN: Record<string, string> = {
+    none: "text-left",
+    left: "text-left",
+    center: "text-center",
+    right: "text-right",
+  };
 </script>
 
 {#snippet inlines(parts: readonly Inline[])}
@@ -103,7 +111,9 @@
     {:else if piece.kind === "link"}
       {@const target = piece.target}
       {#if ABSOLUTE.test(target)}
-        <a href={target} rel="noreferrer" target="_blank" class="text-accent underline">{@render drawn(piece.parts)}</a>
+        <a href={target} rel="noreferrer" target="_blank" class="text-accent underline"
+          >{@render drawn(piece.parts)}</a
+        >
       {:else if onOpen === undefined}
         {@render drawn(piece.parts)}
       {:else}
@@ -129,82 +139,122 @@
 
 <!-- Reading text takes the reading face (wire D52); the wrapper adds no box, so the blocks lay out as its parent's children. -->
 <div class="contents font-read">
-{#each blocks as block, index (index)}
-  {@const start = placed ? spanOf(block) : undefined}
-  {#if "heading" in block}
-    <p data-start={start} class={["mt-base mb-tight font-heading", block.heading.level <= 2 ? "text-heading" : "text-body"]}>
-      {@render drawn(block.heading.inline)}
-    </p>
-  {:else if "paragraph" in block}
-    <p data-start={start} class="my-snug leading-relaxed">{@render drawn(block.paragraph.inline)}</p>
-  {:else if "list" in block}
-    {@const order = block.list.order}
-    <!-- An ordered marker such as "10. " is wider than a bullet in a monospaced face, so an ordered list reserves two more characters for it instead of letting the scroller clip the number. -->
-    <svelte:element
-      this={order === "bullet" ? "ul" : "ol"}
-      data-start={start}
-      start={order === "bullet" ? undefined : order.ordered.start}
-      class={["my-snug", order === "bullet" ? "pl-wide list-disc" : "pl-[calc(var(--spacing-wide)+2ch)] list-decimal"]}
-    >
-      {#each block.list.items as item, at (at)}
-        <!-- A tight list's paragraphs sit on the item's own line; a task's
+  {#each blocks as block, index (index)}
+    {@const start = placed ? spanOf(block) : undefined}
+    {#if "heading" in block}
+      <p
+        data-start={start}
+        class={[
+          "mt-base mb-tight font-heading",
+          block.heading.level <= 2 ? "text-heading" : "text-body",
+        ]}
+      >
+        {@render drawn(block.heading.inline)}
+      </p>
+    {:else if "paragraph" in block}
+      <p data-start={start} class="my-snug leading-relaxed">
+        {@render drawn(block.paragraph.inline)}
+      </p>
+    {:else if "list" in block}
+      {@const order = block.list.order}
+      <!-- An ordered marker such as "10. " is wider than a bullet in a monospaced face, so an ordered list reserves two more characters for it instead of letting the scroller clip the number. -->
+      <svelte:element
+        this={order === "bullet" ? "ul" : "ol"}
+        data-start={start}
+        start={order === "bullet" ? undefined : order.ordered.start}
+        class={[
+          "my-snug",
+          order === "bullet"
+            ? "pl-wide list-disc"
+            : "pl-[calc(var(--spacing-wide)+2ch)] list-decimal",
+        ]}
+      >
+        {#each block.list.items as item, at (at)}
+          <!-- A tight list's paragraphs sit on the item's own line; a task's
              box sits beside them, in place of the bullet. -->
-        <li
-          class={[
-            "leading-relaxed",
-            block.list.spacing === "loose" ? "my-snug" : "my-tight [&_p]:my-0",
-            item.check === "not_a_task" ? "" : "-ml-wide flex list-none items-baseline gap-snug",
-          ]}
-        >
-          {#if item.check !== "not_a_task"}
-            <input
-              type="checkbox"
-              disabled
-              checked={item.check === "done"}
-              aria-label={say($lang, item.check === "done" ? "refrain_task_done" : "refrain_task_open")}
-              class="w-glyph-sm shrink-0"
-            />
-          {/if}
-          <div class="min-w-0 flex-1"><Laid blocks={item.blocks} {onOpen} /></div>
-        </li>
-      {/each}
-    </svelte:element>
-  {:else if "quote" in block}
-    <blockquote data-start={start} class="my-snug border-l-2 border-edge-input pl-base text-text-quiet">
-      <Laid blocks={block.quote.blocks} {onOpen} />
-    </blockquote>
-  {:else if "code" in block}
-    <pre data-start={start} class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet"><Inked text={block.code.text} source={block.code.info} /></pre>
-  {:else if "table" in block}
-    <div data-start={start} class="my-snug overflow-x-auto">
-      <table class="w-full border-collapse text-note">
-        <thead>
-          <tr class="text-text-quiet">
-            {#each block.table.head.cells as cell, at (at)}
-              <th class={["border-b border-edge-input px-snug py-tight font-label", ALIGN[block.table.align[at] ?? "none"]]}>{@render drawn(cell)}</th>
-            {/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each block.table.body as row, line (line)}
-            <tr>
-              {#each row.cells as cell, at (at)}
-                <td class={["border-b border-edge px-snug py-tight align-top", ALIGN[block.table.align[at] ?? "none"]]}>{@render drawn(cell)}</td>
+          <li
+            class={[
+              "leading-relaxed",
+              block.list.spacing === "loose" ? "my-snug" : "my-tight [&_p]:my-0",
+              item.check === "not_a_task" ? "" : "-ml-wide flex list-none items-baseline gap-snug",
+            ]}
+          >
+            {#if item.check !== "not_a_task"}
+              <input
+                type="checkbox"
+                disabled
+                checked={item.check === "done"}
+                aria-label={say(
+                  $lang,
+                  item.check === "done" ? "refrain_task_done" : "refrain_task_open",
+                )}
+                class="w-glyph-sm shrink-0"
+              />
+            {/if}
+            <div class="min-w-0 flex-1"><Laid blocks={item.blocks} {onOpen} /></div>
+          </li>
+        {/each}
+      </svelte:element>
+    {:else if "quote" in block}
+      <blockquote
+        data-start={start}
+        class="my-snug border-l-2 border-edge-input pl-base text-text-quiet"
+      >
+        <Laid blocks={block.quote.blocks} {onOpen} />
+      </blockquote>
+    {:else if "code" in block}
+      <pre
+        data-start={start}
+        class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet"><Inked
+          text={block.code.text}
+          source={block.code.info}
+        /></pre>
+    {:else if "table" in block}
+      <div data-start={start} class="my-snug overflow-x-auto">
+        <table class="w-full border-collapse text-note">
+          <thead>
+            <tr class="text-text-quiet">
+              {#each block.table.head.cells as cell, at (at)}
+                <th
+                  class={[
+                    "border-b border-edge-input px-snug py-tight font-label",
+                    ALIGN[block.table.align[at] ?? "none"],
+                  ]}>{@render drawn(cell)}</th
+                >
               {/each}
             </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {:else if "rule" in block}
-    <hr data-start={start} class="my-base border-edge" />
-  {:else if "footnote" in block}
-    <div data-start={start} class="my-snug flex items-baseline gap-snug text-note text-text-quiet">
-      <sup class="text-text-faint">{block.footnote.name}</sup>
-      <div class="min-w-0 flex-1"><Laid blocks={block.footnote.blocks} {onOpen} /></div>
-    </div>
-  {:else}
-    <pre data-start={start} class="my-snug overflow-x-auto whitespace-pre-wrap font-mono text-note text-text-faint">{block.unsupported.source}</pre>
-  {/if}
-{/each}
+          </thead>
+          <tbody>
+            {#each block.table.body as row, line (line)}
+              <tr>
+                {#each row.cells as cell, at (at)}
+                  <td
+                    class={[
+                      "border-b border-edge px-snug py-tight align-top",
+                      ALIGN[block.table.align[at] ?? "none"],
+                    ]}>{@render drawn(cell)}</td
+                  >
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else if "rule" in block}
+      <hr data-start={start} class="my-base border-edge" />
+    {:else if "footnote" in block}
+      <div
+        data-start={start}
+        class="my-snug flex items-baseline gap-snug text-note text-text-quiet"
+      >
+        <sup class="text-text-faint">{block.footnote.name}</sup>
+        <div class="min-w-0 flex-1"><Laid blocks={block.footnote.blocks} {onOpen} /></div>
+      </div>
+    {:else}
+      <pre
+        data-start={start}
+        class="my-snug overflow-x-auto whitespace-pre-wrap font-mono text-note text-text-faint">{block
+          .unsupported.source}</pre>
+    {/if}
+  {/each}
 </div>

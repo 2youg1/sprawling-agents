@@ -46,16 +46,25 @@ export interface BuildingRow {
 // The table's rows, ordered as the board orders its buildings: one
 // holding a waiting run first, then by name. A run whose building the
 // city does not name is left out, because the board below lists it.
-export function tableOf(buildings: readonly BuildingProgress[], runs: readonly BoardRun[]): readonly BuildingRow[] {
+export function tableOf(
+  buildings: readonly BuildingProgress[],
+  runs: readonly BoardRun[],
+): readonly BuildingRow[] {
   const held = new Map<string, BoardRun[]>(buildings.map((each) => [each.addr, []]));
   for (const run of runs) held.get(placeOf(run.addr).building)?.push(run);
-  const ordered = buildings.map((each) => ({ addr: each.addr, name: each.addr, runs: held.get(each.addr) ?? [] })).sort(placeByNeed);
-  return ordered.map((building, at) => rowOf(building.addr, building.runs, guide([], at === ordered.length - 1)));
+  const ordered = buildings
+    .map((each) => ({ addr: each.addr, name: each.addr, runs: held.get(each.addr) ?? [] }))
+    .sort(placeByNeed);
+  return ordered.map((building, at) =>
+    rowOf(building.addr, building.runs, guide([], at === ordered.length - 1)),
+  );
 }
 
 function rowOf(addr: Address, runs: readonly BoardRun[], place: string): BuildingRow {
   const starts = runs
-    .flatMap((run) => (run.started === null ? [] : [{ run: run.run, at: run.started, phase: phaseOf(run.doing) }]))
+    .flatMap((run) =>
+      run.started === null ? [] : [{ run: run.run, at: run.started, phase: phaseOf(run.doing) }],
+    )
     .sort((a, b) => a.at - b.at || a.run.localeCompare(b.run));
   const phases = runs.map((run) => phaseOf(run.doing));
   const going = starts.filter((start) => !ended(start.phase));
@@ -76,7 +85,11 @@ function rowOf(addr: Address, runs: readonly BoardRun[], place: string): Buildin
 // clock, in per cent of the bar (client D95).
 export interface TableLook {
   readonly label: string;
-  readonly folds: readonly { readonly minutes: number; readonly at: number; readonly label: string }[];
+  readonly folds: readonly {
+    readonly minutes: number;
+    readonly at: number;
+    readonly label: string;
+  }[];
   readonly now: string;
   readonly rows: readonly TableRowLook[];
 }
@@ -141,7 +154,11 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
             ? say(lang, "city_table_none")
             : ago(lang, row.latest, now),
         live: from === null ? null : { left: from, width: 100 - from },
-        starts: row.starts.map((start) => ({ key: start.run, at: along(start.at, now), phase: start.phase })),
+        starts: row.starts.map((start) => ({
+          key: start.run,
+          at: along(start.at, now),
+          phase: start.phase,
+        })),
         wire: {
           type: "button",
           "aria-pressed": row.addr === seat.picked,

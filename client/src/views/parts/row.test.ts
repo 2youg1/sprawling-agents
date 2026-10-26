@@ -23,7 +23,15 @@ function rows(total: number): readonly number[] {
 
 describe("which keys the list takes", () => {
   test("the four walking keys on a row, and nothing else", () => {
-    expect(KEYS.map((key) => taken("row", key))).toEqual(["next", "previous", "first", "last", null, null, null]);
+    expect(KEYS.map((key) => taken("row", key))).toEqual([
+      "next",
+      "previous",
+      "first",
+      "last",
+      null,
+      null,
+      null,
+    ]);
   });
 
   test("a field keeps every key", () => {
@@ -67,10 +75,10 @@ describe("where a step lands", () => {
 
 describe("what a row's look is handed", () => {
   test("a plain row leads nowhere and is not chosen", () => {
-    expect(lookOf({ primary: "zenmux", secondary: "two models" })).toEqual({
+    expect(lookOf({ primary: "example", secondary: "two models" })).toEqual({
       item: {},
       chosen: false,
-      primary: "zenmux",
+      primary: "example",
       secondary: "two models",
       status: undefined,
       actions: undefined,
@@ -81,7 +89,7 @@ describe("what a row's look is handed", () => {
   test("a row that leads somewhere hands its press to a button", () => {
     let opened = 0;
     const look = lookOf({
-      primary: "zenmux",
+      primary: "example",
       onOpen: () => {
         opened += 1;
       },
@@ -91,7 +99,7 @@ describe("what a row's look is handed", () => {
   });
 
   test("the chosen row says so to a screen reader as well as with the bar", () => {
-    const look = lookOf({ primary: "zenmux", chosen: true });
+    const look = lookOf({ primary: "example", chosen: true });
     expect([look.item, look.chosen]).toEqual([{ "aria-current": "true" }, true]);
   });
 });

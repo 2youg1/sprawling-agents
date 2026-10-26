@@ -30,7 +30,12 @@
         label: "run_turns",
         rows: [
           { id: "turn-3", label: fill(say($lang, "run_turn_n"), { n: "3" }), secondary: "03:35" },
-          { id: "turn-2", label: fill(say($lang, "run_turn_n"), { n: "2" }), secondary: "03:12", chosen: true },
+          {
+            id: "turn-2",
+            label: fill(say($lang, "run_turn_n"), { n: "2" }),
+            secondary: "03:12",
+            chosen: true,
+          },
           { id: "turn-1", label: fill(say($lang, "run_turn_n"), { n: "1" }), secondary: "02:58" },
         ],
       },

@@ -39,9 +39,21 @@
   // Three refusals across a quarter hour, arriving twelve times: the
   // drawer keeps every arrival as its own row with the count that
   // merged into it.
-  const MISSING_KEY = refusal("E_CREDENTIAL_MISSING", "zenmux", "file a key for this provider, then attach it again");
-  const REFUSED_LINK = refusal("E_LINK_REFUSED", "local", "start the endpoint, then try this again");
-  const STALE_DRAFT = refusal("E_DRAFT_STALE", "config.toml", "reload the file, then make the change again");
+  const MISSING_KEY = refusal(
+    "E_CREDENTIAL_MISSING",
+    "example",
+    "file a key for this provider, then attach it again",
+  );
+  const REFUSED_LINK = refusal(
+    "E_LINK_REFUSED",
+    "local",
+    "start the endpoint, then try this again",
+  );
+  const STALE_DRAFT = refusal(
+    "E_DRAFT_STALE",
+    "config.toml",
+    "reload the file, then make the change again",
+  );
 
   const DRAWER: readonly Entry[] = [
     entry("03:35", 3, MISSING_KEY),
@@ -87,7 +99,9 @@ capped and floats at the corner; an entry fills the panel it belongs
 to. Drawn stacked in one case they read as a page whose right edge
 disagrees with itself. -->
 <Case label="notices · toasts">
-  <div class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug">
+  <div
+    class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug"
+  >
     <div class="flex min-w-0 max-w-measure flex-col gap-tight">
       <Notice
         seat="toast"

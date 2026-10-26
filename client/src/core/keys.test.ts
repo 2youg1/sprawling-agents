@@ -12,7 +12,15 @@ import { loadPreferences } from "./prefs";
 import { memory } from "./rows";
 
 function press(key: string, held: Partial<Pressed> = {}): Pressed {
-  return { key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, target: "page", ...held };
+  return {
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    target: "page",
+    ...held,
+  };
 }
 
 describe("the shell's own keys", () => {
@@ -20,7 +28,10 @@ describe("the shell's own keys", () => {
 
   test("Accel-backslash changes the tier, and the backslash alone is typed", () => {
     expect(keys.acting(press("\\", { ctrlKey: true }))).toBe("tier.cycle");
-    expect([keys.acting(press("\\")), keys.acting(press("\\", { target: "field" }))]).toEqual([null, null]);
+    expect([keys.acting(press("\\")), keys.acting(press("\\", { target: "field" }))]).toEqual([
+      null,
+      null,
+    ]);
   });
 
   test("Accel-slash opens the palette, from a text box too", () => {
@@ -31,7 +42,9 @@ describe("the shell's own keys", () => {
   // the conversation or answered the card for the person; only the key
   // that moves the focus into the message box stays a single key.
   test("every bound action but focusing the message box holds the accelerator", () => {
-    expect(ACTIONS.filter((action) => DEFAULTS[action]?.accel === false)).toEqual(["composer.focus"]);
+    expect(ACTIONS.filter((action) => DEFAULTS[action]?.accel === false)).toEqual([
+      "composer.focus",
+    ]);
   });
 
   test("no action ships on a chord the browser keeps for itself", () => {

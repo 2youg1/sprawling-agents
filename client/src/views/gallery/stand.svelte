@@ -79,7 +79,8 @@
   import type { Connection } from "../../core/socket";
   import { setUi, ui } from "../../ui";
 
-  const { link, unread, waiting, answers, refusing, records, logs, children }: StandProps = $props();
+  const { link, unread, waiting, answers, refusing, records, logs, children }: StandProps =
+    $props();
 
   // The city as this fixture meets it: the real one, or the stand
   // before this one while several stands mount in turn.
@@ -136,9 +137,7 @@
   // page that has asked and not yet been answered holds, and what
   // every other fixture on this route already draws under.
   function answer(query: Query): Answer | undefined {
-    return query === QUERIES.approvals
-      ? { approvals: { items: waiting } }
-      : answers?.(query);
+    return query === QUERIES.approvals ? { approvals: { items: waiting } } : answers?.(query);
   }
 
   const stand: Connection = {

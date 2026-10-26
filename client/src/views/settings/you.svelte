@@ -42,11 +42,15 @@
 
   const stated = $derived.by((): StatedIdentity | null => {
     const answer = $asked;
-    return answer !== undefined && "identity" in answer && "stated" in answer.identity ? answer.identity.stated : null;
+    return answer !== undefined && "identity" in answer && "stated" in answer.identity
+      ? answer.identity.stated
+      : null;
   });
   const unreadable = $derived.by(() => {
     const answer = $asked;
-    return answer !== undefined && "identity" in answer && "unreadable" in answer.identity ? answer.identity.unreadable : null;
+    return answer !== undefined && "identity" in answer && "unreadable" in answer.identity
+      ? answer.identity.unreadable
+      : null;
   });
 
   // The two cards' fields, which follow the answer until somebody types.
@@ -95,7 +99,13 @@
   function savePerson(): void {
     if (stated === null) return;
     const id = userId.trim();
-    const card: IdentityCard = { person: { user_id: id === "" ? null : id, imported_from: id === "" ? null : importedFrom, about } };
+    const card: IdentityCard = {
+      person: {
+        user_id: id === "" ? null : id,
+        imported_from: id === "" ? null : importedFrom,
+        about,
+      },
+    };
     settle(card, stated.preferences_text, personSlot);
   }
 
@@ -116,7 +126,10 @@
     <p class="font-mono text-note text-text-quiet">
       {`${unreadable.document === "mayor" ? "MAYOR.md" : "PREFERENCES.md"}:${String(unreadable.line)} · ${unreadable.why}`}
     </p>
-    <a href={toFragment({ kind: "setup", group: "run" })} class="w-fit text-label text-text-quiet underline hover:text-text">
+    <a
+      href={toFragment({ kind: "setup", group: "run" })}
+      class="w-fit text-label text-text-quiet underline hover:text-text"
+    >
       {say($lang, "you_unreadable_open")}
     </a>
   </div>
@@ -126,7 +139,13 @@
   {/if}
 {:else}
   <div class="flex max-w-talk flex-col gap-base">
-    <Card title="you_person" note="you_person_note" saving={person} settled="you_next_session" onSave={savePerson}>
+    <Card
+      title="you_person"
+      note="you_person_note"
+      saving={person}
+      settled="you_next_session"
+      onSave={savePerson}
+    >
       <Field
         label={say($lang, "you_user_id")}
         placeholder={say($lang, "you_user_id_default")}
@@ -150,11 +169,16 @@
         <textarea
           class="min-h-figure w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body text-text"
           bind:value={about}
-          oninput={personMoved}
-        ></textarea>
+          oninput={personMoved}></textarea>
       </label>
     </Card>
-    <Card title="you_mayor" note="you_mayor_note" saving={named} settled="you_next_session" onSave={saveMayor}>
+    <Card
+      title="you_mayor"
+      note="you_mayor_note"
+      saving={named}
+      settled="you_next_session"
+      onSave={saveMayor}
+    >
       <Field
         label={say($lang, "you_mayor_name")}
         placeholder={say($lang, "nav_mayor")}

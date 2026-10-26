@@ -65,15 +65,21 @@
   });
 
   const asked = $derived(u.conn.asking.ask({ proposals: doc }));
-  const read = $derived(readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)));
-  const held = $derived(read.kind === "held" ? (read.value.open.find((each) => each.id === card) ?? null) : null);
+  const read = $derived(
+    readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)),
+  );
+  const held = $derived(
+    read.kind === "held" ? (read.value.open.find((each) => each.id === card) ?? null) : null,
+  );
   const building = $derived(buildingOf(doc));
   const path = $derived(doc.slice(building.length + 1));
 
   // The sender as the run page reads it: the city's summary adopted
   // over what this page folded, so a run the page never saw still draws.
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
-  const sender = $derived(held === null ? NOTHING : u.conn.asking.ask({ run_view: { run: held.run } }));
+  const sender = $derived(
+    held === null ? NOTHING : u.conn.asking.ask({ run_view: { run: held.run } }),
+  );
   const sent = $derived.by(() => {
     if (held === null) return undefined;
     const answer = $sender;
@@ -84,11 +90,21 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col bg-page">
-  <div class="flex flex-wrap items-center gap-x-base gap-y-tight border-b border-edge px-wide py-snug">
-    <h2 bind:this={heading} tabindex="-1" class="min-w-0 flex-1 font-mono text-note break-all text-text-quiet">{doc}</h2>
+  <div
+    class="flex flex-wrap items-center gap-x-base gap-y-tight border-b border-edge px-wide py-snug"
+  >
+    <h2
+      bind:this={heading}
+      tabindex="-1"
+      class="min-w-0 flex-1 font-mono text-note break-all text-text-quiet"
+    >
+      {doc}
+    </h2>
     {#if held !== null}
       <TextKey
-        label={fill(say($lang, "letter_sender"), { who: $belief.runs[held.run]?.addr ?? held.run.slice(0, 8) })}
+        label={fill(say($lang, "letter_sender"), {
+          who: $belief.runs[held.run]?.addr ?? held.run.slice(0, 8),
+        })}
         wire={{ href: toFragment({ kind: "run", run: held.run }) }}
       />
     {/if}

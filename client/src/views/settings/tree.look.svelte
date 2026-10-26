@@ -73,7 +73,11 @@
     <div class="flex flex-col gap-hair">
       <button
         {...branch.fold.wire}
-        class={[ENTRY, "text-note tracking-wide uppercase", branch.fold.open ? "text-text-quiet" : "text-text-faint"]}
+        class={[
+          ENTRY,
+          "text-note tracking-wide uppercase",
+          branch.fold.open ? "text-text-quiet" : "text-text-faint",
+        ]}
       >
         <span class="min-w-0 flex-1 truncate">{branch.fold.label}</span>
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->

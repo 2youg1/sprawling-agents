@@ -53,7 +53,16 @@ export interface TableState {
 }
 
 export function freshTable(): TableState {
-  return { ticked: {}, context: {}, output: {}, role: {}, input: {}, search: "", textOnly: true, manual: "" };
+  return {
+    ticked: {},
+    context: {},
+    output: {},
+    role: {},
+    input: {},
+    search: "",
+    textOnly: true,
+    manual: "",
+  };
 }
 
 function looksTextual(row: ModelFact): boolean {
@@ -167,7 +176,11 @@ export interface TableAbout {
 // empty boxes would register (`Query::ModelFigures`, wire D58). Each row
 // carries what the provider's list stated and the role it is to fill,
 // because those are two rungs of the ladder the city climbs for it.
-export function figuresQuery(about: TableAbout, state: TableState, served: readonly ModelFact[]): Query {
+export function figuresQuery(
+  about: TableAbout,
+  state: TableState,
+  served: readonly ModelFact[],
+): Query {
   const models: FiguresAsked[] = everyRow(served, state.manual).map((row) => ({
     id: row.id,
     context_tokens: wireWindow(row.contextTokens),
@@ -175,7 +188,12 @@ export function figuresQuery(about: TableAbout, state: TableState, served: reado
     tag: tagOf(state.role[row.id] ?? ""),
   }));
   return {
-    model_figures: { endpoint: providerName(about.endpoint), base_url: about.baseUrl, face: about.face, models },
+    model_figures: {
+      endpoint: providerName(about.endpoint),
+      base_url: about.baseUrl,
+      face: about.face,
+      models,
+    },
   };
 }
 
@@ -188,7 +206,11 @@ export function tickedRows(state: TableState, served: readonly ModelFact[]): rea
 export function chosenRows(state: TableState, served: readonly ModelFact[]): readonly ModelRow[] {
   return tickedRows(state, served).map((row) => ({
     id: row.id,
-    stated: { contextTokens: windowOf(state, row), maxOutputTokens: ceilingOf(state, row), input: state.input[row.id] ?? null },
+    stated: {
+      contextTokens: windowOf(state, row),
+      maxOutputTokens: ceilingOf(state, row),
+      input: state.input[row.id] ?? null,
+    },
     tag: tagOf(state.role[row.id] ?? ""),
   }));
 }

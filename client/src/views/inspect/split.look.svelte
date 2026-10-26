@@ -21,7 +21,10 @@
 
 <!-- A focusable separator is the APG Window Splitter, a widget in
 WAI-ARIA 1.2; its role and handlers arrive in the wire bag. -->
-<div {...look.wire} class="split relative shrink-0 cursor-row-resize touch-none border-y border-edge bg-chrome"></div>
+<div
+  {...look.wire}
+  class="split relative shrink-0 cursor-row-resize touch-none border-y border-edge bg-chrome"
+></div>
 
 <style>
   .split {

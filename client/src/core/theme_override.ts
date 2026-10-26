@@ -29,5 +29,7 @@ export function themeOf(stated: ThemeOverride): Theme {
 const readThemeRow = Schema.decodeOption(Schema.fromJsonString(ThemeOverride));
 
 export function readTheme(raw: string | null): Theme {
-  return raw === null ? BUILT_IN_THEME : Option.match(readThemeRow(raw), { onNone: () => BUILT_IN_THEME, onSome: themeOf });
+  return raw === null
+    ? BUILT_IN_THEME
+    : Option.match(readThemeRow(raw), { onNone: () => BUILT_IN_THEME, onSome: themeOf });
 }

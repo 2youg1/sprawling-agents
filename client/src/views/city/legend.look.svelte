@@ -14,7 +14,10 @@
 </script>
 
 <details class="text-note text-text-faint">
-  <summary class="cursor-pointer text-text-quiet transition-colors ease-leave hover:text-text hover:ease-arrive">{look.summary}</summary>
+  <summary
+    class="cursor-pointer text-text-quiet transition-colors ease-leave hover:text-text hover:ease-arrive"
+    >{look.summary}</summary
+  >
   <ul class="mt-snug flex flex-wrap items-center gap-wide">
     {#each look.marks as each (each.mark)}
       <li class="flex items-center gap-tight">

@@ -50,7 +50,9 @@
   // chosen row is marked everywhere (docs/frontend-method.md §7B).
   function isOpen(path: string): boolean {
     const item = rightItem();
-    return item !== null && item.kind === "document" && item.building === building && item.path === path;
+    return (
+      item !== null && item.kind === "document" && item.building === building && item.path === path
+    );
   }
 </script>
 
@@ -73,7 +75,9 @@
       <span class="text-text-faint">{commit.model}</span>
     {/if}
     {#if commit.spent > 0}
-      <span class="figure text-text-faint">{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span>
+      <span class="figure text-text-faint"
+        >{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span
+      >
     {/if}
   </p>
 {/snippet}
@@ -113,9 +117,13 @@
               path={file.path}
               lines={linesWord($lang, file.lines)}
               current={isOpen(file.path)}
-              wire={fileRowWire(fill(say($lang, "git_open_file"), { path: file.path }), isOpen(file.path), () => {
-                openDocument({ building, path: file.path, version: null });
-              })}
+              wire={fileRowWire(
+                fill(say($lang, "git_open_file"), { path: file.path }),
+                isOpen(file.path),
+                () => {
+                  openDocument({ building, path: file.path, version: null });
+                },
+              )}
             />
             {#if point !== null}
               <TakeBack {building} path={file.path} {point} />

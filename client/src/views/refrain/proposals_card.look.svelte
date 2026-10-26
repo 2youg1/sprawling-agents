@@ -26,9 +26,11 @@
   {#if stale !== undefined}
     <p class="text-note text-alert">{stale}</p>
   {/if}
-  <p {...region} class="text-note empty:hidden">{#if status !== undefined}<span
+  <p {...region} class="text-note empty:hidden">
+    {#if status !== undefined}<span
         class={status.tone === "alert" ? "text-alert" : "text-text-faint"}>{status.text}</span
-      >{/if}</p>
+      >{/if}
+  </p>
   {#if body.kind === "edit"}
     <ol class="flex flex-col gap-snug">
       {#each body.rows as row (row.key)}
@@ -41,7 +43,8 @@
           {:else if row.kind === "struck"}
             <del class={["sentence removed", !row.taken && "untaken"]}>{row.text}</del>
           {:else}
-            <textarea class={["sentence added field", !row.taken && "untaken"]} {...row.words}></textarea>
+            <textarea class={["sentence added field", !row.taken && "untaken"]} {...row.words}
+            ></textarea>
           {/if}
         </li>
       {/each}
@@ -51,8 +54,8 @@
     goes and what comes, with each sentence's own spacing kept, so no
     whitespace stands between the tags below. -->
     <p class="run">
-      {#each body.pieces as piece (piece.key)}{#if piece.kind === "same"}<span class="text-text-quiet"
-            >{piece.lead}{piece.text}{piece.trail}</span
+      {#each body.pieces as piece (piece.key)}{#if piece.kind === "same"}<span
+            class="text-text-quiet">{piece.lead}{piece.text}{piece.trail}</span
           >{:else if piece.kind === "delete"}{piece.lead}<del class="removed"
             ><span class="sr-only">{piece.said}</span>{piece.text}</del
           >{piece.trail}{:else}{piece.lead}<ins class={["added", piece.abuts && "abuts"]}

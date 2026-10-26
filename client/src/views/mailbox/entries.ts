@@ -26,7 +26,9 @@ import { pressedOf } from "../../core/press";
 
 // A row that goes somewhere, as its look spreads it: where it goes, the
 // press that puts the mailbox away, and the mark that makes it an entry.
-export type EntryLink = Pick<HTMLAnchorAttributes, "href" | "onclick"> & { readonly "data-entry": "" };
+export type EntryLink = Pick<HTMLAnchorAttributes, "href" | "onclick"> & {
+  readonly "data-entry": "";
+};
 
 // How many entries a digit can reach: one to nine.
 const DIGITS = 9;

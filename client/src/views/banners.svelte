@@ -33,7 +33,9 @@
   const closingWords = $derived.by(() => {
     if ($closing !== "drain") return say($lang, "close_interrupting");
     const going = $belief.live.length;
-    return going === 0 ? say($lang, "close_closing") : fill(say($lang, "close_draining"), { n: String(going) });
+    return going === 0
+      ? say($lang, "close_closing")
+      : fill(say($lang, "close_draining"), { n: String(going) });
   });
 
   const halted = $derived(cityIsShut($belief.halted));
@@ -45,7 +47,8 @@
   $effect(() => {
     const now = $linkState;
     if (now.kind === "backoff") lostAttempt = now.attempt + 1;
-    else if (now.kind === "live" || now.kind === "refused" || now.kind === "closed") lostAttempt = null;
+    else if (now.kind === "live" || now.kind === "refused" || now.kind === "closed")
+      lostAttempt = null;
   });
 </script>
 

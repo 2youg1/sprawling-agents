@@ -33,7 +33,15 @@
     },
     { paragraph: { span, inline: [formula("$$\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$$")] } },
     // wording-ok: fixture text is a model's reply, not a page's words
-    { paragraph: { span, inline: [words("A command KaTeX does not know stays as written: "), formula("$\\notacommand{x}$")] } },
+    {
+      paragraph: {
+        span,
+        inline: [
+          words("A command KaTeX does not know stays as written: "),
+          formula("$\\notacommand{x}$"),
+        ],
+      },
+    },
   ];
 </script>
 

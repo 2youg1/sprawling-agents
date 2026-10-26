@@ -32,12 +32,14 @@
     kind={field.secret ? "password" : "text"}
     mono={field.mono}
     disabled={field.disabled}
-    {...(field.help === undefined ? {} : { help: field.help })}
+    {...field.help === undefined ? {} : { help: field.help }}
   />
 {/snippet}
 
 <div class="flex min-w-0 flex-col gap-snug">
-  <h4 tabindex="-1" class="font-label text-text-quiet" {@attach look.holdHeading}>{look.heading}</h4>
+  <h4 tabindex="-1" class="font-label text-text-quiet" {@attach look.holdHeading}>
+    {look.heading}
+  </h4>
   <p class="text-note text-text-faint">{look.order}</p>
   {#if look.legacy !== undefined}
     <p class="text-note text-text-quiet">{look.legacy}</p>
@@ -56,7 +58,7 @@
                   label={control.label}
                   tone="quiet"
                   onPress={control.press}
-                  {...(control.why === undefined ? {} : { why: control.why })}
+                  {...control.why === undefined ? {} : { why: control.why }}
                 />
               </span>
             {/each}
@@ -74,7 +76,12 @@
   {#if look.retries !== undefined}
     <div class="flex flex-col gap-tight">
       <span class="text-note text-text-quiet">{look.retries.label}</span>
-      <Segmented label={look.retries.label} options={look.retries.options} held={look.retries.held} onPick={look.retries.pick} />
+      <Segmented
+        label={look.retries.label}
+        options={look.retries.options}
+        held={look.retries.held}
+        onPick={look.retries.pick}
+      />
       {#if look.retries.fallback !== undefined}
         <p class="text-note text-text-faint">{look.retries.fallback}</p>
       {/if}
@@ -121,7 +128,7 @@
         tone="secondary"
         label={look.save.label}
         loading={look.save.loading}
-        {...(look.save.why === undefined ? {} : { why: look.save.why })}
+        {...look.save.why === undefined ? {} : { why: look.save.why }}
       />
       {#if look.cancel !== undefined}
         <Button tone="quiet" label={look.cancel.label} onPress={look.cancel.press} />

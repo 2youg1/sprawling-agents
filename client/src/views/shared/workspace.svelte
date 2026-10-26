@@ -55,7 +55,9 @@
       }}
     >
       {#each options as each (each.addr)}
-        <option value={each.addr}>{each.addr}{each.adoptable ? ` · ${say($lang, "city_adoptable")}` : ""}</option>
+        <option value={each.addr}
+          >{each.addr}{each.adoptable ? ` · ${say($lang, "city_adoptable")}` : ""}</option
+        >
       {/each}
     </select>
   {/if}

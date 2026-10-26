@@ -20,7 +20,11 @@ describe("readAnswer", () => {
   });
 
   test("names the variant that arrived in a slot that asked for another", () => {
-    expect(readAnswer({ run: null }, document)).toEqual({ kind: "unavailable", query: "run", reason: null });
+    expect(readAnswer({ run: null }, document)).toEqual({
+      kind: "unavailable",
+      query: "run",
+      reason: null,
+    });
   });
 
   test("keeps the wait apart from the answer", () => {

@@ -42,15 +42,28 @@ function call(n: number, tool: string, subject: string): Call {
 
 function turnsOf(calling: boolean): readonly Turn[] {
   return [1, 2].map((number) => ({
-    calls: calling && number === 2 ? [call(20, "read", "crates/city/city-SPEC.md"), call(21, "edit", "crates/city/src/document.rs")] : [],
+    calls:
+      calling && number === 2
+        ? [
+            call(20, "read", "crates/city/city-SPEC.md"),
+            call(21, "edit", "crates/city/src/document.rs"),
+          ]
+        : [],
     notes: [],
     number,
     opened: Seq.make(number * 10),
     t: TimeMs.make(START + number * 60_000),
     timing: "measured",
     model: MODEL,
-    said: number === 2 ? "Done: the document reads against the version the person saw, and refuses a stale one." : "Reading the city's specification first.",
-    used: { input: Tokens.make(20_000 + number * 10_000), output: Tokens.make(1_100), cached: Tokens.make(12_000) },
+    said:
+      number === 2
+        ? "Done: the document reads against the version the person saw, and refuses a stale one."
+        : "Reading the city's specification first.",
+    used: {
+      input: Tokens.make(20_000 + number * 10_000),
+      output: Tokens.make(1_100),
+      cached: Tokens.make(12_000),
+    },
     spent: UsdMicros.make(41_000),
   }));
 }
@@ -78,7 +91,20 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
   return (query) => {
     if (query === "endpoint_view") return { endpoints: ENDPOINTS };
     if (typeof query !== "object") return undefined;
-    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling), opening: { at: TimeMs.make(START), task: "Review the document", goal: "", policy: FIRST_POLICY, effort: "high" } } };
+    if ("rounds" in query)
+      return {
+        rounds: {
+          run: query.rounds.run,
+          turns: turnsOf(calling),
+          opening: {
+            at: TimeMs.make(START),
+            task: "Review the document",
+            goal: "",
+            policy: FIRST_POLICY,
+            effort: "high",
+          },
+        },
+      };
     // The working room's building boxes a run in a copied tree, so its
     // sandbox is a fact the first message head states; the empty room's
     // building has none, so nothing about a sandbox is drawn there.
@@ -92,20 +118,28 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
           mcp: [],
           plan: [],
           problems: [],
-          progress: { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } },
+          progress: {
+            unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+          },
           rooms: [ROOM],
           sandbox: { arm: "copied_tree", fuel: 0, mounts: [SANDBOXED], shell: true },
         },
       };
     }
-    if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: false } };
+    if ("commits" in query)
+      return { commits: { building: null, before: null, commits: COMMITS, more: false } };
     if ("config" in query) {
       return {
         config: {
           addr: query.config.addr,
           first: 30,
           second: { percent: 65, domain: { min: 31, max: 90 }, from: "city" },
-          tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" },
+          tuning: {
+            from: "default",
+            proxying: "except_local",
+            timeout_ms: 600_000,
+            account_retries: "two",
+          },
           search: SEARCH,
         },
       };

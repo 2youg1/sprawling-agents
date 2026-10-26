@@ -41,11 +41,23 @@ by that step into the pane's own inset, so the pane clips neither. -->
     <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">{group.heading}</h3>
     <ul>
       {#each group.rows as row (row.key)}
-        <li class={["row group relative -mx-snug flex items-start rounded-card", row.chosen ? "here wash-strong" : "hover:wash"]}>
-          <a {...row.link} class="cells grid min-w-0 flex-1 gap-x-base rounded-card px-snug py-snug">
-            <span class="dot mt-snug size-dot rounded-pill" data-dot={row.dot} aria-hidden="true"></span>
+        <li
+          class={[
+            "row group relative -mx-snug flex items-start rounded-card",
+            row.chosen ? "here wash-strong" : "hover:wash",
+          ]}
+        >
+          <a
+            {...row.link}
+            class="cells grid min-w-0 flex-1 gap-x-base rounded-card px-snug py-snug"
+          >
+            <span class="dot mt-snug size-dot rounded-pill" data-dot={row.dot} aria-hidden="true"
+            ></span>
             <span class="flex min-w-0 items-center gap-tight">
-              <span class={["truncate font-label", row.current ? "text-text" : "text-text-quiet"]} title={row.room}>{row.title}</span>
+              <span
+                class={["truncate font-label", row.current ? "text-text" : "text-text-quiet"]}
+                title={row.room}>{row.title}</span
+              >
               {#if row.pin !== undefined}
                 <Tip text={row.pin.hint}>
                   <span {...row.pin.wire} class="flex shrink-0 text-text-faint">
@@ -57,21 +69,32 @@ by that step into the pane's own inset, so the pane clips neither. -->
             {#if !look.narrow}
               <span class="figure text-note text-text-faint">{row.when ?? ""}</span>
               {#if row.phase !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{row.phase}</span>
+                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet"
+                  >{row.phase}</span
+                >
               {/if}
               {#if row.delegated !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{row.delegated}</span>
+                <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
+                  >{row.delegated}</span
+                >
               {/if}
               {#if row.about !== undefined}
-                <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet">{row.about}</span>
+                <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet"
+                  >{row.about}</span
+                >
               {/if}
               {#if row.ranOn !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{row.ranOn}</span>
+                <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
+                  >{row.ranOn}</span
+                >
               {/if}
               {#if row.tags.length > 0}
                 <span class="col-start-2 col-end-4 mt-tight flex flex-wrap gap-tight">
                   {#each row.tags as tag (tag)}
-                    <span class="rounded-pill border border-edge-panel px-tight text-note text-text-faint">{tag}</span>
+                    <span
+                      class="rounded-pill border border-edge-panel px-tight text-note text-text-faint"
+                      >{tag}</span
+                    >
                   {/each}
                 </span>
               {/if}
@@ -83,7 +106,9 @@ by that step into the pane's own inset, so the pane clips neither. -->
           <div
             class={[
               "shrink-0 pt-tight pr-tight",
-              row.chosen ? "" : "opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive",
+              row.chosen
+                ? ""
+                : "opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive",
             ]}
           >
             <SessionMenu {...row.menu} />
@@ -107,11 +132,13 @@ by that step into the pane's own inset, so the pane clips neither. -->
    * their colours. */
   .dot[data-dot="run"] {
     background-color: var(--color-accent);
-    box-shadow: 0 0 0 calc(var(--spacing-dot) * 3 / 8) color-mix(in oklch, var(--color-accent) 14%, transparent);
+    box-shadow: 0 0 0 calc(var(--spacing-dot) * 3 / 8)
+      color-mix(in oklch, var(--color-accent) 14%, transparent);
   }
   .dot[data-dot="ask"] {
     background-color: var(--color-alert);
-    box-shadow: 0 0 0 calc(var(--spacing-dot) * 3 / 8) color-mix(in oklch, var(--color-alert) 12%, transparent);
+    box-shadow: 0 0 0 calc(var(--spacing-dot) * 3 / 8)
+      color-mix(in oklch, var(--color-alert) 12%, transparent);
   }
   .dot[data-dot="done"] {
     border: calc(var(--spacing-dot) * 3 / 16) solid var(--color-mark);

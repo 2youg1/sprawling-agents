@@ -22,14 +22,29 @@ const refusal: AxError = {
 
 describe("a settings card's foot", () => {
   test("says when a saved change takes effect, on every card", () => {
-    const saved: Standing = { word: "saving_saved", weight: "quiet", saved: true, detail: "next run" };
+    const saved: Standing = {
+      word: "saving_saved",
+      weight: "quiet",
+      saved: true,
+      detail: "next run",
+    };
     expect(standingOf({ kind: "saved" }, "next run", true, words)).toEqual(saved);
     expect(standingOf({ kind: "saved" }, "next run", false, words)).toEqual(saved);
   });
 
   test("on a card saved by its picks, says it before anything is saved", () => {
-    expect(standingOf(HELD, "next run", false, words)).toEqual({ word: null, weight: "quiet", saved: false, detail: "next run" });
-    expect(standingOf(HELD, "next run", true, words)).toEqual({ word: null, weight: "quiet", saved: false, detail: null });
+    expect(standingOf(HELD, "next run", false, words)).toEqual({
+      word: null,
+      weight: "quiet",
+      saved: false,
+      detail: "next run",
+    });
+    expect(standingOf(HELD, "next run", true, words)).toEqual({
+      word: null,
+      weight: "quiet",
+      saved: false,
+      detail: null,
+    });
   });
 
   test("gives the city's way on after a refusal", () => {
@@ -42,7 +57,13 @@ describe("a settings card's foot", () => {
   });
 
   test("lets the save be pressed again only when there is something to send", () => {
-    const states = [HELD, { kind: "draft" } as const, sent("v1"), waited(sent("v1")), { kind: "saved" } as const];
+    const states = [
+      HELD,
+      { kind: "draft" } as const,
+      sent("v1"),
+      waited(sent("v1")),
+      { kind: "saved" } as const,
+    ];
     expect(states.map(pressable)).toEqual([false, true, false, true, false]);
   });
 });

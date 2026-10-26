@@ -22,7 +22,12 @@ export interface SkeletonProps {
 // rather than as a chart. Repeated for as many rows as are asked for.
 export type Width = "whole" | "five-sixths" | "two-thirds" | "three-quarters";
 
-const WIDTHS: readonly [Width, ...Width[]] = ["whole", "five-sixths", "two-thirds", "three-quarters"];
+const WIDTHS: readonly [Width, ...Width[]] = [
+  "whole",
+  "five-sixths",
+  "two-thirds",
+  "three-quarters",
+];
 
 // Spread on the block.
 export interface BlockWire {

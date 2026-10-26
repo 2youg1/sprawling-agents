@@ -10,13 +10,22 @@ import { scanningOf, untoldOf } from "./scanning";
 describe("scanningOf", () => {
   test("macOS and Linux say why there is nothing to read, and a stopped scanner says it is off", () => {
     expect([scanningOf("does_not_apply"), scanningOf("stopped")]).toEqual([
-      [{ subject: "machine_scan_realtime", found: { key: "machine_scan_not_windows", said: null } }],
+      [
+        {
+          subject: "machine_scan_realtime",
+          found: { key: "machine_scan_not_windows", said: null },
+        },
+      ],
       [{ subject: "machine_scan_realtime", found: { key: "machine_scan_stopped", said: null } }],
     ]);
   });
 
   test("a Windows reading names the directory, the drive and the exclusion", () => {
-    expect(scanningOf({ read: { city: "D:/city", drive: "trusted", exclusion: { inside: { under: "D:/" } } } })).toEqual([
+    expect(
+      scanningOf({
+        read: { city: "D:/city", drive: "trusted", exclusion: { inside: { under: "D:/" } } },
+      }),
+    ).toEqual([
       { subject: "machine_scan_city", found: { key: "machine_scan_city_read", said: "D:/city" } },
       { subject: "machine_scan_drive", found: { key: "machine_scan_drive_trusted", said: null } },
       { subject: "machine_scan_exclusion", found: { key: "machine_scan_inside", said: "D:/" } },
@@ -31,11 +40,24 @@ describe("scanningOf", () => {
       { untold: { why } },
     ].map((drive) => scanningOf({ read: { city: "c", drive, exclusion: "outside" } }));
     expect(lines.map((each) => [each[1]?.found, each[2]?.found])).toEqual([
-      [{ key: "machine_scan_drive_untrusted", said: "D:" }, { key: "machine_scan_outside", said: null }],
-      [{ key: "machine_scan_drive_not", said: "C: NTFS" }, { key: "machine_scan_outside", said: null }],
-      [{ key: "machine_untold_admin_only", said: null }, { key: "machine_scan_outside", said: null }],
+      [
+        { key: "machine_scan_drive_untrusted", said: "D:" },
+        { key: "machine_scan_outside", said: null },
+      ],
+      [
+        { key: "machine_scan_drive_not", said: "C: NTFS" },
+        { key: "machine_scan_outside", said: null },
+      ],
+      [
+        { key: "machine_untold_admin_only", said: null },
+        { key: "machine_scan_outside", said: null },
+      ],
     ]);
-    expect(scanningOf({ read: { city: "c", drive: "trusted", exclusion: { untold: { why: "no_disk" } } } })[2]?.found).toEqual({
+    expect(
+      scanningOf({
+        read: { city: "c", drive: "trusted", exclusion: { untold: { why: "no_disk" } } },
+      })[2]?.found,
+    ).toEqual({
       key: "machine_untold_no_disk",
       said: null,
     });

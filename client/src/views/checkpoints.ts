@@ -32,7 +32,9 @@ export interface Bracket {
 }
 
 export function bracketOf(rounds: RoundsAnswer, at: Seq): Bracket {
-  const marks = rounds.turns.flatMap((turn) => turn.notes.flatMap((note) => ("checkpointed" in note ? [note.checkpointed] : [])));
+  const marks = rounds.turns.flatMap((turn) =>
+    turn.notes.flatMap((note) => ("checkpointed" in note ? [note.checkpointed] : [])),
+  );
   const before = marks.filter((mark) => mark.at < at).sort((a, b) => b.at - a.at)[0];
   const after = marks.filter((mark) => mark.at > at).sort((a, b) => a.at - b.at)[0];
   return { base: before?.oid ?? rounds.opened_at ?? null, head: after?.oid ?? null };

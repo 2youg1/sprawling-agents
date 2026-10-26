@@ -17,7 +17,11 @@ const FRESH: Clock = { left: 8_000, since: 0, holders: [] };
 
 describe("a toast's clock", () => {
   test("the first holder banks the stretch that ran", () => {
-    expect(held(FRESH, "pointer", 3_000)).toEqual({ left: 5_000, since: 3_000, holders: ["pointer"] });
+    expect(held(FRESH, "pointer", 3_000)).toEqual({
+      left: 5_000,
+      since: 3_000,
+      holders: ["pointer"],
+    });
   });
 
   test("a second holder banks nothing, and the clock runs only once both let go", () => {

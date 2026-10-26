@@ -30,8 +30,7 @@
 
   const answer = ui().conn.asking.ask(QUERIES.approvals);
   const held = $derived(
-    items ??
-      ($answer !== undefined && "approvals" in $answer ? $answer.approvals.items : []),
+    items ?? ($answer !== undefined && "approvals" in $answer ? $answer.approvals.items : []),
   );
 </script>
 

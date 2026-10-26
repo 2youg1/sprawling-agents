@@ -26,7 +26,11 @@ export interface ArmSelectLook {
 
 // The bag for a choice holding `held`; `pick` receives the value a
 // person chose, which is always one of `options`.
-export function armSelectWire(label: string, held: string, pick: (value: string) => void): ArmSelectWire {
+export function armSelectWire(
+  label: string,
+  held: string,
+  pick: (value: string) => void,
+): ArmSelectWire {
   return {
     "aria-label": label,
     value: held,

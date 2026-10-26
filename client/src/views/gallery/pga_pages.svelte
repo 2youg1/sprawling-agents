@@ -26,20 +26,54 @@
     frozen: 31,
     halted: [],
     proved: null,
-    pursuits: [{ addr: Address.make("lab"), goal: "read every unicode escape the spec names", state: "running", verdict: { kind: "work", next: NodeId.make("1.2") } }],
+    pursuits: [
+      {
+        addr: Address.make("lab"),
+        goal: "read every unicode escape the spec names",
+        state: "running",
+        verdict: { kind: "work", next: NodeId.make("1.2") },
+      },
+    ],
     runs: [],
     buildings: [
-      { addr: Address.make("hall"), adoptable: false, blocked: [], problems: [], progress: { unplanned: { steps: 3, budget: { tokens: Tokens.make(120_000), usd: usd(0.84) } } }, ready: 0 },
+      {
+        addr: Address.make("hall"),
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: {
+          unplanned: { steps: 3, budget: { tokens: Tokens.make(120_000), usd: usd(0.84) } },
+        },
+        ready: 0,
+      },
       {
         addr: Address.make("lab"),
         adoptable: false,
         blocked: [{ line: "waiting on a reviewer", source: NodeId.make("2.1"), waiting: 1 }],
         problems: [],
-        progress: { planned: { blocked: 1, blocked_ppb: 0, done: 1, done_ppb: 250_000_000, total: 3 } },
+        progress: {
+          planned: { blocked: 1, blocked_ppb: 0, done: 1, done_ppb: 250_000_000, total: 3 },
+        },
         ready: 1,
       },
-      { addr: Address.make("docs"), adoptable: false, blocked: [], problems: [], progress: { planned: { blocked: 0, blocked_ppb: 0, done: 4, done_ppb: 1_000_000_000, total: 4 } }, ready: 0 },
-      { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: { unplanned: { steps: 0, budget: { tokens: Tokens.make(0), usd: usd(0) } } }, ready: 0 },
+      {
+        addr: Address.make("docs"),
+        adoptable: false,
+        blocked: [],
+        problems: [],
+        progress: {
+          planned: { blocked: 0, blocked_ppb: 0, done: 4, done_ppb: 1_000_000_000, total: 4 },
+        },
+        ready: 0,
+      },
+      {
+        addr: Address.make("notes"),
+        adoptable: true,
+        blocked: [],
+        problems: [],
+        progress: { unplanned: { steps: 0, budget: { tokens: Tokens.make(0), usd: usd(0) } } },
+        ready: 0,
+      },
     ],
   };
 
@@ -47,24 +81,64 @@
     total: usd(18.42),
     unpriced: { calls: 3, tokens: 41_200 },
     renewals: { billed: usd(0.42), late: 1, read: 5, refused: 0, unreported: 0 },
-    by_run: [["a1f0c2d9", usd(6.1)], ["7be410aa", usd(4.75)], ["c09d33e1", usd(2.2)]],
-    by_actor: [["lab/parser", usd(9.4)], ["hall/mayor", usd(5.1)], ["docs/tidy", usd(2.9)]],
-    by_segment: [["model", usd(16.9)], ["tools", usd(1.52)]],
-    by_tool: [["exec", usd(0.9)], ["read", usd(0.4)], ["edit", usd(0.22)]],
+    by_run: [
+      ["a1f0c2d9", usd(6.1)],
+      ["7be410aa", usd(4.75)],
+      ["c09d33e1", usd(2.2)],
+    ],
+    by_actor: [
+      ["lab/parser", usd(9.4)],
+      ["hall/mayor", usd(5.1)],
+      ["docs/tidy", usd(2.9)],
+    ],
+    by_segment: [
+      ["model", usd(16.9)],
+      ["tools", usd(1.52)],
+    ],
+    by_tool: [
+      ["exec", usd(0.9)],
+      ["read", usd(0.4)],
+      ["edit", usd(0.22)],
+    ],
     by_skill: [],
   };
 
   const ASSETS: readonly RegistryLine[] = [
-    { addr: Address.make("lab"), at: TimeMs.make(AT - 3_600_000), kind: "screenshot", subject: "the settings page at 2560 px, forced colours" },
-    { addr: Address.make("hall/mayor"), at: TimeMs.make(AT - 7_200_000), kind: "transcript", subject: "what the mayor was asked on the first day" },
-    { addr: Address.make("docs"), at: TimeMs.make(AT), kind: "release", subject: "sprawling 0.0.8, windows-x86_64" },
+    {
+      addr: Address.make("lab"),
+      at: TimeMs.make(AT - 3_600_000),
+      kind: "screenshot",
+      subject: "the settings page at 2560 px, forced colours",
+    },
+    {
+      addr: Address.make("hall/mayor"),
+      at: TimeMs.make(AT - 7_200_000),
+      kind: "transcript",
+      subject: "what the mayor was asked on the first day",
+    },
+    {
+      addr: Address.make("docs"),
+      at: TimeMs.make(AT),
+      kind: "release",
+      subject: "sprawling 0.0.8, windows-x86_64",
+    },
   ];
 
   // The four page questions this made-up city answers, by name; any
   // other question stays unanswered.
   const ANSWERS: Readonly<Partial<Record<string, Answer>>> = {
     city_view: { city: CITY },
-    metrics: { metrics: { approvals_waiting: 1, buildings: 3, discards_outstanding: 0, events: 48_211, runs_active: 2, runs_frozen: 31, signals_waiting: 0 } },
+    metrics: {
+      metrics: {
+        approvals_waiting: 1,
+        buildings: 3,
+        discards_outstanding: 0,
+        events: 48_211,
+        runs_active: 2,
+        runs_frozen: 31,
+        signals_waiting: 0,
+      },
+    },
     cost_view: { cost: COST },
     registry_view: { registry: { assets: [...ASSETS] } },
   };
@@ -72,11 +146,20 @@
   // What the minimal template writes, cut to a few lines: the raise
   // page shows whatever the city answers, and a fixture need not be the
   // whole file.
-  const RULES = ['# What this building is.', 'purpose = ""', 'confidential = false', 'write = "building"', 'reading_room = []', ''].join("\n");
+  const RULES = [
+    "# What this building is.",
+    'purpose = ""',
+    "confidential = false",
+    'write = "building"',
+    "reading_room = []",
+    "",
+  ].join("\n");
 
   function answers(query: Query): Answer | undefined {
     if (typeof query === "object" && "template" in query) {
-      return { template: { template: query.template.template, addr: query.template.addr, rules: RULES } };
+      return {
+        template: { template: query.template.template, addr: query.template.addr, rules: RULES },
+      };
     }
     return typeof query === "string" ? ANSWERS[query] : undefined;
   }

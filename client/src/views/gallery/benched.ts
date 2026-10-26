@@ -29,14 +29,27 @@
 // of a `.svelte` module: the fixtures of the world layer's controls one
 // at a time (`world.svelte`) read the same city.
 
-import type { Answer, Call, CityAnswer, CommitAnswer, EndpointsAnswer, EventKind, EventRecord, Opening, PrefixSlot, Query, Turn } from "../../wire";
+import type {
+  Answer,
+  Call,
+  CityAnswer,
+  CommitAnswer,
+  EndpointsAnswer,
+  EventKind,
+  EventRecord,
+  Opening,
+  PrefixSlot,
+  Query,
+  Turn,
+} from "../../wire";
 import { Address, B3Hash, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros, Window } from "../../wire";
 import { SEARCH, UNTUNED } from "./configured";
 
 export const ROOM = Address.make("lab/room1");
 const MODEL = "anthropic/claude-fable-5.1";
 const START = 1_790_000_000_000;
-export const run = (n: number): RunId => RunId.make(`0199c0de-0000-4000-8000-${n.toString(16).padStart(12, "0")}`);
+export const run = (n: number): RunId =>
+  RunId.make(`0199c0de-0000-4000-8000-${n.toString(16).padStart(12, "0")}`);
 export const oid = (digit: string): GitOid => GitOid.make(digit.repeat(40));
 
 // Who ran where, and how each run stands: still going, waiting for the
@@ -51,7 +64,13 @@ const RUNS: readonly (readonly [string, string, EventKind | null])[] = [
   ["lab/room1", "change the city's document reading contract", null],
 ];
 
-function record(n: number, at: number, kind: EventKind, room: string, data: Record<string, unknown>): EventRecord {
+function record(
+  n: number,
+  at: number,
+  kind: EventKind,
+  room: string,
+  data: Record<string, unknown>,
+): EventRecord {
   return {
     run: run(n),
     seq: Seq.make(n * 2 + (kind === "run_started" ? 1 : 2)),
@@ -66,14 +85,23 @@ function record(n: number, at: number, kind: EventKind, room: string, data: Reco
 }
 
 export function recordsAt(now: number): readonly EventRecord[] {
-  const named = { ...record(127, now - 3_600_000, "city_initialized", "sprawling", {}), seq: Seq.make(0) };
-  return [named, ...RUNS.flatMap(([room, task, ending], n) => {
-    const began = now - (RUNS.length - n) * 9 * 60_000;
-    const opened = record(n, began, "run_started", room, { task });
-    if (ending === null) return [opened];
-    const data = ending === "run_frozen" ? { completion: "done" } : { action_desc: "run cargo publish --dry-run" };
-    return [opened, record(n, began + 120_000, ending, room, data)];
-  })];
+  const named = {
+    ...record(127, now - 3_600_000, "city_initialized", "sprawling", {}),
+    seq: Seq.make(0),
+  };
+  return [
+    named,
+    ...RUNS.flatMap(([room, task, ending], n) => {
+      const began = now - (RUNS.length - n) * 9 * 60_000;
+      const opened = record(n, began, "run_started", room, { task });
+      if (ending === null) return [opened];
+      const data =
+        ending === "run_frozen"
+          ? { completion: "done" }
+          : { action_desc: "run cargo publish --dry-run" };
+      return [opened, record(n, began + 120_000, ending, room, data)];
+    }),
+  ];
 }
 
 function call(at: number, tool: string, subject: string, ms: number | null): Call {
@@ -103,20 +131,22 @@ const HISTORY: readonly (readonly [string, readonly string[], string, number, st
   ["a", ["5"], "the document contract, first draft", 0, "lab/room1", -1_800],
 ];
 
-const COMMITS: readonly CommitAnswer[] = HISTORY.map(([digit, parents, message, n, actor, after], row) => ({
-  actor: Address.make(actor),
-  at: TimeMs.make(START + after * 1_000),
-  lineage: [],
-  message,
-  model: MODEL,
-  oid: oid(digit),
-  b3: B3Hash.make(`9f2c41ade07b5c1e${digit}`.repeat(4).slice(0, 64)),
-  effort: "medium",
-  parents: parents.map(oid),
-  run: run(n),
-  seq: Seq.make(1_000 - row),
-  spent: UsdMicros.make(12_000),
-}));
+const COMMITS: readonly CommitAnswer[] = HISTORY.map(
+  ([digit, parents, message, n, actor, after], row) => ({
+    actor: Address.make(actor),
+    at: TimeMs.make(START + after * 1_000),
+    lineage: [],
+    message,
+    model: MODEL,
+    oid: oid(digit),
+    b3: B3Hash.make(`9f2c41ade07b5c1e${digit}`.repeat(4).slice(0, 64)),
+    effort: "medium",
+    parents: parents.map(oid),
+    run: run(n),
+    seq: Seq.make(1_000 - row),
+    spent: UsdMicros.make(12_000),
+  }),
+);
 
 // The live session's three turns: it read and ran, edited and
 // checkpointed, then checkpointed again and is running the tests.
@@ -128,9 +158,30 @@ interface Shape {
 }
 
 const SHAPES: readonly Shape[] = [
-  { calls: [call(11, "read", "crates/city/city-SPEC.md", 31), call(12, "exec", "cargo nextest -p city", 3_412)], notes: [], first: 398, used: [380_000, 900, 61_000, 22_400] },
-  { calls: [call(21, "edit", "crates/city/src/document.rs", 87)], notes: [{ checkpointed: { at: Seq.make(22), oid: oid("d") } }], first: 412, used: [402_000, 1_100, 88_000, 9_800] },
-  { calls: [call(31, "edit", "crates/city/city-SPEC.md", 64), call(33, "exec", "just check-client", null)], notes: [{ checkpointed: { at: Seq.make(32), oid: oid("e") } }], first: 455, used: [418_000, 1_300, 92_000, 9_900] },
+  {
+    calls: [
+      call(11, "read", "crates/city/city-SPEC.md", 31),
+      call(12, "exec", "cargo nextest -p city", 3_412),
+    ],
+    notes: [],
+    first: 398,
+    used: [380_000, 900, 61_000, 22_400],
+  },
+  {
+    calls: [call(21, "edit", "crates/city/src/document.rs", 87)],
+    notes: [{ checkpointed: { at: Seq.make(22), oid: oid("d") } }],
+    first: 412,
+    used: [402_000, 1_100, 88_000, 9_800],
+  },
+  {
+    calls: [
+      call(31, "edit", "crates/city/city-SPEC.md", 64),
+      call(33, "exec", "just check-client", null),
+    ],
+    notes: [{ checkpointed: { at: Seq.make(32), oid: oid("e") } }],
+    first: 455,
+    used: [418_000, 1_300, 92_000, 9_900],
+  },
 ];
 
 export const TURNS: readonly Turn[] = SHAPES.map(({ calls, notes, first, used }, index) => ({
@@ -144,7 +195,12 @@ export const TURNS: readonly Turn[] = SHAPES.map(({ calls, notes, first, used },
   timing: "measured",
   model: MODEL,
   said: "Done.",
-  used: { input: Tokens.make(used[0]), output: Tokens.make(used[1]), cached: Tokens.make(used[2]), cache_write: Tokens.make(used[3]) },
+  used: {
+    input: Tokens.make(used[0]),
+    output: Tokens.make(used[1]),
+    cached: Tokens.make(used[2]),
+    cache_write: Tokens.make(used[3]),
+  },
   spent: UsdMicros.make(140_000),
 }));
 
@@ -166,14 +222,14 @@ const SEGMENTS: readonly (readonly [PrefixSlot, number, string, number])[] = [
 ];
 
 const ENDPOINTS: EndpointsAnswer = {
-  chosen: [{ endpoint: "zenmux", model: MODEL, tag: "main" }],
+  chosen: [{ endpoint: "example", model: MODEL, tag: "main" }],
   endpoints: [
     {
-      base_url: "https://api.zenmux.ai/v1",
+      base_url: "https://api.example.test/v1",
       connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: true,
-      label: "ZenMux",
+      label: "Example",
       local: false,
       models: [
         {
@@ -187,21 +243,30 @@ const ENDPOINTS: EndpointsAnswer = {
           listing: "listed",
         },
       ],
-      name: "zenmux",
+      name: "example",
       tuning: UNTUNED,
       account_status: [],
     },
   ],
 };
 
-const unplanned = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 3 } };
+const unplanned = {
+  unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 3 },
+};
 const CITY: CityAnswer = {
   active: 2,
   frozen: 4,
   halted: [],
   pursuits: [],
   runs: [],
-  buildings: ["hall", "lab", "shop"].map((name) => ({ addr: Address.make(name), adoptable: false, blocked: [], problems: [], progress: unplanned, ready: 0 })),
+  buildings: ["hall", "lab", "shop"].map((name) => ({
+    addr: Address.make(name),
+    adoptable: false,
+    blocked: [],
+    problems: [],
+    progress: unplanned,
+    ready: 0,
+  })),
 };
 
 export function answering(query: Query): Answer | undefined {
@@ -225,16 +290,30 @@ export function answering(query: Query): Answer | undefined {
   if (typeof query !== "object") return undefined;
   if ("rounds" in query) {
     const live = query.rounds.run === run(6);
-    return { rounds: { run: query.rounds.run, turns: live ? TURNS : [], opened_at: oid("a"), opening: live ? OPENING : null, worktree: live ? "lab-room1" : null } };
+    return {
+      rounds: {
+        run: query.rounds.run,
+        turns: live ? TURNS : [],
+        opened_at: oid("a"),
+        opening: live ? OPENING : null,
+        worktree: live ? "lab-room1" : null,
+      },
+    };
   }
-  if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: true } };
+  if ("commits" in query)
+    return { commits: { building: null, before: null, commits: COMMITS, more: true } };
   if ("config" in query) {
     return {
       config: {
         addr: query.config.addr,
         first: 30,
         second: { percent: 65, domain: { min: 31, max: 90 }, from: "city" },
-        tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" },
+        tuning: {
+          from: "default",
+          proxying: "except_local",
+          timeout_ms: 600_000,
+          account_retries: "two",
+        },
         search: SEARCH,
       },
     };
@@ -245,8 +324,16 @@ export function answering(query: Query): Answer | undefined {
         base: query.changes.base,
         head: query.changes.head ?? null,
         files: [
-          { path: "crates/city/src/document.rs", how: "modified", lines: { counted: { added: 12, removed: 3 } } },
-          { path: "crates/city/city-SPEC.md", how: "modified", lines: { counted: { added: 4, removed: 1 } } },
+          {
+            path: "crates/city/src/document.rs",
+            how: "modified",
+            lines: { counted: { added: 12, removed: 3 } },
+          },
+          {
+            path: "crates/city/city-SPEC.md",
+            how: "modified",
+            lines: { counted: { added: 4, removed: 1 } },
+          },
         ],
       },
     };

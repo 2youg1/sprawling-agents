@@ -47,7 +47,8 @@ const SHAPE: Unpacked = { kind: "refused", why: "shape" };
 
 export function unpack(bytes: Uint8Array): Promise<Unpacked> {
   const listed = directoryOf(bytes);
-  if (listed === "shape" || listed === "too_large") return Promise.resolve({ kind: "refused", why: listed });
+  if (listed === "shape" || listed === "too_large")
+    return Promise.resolve({ kind: "refused", why: listed });
   return inflateAll(bytes, listed).catch(() => SHAPE);
 }
 
@@ -113,7 +114,10 @@ function dataOf(bytes: Uint8Array, part: Part): Uint8Array | null {
 async function inflate(data: Uint8Array, part: Part): Promise<Uint8Array | null> {
   if (part.method === STORED) return data.length === part.size ? data : null;
   if (part.method !== DEFLATED) return null;
-  const reader = new Blob([data.slice()]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const reader = new Blob([data.slice()])
+    .stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"))
+    .getReader();
   const out = new Uint8Array(part.size);
   let filled = 0;
   for (;;) {

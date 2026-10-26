@@ -14,7 +14,10 @@ import { describe, expect, test } from "bun:test";
 
 import { lookOf, type ButtonProps } from "./button";
 
-function counted(props: Omit<ButtonProps, "onPress">): { readonly props: ButtonProps; readonly presses: () => number } {
+function counted(props: Omit<ButtonProps, "onPress">): {
+  readonly props: ButtonProps;
+  readonly presses: () => number;
+} {
   let presses = 0;
   return {
     props: {
@@ -51,7 +54,10 @@ describe("button wiring", () => {
 
   test("a given name is what the control is read by, while the face stays the label", () => {
     const look = lookOf({ label: "forget", name: "forget Firefox · Windows" });
-    expect([look.label, look.wire(undefined)["aria-label"]]).toEqual(["forget", "forget Firefox · Windows"]);
+    expect([look.label, look.wire(undefined)["aria-label"]]).toEqual([
+      "forget",
+      "forget Firefox · Windows",
+    ]);
   });
 
   test("a loading button is disabled and busy, and swallows the press", () => {
@@ -73,7 +79,13 @@ describe("button wiring", () => {
       disabled: wire["aria-disabled"],
       busy: wire["aria-busy"],
       described: wire["aria-describedby"],
-    }).toEqual({ state: "stopped", why: "the city is halted", disabled: true, busy: false, described: "hint-7" });
+    }).toEqual({
+      state: "stopped",
+      why: "the city is halted",
+      disabled: true,
+      busy: false,
+      described: "hint-7",
+    });
     wire.onclick();
     expect(hand.presses()).toBe(0);
   });

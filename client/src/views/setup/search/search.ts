@@ -14,7 +14,20 @@ import type { Key } from "../../../core/lang";
 import type { AxError, ConfigLayer } from "../../../wire";
 import type { Roster } from "../providers/account_editor";
 import { supplierRoster } from "../providers/rosters";
-import { cancel, choiceOf, choose, customOf, edit, input, remove, save, select, shownSearch, stampOf, unsaveable } from "./search_editor";
+import {
+  cancel,
+  choiceOf,
+  choose,
+  customOf,
+  edit,
+  input,
+  remove,
+  save,
+  select,
+  shownSearch,
+  stampOf,
+  unsaveable,
+} from "./search_editor";
 import type { Choice, SearchEditor, SearchHands, SupplierDraft } from "./search_editor";
 
 export interface ChoiceLook {
@@ -57,7 +70,11 @@ export interface SupplierFormLook {
   // read far more often than a service is added.
   readonly open: boolean;
   readonly fields: readonly SupplierFieldLook[];
-  readonly save: { readonly label: string; readonly why: string | undefined; readonly press: () => void };
+  readonly save: {
+    readonly label: string;
+    readonly why: string | undefined;
+    readonly press: () => void;
+  };
   readonly cancel: { readonly label: string; readonly press: () => void } | undefined;
 }
 
@@ -130,7 +147,10 @@ export function lookOf(editor: SearchEditor, hands: SearchHands): SearchLook {
     defaultAt: fill(say(lang, "search_default_at"), { url: settled.default_url }),
     override:
       settled.from === "building" || settled.from === "resident"
-        ? fill(say(lang, "search_override"), { choice: say(lang, CHOICE_WORDS[choiceOf(settled.configuration)]), layer: say(lang, LAYERS[settled.from]) })
+        ? fill(say(lang, "search_override"), {
+            choice: say(lang, CHOICE_WORDS[choiceOf(settled.configuration)]),
+            layer: say(lang, LAYERS[settled.from]),
+          })
         : undefined,
     confidential: say(lang, "search_confidential"),
     noFallback: custom === null ? undefined : say(lang, "search_no_fallback"),
@@ -144,9 +164,20 @@ export function lookOf(editor: SearchEditor, hands: SearchHands): SearchLook {
         remote: supplier.remote,
         selected,
         controls: [
-          control("use", "search_use", selected ? "search_in_use" : null, () => { select(editor, hands, supplier.id); }),
-          control("edit", "search_edit", null, () => { edit(editor, supplier); }),
-          control("remove", "search_remove", only ? "search_only" : selected ? "search_remove_in_use" : null, () => { remove(editor, hands, supplier.id); }),
+          control("use", "search_use", selected ? "search_in_use" : null, () => {
+            select(editor, hands, supplier.id);
+          }),
+          control("edit", "search_edit", null, () => {
+            edit(editor, supplier);
+          }),
+          control(
+            "remove",
+            "search_remove",
+            only ? "search_only" : selected ? "search_remove_in_use" : null,
+            () => {
+              remove(editor, hands, supplier.id);
+            },
+          ),
         ],
         accounts: fill(say(lang, "setup_accounts_toggle"), { n: String(supplier.accounts.length) }),
         roster: supplierRoster(
@@ -161,7 +192,10 @@ export function lookOf(editor: SearchEditor, hands: SearchHands): SearchLook {
       custom === null && !editor.adding
         ? undefined
         : {
-            title: editor.editing === null ? say(lang, "search_add") : fill(say(lang, "search_editing"), { id: editor.editing }),
+            title:
+              editor.editing === null
+                ? say(lang, "search_add")
+                : fill(say(lang, "search_editing"), { id: editor.editing }),
             open: editor.editing !== null || editor.adding,
             fields: FIELDS.map(([name, label]) => ({
               name,
@@ -172,8 +206,22 @@ export function lookOf(editor: SearchEditor, hands: SearchHands): SearchLook {
                 input(editor, name, value);
               },
             })),
-            save: { label: say(lang, "search_save"), why: unsaved === null ? undefined : say(lang, unsaved), press: () => { save(editor, hands); } },
-            cancel: editor.editing === null && !editor.adding ? undefined : { label: say(lang, "setup_account_cancel"), press: () => { cancel(editor); } },
+            save: {
+              label: say(lang, "search_save"),
+              why: unsaved === null ? undefined : say(lang, unsaved),
+              press: () => {
+                save(editor, hands);
+              },
+            },
+            cancel:
+              editor.editing === null && !editor.adding
+                ? undefined
+                : {
+                    label: say(lang, "setup_account_cancel"),
+                    press: () => {
+                      cancel(editor);
+                    },
+                  },
           },
     note: editor.note ?? undefined,
     refused: editor.refused ?? undefined,

@@ -48,7 +48,11 @@ export type ScrollerWire = Readonly<Record<symbol, Attachment<HTMLElement>>>;
 
 // `recover` is handed the lever and the refusal it answers when the
 // person presses it.
-export function linkOf(link: LinkState, lang: Lang, recover: (lever: Recovery, error: AxError) => void): LinkLook | undefined {
+export function linkOf(
+  link: LinkState,
+  lang: Lang,
+  recover: (lever: Recovery, error: AxError) => void,
+): LinkLook | undefined {
   switch (link.kind) {
     case "live":
       return undefined;

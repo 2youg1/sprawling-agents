@@ -32,7 +32,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应，测试模块无条目也可（D40）；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
-| wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
+| wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；`wording-ok:` 豁免它所在的块里的专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17、§8-38 与 §8-51 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
@@ -195,7 +195,7 @@ pub(crate) struct Violation {
 
 **去掉城自己的值之后剩下的那部分才是问题。** `{percent}%`、`+{added}` 没有递给读者任何视图写的东西；`{count} waiting` 递了一个英文词。故插值槽与转义先取出，再问剩下的部分里有没有相邻的两个字母。
 
-**专名进不了短语表，所以它必须有一扇门。** 短语表拒绝一条两种语言相同的短语，而 `openai` 在两种语言里就是 `openai`。这些位置用 `wording-ok: <理由>` 写在本行或上一行——**同一个拼法、同一条两行规则，照搬 `lexicon-ok:`**。一个可见的、带理由的现场标记，比一张没人会去读的 toml 名单诚实。
+**专名进不了短语表，所以它必须有一扇门。** 短语表拒绝一条两种语言相同的短语，而 `openai` 在两种语言里就是 `openai`。这些位置用 `wording-ok: <理由>` 豁免**标记所在的那一块**：它自己那一行，以及它下面缩进不浅于它的行，直到某一行缩进变浅为止。规则按缩进而不是按行数写，因为换行位置由格式化器决定：`bun fmt` 会把一个 `placeholder` 属性或一个条目折到深八列的下行，而注释放着不动，所以「本行或上一行」式的豁免会指向一行不再持有它辩护的那个词的地方。写在文件最外层的那一个因此豁免整个模块，这是同一条规则在最外层块上的读法；一个先关掉的块里的标记豁免不了块外的词。一个可见的、带理由的现场标记，比一张没人会去读的 toml 名单诚实。
 -/
 
 /-! ### 命令 `wire-ts`：线的 TS 面由 Rust 面生成
@@ -531,7 +531,7 @@ D38 **测试函数的总数不是一个事实，文档不引它。** 每加一�
 **三条断言挂在 `artifact` 门下，不新建门。** 挂 `artifact` 而不挂 `release` 的理由是 §1 的门表早已把「发布档的形状：平台三元组、归档命名」写在 `artifact` 那一行——写进 `release` 会让同一个责任有两个家，并让那一行继续说一件不真的话。三条：
 
 1. **矩阵**：`release.yml` 的 `- os:`／`target:` 成对读出，与 `(runner, cargo_target)` 集合双向相等。
-2. **shim**：`tools/xtask/src/channel/shim.js` 的每个条目读成「键、包、可执行文件」，与 `("<os> <cpu>", package, binary)` 双向相等。
+2. **shim**：`tools/xtask/src/channel/shim.js` 的每个条目读成「键、包、可执行文件」，与 `("<os> <cpu>", package, binary)` 双向相等。读的是那个对象本身（按深度切条目、按引号忽略字符串里的括号），不是它的行：`bun fmt` 会把一行放不下的条目折成四行，按行读会在那一刻报整张表都缺。
 3. **写全的后缀**：`release.yml`、`install.sh`、`install.ps1`、`crates/sprawling/Cargo.toml`（`[package.metadata.binstall]` 的各行）里每一个**写全**的归档后缀，必须是某一行的后缀。
 
 **只判写全的那些，插值拼出来的不判。** `"-${os}-${arch}.zip"` 不是一个可比对的拼法，猜它就会判错一份正确的脚本。这是漏报而非误报，也是赔得起的那一半：拼错的归档名是已经发生过的缺陷，而插值拼出来的那个由下载本身拒绝，并告诉读者这次发布实际带了什么。
@@ -1418,7 +1418,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 /-! ## 16 测试与约束
 
-单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；`wording-ok:` 豁免跨过格式化器折出的行、块关掉之后不再豁免、同行的豁免仍生效；shim 表被折成多行时每个条目仍读成一行；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 **证明的性质**（`lake build Spec`，经 `just models`；不依赖 `sorry`、`admit`、`axiom`）：
 

@@ -1,45 +1,45 @@
 <script lang="ts" generics="T">
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
+  // This Source Code Form is subject to the terms of the Mozilla Public
+  // License, v. 2.0. If a copy of the MPL was not distributed with this
+  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How a table is drawn, and nothing else (`./table`, `TableLook`).
-//
-// **A column states what it is worth; the table scrolls rather than
-// squeezing it.** The header is one line whatever the column's width,
-// every row is a control tall, and rows are separated by a hairline
-// rather than by stripes: a band of alternating colour is one more
-// thing competing with the values in the cells. A row lights with the
-// ink wash as every row does (docs/frontend-method.md §7A-5), arriving
-// in `short` and leaving on the leaving curve.
+  // How a table is drawn, and nothing else (`./table`, `TableLook`).
+  //
+  // **A column states what it is worth; the table scrolls rather than
+  // squeezing it.** The header is one line whatever the column's width,
+  // every row is a control tall, and rows are separated by a hairline
+  // rather than by stripes: a band of alternating colour is one more
+  // thing competing with the values in the cells. A row lights with the
+  // ink wash as every row does (docs/frontend-method.md §7A-5), arriving
+  // in `short` and leaving on the leaving curve.
 
-import type { Snippet } from "svelte";
+  import type { Snippet } from "svelte";
 
-import type { HeldLook, Min, TableLook } from "./table";
+  import type { HeldLook, Min, TableLook } from "./table";
 
-const look: TableLook<T> = $props();
+  const look: TableLook<T> = $props();
 
-// The class a column's stated minimum resolves to, and nothing at all
-// when the column states none: the width rules of
-// docs/frontend-method.md §4-33 have one spelling and this is it.
-function breadthOf(min: Min | undefined): string | undefined {
-  switch (min) {
-    case undefined:
-      return undefined;
-    case "12ch":
-      return "min-w-[12ch]";
-    case "24ch":
-      return "min-w-[24ch]";
-    case "figure":
-      return "w-figure";
+  // The class a column's stated minimum resolves to, and nothing at all
+  // when the column states none: the width rules of
+  // docs/frontend-method.md §4-33 have one spelling and this is it.
+  function breadthOf(min: Min | undefined): string | undefined {
+    switch (min) {
+      case undefined:
+        return undefined;
+      case "12ch":
+        return "min-w-[12ch]";
+      case "24ch":
+        return "min-w-[24ch]";
+      case "figure":
+        return "w-figure";
+    }
   }
-}
 
-// The checker types a `{#snippet}` name as a void call, which the
-// lint lane rejects inside a render tag. The name is taken again as
-// its `Snippet` type, and the template renders that.
-const held: Snippet<[HeldLook<T>]> = drawHeld;
+  // The checker types a `{#snippet}` name as a void call, which the
+  // lint lane rejects inside a render tag. The name is taken again as
+  // its `Snippet` type, and the template renders that.
+  const held: Snippet<[HeldLook<T>]> = drawHeld;
 </script>
 
 {#snippet drawHeld(content: HeldLook<T>)}
@@ -101,7 +101,13 @@ const held: Snippet<[HeldLook<T>]> = drawHeld;
               </td>
             {/if}
             {#each line.cells as cell (cell.key)}
-              <td class={["px-base py-tight text-text", breadthOf(cell.min), cell.summary && "summary"]}>
+              <td
+                class={[
+                  "px-base py-tight text-text",
+                  breadthOf(cell.min),
+                  cell.summary && "summary",
+                ]}
+              >
                 <!-- A figure column hands its control a box of the
                      figure's width. `width` on the cell states what the
                      column prefers; only a definite width on the box

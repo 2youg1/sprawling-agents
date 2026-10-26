@@ -37,15 +37,15 @@ describe("the blend tier's opacity", () => {
       rows.setItem(BLEND, raw);
       return get(loadPreferences(rows, "en").held).appearance.blend;
     };
-    expect([read("45"), read("90"), read("30"), read("95"), read("20"), read("half"), read("4.5")]).toEqual([
-      45,
-      90,
-      30,
-      null,
-      null,
-      null,
-      null,
-    ]);
+    expect([
+      read("45"),
+      read("90"),
+      read("30"),
+      read("95"),
+      read("20"),
+      read("half"),
+      read("4.5"),
+    ]).toEqual([45, 90, 30, null, null, null, null]);
   });
 
   test("an opacity nobody stated leaves no row behind for the next paint to find", () => {
@@ -64,7 +64,15 @@ describe("the city's answer", () => {
     const rows = memory();
     const door = loadPreferences(rows, "en");
     const before = get(door.held);
-    const held = { ...before, appearance: { ...before.appearance, reading: "libron" as const, glass: "off" as const, blend: 40 } };
+    const held = {
+      ...before,
+      appearance: {
+        ...before.appearance,
+        reading: "libron" as const,
+        glass: "off" as const,
+        blend: 40,
+      },
+    };
     const answer = {
       appearance: {
         lighting: "light" as const,

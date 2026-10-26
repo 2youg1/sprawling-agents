@@ -104,7 +104,10 @@
     const row = wantedRow();
     if (row === null) return;
     takeRow();
-    const next = stepLetter({ mail: { shown: open, focus: focusNow() }, opener: row, row: null }, { kind: "close" });
+    const next = stepLetter(
+      { mail: { shown: open, focus: focusNow() }, opener: row, row: null },
+      { kind: "close" },
+    );
     open = next.mail.shown;
     const target = next.row;
     if (target === null) return;
@@ -141,7 +144,8 @@
 
   // What needs the person, and what is merely new.
   const blocking = $derived(
-    $belief.notices.filter((notice) => !notice.seen && urgencyOf(notice.error) === "needs_you").length,
+    $belief.notices.filter((notice) => !notice.seen && urgencyOf(notice.error) === "needs_you")
+      .length,
   );
   // The cards open on the documents this page saw proposals for: the
   // only questions a closed mailbox asks (4-49, 4-55).

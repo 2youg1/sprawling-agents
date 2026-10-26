@@ -21,7 +21,11 @@ export type Columns = "one" | "twelve";
 // workbench's dividers outside its box.
 export function watchColumns(element: Element, onColumns: (columns: Columns) => void): () => void {
   const report = (): void => {
-    onColumns(getComputedStyle(element).getPropertyValue("--shell-columns").trim() === "1" ? "one" : "twelve");
+    onColumns(
+      getComputedStyle(element).getPropertyValue("--shell-columns").trim() === "1"
+        ? "one"
+        : "twelve",
+    );
   };
   report();
   const observer = new ResizeObserver(report);
@@ -45,7 +49,10 @@ export function watchColumns(element: Element, onColumns: (columns: Columns) => 
 export function followViewport(frame: HTMLElement, viewport: VisualViewport): () => void {
   const follow = (): void => {
     frame.style.setProperty("--viewport-block", `${String(viewport.height * viewport.scale)}px`);
-    frame.style.setProperty("--viewport-top", `${String(viewport.scale > 1 ? 0 : viewport.offsetTop)}px`);
+    frame.style.setProperty(
+      "--viewport-top",
+      `${String(viewport.scale > 1 ? 0 : viewport.offsetTop)}px`,
+    );
   };
   follow();
   viewport.addEventListener("resize", follow);

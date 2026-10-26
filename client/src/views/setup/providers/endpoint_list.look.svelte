@@ -51,7 +51,10 @@
           </div>
         {/if}
         <details class="mt-snug">
-          <summary class="w-fit cursor-pointer rounded-control px-tight text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive">{row.accounts}</summary>
+          <summary
+            class="w-fit cursor-pointer rounded-control px-tight text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
+            >{row.accounts}</summary
+          >
           <div class="pt-snug">
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render look.accounts(row.name)}

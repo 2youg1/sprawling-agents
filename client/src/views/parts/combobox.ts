@@ -84,7 +84,8 @@ const PASS: Answer = { kind: "pass" };
 // input method is composing passes, whatever it is (client D99).
 export function answer(pressed: Pressed, origin: Origin, cursor: number, count: number): Answer {
   if (pressed.isComposing) return PASS;
-  if (origin === "trigger") return pressed.key === "Escape" ? { kind: "close", focus: "opener" } : PASS;
+  if (origin === "trigger")
+    return pressed.key === "Escape" ? { kind: "close", focus: "opener" } : PASS;
   const last = Math.max(0, count - 1);
   switch (pressed.key) {
     case "ArrowDown":
@@ -266,7 +267,12 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       hands.act(answered);
     };
   return {
-    root: { onfocusout: (event) => { hands.leave(event.relatedTarget); }, [HOLD]: hands.holds.root },
+    root: {
+      onfocusout: (event) => {
+        hands.leave(event.relatedTarget);
+      },
+      [HOLD]: hands.holds.root,
+    },
     trigger: {
       type: "button",
       "aria-label": props.label,
@@ -287,7 +293,9 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       "aria-activedescendant": open && rows.length > 0 ? rowId(uid, cursor) : undefined,
       placeholder: props.placeholder,
       value: view.query,
-      oninput: (event) => { hands.type(event.currentTarget.value); },
+      oninput: (event) => {
+        hands.type(event.currentTarget.value);
+      },
       onkeydown: keyed("field"),
       [HOLD]: hands.holds.search,
     },
@@ -295,7 +303,9 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       id: `${uid}-list`,
       role: "listbox",
       "aria-label": props.label,
-      onmousedown: (event) => { event.preventDefault(); },
+      onmousedown: (event) => {
+        event.preventDefault();
+      },
       [HOLD]: hands.holds.list,
     },
     options: rows.map((choice, index) => ({
@@ -308,8 +318,12 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
         id: rowId(uid, index),
         role: "option",
         "aria-selected": choice.value === props.value,
-        onmouseenter: () => { hands.point(index); },
-        onclick: () => { hands.take(choice); },
+        onmouseenter: () => {
+          hands.point(index);
+        },
+        onclick: () => {
+          hands.take(choice);
+        },
       },
     })),
     empty: props.empty,

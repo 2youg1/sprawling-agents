@@ -61,7 +61,8 @@ export function rowsOf(answer: CatalogAnswer, scope: Scope): readonly Row[] {
   const city = tableOf(answer.city);
   const building = tableOf(answer.stated);
   return answer.tools.map((tool) => {
-    const said = (table: Table): Exposure | undefined => table.tools[tool.name] ?? table.namespaces[tool.namespace];
+    const said = (table: Table): Exposure | undefined =>
+      table.tools[tool.name] ?? table.namespaces[tool.namespace];
     return {
       tool,
       fixed: tool.from === "fixed",
@@ -93,12 +94,20 @@ function omit(record: Readonly<Record<string, Exposure>>, key: string): Record<s
 export function pressRow(table: Table, row: Row, value: Exposure): Table {
   if (row.fixed) return table;
   const tools = omit(table.tools, row.tool.name);
-  return { ...table, tools: value === without(table, row) ? tools : { ...tools, [row.tool.name]: value } };
+  return {
+    ...table,
+    tools: value === without(table, row) ? tools : { ...tools, [row.tool.name]: value },
+  };
 }
 
 // One press on a namespace: every member's tool key goes, and the
 // namespace key is written unless every member inherits that value.
-export function pressGroup(rows: readonly Row[], table: Table, namespace: string, value: Exposure): Table {
+export function pressGroup(
+  rows: readonly Row[],
+  table: Table,
+  namespace: string,
+  value: Exposure,
+): Table {
   const members = rows.filter((row) => row.tool.namespace === namespace && !row.fixed);
   const tools = members.reduce((held, row) => omit(held, row.tool.name), { ...table.tools });
   const namespaces = members.every((row) => row.inherited === value)
@@ -153,7 +162,11 @@ export interface CatalogLook {
   // Said instead of the rows before the building's first run.
   readonly empty: string | undefined;
   readonly groups: readonly GroupLook[];
-  readonly save: { readonly label: string; readonly why: string | undefined; readonly onPress: () => void };
+  readonly save: {
+    readonly label: string;
+    readonly why: string | undefined;
+    readonly onPress: () => void;
+  };
   readonly note: string;
 }
 
@@ -203,7 +216,11 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
   const saved = draftOf(seat.answer, seat.scope);
   const delta = meterOf(saved, seat.draft, rows);
   const choices = (why: string | undefined): readonly Choice<Exposure>[] =>
-    EXPOSURES.map((value) => ({ value, label: say(lang, EXPOSURE_WORD[value]), ...(why === undefined ? {} : { why }) }));
+    EXPOSURES.map((value) => ({
+      value,
+      label: say(lang, EXPOSURE_WORD[value]),
+      ...(why === undefined ? {} : { why }),
+    }));
   const namespaces = [...new Set(rows.map((row) => row.tool.namespace))];
   return {
     scopeLabel: say(lang, "catalog_scope"),
@@ -217,7 +234,12 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
       core: count(seat.answer.core_bytes),
       index: count(seat.answer.index_bytes),
     }),
-    delta: seat.edited && delta !== 0 ? fill(say(lang, delta > 0 ? "catalog_more" : "catalog_less"), { n: count(Math.abs(delta)) }) : undefined,
+    delta:
+      seat.edited && delta !== 0
+        ? fill(say(lang, delta > 0 ? "catalog_more" : "catalog_less"), {
+            n: count(Math.abs(delta)),
+          })
+        : undefined,
     empty: seat.answer.run == null ? say(lang, "catalog_no_run") : undefined,
     groups: namespaces.map((namespace) => {
       const members = rows.filter((row) => row.tool.namespace === namespace);
@@ -233,7 +255,9 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
           off: String(tally[2] ?? 0),
         }),
         open: members.length <= OPEN_GROUP,
-        choices: choices(members.every((row) => row.fixed) ? say(lang, "catalog_fixed") : undefined),
+        choices: choices(
+          members.every((row) => row.fixed) ? say(lang, "catalog_fixed") : undefined,
+        ),
         held: held.every((each) => each === held[0]) ? (held[0] ?? null) : null,
         onPick: (value) => {
           hands.edit(pressGroup(rows, seat.draft, namespace, value));
@@ -254,7 +278,10 @@ function rowLook(
   row: Row,
   seat: Seat,
   lang: Lang,
-  hands: { readonly choices: (why: string | undefined) => readonly Choice<Exposure>[]; readonly edit: (draft: Table) => void },
+  hands: {
+    readonly choices: (why: string | undefined) => readonly Choice<Exposure>[];
+    readonly edit: (draft: Table) => void;
+  },
 ): RowLook {
   const last = row.tool.last_used;
   const used =

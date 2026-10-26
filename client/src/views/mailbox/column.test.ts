@@ -30,9 +30,17 @@ describe("the mailbox column's head", () => {
   });
 
   test("says a link on its way up and offers no recovery", () => {
-    const ways: readonly LinkState[] = [{ kind: "idle" }, { kind: "opening" }, { kind: "handshaking" }, { kind: "backoff", attempt: 1 }];
+    const ways: readonly LinkState[] = [
+      { kind: "idle" },
+      { kind: "opening" },
+      { kind: "handshaking" },
+      { kind: "backoff", attempt: 1 },
+    ];
     for (const link of ways) {
-      expect(linkOf(link, "en", () => undefined)).toEqual({ word: "connecting…", recovery: undefined });
+      expect(linkOf(link, "en", () => undefined)).toEqual({
+        word: "connecting…",
+        recovery: undefined,
+      });
     }
   });
 

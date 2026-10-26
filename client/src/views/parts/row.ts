@@ -135,7 +135,11 @@ function courseOf(step: Step, from: number, last: number): readonly [number, num
 // The control a step lands on, given each row's first reachable control
 // in order (undefined for a row offering none - a spacer, a sentinel -
 // which the walk steps over). Undefined when the step runs off an end.
-export function landing<T>(reach: readonly (T | undefined)[], step: Step, from: number): T | undefined {
+export function landing<T>(
+  reach: readonly (T | undefined)[],
+  step: Step,
+  from: number,
+): T | undefined {
   const [start, by] = courseOf(step, from, reach.length - 1);
   for (let at = start; at >= 0 && at < reach.length; at += by) {
     const found = reach[at];

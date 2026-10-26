@@ -25,7 +25,24 @@ export const SIGNATURE_BYTES = ED25519_SIGNATURE_BYTES + 2420;
 const DERIVATION_SALT = new TextEncoder().encode("sprawling remote key v1");
 // RFC 8410's PKCS #8 wrapping of a raw Ed25519 private key, the one form
 // WebCrypto imports one from.
-const ED25519_PKCS8 = Uint8Array.of(0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20);
+const ED25519_PKCS8 = Uint8Array.of(
+  0x30,
+  0x2e,
+  0x02,
+  0x01,
+  0x00,
+  0x30,
+  0x05,
+  0x06,
+  0x03,
+  0x2b,
+  0x65,
+  0x70,
+  0x04,
+  0x22,
+  0x04,
+  0x20,
+);
 
 export interface DeviceKey {
   // Ed25519 then ML-DSA-44, as the city stores a device's key.
@@ -38,12 +55,19 @@ const postQuantum = () => import("@noble/post-quantum/ml-dsa.js");
 
 // The two 32-byte sub-seeds: HKDF-SHA256 under the derivation salt, one
 // label per half, so the halves share no key material.
-export async function halves(seed: Uint8Array<ArrayBuffer>): Promise<readonly [Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>]> {
+export async function halves(
+  seed: Uint8Array<ArrayBuffer>,
+): Promise<readonly [Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>]> {
   const material = await crypto.subtle.importKey("raw", seed, "HKDF", false, ["deriveBits"]);
   const half = async (label: string) =>
     new Uint8Array(
       await crypto.subtle.deriveBits(
-        { name: "HKDF", hash: "SHA-256", salt: DERIVATION_SALT, info: new TextEncoder().encode(label) },
+        {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: DERIVATION_SALT,
+          info: new TextEncoder().encode(label),
+        },
         material,
         256,
       ),
@@ -67,11 +91,18 @@ export async function keyFrom(seed: Uint8Array<ArrayBuffer>): Promise<DeviceKey 
   if (kept === null || edPublic === null) return null;
   const { ml_dsa44 } = await postQuantum();
   const ml = ml_dsa44.keygen(mlSeed);
-  return { public: new Uint8Array([...edPublic, ...ml.publicKey]), ed25519: kept, mlDsa: ml.secretKey };
+  return {
+    public: new Uint8Array([...edPublic, ...ml.publicKey]),
+    ed25519: kept,
+    mlDsa: ml.secretKey,
+  };
 }
 
 // Both halves' signatures, Ed25519 first; null when either refused.
-export async function sign(key: DeviceKey, message: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer> | null> {
+export async function sign(
+  key: DeviceKey,
+  message: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer> | null> {
   const ed = await crypto.subtle.sign({ name: "Ed25519" }, key.ed25519, message).catch(() => null);
   const { ml_dsa44 } = await postQuantum();
   const ml = Result.getOrNull(Result.try(() => ml_dsa44.sign(message, key.mlDsa)));
@@ -86,15 +117,26 @@ export async function verifies(
 ): Promise<boolean> {
   if (publicKey.length !== PUBLIC_BYTES || signature.length !== SIGNATURE_BYTES) return false;
   const edHolds = await crypto.subtle
-    .importKey("raw", publicKey.slice(0, ED25519_PUBLIC_BYTES), { name: "Ed25519" }, false, ["verify"])
+    .importKey("raw", publicKey.slice(0, ED25519_PUBLIC_BYTES), { name: "Ed25519" }, false, [
+      "verify",
+    ])
     .then((key) =>
-      crypto.subtle.verify({ name: "Ed25519" }, key, signature.slice(0, ED25519_SIGNATURE_BYTES), message),
+      crypto.subtle.verify(
+        { name: "Ed25519" },
+        key,
+        signature.slice(0, ED25519_SIGNATURE_BYTES),
+        message,
+      ),
     )
     .catch(() => false);
   const { ml_dsa44 } = await postQuantum();
   const mlHolds = Result.getOrElse(
     Result.try(() =>
-      ml_dsa44.verify(signature.slice(ED25519_SIGNATURE_BYTES), message, publicKey.slice(ED25519_PUBLIC_BYTES)),
+      ml_dsa44.verify(
+        signature.slice(ED25519_SIGNATURE_BYTES),
+        message,
+        publicKey.slice(ED25519_PUBLIC_BYTES),
+      ),
     ),
     () => false,
   );
@@ -103,5 +145,7 @@ export async function verifies(
 
 function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
   const padded = text.replace(/-/g, "+").replace(/_/g, "/");
-  return Result.getOrNull(Result.try(() => Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))));
+  return Result.getOrNull(
+    Result.try(() => Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))),
+  );
 }

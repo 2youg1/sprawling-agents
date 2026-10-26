@@ -34,7 +34,9 @@
   const { lang } = u;
 
   const asked = $derived(u.conn.asking.ask({ proposals: doc }));
-  const read = $derived(readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)));
+  const read = $derived(
+    readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)),
+  );
   const open = $derived(read.kind === "held" ? read.value.open : []);
   const version = $derived(read.kind === "held" ? (read.value.version ?? null) : null);
   const id = $props.id();

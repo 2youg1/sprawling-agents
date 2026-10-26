@@ -21,7 +21,16 @@ import type { Readable } from "svelte/store";
 
 import type { Key } from "../../core/lang";
 import { STACK_SHAPE } from "../../core/appearance";
-import type { Appearance, Chroma, Density, Face, Glass, Lighting, Motion, ReadingFace } from "../../core/appearance";
+import type {
+  Appearance,
+  Chroma,
+  Density,
+  Face,
+  Glass,
+  Lighting,
+  Motion,
+  ReadingFace,
+} from "../../core/appearance";
 import type { PreferenceDoor } from "../../core/prefs";
 import { motionOff } from "../shared/motion";
 
@@ -174,7 +183,12 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
 // press on the switch that started it does not miss.
 function wearLighting(root: HTMLElement, lighting: "dark" | "light"): void {
   const was = root.dataset.theme;
-  if (was === undefined || was === lighting || !("startViewTransition" in document) || motionOff(root)) {
+  if (
+    was === undefined ||
+    was === lighting ||
+    !("startViewTransition" in document) ||
+    motionOff(root)
+  ) {
     root.dataset.theme = lighting;
     return;
   }

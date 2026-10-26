@@ -32,7 +32,10 @@
   let waiting = $state<ExportFormat | null>(null);
   let missed = $state<Exported | null>(null);
   // The open wait of each format; the button's busy state allows one.
-  const waits: Record<ExportFormat, (() => void) | undefined> = { jsonl: undefined, csv: undefined };
+  const waits: Record<ExportFormat, (() => void) | undefined> = {
+    jsonl: undefined,
+    csv: undefined,
+  };
   onDestroy(() => {
     for (const format of FORMATS) waits[format]?.();
   });
@@ -51,7 +54,8 @@
       const exported = exportedOf(answer);
       if (exported === undefined) return;
       // wording-ok: a file name, spelled the same in every language.
-      if (exported.kind === "file") saveFile(`${what}-usage.${format}`, TYPES[format], exported.body);
+      if (exported.kind === "file")
+        saveFile(`${what}-usage.${format}`, TYPES[format], exported.body);
       else missed = exported;
       waiting = null;
       waits[format] = undefined;
@@ -62,7 +66,10 @@
 
   const unavailable = $derived.by(() => {
     if (missed?.kind !== "unavailable") return undefined;
-    return { said: fill(say($lang, "answer_unavailable"), { query: missed.query }), reason: missed.reason };
+    return {
+      said: fill(say($lang, "answer_unavailable"), { query: missed.query }),
+      reason: missed.reason,
+    };
   });
 </script>
 

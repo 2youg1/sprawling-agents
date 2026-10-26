@@ -50,7 +50,12 @@ export interface RowWire {
 }
 
 export type RowBody =
-  | { readonly kind: "building"; readonly name: string; readonly asking: number; readonly runs: number }
+  | {
+      readonly kind: "building";
+      readonly name: string;
+      readonly asking: number;
+      readonly runs: number;
+    }
   | { readonly kind: "room"; readonly name: string }
   | {
       readonly kind: "run";
@@ -82,9 +87,17 @@ export interface BoardLook {
       readonly wire: { readonly type: "button"; readonly onclick: () => void };
     }[];
   } | null;
-  readonly legend: { readonly label: string; readonly phases: readonly { readonly phase: Phase; readonly word: string }[] };
+  readonly legend: {
+    readonly label: string;
+    readonly phases: readonly { readonly phase: Phase; readonly word: string }[];
+  };
   // `wide` marks a fold the scale names only where the board has room.
-  readonly folds: readonly { readonly minutes: number; readonly at: number; readonly label: string; readonly wide: boolean }[];
+  readonly folds: readonly {
+    readonly minutes: number;
+    readonly at: number;
+    readonly label: string;
+    readonly wide: boolean;
+  }[];
   readonly now: string;
   readonly tree: TreeWire;
   // The height, in pixels, of the rows above and below the drawn window,
@@ -143,7 +156,10 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
               },
             })),
           },
-    legend: { label: say(lang, "runs_legend"), phases: PHASES.map((phase) => ({ phase, word: say(lang, PHASE_WORD[phase]) })) },
+    legend: {
+      label: say(lang, "runs_legend"),
+      phases: PHASES.map((phase) => ({ phase, word: say(lang, PHASE_WORD[phase]) })),
+    },
     folds: FOLDS.filter((fold) => fold.minutes > 0).map((fold) => ({
       minutes: fold.minutes,
       at: fold.at,
@@ -219,7 +235,9 @@ function bodyOf(row: Row, lang: Lang, now: number): RowBody {
 function titleOf(run: BoardRun, lang: Lang): string {
   const words = [run.task, run.goal].find((said) => said !== null && said.trim() !== "");
   if (words !== undefined && words !== null) return words;
-  return run.addr === null ? say(lang, "runs_untitled") : fill(say(lang, "runs_untitled_in"), { addr: run.addr });
+  return run.addr === null
+    ? say(lang, "runs_untitled")
+    : fill(say(lang, "runs_untitled_in"), { addr: run.addr });
 }
 
 // The bar draws what the belief knows: a run's life runs from its start

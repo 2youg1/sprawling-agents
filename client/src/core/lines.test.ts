@@ -9,14 +9,22 @@ import { SEQUENCE_MS, initialOf, initialTyped, lineFaces, lineWalker } from "./l
 import type { Pressed } from "./press";
 
 function press(key: string, held: Partial<Pressed> = {}): Pressed {
-  return { key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, target: "page", ...held };
+  return {
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    target: "page",
+    ...held,
+  };
 }
 
 describe("walking the lines of a list", () => {
   test("j, k, the arrows, G, End, Home, Enter and Escape are one move each", () => {
     const walk = lineWalker();
-    const moves = ["j", "ArrowDown", "k", "ArrowUp", "G", "End", "Home", "Enter", "Escape"].map((key, at) =>
-      walk(press(key, { shiftKey: key === "G" }), at * 2000),
+    const moves = ["j", "ArrowDown", "k", "ArrowUp", "G", "End", "Home", "Enter", "Escape"].map(
+      (key, at) => walk(press(key, { shiftKey: key === "G" }), at * 2000),
     );
     expect(moves).toEqual([
       "line.next",
@@ -34,12 +42,19 @@ describe("walking the lines of a list", () => {
   test("gg is two g inside the sequence time, and only then", () => {
     const walk = lineWalker();
     expect([walk(press("g"), 0), walk(press("g"), SEQUENCE_MS)]).toEqual([null, "line.first"]);
-    expect([walk(press("g"), 5000), walk(press("g"), 5000 + SEQUENCE_MS + 1)]).toEqual([null, null]);
+    expect([walk(press("g"), 5000), walk(press("g"), 5000 + SEQUENCE_MS + 1)]).toEqual([
+      null,
+      null,
+    ]);
   });
 
   test("another key between the two g drops the first", () => {
     const walk = lineWalker();
-    expect([walk(press("g"), 0), walk(press("j"), 10), walk(press("g"), 20)]).toEqual([null, "line.next", null]);
+    expect([walk(press("g"), 0), walk(press("j"), 10), walk(press("g"), 20)]).toEqual([
+      null,
+      "line.next",
+      null,
+    ]);
   });
 
   test("a press in a field or holding a modifier is not a move", () => {

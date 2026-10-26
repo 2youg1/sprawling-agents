@@ -18,7 +18,8 @@
   import type { Seat } from "./notice";
 
   const PAINT: Record<Seat, string> = {
-    toast: "toast rise rounded-panel border border-edge-panel bg-raised px-pane py-base shadow-float",
+    toast:
+      "toast rise rounded-panel border border-edge-panel bg-raised px-pane py-base shadow-float",
     inline: "fade mt-tight rounded-card border border-edge-input px-snug py-tight",
     drawer: "fade w-full border-b border-edge px-base py-snug",
   };
@@ -31,13 +32,24 @@
   const look: NoticeLook = $props();
 </script>
 
-<div {...look.region} class={[PAINT[look.seat], "flex min-w-0 flex-wrap items-start justify-between gap-base text-note"]}>
+<div
+  {...look.region}
+  class={[
+    PAINT[look.seat],
+    "flex min-w-0 flex-wrap items-start justify-between gap-base text-note",
+  ]}
+>
   <!-- The words keep a readable measure and the buttons move under them
   when the seat is narrower than both, rather than the words being
   squeezed to one character a line beside buttons that never shrink. -->
   <div class="flex min-w-0 grow basis-[16rem] flex-col gap-tight">
     <div class="flex min-w-0 flex-wrap items-baseline gap-snug">
-      <span class={["min-w-0 font-label wrap-anywhere", look.weight === "alert" ? "text-alert" : "text-text"]}>
+      <span
+        class={[
+          "min-w-0 font-label wrap-anywhere",
+          look.weight === "alert" ? "text-alert" : "text-text",
+        ]}
+      >
         {look.title}
       </span>
       {#if look.at !== undefined}
@@ -55,8 +67,12 @@
     {/if}
     {#if look.fold !== undefined}
       <details class="min-w-0">
-        <summary class="cursor-pointer text-note text-text-faint hover:text-text">{look.fold.summary}</summary>
-        <div class="mt-tight flex min-w-0 flex-col gap-tight wrap-anywhere font-mono text-note text-text-quiet">
+        <summary class="cursor-pointer text-note text-text-faint hover:text-text"
+          >{look.fold.summary}</summary
+        >
+        <div
+          class="mt-tight flex min-w-0 flex-col gap-tight wrap-anywhere font-mono text-note text-text-quiet"
+        >
           {#each look.fold.lines as line, at (at)}
             <span>{line}</span>
           {/each}

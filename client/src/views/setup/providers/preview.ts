@@ -127,9 +127,7 @@ function configToml(draft: Draft, reference: string): string {
 function requestPreview(draft: Draft, reference: string, model: string): string {
   const url = `${draft.baseUrl.trim()}${callPath(draft.wireApi)}`;
   const header =
-    draft.wireApi === "messages"
-      ? `x-api-key: ${reference}`
-      : `authorization: Bearer ${reference}`;
+    draft.wireApi === "messages" ? `x-api-key: ${reference}` : `authorization: Bearer ${reference}`;
   const written = [
     `POST ${url === callPath(draft.wireApi) ? "<base_url>" : url}`,
     header,
@@ -158,9 +156,24 @@ export interface ReadingLook {
   readonly wraps: boolean;
 }
 
-export function readingsOf(draft: Draft, reference: string, model: string, lang: Lang): readonly ReadingLook[] {
+export function readingsOf(
+  draft: Draft,
+  reference: string,
+  model: string,
+  lang: Lang,
+): readonly ReadingLook[] {
   return [
-    { key: "toml", title: say(lang, "setup_preview_toml"), text: configToml(draft, reference), wraps: true },
-    { key: "request", title: say(lang, "setup_preview_request"), text: requestPreview(draft, reference, model), wraps: false },
+    {
+      key: "toml",
+      title: say(lang, "setup_preview_toml"),
+      text: configToml(draft, reference),
+      wraps: true,
+    },
+    {
+      key: "request",
+      title: say(lang, "setup_preview_request"),
+      text: requestPreview(draft, reference, model),
+      wraps: false,
+    },
   ];
 }

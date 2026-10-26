@@ -48,7 +48,14 @@ export function opened(answer: DocumentAnswer): Opened {
     const empty = state.empty;
     return {
       kind: "text",
-      gathering: { version: empty.version, format: empty.format, encoding: "utf8", bytes: 0, text: "", through: 0 },
+      gathering: {
+        version: empty.version,
+        format: empty.format,
+        encoding: "utf8",
+        bytes: 0,
+        text: "",
+        through: 0,
+      },
     };
   }
   const held = state.held;
@@ -96,9 +103,9 @@ export function nextSpan(gathering: Gathering): Span | null {
 // the city saying the version ends there.
 export function joined(gathering: Gathering, answer: RangeAnswer): Gathering {
   const window = answer.window;
-  if (answer.version !== gathering.version || window.span.start !== gathering.through) return gathering;
+  if (answer.version !== gathering.version || window.span.start !== gathering.through)
+    return gathering;
   return window.span.end === window.span.start
     ? { ...gathering, bytes: gathering.through }
     : { ...gathering, text: gathering.text + window.text, through: window.span.end };
 }
-

@@ -18,7 +18,13 @@
   import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
   import { Table, type Column } from "../parts/table";
-  import type { ChoiceLook, ColumnKey, FigureLook, ModelRowLook, ModelTableLook } from "./model_table";
+  import type {
+    ChoiceLook,
+    ColumnKey,
+    FigureLook,
+    ModelRowLook,
+    ModelTableLook,
+  } from "./model_table";
 
   const look: ModelTableLook = $props();
 
@@ -149,7 +155,9 @@
         onInput={look.search.input}
       />
     </div>
-    <label class="flex h-control shrink-0 cursor-pointer items-center gap-tight whitespace-nowrap rounded-control px-snug text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive">
+    <label
+      class="flex h-control shrink-0 cursor-pointer items-center gap-tight whitespace-nowrap rounded-control px-snug text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
+    >
       <input
         type="checkbox"
         checked={look.textOnly.on}

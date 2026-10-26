@@ -87,7 +87,9 @@ describe("a copy key's receipt", () => {
     press("secret-free text");
     writes[0]?.refuse(new Error("Document is not focused."));
     await settle();
-    expect(shown).toEqual([{ kind: "refused", why: { kind: "refused", said: "Document is not focused." } }]);
+    expect(shown).toEqual([
+      { kind: "refused", why: { kind: "refused", said: "Document is not focused." } },
+    ]);
     expect(time.waits).toEqual([]);
   });
 
@@ -123,7 +125,12 @@ describe("what a look of the copy key is given", () => {
 
   test("a bare key names itself for a screen reader, and a refusal replaces the note with the reason", () => {
     const refused: Copied = { kind: "refused", why: { kind: "absent" } };
-    const look = lookOf({ text: () => "a whole file", note: "the file", form: "bare" }, refused, "en", press);
+    const look = lookOf(
+      { text: () => "a whole file", note: "the file", form: "bare" },
+      refused,
+      "en",
+      press,
+    );
     expect(look.key["aria-label"]).toBe(say("en", "copy_refused"));
     expect(look.note).toBe(say("en", "copy_no_clipboard"));
     expect(look.said).toBe(say("en", "copy_refused"));

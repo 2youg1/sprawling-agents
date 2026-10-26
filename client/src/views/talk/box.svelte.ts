@@ -33,7 +33,8 @@ export class TextBox {
   constructor(words: () => string) {
     $effect(() => {
       const written = words();
-      if (this.element !== undefined && this.element.value !== written) this.element.value = written;
+      if (this.element !== undefined && this.element.value !== written)
+        this.element.value = written;
     });
   }
 

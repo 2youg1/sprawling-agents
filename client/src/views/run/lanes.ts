@@ -51,7 +51,11 @@ export const OVERSCAN = 8;
 
 // `tail` is what a live run is doing now, which decides its last
 // stretch; a run that is over passes `null`.
-export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | null): readonly Stretch[] {
+export function stretchesOf(
+  turns: readonly Turn[],
+  end: number,
+  tail: Share | null,
+): readonly Stretch[] {
   return turns.flatMap((turn, at) => {
     const to = Math.max(turn.t, turns[at + 1]?.t ?? end);
     const whole = (share: Share): Stretch[] => [{ share, turn: turn.number, from: turn.t, to }];
@@ -61,7 +65,11 @@ export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | n
     if (first === undefined) return worked(turn, to);
     const within = (moment: number): number => Math.min(to, Math.max(turn.t, moment));
     const since = within(first.t);
-    return waited(turn, { since, until: Math.max(since, within(waits.at(-1)?.answered ?? to)) }, to);
+    return waited(
+      turn,
+      { since, until: Math.max(since, within(waits.at(-1)?.answered ?? to)) },
+      to,
+    );
   });
 }
 
@@ -69,11 +77,21 @@ export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | n
 // were recorded: the person holds the span between, and either side is
 // cut like any other turn by the calls made there. An answer the wire
 // does not carry leaves the rest of the turn the person's.
-function waited(turn: Turn, wait: { readonly since: number; readonly until: number }, to: number): Stretch[] {
+function waited(
+  turn: Turn,
+  wait: { readonly since: number; readonly until: number },
+  to: number,
+): Stretch[] {
   const before = { ...turn, calls: turn.calls.filter((call) => call.called < wait.since) };
-  const after = { ...turn, t: TimeMs.make(wait.until), calls: turn.calls.filter((call) => call.called >= wait.until) };
+  const after = {
+    ...turn,
+    t: TimeMs.make(wait.until),
+    calls: turn.calls.filter((call) => call.called >= wait.until),
+  };
   const person: Stretch = { share: "person", turn: turn.number, from: wait.since, to: wait.until };
-  return [...worked(before, wait.since), person, ...worked(after, to)].filter((part) => part.to > part.from);
+  return [...worked(before, wait.since), person, ...worked(after, to)].filter(
+    (part) => part.to > part.from,
+  );
 }
 
 function worked(turn: Turn, to: number): Stretch[] {
@@ -105,7 +123,12 @@ function cut(number: number, from: number, to: number, calls: readonly Call[]): 
 // The stretches as boxes over `columns` columns spanning `from`..`to`:
 // each column takes the stretch under its middle, and neighbouring
 // columns of one share become one box. `stretches` is in time order.
-export function columnsOf(stretches: readonly Stretch[], from: number, to: number, columns: number): readonly Segment[] {
+export function columnsOf(
+  stretches: readonly Stretch[],
+  from: number,
+  to: number,
+  columns: number,
+): readonly Segment[] {
   const width = Math.max(1, to - from) / Math.max(1, columns);
   const out: Segment[] = [];
   let open: { share: Share; first: number } | null = null;
@@ -170,7 +193,9 @@ export function figuresOf(turns: readonly Turn[]): Figures {
       input: sum.input + (turn.used?.input ?? 0),
       output: sum.output + (turn.used?.output ?? 0),
       cached:
-        turn.used?.cached === undefined || turn.used.cached === null ? sum.cached : (sum.cached ?? 0) + turn.used.cached,
+        turn.used?.cached === undefined || turn.used.cached === null
+          ? sum.cached
+          : (sum.cached ?? 0) + turn.used.cached,
       usd: sum.usd + (turn.spent ?? 0),
     }),
     { input: 0, output: 0, cached: null, usd: 0 },

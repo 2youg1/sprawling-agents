@@ -13,7 +13,14 @@
 import type { Key, Lang } from "../../core/lang";
 import { calendarDay } from "../../core/time";
 import type { Weight } from "../parts/glyph";
-import type { AgentCatalogAnswer, AgentLine, AgentOffer, AgentSource, LoginKind, PinState } from "../../wire";
+import type {
+  AgentCatalogAnswer,
+  AgentLine,
+  AgentOffer,
+  AgentSource,
+  LoginKind,
+  PinState,
+} from "../../wire";
 
 export type BoxReading =
   | { readonly kind: "search"; readonly typed: string }

@@ -28,11 +28,22 @@ comes in the bags. -->
     </Tip>
   {/if}
   {#if look.open}
-    <div {...look.popup} class="absolute top-full right-0 z-(--layer-popover) flex min-w-[20ch] flex-col rounded-card bg-raised p-tight shadow-float">
+    <div
+      {...look.popup}
+      class="absolute top-full right-0 z-(--layer-popover) flex min-w-[20ch] flex-col rounded-card bg-raised p-tight shadow-float"
+    >
       {#if look.naming !== undefined}
         <form {...look.naming.form} class="flex flex-col gap-tight p-tight">
-          <input {...look.naming.field} class="h-control-sm rounded-control bg-page px-snug text-note text-text" />
-          <p id={look.naming.hint.id} class={["text-note", look.naming.hint.wrong ? "text-alert" : "text-text-faint"]}>{look.naming.hint.text}</p>
+          <input
+            {...look.naming.field}
+            class="h-control-sm rounded-control bg-page px-snug text-note text-text"
+          />
+          <p
+            id={look.naming.hint.id}
+            class={["text-note", look.naming.hint.wrong ? "text-alert" : "text-text-faint"]}
+          >
+            {look.naming.hint.text}
+          </p>
         </form>
       {:else}
         <ul {...look.list}>

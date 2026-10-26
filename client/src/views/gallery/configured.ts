@@ -27,20 +27,28 @@ export const SEARCH: SettledSearch = {
 // can be in that a person has to read differently: stored, missing,
 // and read from an environment variable the page cannot write.
 export const ACCOUNTED: EndpointSummary = {
-  base_url: "https://api.zenmux.ai/v1",
+  base_url: "https://api.example.test/v1",
   connection_kind: "openai_compat",
   dialect: "open_ai",
   has_credential: true,
-  label: "ZenMux",
+  label: "Example",
   local: false,
-  models: [{ id: "fable", input_modalities: [], canonical: "fable", listing: "listed", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
-  name: "zenmux",
+  models: [
+    {
+      id: "fable",
+      input_modalities: [],
+      canonical: "fable",
+      listing: "listed",
+      thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+    },
+  ],
+  name: "example",
   tuning: {
     ...UNTUNED,
     accounts: [
-      { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
-      { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
-      { id: ServerLabel.make("team"), reference: "secret:providers/zenmux.team" },
+      { id: ServerLabel.make("main"), reference: "secret:providers/example.main" },
+      { id: ServerLabel.make("spare"), reference: "secret:providers/example.spare" },
+      { id: ServerLabel.make("team"), reference: "secret:providers/example.team" },
     ],
   },
   account_status: [
@@ -58,19 +66,36 @@ export const UNLISTED: EndpointSummary = { ...ACCOUNTED, account_status: [], tun
 // with one keyed account, while the hall's own file turns search off:
 // the card edits the city's value and says the hall's stands apart.
 export const SEARCH_CUSTOM: SettledSearch = {
-  account_status: [{ supplier: ServerLabel.make("brave"), accounts: [{ id: ServerLabel.make("main"), key: "stored" }] }],
+  account_status: [
+    {
+      supplier: ServerLabel.make("brave"),
+      accounts: [{ id: ServerLabel.make("main"), key: "stored" }],
+    },
+  ],
   city: {
     custom: {
       selected: ServerLabel.make("brave"),
       suppliers: [
-        { id: ServerLabel.make("tavily"), url: "https://mcp.tavily.invalid/mcp", remote: "tavily_search", query_field: "query", accounts: [] },
+        {
+          id: ServerLabel.make("tavily"),
+          url: "https://mcp.tavily.invalid/mcp",
+          remote: "tavily_search",
+          query_field: "query",
+          accounts: [],
+        },
         {
           id: ServerLabel.make("brave"),
           url: "https://mcp.brave.invalid/mcp",
           remote: "brave_web_search",
           query_field: "query",
           count_field: "count",
-          accounts: [{ id: ServerLabel.make("main"), reference: "secret:search/brave.main", header: "x-subscription-token" }],
+          accounts: [
+            {
+              id: ServerLabel.make("main"),
+              reference: "secret:search/brave.main",
+              header: "x-subscription-token",
+            },
+          ],
         },
       ],
     },

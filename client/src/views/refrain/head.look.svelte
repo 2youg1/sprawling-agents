@@ -22,13 +22,17 @@
 <div class="head">
   <div class="where">
     <p class="flex min-w-0 items-baseline truncate">
-      <span class="truncate text-text-faint">{look.place.folder}</span><span class="text-text-quiet">{look.place.name}</span>
+      <span class="truncate text-text-faint">{look.place.folder}</span><span class="text-text-quiet"
+        >{look.place.name}</span
+      >
     </p>
     {#if look.version !== null}
       <span class="shrink-0 text-text-faint">{look.version}</span>
     {/if}
-    <span {...look.wire} class={["receipt", look.receipt === null && "sr-only"]} data-alert={look.receipt?.alert ?? false}
-      >{look.receipt?.text ?? ""}</span
+    <span
+      {...look.wire}
+      class={["receipt", look.receipt === null && "sr-only"]}
+      data-alert={look.receipt?.alert ?? false}>{look.receipt?.text ?? ""}</span
     >
   </div>
   <div class="flex shrink-0 items-center gap-snug">

@@ -14,7 +14,11 @@ import type { LinkState } from "../../core/link";
 import { mailboxKey } from "./key";
 import type { MailboxWire } from "./key";
 
-const WIRE: MailboxWire = { "aria-expanded": false, "aria-controls": "m-column", onclick: () => undefined };
+const WIRE: MailboxWire = {
+  "aria-expanded": false,
+  "aria-controls": "m-column",
+  onclick: () => undefined,
+};
 const LIVE: LinkState = { kind: "live", city: "sprawling" };
 const words = (name: string): string => name;
 
@@ -33,7 +37,11 @@ describe("the mailbox key", () => {
 
   test("carries nothing when nothing waits and the link is live", () => {
     const look = mailboxKey({ needs: 0, fresh: false, link: LIVE }, "en", words, WIRE);
-    expect([look.corner, look.foot, look.hint]).toEqual([{ kind: "none" }, { kind: "none" }, "mailbox"]);
+    expect([look.corner, look.foot, look.hint]).toEqual([
+      { kind: "none" },
+      { kind: "none" },
+      "mailbox",
+    ]);
   });
 
   test("bars the link that is not live, pulsing only while it is on its way up", () => {
@@ -45,7 +53,15 @@ describe("the mailbox key", () => {
       [
         {
           kind: "refused",
-          error: { action: "open", code: "E_WIRE_MISMATCH", gate: null, nearby: [], recovery: "reload", retry: "no", subject: "wire" },
+          error: {
+            action: "open",
+            code: "E_WIRE_MISMATCH",
+            gate: null,
+            nearby: [],
+            recovery: "reload",
+            retry: "no",
+            subject: "wire",
+          },
         },
         "refused",
       ],
@@ -60,6 +76,9 @@ describe("the mailbox key", () => {
 
   test("is a button named by its whole reading, wired by the seat", () => {
     const look = mailboxKey({ needs: 0, fresh: false, link: LIVE }, "en", words, WIRE);
-    expect(look.key).toEqual({ as: "button", wire: { ...WIRE, type: "button", "aria-label": "mailbox" } });
+    expect(look.key).toEqual({
+      as: "button",
+      wire: { ...WIRE, type: "button", "aria-label": "mailbox" },
+    });
   });
 });

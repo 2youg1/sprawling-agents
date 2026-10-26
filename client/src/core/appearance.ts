@@ -43,7 +43,9 @@ export type Glass = WireGlass;
 // person can pick is therefore an option this build can load.
 export const LIGHTINGS: readonly Lighting[] = ["system", "dark", "light"];
 export const FACES: readonly Face[] = ["geist", "system", "custom"];
-export const READING_FACES: readonly ReadingFace[] = ReadingFaceSchema.members.map((face) => face.literal);
+export const READING_FACES: readonly ReadingFace[] = ReadingFaceSchema.members.map(
+  (face) => face.literal,
+);
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
