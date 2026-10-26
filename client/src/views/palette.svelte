@@ -128,6 +128,7 @@
   );
 
   const city = u.conn.asking.ask(QUERIES.city);
+  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
 
   const halted = $derived(cityIsShut($belief.halted));
@@ -289,6 +290,7 @@
       here,
       live,
       newest,
+      buildings,
       models,
       effort: $effort,
       setEffort: (level) => {

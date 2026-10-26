@@ -38,6 +38,7 @@ import { askQuit } from "./quitting";
 import { PAGE_VERBS } from "./slash_pages";
 import { given, stripped } from "./tags";
 import { CITY } from "./scope";
+import { buildingDestination, buildingOf } from "./route";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
 import { compact, fresh, retag } from "./slash_session";
 
@@ -293,6 +294,26 @@ export const SLASH: readonly Slash[] = [
       const address = addressed(call.words.at(0));
       if (address === null) return;
       hands.go({ kind: "talk", address });
+      hands.write("");
+    },
+  },
+  {
+    spelling: "/cd",
+    grammar: "[addr]",
+    about: "slash_cd",
+    section: "navigation",
+    run: (hands, call) => {
+      if (call.words.length === 0) {
+        hands.go({ kind: "city" });
+        hands.write("");
+        return;
+      }
+      // One top-level name only: a room or extra words are not a
+      // building destination, so the line stays for correction.
+      if (call.words.length !== 1) return;
+      const addr = addressed(call.words.at(0));
+      if (addr === null || buildingOf(addr) !== addr) return;
+      hands.go(buildingDestination(addr, hands.buildings).view);
       hands.write("");
     },
   },

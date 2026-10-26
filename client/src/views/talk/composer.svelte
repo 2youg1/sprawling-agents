@@ -186,6 +186,8 @@
   // ------------------------------------------------- what the city offers
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
+  const city = u.conn.asking.ask(QUERIES.city);
+  const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
@@ -222,6 +224,7 @@
         here,
         live,
         belief: get(belief),
+        buildings,
         models: offered.models,
         effort: get(effort),
         setEffort: u.chooseEffort,

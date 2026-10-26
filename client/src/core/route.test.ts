@@ -7,9 +7,11 @@ import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
 import { Address, B3Hash, RunId, Seq } from "../wire";
+import type { BuildingProgress } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,
+  buildingDestination,
   current,
   fromFragment,
   go,
@@ -45,6 +47,10 @@ const EVERY_VIEW: readonly View[] = [
   { kind: "setup" },
   ...SETUP_GROUPS.map((group): View => ({ kind: "setup", group })),
   { kind: "building", address: lab },
+  { kind: "raise" },
+  { kind: "raise", address: Address.make("notes") },
+  { kind: "monitor" },
+  { kind: "gallery" },
   { kind: "run", run: seven },
   { kind: "talk", address: parser, item: call },
   { kind: "talk", address: parser, item: file },
@@ -234,6 +240,24 @@ describe("deep links", () => {
     const odd = Address.make("lab/what?");
     expect(toFragment({ kind: "talk", address: odd })).toBe("#/talk/lab/what%3F");
     expect(fromFragment("#/talk/lab/what%3F")).toEqual(Option.some({ kind: "talk", address: odd }));
+  });
+});
+
+describe("building destinations", () => {
+  const notes = Address.make("notes");
+  const progress: BuildingProgress["progress"] = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
+  const buildings: readonly BuildingProgress[] = [
+    { addr: lab, adoptable: false, blocked: [], problems: [], progress, ready: 0 },
+    { addr: notes, adoptable: true, blocked: [], problems: [], progress, ready: 0 },
+  ];
+
+  test("an established building, an adoptable folder and an unknown name each have one destination and view", () => {
+    const unknown = Address.make("new-project");
+    expect([buildingDestination(lab, buildings), buildingDestination(notes, buildings), buildingDestination(unknown, buildings)]).toEqual([
+      { kind: "building", view: { kind: "building", address: lab } },
+      { kind: "adopt", view: { kind: "raise", address: notes } },
+      { kind: "build", view: { kind: "raise", address: unknown } },
+    ]);
   });
 });
 
