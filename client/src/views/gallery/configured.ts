@@ -27,11 +27,11 @@ export const SEARCH: SettledSearch = {
 // can be in that a person has to read differently: stored, missing,
 // and read from an environment variable the page cannot write.
 export const ACCOUNTED: EndpointSummary = {
-  base_url: "https://api.zenmux.ai/v1",
+  base_url: "https://api.example.test/v1",
   connection_kind: "openai_compat",
   dialect: "open_ai",
   has_credential: true,
-  label: "ZenMux",
+  label: "Example",
   local: false,
   models: [
     {
@@ -42,13 +42,13 @@ export const ACCOUNTED: EndpointSummary = {
       thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
     },
   ],
-  name: "zenmux",
+  name: "example",
   tuning: {
     ...UNTUNED,
     accounts: [
-      { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
-      { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
-      { id: ServerLabel.make("team"), reference: "secret:providers/zenmux.team" },
+      { id: ServerLabel.make("main"), reference: "secret:providers/example.main" },
+      { id: ServerLabel.make("spare"), reference: "secret:providers/example.spare" },
+      { id: ServerLabel.make("team"), reference: "secret:providers/example.team" },
     ],
   },
   account_status: [

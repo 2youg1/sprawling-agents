@@ -156,7 +156,7 @@ const HIDDEN: usize = 0;
   // numbers are the only thing left to read by.
   const UNNAMED = `error: the city refused to start
   because: CONFIG.toml names a provider with no key filed for it
-  try: sprawling attach --provider zenmux
+  try: sprawling attach --provider example
 `;
 </script>
 

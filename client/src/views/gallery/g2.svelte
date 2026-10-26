@@ -21,7 +21,7 @@ open picker stands in a box as tall as the page's foot gives it. -->
   import {
     AT_DEEPSEEK,
     AT_OLLAMA,
-    AT_OPENROUTER,
+    AT_AGGREGATOR,
     MANY_MODELS,
     MANY_PROVIDERS,
     ONE_PROVIDER,
@@ -33,7 +33,7 @@ open picker stands in a box as tall as the page's foot gives it. -->
   const stated = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, "xhigh");
   const local = pickerFacts(MANY_PROVIDERS, AT_OLLAMA, null);
   const alone = pickerFacts(ONE_PROVIDER, AT_OLLAMA, null);
-  const aggregated = pickerFacts(MANY_MODELS, AT_OPENROUTER, "medium");
+  const aggregated = pickerFacts(MANY_MODELS, AT_AGGREGATOR, "medium");
   const none = pickerFacts([], undefined, null);
   // The open picker alone, as its seat draws it once "more…" opened the
   // aggregator's models in full: the list scrolls inside the room it

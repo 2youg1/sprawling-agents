@@ -143,22 +143,22 @@ export const FIGURED: readonly FiguresLine[] = [
 // which is the difference the endpoint list exists to show. The first
 // lists two accounts, one whose key is stored and one whose is not.
 export const ENDPOINTS: EndpointsAnswer = {
-  chosen: [{ endpoint: "zenmux", model: CHOSEN.id, tag: "main" }],
+  chosen: [{ endpoint: "example", model: CHOSEN.id, tag: "main" }],
   endpoints: [
     {
-      base_url: "https://api.zenmux.ai/v1",
+      base_url: "https://api.example.test/v1",
       connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: true,
-      label: "ZenMux",
+      label: "Example",
       local: false,
       models: [facts(FABLE, 204_800, 64_000), facts(NUCLEUS, 400_000, null)],
-      name: "zenmux",
+      name: "example",
       tuning: {
         ...UNTUNED,
         accounts: [
-          { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
-          { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
+          { id: ServerLabel.make("main"), reference: "secret:providers/example.main" },
+          { id: ServerLabel.make("spare"), reference: "secret:providers/example.spare" },
         ],
       },
       account_status: [
@@ -240,7 +240,7 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
       {
         code: "E_TIMEOUT",
         action: "probe",
-        subject: "api.zenmux.ai",
+        subject: "api.example.test",
         at: "08:47",
         count: 3,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
@@ -377,7 +377,7 @@ export const TOASTS: readonly NoticeLine[] = [
   {
     code: "E_PROVIDER",
     action: "dispatch",
-    subject: "api.zenmux.ai",
+    subject: "api.example.test",
     at: "03:29",
     count: 1,
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them

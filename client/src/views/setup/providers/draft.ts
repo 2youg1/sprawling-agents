@@ -17,13 +17,13 @@
 // where somebody who keeps a `config.toml` of their own overrules them.
 //
 // **The derivation is one rule and no host table.** The label before
-// the last one is `openai` for `api.openai.com`, `anthropic` for
-// `api.anthropic.com` and `openrouter` for `openrouter.ai`, so a table
-// of known hosts on this side would be a second home for what
-// `gateway::provider::preset` already holds, and the two would
-// disagree the first time a provider moved. `known.ts` reads the
-// city's own answer for a different fact - which request shapes a known
-// host answers, and at which base URL - and it never derives a name.
+// the last one is `openai` for `api.openai.com` and `anthropic` for
+// `api.anthropic.com`, so a table of known hosts on this side would be
+// a second home for what `gateway::provider::preset` already holds, and
+// the two would disagree the first time a provider moved. `known.ts`
+// reads the city's own answer for a different fact - which request
+// shapes a known host answers, and at which base URL - and it never
+// derives a name.
 
 import { WIRE_APIS, dialectOf } from "../../../core/commands";
 import type { Endpoint, Pair, Tuning, WireApi } from "../../../core/commands";

@@ -46,10 +46,10 @@ export function offersOf(endpoints: readonly EndpointSummary[]): readonly Offer[
 }
 
 // Which choice level the picker lists first. A city with more models
-// than providers (an aggregator such as OpenRouter) is narrowed by
-// provider first; any other is narrowed by model first, and the
-// providers of the chosen model form the band under it. The order is a
-// function of the offers alone, so it moves only when the endpoints do.
+// than providers is narrowed by provider first; any other is narrowed
+// by model first, and the providers of the chosen model form the band
+// under it. The order is a function of the offers alone, so it moves
+// only when the endpoints do.
 export type Order = "providers_first" | "models_first";
 
 export function orderOf(offers: readonly Offer[]): Order {

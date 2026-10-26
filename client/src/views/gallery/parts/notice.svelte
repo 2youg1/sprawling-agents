@@ -41,7 +41,7 @@
   // merged into it.
   const MISSING_KEY = refusal(
     "E_CREDENTIAL_MISSING",
-    "zenmux",
+    "example",
     "file a key for this provider, then attach it again",
   );
   const REFUSED_LINK = refusal(

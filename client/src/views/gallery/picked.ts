@@ -76,7 +76,7 @@ export const MANY_PROVIDERS: readonly EndpointSummary[] = [
       levels: ["low", "high", "max"],
     }),
   ]),
-  endpoint("openrouter", "OpenRouter", [
+  endpoint("aggregator", "Aggregator", [
     model(`deepseek/${DEEPSEEK}`, {
       canonical: DEEPSEEK,
       context: 1_000_000,
@@ -112,7 +112,7 @@ export const MANY_PROVIDERS: readonly EndpointSummary[] = [
 // An aggregator with more models than the city has providers: the
 // picker lists providers first and the chosen one's models under it.
 export const MANY_MODELS: readonly EndpointSummary[] = [
-  endpoint("openrouter", "OpenRouter", [
+  endpoint("aggregator", "Aggregator", [
     model(`deepseek/${DEEPSEEK}`, {
       canonical: DEEPSEEK,
       context: 1_000_000,
@@ -162,7 +162,7 @@ export const ONE_PROVIDER: readonly EndpointSummary[] = [
 
 export const AT_DEEPSEEK: Names = { endpoint: "deepseek", model: DEEPSEEK };
 export const AT_OLLAMA: Names = { endpoint: "ollama", model: QWEN };
-export const AT_OPENROUTER: Names = { endpoint: "openrouter", model: `deepseek/${DEEPSEEK}` };
+export const AT_AGGREGATOR: Names = { endpoint: "aggregator", model: `deepseek/${DEEPSEEK}` };
 
 const ignore = (): void => undefined;
 

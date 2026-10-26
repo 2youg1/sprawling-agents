@@ -22,7 +22,9 @@ describe("the heading of a timeout", () => {
   });
 
   test("of a request the city cut keeps the code's own sentence", () => {
-    expect(noticeTitle("en", "E_TIMEOUT", "api.zenmux.ai")).toBe("this took too long and was cut");
+    expect(noticeTitle("en", "E_TIMEOUT", "api.example.test")).toBe(
+      "this took too long and was cut",
+    );
   });
 });
 

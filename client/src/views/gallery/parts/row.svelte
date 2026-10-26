@@ -43,7 +43,7 @@
     onOpen={() => undefined}
     chosen
   />
-  <Row primary="zenmux/local-mirror" secondary={say($lang, "tree_no_runs")}>
+  <Row primary="example/local-mirror" secondary={say($lang, "tree_no_runs")}>
     {#snippet status()}
       <Badge text={say($lang, "city_quiet")} dot />
     {/snippet}

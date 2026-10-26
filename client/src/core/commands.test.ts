@@ -18,7 +18,7 @@ import {
 // did not state is absent rather than guessed (client/Spec.lean §7).
 describe("choosing a model", () => {
   test("carries the input kinds the person stated", () => {
-    const frame = selectModel("zenmux", "vision-1", "main", {
+    const frame = selectModel("example", "vision-1", "main", {
       contextTokens: null,
       maxOutputTokens: null,
       input: "text_image",
@@ -27,7 +27,7 @@ describe("choosing a model", () => {
   });
 
   test("leaves the input kinds to the city when nobody stated them", () => {
-    const frame = selectModel("zenmux", "plain-1", "main");
+    const frame = selectModel("example", "plain-1", "main");
     expect("select_model" in frame ? frame.select_model.input : undefined).toBeNull();
   });
 });

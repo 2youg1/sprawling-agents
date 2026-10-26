@@ -26,7 +26,12 @@ function answering(body: string, status: number): () => void {
   };
 }
 
-const ZENMUX = { origin: "http://localhost:7000", token: null, value: "sk-x", lang: "en" } as const;
+const EXAMPLE = {
+  origin: "http://localhost:7000",
+  token: null,
+  value: "sk-x",
+  lang: "en",
+} as const;
 
 describe("the place in the vault", () => {
   test("the page spells a reference the way the city writes one", () => {
@@ -34,23 +39,23 @@ describe("the place in the vault", () => {
     // `[A-Za-z0-9._-]+` joined by `/`. The page states the same shape
     // here and nowhere else, so a form cannot promise a place the city
     // would refuse to resolve.
-    const spelled = referenceText(referenceFor("zenmux"));
-    expect(spelled).toBe("secret:providers/zenmux");
+    const spelled = referenceText(referenceFor("example"));
+    expect(spelled).toBe("secret:providers/example");
     expect(spelled).toMatch(/^secret:[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/);
   });
 });
 
 describe("what a form keeps after an enrolment", () => {
   test("the city's answer is what is stored, not the page's promise", async () => {
-    const restore = answering("secret:providers/zenmux", 201);
-    const outcome = await enrol({ ...ZENMUX, ...referenceFor("zenmux") });
+    const restore = answering("secret:providers/example", 201);
+    const outcome = await enrol({ ...EXAMPLE, ...referenceFor("example") });
     restore();
-    expect(outcome).toEqual({ kind: "stored", reference: "secret:providers/zenmux" });
+    expect(outcome).toEqual({ kind: "stored", reference: "secret:providers/example" });
   });
 
   test("a refusal carries the city's own sentence", async () => {
     const restore = answering("a realm is letters, digits, dot, dash and underscore", 400);
-    const outcome = await enrol({ ...ZENMUX, ...referenceFor("zen mux") });
+    const outcome = await enrol({ ...EXAMPLE, ...referenceFor("example id") });
     restore();
     expect(outcome).toEqual({
       kind: "refused",
@@ -62,14 +67,14 @@ describe("what a form keeps after an enrolment", () => {
   // language rather than with an empty box.
   test("a refusal with no body says so", async () => {
     const restore = answering("", 400);
-    const outcome = await enrol({ ...ZENMUX, ...referenceFor("zenmux") });
+    const outcome = await enrol({ ...EXAMPLE, ...referenceFor("example") });
     restore();
     expect(outcome).toEqual({ kind: "refused", reason: "the city did not say why" });
   });
 
   test("the stored reference is used only with the provider it was filed under", () => {
-    const held = { provider: "zenmux", reference: "secret:providers/zenmux" };
-    expect(secretFor(held, "zenmux")).toBe("secret:providers/zenmux");
+    const held = { provider: "example", reference: "secret:providers/example" };
+    expect(secretFor(held, "example")).toBe("secret:providers/example");
     expect(secretFor(held, "openai")).toBeNull();
     expect(keyField(held, "openai")).toEqual({ kind: "empty" });
   });

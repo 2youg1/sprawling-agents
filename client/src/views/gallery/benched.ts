@@ -222,14 +222,14 @@ const SEGMENTS: readonly (readonly [PrefixSlot, number, string, number])[] = [
 ];
 
 const ENDPOINTS: EndpointsAnswer = {
-  chosen: [{ endpoint: "zenmux", model: MODEL, tag: "main" }],
+  chosen: [{ endpoint: "example", model: MODEL, tag: "main" }],
   endpoints: [
     {
-      base_url: "https://api.zenmux.ai/v1",
+      base_url: "https://api.example.test/v1",
       connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: true,
-      label: "ZenMux",
+      label: "Example",
       local: false,
       models: [
         {
@@ -243,7 +243,7 @@ const ENDPOINTS: EndpointsAnswer = {
           listing: "listed",
         },
       ],
-      name: "zenmux",
+      name: "example",
       tuning: UNTUNED,
       account_status: [],
     },
