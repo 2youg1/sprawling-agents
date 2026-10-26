@@ -631,7 +631,11 @@ jobs:
   # auth action exchanges this job's OIDC token for one that lasts thirty
   # minutes and is revoked when the job ends. As with npm, a package name
   # must exist on crates.io before it can be registered, so a new crate is
-  # published once by a person first.
+  # published once by a person first and registered as trusted to this
+  # workflow before the next tag: the exchange covers exactly the packages
+  # whose registration matches this run, so one missing registration stops
+  # the job at `publish` with a 403
+  # (`crates/sprawling/spec/Doctor.lean` §8-157).
   #
   # Last of all, after npm: a crates.io version can never be replaced, and
   # a tag can be re-cut, so nothing irreversible happens before every other
