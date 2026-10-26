@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -38,7 +39,7 @@
     "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.4",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.12.0",
     "eslint-plugin-svelte": "^3.23.0",
