@@ -40,6 +40,8 @@ runs:
         key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       if: steps.bundle.outputs.cache-hit != 'true'
+      with:
+        bun-version-file: client/package.json
     # On Windows bun downloads into the work drive that holds the checkout
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
