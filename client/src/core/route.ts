@@ -11,7 +11,7 @@
 import { Option, Schema } from "effect";
 
 import { Address, B3Hash, GuideStep, Seq, SessionName } from "../wire";
-import type { RunId } from "../wire";
+import type { BuildingProgress, RunId } from "../wire";
 import { isInvitation } from "./remote/invitation";
 import { readRunId } from "./run_id";
 
@@ -368,6 +368,21 @@ export function go(bar: AddressBar, view: View): void {
 export function buildingOf(address: Address): Address {
   const slash = address.indexOf("/");
   return slash < 0 ? address : Address.make(address.slice(0, slash));
+}
+
+export type BuildingDestination =
+  | { readonly kind: "building"; readonly view: { readonly kind: "building"; readonly address: Address } }
+  | { readonly kind: "adopt" | "build"; readonly view: { readonly kind: "raise"; readonly address: Address } };
+
+// Where a top-level address goes, read against the city's own building
+// list. Navigation and the raise form share this classification (client
+// D104): an established building has a page, while an adoptable folder or
+// an unknown name is confirmed on the prefilled raise page.
+export function buildingDestination(addr: Address, buildings: readonly BuildingProgress[]): BuildingDestination {
+  const held = buildings.find((each) => each.addr === addr);
+  if (held === undefined) return { kind: "build", view: { kind: "raise", address: addr } };
+  if (held.adoptable) return { kind: "adopt", view: { kind: "raise", address: addr } };
+  return { kind: "building", view: { kind: "building", address: addr } };
 }
 
 // The last segment: what a person called the room.

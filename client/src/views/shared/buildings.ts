@@ -7,13 +7,13 @@
 // `buildings.svelte` draws the column; this file decides what stands in
 // it, so the two screens that share it cannot order it two ways.
 //
-// Two screens ask the same question - the tool servers a building may
-// reach, and the skills its reading room admits - so the order is
-// decided once: the hall first, because it is the building every city
-// has and the one a person opening either screen means, then the rest
-// by name. A city that has not answered yet is the hall alone rather
-// than an empty column, so neither screen has a state where nothing
-// can be picked.
+// The building column, settings selects and the workspace entries all
+// read the same city answer, so the order is decided once: the hall
+// first, because it is the building every city has and the one a person
+// opening these screens means, then the rest by name. A city that has
+// not answered yet is the hall alone rather than an empty column, so a
+// caller that lists addresses never has a state where nothing can be
+// picked.
 
 import { derived } from "svelte/store";
 import type { Readable } from "svelte/store";

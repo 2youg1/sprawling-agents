@@ -85,7 +85,7 @@
 </script>
 
 <nav
-  class="edge-keys relative z-10 col-start-1 row-start-2 flex flex-col items-start gap-snug self-end narrow:row-start-3 narrow:flex-row narrow:pt-snug"
+  class="edge-keys relative z-(--layer-edge) col-start-1 row-start-2 flex flex-col items-start gap-snug self-end narrow:row-start-3 narrow:flex-row narrow:pt-snug"
   aria-label={say($lang, "region_edge")}
 >
   <Look {...layersKey(tier, $lang, named("tier.cycle"), { press, release, click })} />

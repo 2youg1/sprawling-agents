@@ -24,7 +24,7 @@ import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import type { Address } from "../../wire";
-import type { Answer, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
+import type { Answer, BuildingProgress, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
 import { offersOf } from "./picker";
@@ -252,6 +252,7 @@ export interface Reach extends SessionHands {
   readonly here: Address | null;
   readonly live: RunBelief | undefined;
   readonly belief: Belief;
+  readonly buildings: readonly BuildingProgress[] | undefined;
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;

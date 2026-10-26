@@ -20,14 +20,13 @@
   const look: PopoverLook = $props();
 </script>
 
-<!-- No stacking number on the panel below: a positioned box is painted
-     after every box that is not positioned, so the list already covers
-     the text box and the buttons it opens over. It rises into place
-     from the side it opens on through the theme's entrances, which fall
-     back to a cut under reduced motion. -->
+<!-- The panel takes the theme's popover layer, so it paints and
+     hit-tests above the content it opens over. It rises into place from
+     the side it opens on through the theme's entrances, which fall back
+     to a cut under reduced motion. -->
 <div
   class={[
-    "absolute left-0 w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
+    "absolute left-0 z-(--layer-popover) w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
     look.side === "above" ? "bottom-full mb-snug rise" : "top-full mt-snug drop",
   ]}
   {...look.dialog}

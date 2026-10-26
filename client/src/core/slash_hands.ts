@@ -10,7 +10,7 @@
 import type { RunBelief } from "./belief";
 import type { Key } from "./lang";
 import type { View } from "./route";
-import type { Address, Carry, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
+import type { Address, BuildingProgress, Carry, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.
@@ -66,6 +66,10 @@ export interface SlashHands extends SessionHands {
   readonly live: Reached | null;
   // The newest run in a room somebody named by hand.
   readonly newest: (room: string) => Reached | null;
+  // The buildings and adoptable folders the city already answered with;
+  // `/cd` classifies a destination against these, never another store.
+  // Undefined until a city answer is available; an empty list is answered.
+  readonly buildings: readonly BuildingProgress[] | undefined;
   readonly models: readonly Offered[];
   // How hard a run this verb opens should think, or `null` when the
   // person has chosen no level and the provider decides. It comes from

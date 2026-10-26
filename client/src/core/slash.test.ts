@@ -133,6 +133,7 @@ describe("new and fork", () => {
         here,
         live,
         newest,
+        buildings: [],
         models: [],
         effort: null,
         setEffort: () => undefined,

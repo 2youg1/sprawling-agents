@@ -12,7 +12,7 @@
 import { Option, Schema } from "effect";
 
 import type { Key } from "../core/lang";
-import { buildingOf } from "../core/route";
+import { buildingDestination, buildingOf } from "../core/route";
 import type { Template } from "../core/commands";
 import { Address } from "../wire";
 import type { BuildingProgress } from "../wire";
@@ -31,9 +31,14 @@ export function raisingOf(typed: string, buildings: readonly BuildingProgress[])
   const addr = Option.getOrNull(Schema.decodeOption(Address)(text));
   if (addr === null) return { kind: "refused", why: "raise_unreadable" };
   if (buildingOf(addr) !== addr) return { kind: "refused", why: "raise_room" };
-  const held = buildings.find((each) => each.addr === addr);
-  if (held === undefined) return { kind: "build", addr };
-  return held.adoptable ? { kind: "adopt", addr } : { kind: "refused", why: "raise_taken" };
+  const destination = buildingDestination(addr, buildings);
+  switch (destination.kind) {
+    case "building":
+      return { kind: "refused", why: "raise_taken" };
+    case "adopt":
+    case "build":
+      return { kind: destination.kind, addr };
+  }
 }
 
 // The templates a person raises a building from. City Hall's is the

@@ -55,7 +55,7 @@ it is for. -->
             <span class="truncate">{permissions.face}</span>
           </Fact>
           {#if permissions.panel !== undefined}
-            <div class="rise absolute bottom-full left-0 mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
+            <div class="rise absolute bottom-full left-0 z-(--layer-popover) mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
               {...permissions.panel.wire}>
               {#each permissions.panel.switches as each (each.key)}
                 <label class="flex items-center justify-between gap-base text-body text-text">

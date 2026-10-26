@@ -167,14 +167,14 @@
 
 <!-- The column stands from the left edge of the frame, under the keys:
 it is a fixed child of the edge keys' nav, whose stacking it shares, and
-`-z-10` sets it under the keys inside that nav. Its padding keeps every
+`z-(--layer-mailbox)` keeps it under the keys inside that nav. Its padding keeps every
 row clear of the key column, so the keys never cover what it says. -->
 {#if open}
   <aside
     bind:this={column}
     id="{uid}-column"
     aria-label={say($lang, "edge_mailbox")}
-    class="push fixed inset-y-0 left-0 -z-10 flex h-full w-[calc(440px+var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] max-w-[100vw] flex-col overflow-hidden bg-raised pl-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] text-body text-text shadow-sheet narrow:w-full narrow:pl-0"
+    class="push fixed inset-y-0 left-0 z-(--layer-mailbox) flex h-full w-[calc(440px+var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] max-w-[100vw] flex-col overflow-hidden bg-raised pl-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] text-body text-text shadow-sheet narrow:w-full narrow:pl-0"
   >
     <Column
       onClose={() => {

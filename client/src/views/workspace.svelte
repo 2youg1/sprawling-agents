@@ -390,7 +390,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
     inside the page's padding. -->
     <div
       class={[
-        "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:absolute narrow:inset-0 narrow:z-20 narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0",
+        "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:absolute narrow:inset-0 narrow:z-(--layer-sheet) narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0",
         narrow ? "sheet" : "",
       ]}
       data-side="right"

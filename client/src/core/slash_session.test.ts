@@ -70,6 +70,7 @@ describe("the session in main", () => {
         here: ROOM,
         live: live ? { run: GOING, at: Seq.make(9) } : null,
         newest: () => null,
+        buildings: [],
         models: [],
         effort: null,
         setEffort: () => undefined,

@@ -37,7 +37,7 @@
 {/if}
 {#each look.files as file (file.path)}
   <div data-path={file.path}>
-    <div class="file sticky top-0 flex h-control items-center gap-snug border-b border-edge bg-chrome px-snug text-note">
+    <div class="file sticky top-0 z-(--layer-raised) flex h-control items-center gap-snug border-b border-edge bg-chrome px-snug text-note">
       <span class="min-w-0 truncate font-mono text-text">{file.path}</span>
       <span class="shrink-0 rounded-pill bg-raised px-snug text-text-quiet">{file.how}</span>
     </div>
@@ -72,11 +72,6 @@
 {/each}
 
 <style>
-  /* The header stands over the hunk lines that scroll under it. */
-  .file {
-    z-index: 1;
-  }
-
   .hunk {
     line-height: 1.65;
   }

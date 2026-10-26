@@ -9031,6 +9031,10 @@
     "en": "open the conversation of another room",
     "zh": "打开另一个房间的对话"
   },
+  "slash_cd": {
+    "en": "open the city, switch buildings, or prefill a raise page without creating anything",
+    "zh": "打开城市、切换楼，或预填建楼页，不直接建楼或收编"
+  },
   "ask_late_title": {
     "en": "no answer came back to the {query} question",
     "zh": "{query} 这个问题没有等到回答"
@@ -9462,6 +9466,14 @@
   "city_buildings": {
     "en": "buildings",
     "zh": "楼"
+  },
+  "workspace_new_import": {
+    "en": "new / import workspace",
+    "zh": "新建／导入工作区"
+  },
+  "workspace_switch": {
+    "en": "switch workspace",
+    "zh": "切换工作区"
   },
   "finder_title": {
     "en": "find a file in {building}",

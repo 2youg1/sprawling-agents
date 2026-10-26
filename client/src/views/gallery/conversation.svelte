@@ -64,6 +64,12 @@
   import { ui } from "../../ui";
   import Popover from "../parts/popover.svelte";
   import Composer from "../talk/composer.svelte";
+  import ComposerLook from "../talk/composer.look.svelte";
+  import type { ComposerLook as ComposerLookValue } from "../talk/composer";
+  import Coin from "../talk/coin.svelte";
+  import Gauge from "../talk/gauge.svelte";
+  import SettingsRow from "../talk/settings_row.svelte";
+  import TypedLine from "../talk/typed_line.svelte";
   import AddressLine from "../talk/address_line.look.svelte";
   import { addressLineOf, boxWords } from "../talk/address_line";
   import Saying from "../talk/saying.svelte";
@@ -73,10 +79,23 @@
   import { foldWire } from "../talk/fold";
   import Rule from "../talk/rule.look.svelte";
   import Case from "./case.svelte";
+  import { AT_DEEPSEEK, MANY_PROVIDERS, pickerFacts } from "./picked";
 
   const { lang } = ui();
   // The previous segment is folded away until somebody asks for it.
   let open = $state(false);
+  const picker = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, null);
+  const overlap: ComposerLookValue = $derived({
+    form: { "aria-label": say($lang, "region_composer") },
+    over: false,
+    box: { rows: 1, "aria-label": say($lang, "talk_placeholder_mayor") },
+    menu: undefined,
+    door: inBox,
+    band: undefined,
+    keys: composerKeys,
+    line: composerLine,
+    under: openSettings,
+  });
 </script>
 
 {#snippet utterance(line: Utterance)}
@@ -153,6 +172,20 @@ with one round in it reads as a page that broke. -->
   <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), () => undefined)} seat={{ at: "box", ...boxWords($lang) }} />
 {/snippet}
 
+{#snippet composerKeys()}
+  <Gauge room={null}>
+    <Coin face="idle" sending="dispatch" onStop={() => undefined} />
+  </Gauge>
+{/snippet}
+
+{#snippet composerLine()}
+  <TypedLine text="" box={undefined} lit={false} />
+{/snippet}
+
+{#snippet openSettings()}
+  <SettingsRow {picker} room={null} draws="everything" kept={false} menu="open" />
+{/snippet}
+
 <Case label="composer · an empty room lifts the box, the address line in its placeholder">
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
     <div class="w-full">
@@ -164,6 +197,12 @@ with one round in it reads as a page that broke. -->
         onStop={() => false}
       />
     </div>
+  </div>
+</Case>
+
+<Case label="composer · permissions open over the address line">
+  <div class="flex min-h-[14rem] flex-col justify-end">
+    <ComposerLook {...overlap} />
   </div>
 </Case>
 

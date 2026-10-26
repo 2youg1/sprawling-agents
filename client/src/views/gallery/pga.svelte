@@ -15,10 +15,11 @@
   //
   // The moments are fixed rather than read off the clock, so a picture
   // of this route compares with yesterday's.
-  import type { Answer, BuildingAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits, SkillsAnswer } from "../../wire";
+  import type { Answer, BuildingAnswer, CityAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits, SkillsAnswer } from "../../wire";
   import { Address, B3Hash, ContainerImage, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
 
   const LAB = Address.make("lab");
+  const HALL = Address.make("hall");
   const AT = 1_790_000_000_000;
 
   // `<main>` at a 1440 window: eleven of the shell's twelve columns.
@@ -111,6 +112,19 @@
     sandbox: SANDBOX,
   };
 
+  const WORKSPACES: CityAnswer = {
+    active: 0,
+    frozen: 0,
+    halted: [],
+    pursuits: [],
+    runs: [],
+    buildings: [
+      { addr: Address.make("hall"), adoptable: false, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
+      { addr: LAB, adoptable: false, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
+      { addr: Address.make("notes"), adoptable: true, blocked: [], problems: [], progress: BUILDING.progress, ready: 0 },
+    ],
+  };
+
   const ROOT: readonly Entry[] = [
     { kind: "directory", name: "parser" },
     { kind: "directory", name: "docs" },
@@ -152,6 +166,7 @@
   // What this made-up city answers; anything else stays unanswered, the
   // way a page that has asked and not been answered holds it.
   export function answers(query: Query): Answer | undefined {
+    if (query === "city_view") return { city: WORKSPACES };
     if (typeof query === "string") return undefined;
     if ("building_view" in query) return { building: { ...BUILDING, addr: query.building_view.addr } };
     if ("commits" in query) return { commits: { building: LAB, before: null, commits: [...COMMITS], more: false } };
@@ -191,6 +206,9 @@
 </script>
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers}>
+  <Case label="building · hall, workspace switcher and create/import" width={PAGE_WIDTH}>
+    <Building address={HALL} rank="section" />
+  </Case>
   <Case label="building · the page, on the plan" width={PAGE_WIDTH}>
     <Building address={LAB} rank="section" />
   </Case>

@@ -93,7 +93,7 @@
 </script>
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers}>
-  <Case label="city · the page, on the building table" width={PAGE_WIDTH}>
+  <Case label="city · the building table, with new/import workspace" width={PAGE_WIDTH}>
     <City rank="section" />
   </Case>
   <Case label="cost · the page, five cuts of one total" width={PAGE_WIDTH}>

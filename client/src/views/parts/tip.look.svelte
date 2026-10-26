@@ -44,9 +44,6 @@
     }
   }
 
-  // No stacking number: the hint is positioned and whatever it is drawn
-  // over is not, which is already the order the two are painted in.
-  //
   // The 300 ms delay is the whole point of the transition: it stops a
   // pointer crossing a row from lighting its hints one after another,
   // and client/Spec.lean §4-18 pins it. It is not `HOLD_MS` in
@@ -60,7 +57,7 @@
   // it to nothing. The resting state leaves and the shown state arrives
   // (docs/frontend-method.md §4-43).
   const PAINT =
-    "pointer-events-none w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
+    "pointer-events-none z-(--layer-popover) w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
     "transition-[opacity,display] transition-discrete delay-300 duration-panel ease-leave " +
     "still:transition-none";
