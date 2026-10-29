@@ -133,7 +133,7 @@ jobs:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-mutants,cargo-nextest,just
       - uses: ./.github/actions/client-artifacts
@@ -171,7 +171,7 @@ jobs:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-mutants,cargo-nextest,just
       - uses: ./.github/actions/client-artifacts
@@ -195,7 +195,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -220,7 +220,7 @@ jobs:
           shared-key: sim
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - name: the citysim scenarios
@@ -328,7 +328,7 @@ jobs:
           shared-key: release
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - uses: ./.github/actions/client-artifacts
@@ -794,7 +794,7 @@ jobs:
         with:
           shared-key: core
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-nextest
       - name: prepare the disposable daemon and immutable local image
@@ -853,7 +853,7 @@ jobs:
           save-if: false
       - uses: ./.github/actions/client-artifacts
         if: runner.os == 'Windows'
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-nextest
       - name: Linux allocation profiler
