@@ -172,7 +172,7 @@ jobs:
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       # `fmt-check` includes `bun fmt --check`, so Bun has to be present
@@ -243,7 +243,7 @@ jobs:
         with:
           shared-key: gates
           save-if: false
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - uses: ./.github/actions/client-artifacts
@@ -258,7 +258,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - uses: ./.github/actions/lean
@@ -282,7 +282,7 @@ jobs:
         with:
           shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - name: clippy
@@ -330,7 +330,7 @@ jobs:
           shared-key: test-registry
           cache-targets: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-nextest,just
       # The binary embeds the bundle, so the archive carries the one a
@@ -389,7 +389,7 @@ jobs:
       # trybuild compiles `sprawling-runtime`, which builds the Zig leaf.
       - uses: ./.github/actions/zig
         if: matrix.environment == 'compile'
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-nextest,just
       # The trybuild suites are cold rather than slow: one suite is 21.4s
@@ -460,7 +460,7 @@ jobs:
         with:
           shared-key: core
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-nextest,just
       - name: the macOS sandbox mechanism supplied by this runner
@@ -513,7 +513,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: cargo-deny,just
       - name: licences, bans and sources
@@ -530,7 +530,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: client/package.json
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2
         with:
           tool: just
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
