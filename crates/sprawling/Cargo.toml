@@ -94,7 +94,7 @@ tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 # Windows self-uninstall releases the installed name before exit (Install.lean D53).
-self-replace = "=1.5.0"
+self-replace = "=1.5.1"
 # Protected Windows installation path for the read-only privacy identity query.
 winreg = { workspace = true }
 
