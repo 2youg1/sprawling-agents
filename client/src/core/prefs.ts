@@ -228,8 +228,8 @@ export interface PreferenceDoor {
 function readAppearance(rows: Rows): Appearance {
   return {
     lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
-    sans: readOne(FACES, rows.getItem(ROWS.sans), "geist"),
-    mono: readOne(FACES, rows.getItem(ROWS.mono), "geist"),
+    sans: readOne(FACES, rows.getItem(ROWS.sans), "maple"),
+    mono: readOne(FACES, rows.getItem(ROWS.mono), "maple"),
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
     monoStack: readStack(rows.getItem(ROWS.monoStack)),
     reading: readOne(READING_FACES, rows.getItem(ROWS.reading), "interface"),

@@ -88,7 +88,7 @@ describe("the city's answer", () => {
       appearance: {
         lighting: "light" as const,
         sans: "system" as const,
-        mono: "geist" as const,
+        mono: "maple" as const,
         sans_stack: "",
         mono_stack: "",
         body_px: null,
@@ -100,7 +100,7 @@ describe("the city's answer", () => {
     expect(adopted(held, answer).appearance).toEqual({
       lighting: "light",
       sans: "system",
-      mono: "geist",
+      mono: "maple",
       sansStack: "",
       monoStack: "",
       reading: "libron",

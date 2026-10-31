@@ -202,7 +202,8 @@ mod tests {
                 | Detection::Component { .. }
                 | Detection::Interpreter { .. }
                 | Detection::Built { .. }
-                | Detection::Family(_) => row.name.to_owned(),
+                | Detection::Family(_)
+                | Detection::Font { .. } => row.name.to_owned(),
             })
             .collect();
         assert_eq!(

@@ -139,6 +139,15 @@ impl Machine for ThisMachine {
             }
             Detection::Built { carried } => super::host::built(*carried),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
+            Detection::Font { file } => match self.platform {
+                Some(platform) => {
+                    let home = accounting::home::Home::detect()
+                        .ok()
+                        .map(|home| home.path().to_path_buf());
+                    font_at(platform, home, std::env::var_os("LOCALAPPDATA"), file)
+                }
+                None => Presence::Absent(Absence::NotInstalled),
+            },
         }
     }
 
@@ -179,6 +188,62 @@ impl accounting::Machine for ThisMachine {
             super::running::patience_for(runnable),
             &super::host::install_log(item),
         )
+    }
+}
+
+/// The regular face of an installed font, in the user and system
+/// directories the platform's own font manager reads. Scoop is covered
+/// beside Windows' per-user directory because that is where its
+/// Maple-Mono-NF-CN package lands.
+pub(super) fn font_at(
+    platform: Platform,
+    home: Option<PathBuf>,
+    local_app_data: Option<OsString>,
+    file: &str,
+) -> Presence {
+    let mut candidates = Vec::new();
+    if let Some(home) = home.as_ref() {
+        match platform {
+            Platform::Windows => candidates.push(
+                home.join("scoop")
+                    .join("apps")
+                    .join("maple-mono-nf-cn")
+                    .join("current")
+                    .join(file),
+            ),
+            Platform::MacOs => candidates.push(home.join("Library").join("Fonts").join(file)),
+            Platform::Linux => {
+                candidates.push(home.join(".local").join("share").join("fonts").join(file));
+                candidates.push(home.join(".fonts").join(file));
+            }
+        }
+    }
+    match platform {
+        Platform::Windows => {
+            if let Some(local) = local_app_data {
+                candidates.push(
+                    PathBuf::from(local)
+                        .join("Microsoft")
+                        .join("Windows")
+                        .join("Fonts")
+                        .join(file),
+                );
+            }
+            candidates.push(PathBuf::from(r"C:\Windows\Fonts").join(file));
+        }
+        Platform::MacOs => candidates.push(PathBuf::from("/Library/Fonts").join(file)),
+        Platform::Linux => {
+            candidates.push(PathBuf::from("/usr/local/share/fonts").join(file));
+            candidates.push(PathBuf::from("/usr/share/fonts").join(file));
+        }
+    }
+    match candidates.into_iter().find(|candidate| candidate.is_file()) {
+        Some(at) => Presence::Present {
+            at,
+            version: Version::Silent,
+        },
+        None if home.is_none() => Presence::Absent(Absence::NoHome),
+        None => Presence::Absent(Absence::NotInstalled),
     }
 }
 
@@ -389,5 +454,72 @@ fn line_of(stdout: std::process::ChildStdout, wanted: Wanted, patience: Duration
         Ok(Some(Err(_))) => Version::Unreadable,
         Err(RecvTimeoutError::Disconnected) => Version::Silent,
         Err(RecvTimeoutError::Timeout) => Version::Late,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::*;
+
+    /// The font row closes after installation: both the platform's
+    /// ordinary user-font directory and Scoop's layout answer Present,
+    /// while a missing face is an explicit absence (`Doctor.lean` §8-174).
+    #[test]
+    fn font_files_are_found_in_user_font_directories_and_absence_is_explicit() {
+        const FILE: &str = "MapleMono-NF-CN-Regular.ttf";
+        let linux_home = tempfile::tempdir().unwrap();
+        let linux = linux_home
+            .path()
+            .join(".local")
+            .join("share")
+            .join("fonts")
+            .join(FILE);
+        std::fs::create_dir_all(linux.parent().unwrap()).unwrap();
+        std::fs::write(&linux, b"font").unwrap();
+        assert_eq!(
+            font_at(
+                Platform::Linux,
+                Some(linux_home.path().to_path_buf()),
+                None,
+                FILE
+            ),
+            Presence::Present {
+                at: linux,
+                version: Version::Silent,
+            }
+        );
+
+        let windows_home = tempfile::tempdir().unwrap();
+        let windows = windows_home
+            .path()
+            .join("scoop")
+            .join("apps")
+            .join("maple-mono-nf-cn")
+            .join("current")
+            .join(FILE);
+        std::fs::create_dir_all(windows.parent().unwrap()).unwrap();
+        std::fs::write(&windows, b"font").unwrap();
+        assert_eq!(
+            font_at(
+                Platform::Windows,
+                Some(windows_home.path().to_path_buf()),
+                None,
+                FILE
+            ),
+            Presence::Present {
+                at: windows,
+                version: Version::Silent,
+            }
+        );
+        assert_eq!(
+            font_at(
+                Platform::MacOs,
+                Some(windows_home.path().to_path_buf()),
+                None,
+                FILE
+            ),
+            Presence::Absent(Absence::NotInstalled)
+        );
     }
 }

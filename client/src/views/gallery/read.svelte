@@ -19,8 +19,8 @@
 
   const LIBRON: Appearance = {
     lighting: "system",
-    sans: "geist",
-    mono: "geist",
+    sans: "maple",
+    mono: "maple",
     sansStack: "",
     monoStack: "",
     reading: "libron",

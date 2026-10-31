@@ -22,7 +22,7 @@ import {
 // `prefers-color-scheme` block would be a second authority for the
 // same eleven rungs.
 export type Lighting = "system" | "dark" | "light";
-export type Face = "geist" | "system" | "custom";
+export type Face = "maple" | "system" | "custom";
 // Which face reading text is set in: the interface's own, or the serif
 // face Libron, spelled by the wire (`wire::ReadingFace`, wire D52).
 export type ReadingFace = WireReadingFace;
@@ -42,7 +42,7 @@ export type Glass = WireGlass;
 // same list each stored string is read back through: an option a
 // person can pick is therefore an option this build can load.
 export const LIGHTINGS: readonly Lighting[] = ["system", "dark", "light"];
-export const FACES: readonly Face[] = ["geist", "system", "custom"];
+export const FACES: readonly Face[] = ["maple", "system", "custom"];
 export const READING_FACES: readonly ReadingFace[] = ReadingFaceSchema.members.map(
   (face) => face.literal,
 );

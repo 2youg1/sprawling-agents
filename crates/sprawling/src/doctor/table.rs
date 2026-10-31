@@ -131,7 +131,8 @@ fn shell_probe(detect: &Detection) -> String {
         Detection::Component { .. }
         | Detection::Interpreter { .. }
         | Detection::Built { .. }
-        | Detection::Family(_) => "-".to_owned(),
+        | Detection::Family(_)
+        | Detection::Font { .. } => "-".to_owned(),
     }
 }
 
@@ -324,6 +325,37 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         },
         pin: Pin::Unpinned,
         upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
+    },
+    Requirement {
+        name: "maple-mono-nf-cn",
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "Chinese glyphs and Nerd Font icons in terminals and tools that use Maple Mono NF CN",
+        detect: Detection::Font {
+            file: "MapleMono-NF-CN-Regular.ttf",
+        },
+        homepage: Some("https://font.subf.dev/en/"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "powershell",
+                args: &[
+                    "-NoProfile",
+                    "-Command",
+                    "scoop bucket add nerd-fonts; scoop install Maple-Mono-NF-CN",
+                ],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "--cask", "font-maple-mono-nf-cn"],
+            },
+            linux: Recipe::Command {
+                program: "brew",
+                args: &["install", "--cask", "font-maple-mono-nf-cn"],
+            },
+        },
+        pin: Pin::Unpinned,
+        upstream: Upstream::GitHub("subframe7536/maple-font"),
         pack: None,
     },
     toolchain::GIT,
