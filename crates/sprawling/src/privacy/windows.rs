@@ -71,6 +71,16 @@ pub(crate) fn system_root() -> Result<std::path::PathBuf, AxError> {
     }
 }
 
+/// Where [`system_root`] reads its value, in the form a report names it
+/// to a person.
+///
+/// This module decides the value's address, so it also spells it: a
+/// caller that reported a key of its own would go on naming a key this
+/// reader had stopped opening.
+pub(crate) fn system_root_location() -> std::path::PathBuf {
+    std::path::PathBuf::from(format!(r"HKLM\{CURRENT_VERSION}\SystemRoot"))
+}
+
 /// The edition and build this host reports, as the privacy page shows
 /// them beside each control's edition list.
 #[derive(Debug, PartialEq, Eq)]

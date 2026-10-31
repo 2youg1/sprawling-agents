@@ -8,8 +8,12 @@
  * Maple Mono and never swaps the face afterwards. A face that arrives late
  * therefore costs the first paint nothing and moves no text a person is
  * already reading, which is what `swap` could not promise. `index.html`
- * preloads the regular file so that moment is long enough. The three
- * weights are the interface's 400, 600 and 700, unmodified from upstream. */
+ * preloads the two files the first screen is set in, regular for running
+ * text and notes and semibold for titles, headings, labels and figures,
+ * so that moment is long enough. Bold is not preloaded, because no rule
+ * asks for it: only a `strong` span in rendered text does, and that file
+ * is fetched when the span appears. The three weights are the
+ * interface's 400, 600 and 700, unmodified from upstream. */
 @font-face {
   font-family: "Maple Mono";
   src: url("../fonts/MapleMono-Regular.woff2") format("woff2");

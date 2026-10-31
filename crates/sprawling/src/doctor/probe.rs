@@ -224,18 +224,31 @@ pub(super) fn font_at(
 struct FontLocations {
     home: Option<PathBuf>,
     local_app_data: Option<OsString>,
-    system: Result<Vec<PathBuf>, String>,
+    system: Result<Vec<PathBuf>, UnreadableRoot>,
+}
+
+/// A system font root that could not be read, with the registry value
+/// that was to name it: a fault and where it sits are one report, so
+/// they travel as one value.
+struct UnreadableRoot {
+    at: PathBuf,
+    said: String,
 }
 
 #[cfg(windows)]
-fn windows_font_root() -> Result<Vec<PathBuf>, String> {
+fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
     crate::privacy::windows::system_root()
         .map(|root| vec![root.join("Fonts")])
-        .map_err(|err| err.to_string())
+        .map_err(|err| UnreadableRoot {
+            at: crate::privacy::windows::system_root_location(),
+            said: err.to_string(),
+        })
 }
 
 #[cfg(not(windows))]
-fn windows_font_root() -> Result<Vec<PathBuf>, String> {
+fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
+    // The caller supplies Windows' system roots here, so this platform
+    // never reads the installation record (Doctor §8-174).
     Ok(Vec::new())
 }
 
@@ -285,10 +298,10 @@ fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence
                 }
             }
         }
-        Err(error) => {
+        Err(UnreadableRoot { at, said }) => {
             return Presence::Broken {
-                at: PathBuf::from(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRoot"),
-                fault: Fault::Unreadable(error),
+                at,
+                fault: Fault::Unreadable(said),
             };
         }
     }
@@ -727,7 +740,10 @@ mod tests {
         let locations = FontLocations {
             home: Some(dir.path().to_path_buf()),
             local_app_data: None,
-            system: Err("unreadable registry".to_owned()),
+            system: Err(UnreadableRoot {
+                at: PathBuf::from("HKLM"),
+                said: "unreadable registry".to_owned(),
+            }),
         };
         assert!(matches!(
             font_in(Platform::Windows, locations, "font.ttf"),
