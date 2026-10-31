@@ -86,14 +86,18 @@ pub(crate) fn room_conventions(city_root: &Path, addr: &Address, building: &Addr
 pub(crate) enum Reading { Sent(Vec<u8>), Absent, Withheld(String) }
 pub(crate) fn read_convention(city_root: &Path, building: &Address, path: &Path) -> Result<Reading, AxError>;
 pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound;               // 工作台的读界也取它
+pub(crate) fn convention_block(heading: &str, whose: &str, text: &[u8]) -> Vec<u8>;            // 前缀与 read 的附注共用一个画法
+pub(crate) fn nested_rules(read_root: &Path, building: &Address, at: &Address,
+    delivered: &mut BTreeSet<Address>) -> Result<Option<runtime::Note>, AxError>;              // read 之后补上的规则
 // accounting::views::layers（锁外）
 pub(super) fn layers_answer(city_root: &Path, addr: Address) -> wire::Answer;
 ```
 
 - **`AGENTS.md` 经读界读，与 `read` 工具同一个判定。** `read_convention` 先看这一项本身（`symlink_metadata`）：不在答 `Absent`；是目录答 `Withheld`。否则经 `runtime::BoundReader::open` 读，读界以这栋楼为家（`read_bound`）：链接指向城外、机密楼或保留子树时 `BoundReader` 拒（`E_GATE_DENIED`），这里答 `Withheld` 并带拒因；`E_INVALID_ARGS`（链接落空、指向目录）同样答 `Withheld`。只有在那里、却打不开的文件（`E_STORAGE_FATAL`）仍拒掉冻结，因为那是这个项目写下、而 run 收不到的约定。理由：一个 run 能在房间里建链接（例如在主机上跑的 `exec`），而前缀会被送给 provider；用 `std::fs::read` 读就是绕过读界的第二条读路。一个叫 `AGENTS.md` 的目录在 Windows 上读出 `PermissionDenied`，以前会让这个房间的每个 run 都开不起来。
+- **比自己的房间更深的 `AGENTS.md` 随 `read` 到达，不进前缀**（`nested_rules`；`crates/runtime/spec/Tools/Read.lean` §8-29-7）。前缀在 run 开始时冻一次，只带城、楼与 run 自己那条房间链上的规则；再深一层的规则是 run 后来才碰到的，改系统块会让它之后每次请求都不中缓存，所以它走新事实走的那条路：附在碰上它的那条工具结果后面。候选是 `city::room_agents_paths` 给出的、从楼根到目标文件所在目录上的每一份 `AGENTS.md`，经 `read_convention` 读——与 `read` 同一个读界，链接指向楼外时照样扣下。`delivered` 记这个 run 已经给过的：开局是母 run 的 `read` 给过的（`runtime::fork::Inherited.delivered`）加 resident 段自己那条房间链，所以一份规则不会第二次到达；同一份附注里整份文件按次序装，总量以 `INTERVAL_CAP_BYTES` 为界，装不下的留给下一次读，首份就超限时用省略记号切下并记已投递。目标不在本楼时不做：别的楼的规则不属于这个 run 的前缀，也不该在它读一份文件时改它的从属。附注的字节进那次工具回答的载荷（`rules`），由渲染器 V4 画在编号正文之后，所以 fork 重建出的历史是它当时读到的那一份。
 - **冻结与视图读同一个函数。** `worker::freezing` 冻 Building 段与 Resident 段时、`views::layers` 答 `Query::Layers` 时都调 `prompt_chain`，所以页面说「送」的就是下一个 run 收到的，说「不送」时给的原因就是冻结跳过它的原因。工作台给 run 的读界也从 `read_bound` 取，读界只有一处定义。
 - **`Query::Layers` 的答复**（`crates/wire/Spec.lean` §8-98）在锁外读盘：City 段经 `city::city_prompt_path`（楼的那份在时城根那份是 `Replaced`）；Building 段与 Resident 段的 `AGENTS.md` 经 `read_convention`；身份文件是 `city::urbanite_path`，City Hall 的两个座位因此落到 `MAYOR.md` 与 `CLERK.md`；Run 段是 `city::model_notes` 列出的城与楼两层的每一份，楼里有同一个模型的一份时城那份是 `Replaced`。带默认的三份经 `city::standing` 判副本，`ShippedDefault.version` 是默认文本的哈希。地址拼不出一栋楼（保留子树）答 `Unavailable`。
 - **默认文本是一版。** `Query::Versions` 问城根的 `City.md`、`MAYOR.md` 或 `CLERK.md` 时，答复在末尾多一版 `VersionSource::Shipped`；答之前把默认文本放进内容库（`keep`，已在时只是一次存在检查），放进去了 `kept` 为真，RefRain 的比较与导出读得到它；内容库不收（盘满、目录不可写）时这一版照样列出，`kept` 为假，与任何没存下的一版一样，页面不提供比较。它排在截断之后加上，`VERSIONS_MAX` 不会把它截掉。
-- 验收：`views::layers::tests`、`worker::freezing::tests::room_chain` 里一个叫 `AGENTS.md` 的目录与一个指向城外的链接不进前缀且冻结照常、`views::versions::tests` 里城根 `City.md` 的末一版是 `Shipped`。
+- 验收：`views::layers::tests`、`worker::freezing::tests::room_chain` 里一个叫 `AGENTS.md` 的目录与一个指向城外的链接不进前缀且冻结照常、`views::versions::tests` 里城根 `City.md` 的末一版是 `Shipped`；`worker::driving::tests::rules_note` 从派活走一遍：比房间更深的规则只在碰上它的那次 `read` 上出现一次，第二次读同一份文件不再出现。
 -/
 

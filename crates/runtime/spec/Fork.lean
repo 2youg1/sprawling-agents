@@ -28,12 +28,15 @@ pub fn fork_draft(origin: Origin, new_run: RunId, addr: Address, t: TimeMs, who:
 /// then that run's own lines, and nothing else read.
 pub fn inherited_indexed(index: &storage::LedgerIndex, dir: &Path, at_seq: Seq)
     -> Result<Inherited, AxError>;
-pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
+pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq,
+                       pub delivered: BTreeSet<Address> }   // 母 run 的 read 已经给过的规则文件
 ```
 
 **`inherited_indexed` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 conversation 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Conversation` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
 
 **切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以折叠（`fold_run`）维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
+
+**母 run 已经给过的项目规则随对话一起继承。** `tool_result` 的载荷带 `rules.delivered` 时（§8-29-7），`fold_run` 把这些地址收进 `Inherited.delivered`，与消息同一个来源：分支的 `read` 从这一组开始算「已经给过」，于是母 run 碰到过的深层规则不会在分支上以附注形式再来一次。`rules.text` 已经在重建出的那条工具结果里（按那一行记下的版本画出），所以分支读到的规则与母亲读到的逐字节相同。这一组不是消息，进程停了只剩账本，所以它必须从同一批记录重新读出来；更早的账本没有这把键，读成空集。
 
 **上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`fold_run` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 

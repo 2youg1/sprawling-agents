@@ -41,7 +41,7 @@ pub(crate) use stamp::Stamp;
 // readers outside the tool: the machine's own dependency report, and a
 // caller deciding whether a task can be done here at all.
 pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings};
-pub use read::ReadTool;
+pub use read::{Note, Notes, ReadTool};
 pub use search::SearchTool;
 pub use status::ChildStatus;
 pub use status::ProviderMode;

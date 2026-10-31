@@ -15,8 +15,8 @@
 ### 8-63 runtime::rendering（形状 1 判定）
 
 ```rust
-pub const CURRENT: Rendering = Rendering::V3;
-pub enum Numbering { FromZero, FromOne }   // 一版渲染器怎样给行编号；V1、V2 从 0，V3 从 1
+pub const CURRENT: Rendering = Rendering::V4;
+pub enum Numbering { FromZero, FromOne }   // 一版渲染器怎样给行编号；V1、V2 从 0，V3、V4 从 1
 impl Numbering { pub fn of(rendering: Rendering) -> Numbering; }
 pub fn shown(rendering: Rendering, name: &ToolName, answer: &ToolAnswer) -> Result<String, AxError>;
 pub struct Copied<'a>;   // 从 read 答里抄出的段落，每行带它可能有的标记
@@ -43,6 +43,8 @@ impl Copied<'_> {
 
 **V3**：与 V2 只差行号——read 的头、续读点、越过末尾的那句、每 10 行的标记，与 search 命中块的标记，都按 1 基行号画：下标 `i` 画成 `i + 1`，标记画在首行与 1 基行号是 10 的倍数的行上。拒绝、`tool` 与其余工具同 V2。理由与被否见 D119。
 
+**V4**：与 V3 只差一条——`read` 的载荷带 `rules` 时，正文之后空一行，把 `rules.text` 原样画出。它不编号：那不是文件的行走，标一个号就是一个 `read` 会拒绝的 offset（§8-29-7）。载荷没有 `rules` 时 V4 与 V3 逐字节相同，所以从没碰上更深的规则的会话，前缀不因这一版而变；`rules` 只出现在 V4 写下的行上，V2、V3 照旧只画正文，旧账重建的字节不变。拒绝、`search`、`tool` 与其余工具同 V3。
+
 **剥标记**：标记是行首的一个或多个 ASCII 数字加 `|`，语法只写在 `rendering::read` 一处，画与剥不会分歧。`edit` 按 `CURRENT` 的编号剥：模型这一回合抄的是这一版画出的段落；升级之前画出、又被抄进升级之后的 `old_string` 的标记剥不掉，那次 edit 零命中，拒词让模型再读一次。行首长成这样的行可能是渲染器画的标记，也可能是文件本来的文本，单看段落分不出；分得出的是位置：read 只在标记所写的那个行号的行上画它，且只画在答（或搜索命中块）的首行或行号为 10 的倍数的行；这条位置规则只写在 `rendering::read::is_marked` 一处，画（read、search）与剥（`Copied`）都问它。`edit` 先按原样匹配 `old_string`；零命中时，对 `Copied::starts` 给出的每个可能的首行号 `start`，取 `drawn_from(start)` 剥掉的文本，只有它恰好从文件的第 `start` 行行首开始出现时才算被文件证实；恰有一个 `start` 被证实时，用剥掉的 `old_string`，`new_string` 只剥掉与 `old_string` 剥掉的号相同的标记，其余行原样（`tools::edit::as_the_file_spells`）。之后的唯一匹配判定照旧。
 -/
 
@@ -55,6 +57,17 @@ impl Copied<'_> {
 **被否**：①账本只存渲染后的文本：accounting 视图与 UI 读结构，失去结构就要从文本反解析；②渲染器不带版本、改了就改：旧会话恢复后模型读到的历史变了，前缀缓存也断了；③版本记在 run 上：跨升级的 run 前后两半由不同版本画出。
 
 **重开参数**：渲染需要行以外的输入（调用参数、房间地址、时钟）时，这些输入要随行记下，或改为记文本本身。
+-/
+
+/-! D126 V4 把一次 read 带上的项目规则画在编号正文之后
+
+**决定**：`read` 的载荷多一把可缺席的 `rules`（`{delivered: [Address], text: String}`，§8-29-7）；渲染器 V4 在编号正文之后空一行、把 `rules.text` 原样画出，V2、V3 不画；`CURRENT` 进位到 V4。
+
+**理由**：比 run 自己房间更深的 `AGENTS.md` 是 run 后来才碰到的规则，它不能进冻结前缀（前缀一移动，之后每次请求都不中缓存，见 D107 的理由），只能跟着那次工具结果到达。模型读到的字节必须与分支重建出的字节相同，而重建只凭账本那一行与版本的编号（D107），所以这把键必须由按版本渲染的渲染器画出，不能由调用方在窗口文本上拼接。不带 `rules` 的载荷在 V4 下与 V3 逐字节相同，于是没碰上更深规则的 run 不付任何代价。
+
+**被否**：①把附注直接接进载荷的 `text`——正文按行编号，附注不是文件的行走，编号会让模型把一段规则当成文件的第 n 行并把它递回 `offset`；②让 `read` 把规则放进窗口文本、不进账本——分支与恢复读不到它，同一份历史在两次运行里画出不同字节；③把深层的规则塞进第二条 system 消息——各家 provider 对它的支持不一，且系统块一移动缓存全失效；④不按版本、改了就改——旧账重建出的历史变了，前缀缓存也断了。
+
+**重开参数**：出现一种 provider 支持在会话中途稳定追加系统块、且不破坏前缀缓存，或读数显示附注放在尾部比放在工具结果里更常被遵守。
 -/
 
 /-! D108 read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配

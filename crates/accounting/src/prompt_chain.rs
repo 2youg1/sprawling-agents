@@ -12,6 +12,7 @@
 //! to a provider, and a run can make links in its room: reading these
 //! files past the read bound would be a second path out of it.
 
+use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -39,6 +40,11 @@ pub(crate) enum Reading {
     /// read bound refuses to follow.
     Withheld(String),
 }
+
+/// The words a nested rule arrives under, the same ones the resident
+/// slot gives the run's own chain of rooms, so a model reads one grammar
+/// whether a rule came with the run or with a file it opened.
+const NESTED_WHOSE: &str = "How work is done in this part of the project, from the project itself.";
 
 /// The building slot's conventions: the workspace's copy first and the
 /// building's after it, so the one nearest the work is read last.
@@ -79,6 +85,107 @@ pub(crate) fn room_conventions(
             whose: "How work is done in this part of the project, from the project itself.",
         })
         .collect())
+}
+
+/// The bytes one convention file is sent as: its heading, whose words it
+/// is, and its text.
+///
+/// Written once because two places send these files — the frozen prefix
+/// and a note on a read (`crates/runtime/spec/Tools/Read.lean` §8-29-7) —
+/// and a heading that moved in one of them would be a second grammar for
+/// the same document.
+pub(crate) fn convention_block(heading: &str, whose: &str, text: &[u8]) -> Vec<u8> {
+    let mut block = format!(
+        "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
+         the rules decide: they are what the city enforces.\n\n"
+    )
+    .into_bytes();
+    block.extend_from_slice(text);
+    block
+}
+
+/// The project's rules between `building`'s root and the directory of
+/// `at`, for a read that opened a file there: every `AGENTS.md` this run
+/// has not been given yet, in reading order, as one note.
+///
+/// **The frozen prefix cannot do this.** It is assembled once, from the
+/// city's and the building's files and the run's own chain of rooms,
+/// because a system block that moved mid-run would miss the provider's
+/// cached prefix on every request after it. A rule file deeper in the
+/// tree is a fact the run meets later, so it travels where a new fact
+/// already travels: at the end of the conversation, on the answer that
+/// met it.
+///
+/// **Same reading, same door.** Each file is read by
+/// [`read_convention`], the judgement the `read` tool gives a path, so a
+/// link out of the building is withheld here exactly as it is withheld
+/// from the prefix. A file that is not there, or withheld, is not marked
+/// delivered and costs one stat the next time that part is touched.
+///
+/// **One ceiling for the note**: the same 64 KiB a read's own body is
+/// limited to. Whole files are added in order while they fit; the first
+/// file of a call that alone exceeds the ceiling is cut with the
+/// elision marker and carried, so a rule the model just walked into is
+/// never silently dropped. A file that does not fit after another one
+/// has is left for a later read.
+///
+/// # Errors
+/// As [`read_convention`] and [`Address::parse`].
+pub(crate) fn nested_rules(
+    read_root: &Path,
+    building: &Address,
+    at: &Address,
+    delivered: &mut BTreeSet<Address>,
+) -> Result<Option<runtime::Note>, AxError> {
+    if !at.is_within(building) {
+        return Ok(None);
+    }
+    let Some((dir, _file)) = at.as_str().rsplit_once('/') else {
+        return Ok(None);
+    };
+    let dir = Address::parse(dir)?;
+    let ceiling = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let mut text = String::new();
+    let mut carried = Vec::new();
+    for (room, path) in city::room_agents_paths(read_root, building, &dir)? {
+        if delivered.contains(&room) {
+            continue;
+        }
+        let Reading::Sent(bytes) = read_convention(read_root, building, &path)? else {
+            continue;
+        };
+        let mut block = convention_block(
+            &format!("{}/{}", room.as_str(), city::AGENTS_FILE),
+            NESTED_WHOSE,
+            &bytes,
+        );
+        block.push(b'\n');
+        if !text.is_empty() && text.len().saturating_add(block.len()) > ceiling {
+            break;
+        }
+        let mut block = String::from_utf8_lossy(&block).into_owned();
+        if block.len() > ceiling {
+            block = runtime::elision::splice(
+                &block,
+                ceiling,
+                block.len(),
+                runtime::elision::Elided::Tail,
+            )
+            .text;
+        }
+        text.push_str(&block);
+        carried.push(room);
+    }
+    if carried.is_empty() {
+        return Ok(None);
+    }
+    for room in &carried {
+        delivered.insert(room.clone());
+    }
+    Ok(Some(runtime::Note {
+        delivered: carried,
+        text,
+    }))
 }
 
 /// Reads one convention file for a run of `building`.

@@ -39,7 +39,7 @@ impl Numbering {
     pub fn of(rendering: Rendering) -> Numbering {
         match rendering {
             Rendering::V1 | Rendering::V2 => Numbering::FromZero,
-            Rendering::V3 => Numbering::FromOne,
+            Rendering::V3 | Rendering::V4 => Numbering::FromOne,
         }
     }
 
@@ -74,7 +74,12 @@ const MARK_END: char = '|';
 /// without `offset` started at index 0. A payload without `total_lines`
 /// reached the end of its text, so the total is the last index shown
 /// plus one.
-pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
+///
+/// `rules` says whether this version draws the project's rules the read
+/// carried (`crates/runtime/spec/Rendering.lean` D126). They are drawn
+/// after the body, not numbered with it: they are not lines of the file
+/// and a number on them would be an offset `read` would refuse.
+pub(super) fn text(result: &Payload, numbering: Numbering, rules: bool) -> Option<String> {
     let map = result.as_map();
     let path = map.get("path")?.as_str()?;
     let body = map.get("text")?.as_str()?;
@@ -118,6 +123,18 @@ pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     out.push('\n');
     for (at, line) in (offset..).zip(lines) {
         push_line(&mut out, numbering, (offset, at), line)?;
+    }
+    if rules
+        && let Some(note) = map
+            .get("rules")
+            .and_then(|rules| rules.get("text"))
+            .and_then(Value::as_str)
+    {
+        out.push('\n');
+        out.push_str(note);
+        if !note.ends_with('\n') {
+            out.push('\n');
+        }
     }
     Some(out)
 }
