@@ -974,8 +974,8 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
                       local_app_data: Option<OsString>, file: &str) -> Presence;
 ```
 
-- **探测的是字体文件，不是 PATH 上的程序**：`file` 是 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。找到即 `Present { version: Silent }`，没有候选可读时答 `NoHome`，都没找到答 `NotInstalled`；不存在版本号猜测，最新版仍由 `Upstream::GitHub("subframe7536/maple-font")` 读取。
-- **安装方式照上游安装文档**：Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`；macOS 与 Linux 经 Homebrew 安装 `font-maple-mono-nf-cn`。每条配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装，Linux 不用 `sudo`。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
+- **探测的是字体文件，不是 PATH 上的程序**：`file` 是 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。找到即 `Present { version: Silent }`，Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；候选的元数据或遍历目录不可读时答 `Broken(Unreadable)`。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取。不存在版本号猜测，最新版仍由 `Upstream::GitHub("subframe7536/maple-font")` 读取。
+- **安装方式照上游安装文档**：Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`；macOS 经 Homebrew 安装 `font-maple-mono-nf-cn`，Linux 手动下载并安装到 `~/.local/share/fonts`。每条命令配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装。Linux 的 Homebrew cask 可写到该平台探测范围外，故改为手动安装。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
 - **它不是 Use 层必需项**：缺它不影响城市或客户端运行，只少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_maple_mono_nf_cn`，终端的 enables 与它同义。
 
 **本章测试**：需求表包含此行且三个平台都有配方；`font_at` 在临时目录上认出 Regular 文件、缺文件答 `NotInstalled`；表格完整性测试覆盖 `Detection::Font`。
@@ -983,7 +983,7 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 
 /-! D82 Maple Mono NF CN 只作可选系统字体，不随客户端内嵌（§8-174）
 
-**决定**：doctor 新增可选的 Maple Mono NF CN 字体行，以 Regular 字体文件探测，按上游文档用 Scoop 或 Homebrew 安装。
+**决定**：doctor 新增可选的 Maple Mono NF CN 字体行，以 Regular 字体文件探测，Windows 用 Scoop、macOS 用 Homebrew 安装，Linux 手动安装到用户字体目录。
 
 **理由**：人要求内置 Maple Mono，并在 doctor 的依赖安装里为中文与图标补上 Maple Mono NF CN。两种字体职责不同：界面资源要保持小，系统字体的中文与图标覆盖则按需要安装，不能为了省一次探测让安装后复查永远报缺。
 

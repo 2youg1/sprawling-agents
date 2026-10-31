@@ -349,10 +349,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
                 program: "brew",
                 args: &["install", "--cask", "font-maple-mono-nf-cn"],
             },
-            linux: Recipe::Command {
-                program: "brew",
-                args: &["install", "--cask", "font-maple-mono-nf-cn"],
-            },
+            linux: Recipe::Manual(
+                "download Maple Mono NF CN from https://font.subf.dev/en/ and install the font files in ~/.local/share/fonts",
+            ),
         },
         pin: Pin::Unpinned,
         upstream: Upstream::GitHub("subframe7536/maple-font"),

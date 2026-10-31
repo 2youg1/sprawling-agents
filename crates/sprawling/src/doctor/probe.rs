@@ -201,50 +201,165 @@ pub(super) fn font_at(
     local_app_data: Option<OsString>,
     file: &str,
 ) -> Presence {
-    let mut candidates = Vec::new();
-    if let Some(home) = home.as_ref() {
+    let system = match platform {
+        Platform::Windows => windows_font_root(),
+        Platform::MacOs => Ok(vec![PathBuf::from("/Library/Fonts")]),
+        Platform::Linux => Ok(vec![
+            PathBuf::from("/usr/local/share/fonts"),
+            PathBuf::from("/usr/share/fonts"),
+        ]),
+    };
+    font_in(
+        platform,
+        FontLocations {
+            home,
+            local_app_data,
+            system,
+        },
+        file,
+    )
+}
+
+/// The supplied locations keep tests independent of the host's font directories.
+struct FontLocations {
+    home: Option<PathBuf>,
+    local_app_data: Option<OsString>,
+    system: Result<Vec<PathBuf>, String>,
+}
+
+#[cfg(windows)]
+fn windows_font_root() -> Result<Vec<PathBuf>, String> {
+    crate::privacy::windows::system_root()
+        .map(|root| vec![root.join("Fonts")])
+        .map_err(|err| err.to_string())
+}
+
+#[cfg(not(windows))]
+fn windows_font_root() -> Result<Vec<PathBuf>, String> {
+    Ok(Vec::new())
+}
+
+/// Searches user locations first, then system locations in platform order.
+fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence {
+    let mut roots = Vec::new();
+    if let Platform::Windows = platform
+        && let Some(local) = locations.local_app_data
+    {
+        roots.push(
+            PathBuf::from(local)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Fonts"),
+        );
+    }
+    if let Some(home) = locations.home.as_ref() {
         match platform {
-            Platform::Windows => candidates.push(
+            Platform::Windows => roots.push(
                 home.join("scoop")
                     .join("apps")
                     .join("maple-mono-nf-cn")
-                    .join("current")
-                    .join(file),
+                    .join("current"),
             ),
-            Platform::MacOs => candidates.push(home.join("Library").join("Fonts").join(file)),
+            Platform::MacOs => roots.push(home.join("Library").join("Fonts")),
             Platform::Linux => {
-                candidates.push(home.join(".local").join("share").join("fonts").join(file));
-                candidates.push(home.join(".fonts").join(file));
+                roots.push(home.join(".local").join("share").join("fonts"));
+                roots.push(home.join(".fonts"));
             }
         }
     }
-    match platform {
-        Platform::Windows => {
-            if let Some(local) = local_app_data {
-                candidates.push(
-                    PathBuf::from(local)
-                        .join("Microsoft")
-                        .join("Windows")
-                        .join("Fonts")
-                        .join(file),
-                );
+    let depth = if matches!(platform, Platform::Linux) {
+        4
+    } else {
+        0
+    };
+    for root in roots {
+        if let Some(answer) = font_under(&root, file, depth) {
+            return answer;
+        }
+    }
+    match locations.system {
+        Ok(roots) => {
+            for root in roots {
+                if let Some(answer) = font_under(&root, file, depth) {
+                    return answer;
+                }
             }
-            candidates.push(PathBuf::from(r"C:\Windows\Fonts").join(file));
         }
-        Platform::MacOs => candidates.push(PathBuf::from("/Library/Fonts").join(file)),
-        Platform::Linux => {
-            candidates.push(PathBuf::from("/usr/local/share/fonts").join(file));
-            candidates.push(PathBuf::from("/usr/share/fonts").join(file));
+        Err(error) => {
+            return Presence::Broken {
+                at: PathBuf::from(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRoot"),
+                fault: Fault::Unreadable(error),
+            };
         }
     }
-    match candidates.into_iter().find(|candidate| candidate.is_file()) {
-        Some(at) => Presence::Present {
-            at,
-            version: Version::Silent,
-        },
-        None if home.is_none() => Presence::Absent(Absence::NoHome),
-        None => Presence::Absent(Absence::NotInstalled),
+    if locations.home.is_none() {
+        Presence::Absent(Absence::NoHome)
+    } else {
+        Presence::Absent(Absence::NotInstalled)
     }
+}
+
+/// Examines a root before its sorted children, without following directory links.
+fn font_under(root: &Path, file: &str, depth: usize) -> Option<Presence> {
+    let candidate = root.join(file);
+    match std::fs::metadata(&candidate) {
+        Ok(meta) if meta.is_file() => {
+            return Some(Presence::Present {
+                at: candidate,
+                version: Version::Silent,
+            });
+        }
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            return Some(Presence::Broken {
+                at: candidate,
+                fault: Fault::Unreadable(err.to_string()),
+            });
+        }
+    }
+    if depth == 0 {
+        return None;
+    }
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(err) => {
+            return Some(Presence::Broken {
+                at: root.to_path_buf(),
+                fault: Fault::Unreadable(err.to_string()),
+            });
+        }
+    };
+    let mut directories = Vec::new();
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) => {
+                return Some(Presence::Broken {
+                    at: root.to_path_buf(),
+                    fault: Fault::Unreadable(err.to_string()),
+                });
+            }
+        };
+        match entry.file_type() {
+            Ok(kind) if kind.is_dir() => directories.push(entry.path()),
+            Ok(_) => {}
+            Err(err) => {
+                return Some(Presence::Broken {
+                    at: entry.path(),
+                    fault: Fault::Unreadable(err.to_string()),
+                });
+            }
+        }
+    }
+    directories.sort();
+    for directory in directories {
+        if let Some(answer) = font_under(&directory, file, depth.saturating_sub(1)) {
+            return Some(answer);
+        }
+    }
+    None
 }
 
 /// The file names one program can carry on this platform, in the order
@@ -512,14 +627,114 @@ mod tests {
                 version: Version::Silent,
             }
         );
+        let mac_system = tempfile::tempdir().unwrap();
         assert_eq!(
-            font_at(
+            font_in(
                 Platform::MacOs,
-                Some(windows_home.path().to_path_buf()),
-                None,
-                FILE
+                FontLocations {
+                    home: Some(windows_home.path().to_path_buf()),
+                    local_app_data: None,
+                    system: Ok(vec![mac_system.path().to_path_buf()]),
+                },
+                FILE,
             ),
             Presence::Absent(Absence::NotInstalled)
         );
+    }
+
+    #[test]
+    fn windows_user_fonts_precede_scoop_and_system_fonts() {
+        let dir = tempfile::tempdir().unwrap();
+        let local = dir.path().join("local");
+        let user = local.join("Microsoft/Windows/Fonts/font.ttf");
+        let scoop = dir
+            .path()
+            .join("scoop/apps/maple-mono-nf-cn/current/font.ttf");
+        let system = dir.path().join("system/Fonts/font.ttf");
+        for path in [&user, &scoop, &system] {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"font").unwrap();
+        }
+        let locations = || FontLocations {
+            home: Some(dir.path().to_path_buf()),
+            local_app_data: Some(local.clone().into_os_string()),
+            system: Ok(vec![system.parent().unwrap().to_path_buf()]),
+        };
+        for path in [&user, &scoop, &system] {
+            assert_eq!(
+                font_in(Platform::Windows, locations(), "font.ttf"),
+                Presence::Present {
+                    at: path.to_path_buf(),
+                    version: Version::Silent
+                }
+            );
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn linux_finds_nested_fonts_with_a_depth_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join(".local/share/fonts");
+        let nested = root.join("one/two/three/four/font.ttf");
+        std::fs::create_dir_all(nested.parent().unwrap()).unwrap();
+        std::fs::write(&nested, b"font").unwrap();
+        let locations = || FontLocations {
+            home: Some(dir.path().to_path_buf()),
+            local_app_data: None,
+            system: Ok(vec![]),
+        };
+        assert_eq!(
+            font_in(Platform::Linux, locations(), "font.ttf"),
+            Presence::Present {
+                at: nested.clone(),
+                version: Version::Silent
+            }
+        );
+        let top = root.join("font.ttf");
+        std::fs::write(&top, b"font").unwrap();
+        assert_eq!(
+            font_in(Platform::Linux, locations(), "font.ttf"),
+            Presence::Present {
+                at: top.clone(),
+                version: Version::Silent
+            }
+        );
+        std::fs::remove_file(top).unwrap();
+        std::fs::remove_file(nested).unwrap();
+        let too_deep = root.join("one/two/three/four/five/font.ttf");
+        std::fs::create_dir_all(too_deep.parent().unwrap()).unwrap();
+        std::fs::write(too_deep, b"font").unwrap();
+        assert_eq!(
+            font_in(Platform::Linux, locations(), "font.ttf"),
+            Presence::Absent(Absence::NotInstalled)
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_font_metadata_is_broken() {
+        let dir = tempfile::tempdir().unwrap();
+        let candidate = dir.path().join("font.ttf");
+        std::os::unix::fs::symlink("font.ttf", &candidate).unwrap();
+        assert!(matches!(font_under(dir.path(), "font.ttf", 0),
+            Some(Presence::Broken { at, fault: Fault::Unreadable(_) }) if at == candidate));
+    }
+
+    #[test]
+    fn unavailable_windows_system_root_is_reported_after_user_locations() {
+        let dir = tempfile::tempdir().unwrap();
+        let locations = FontLocations {
+            home: Some(dir.path().to_path_buf()),
+            local_app_data: None,
+            system: Err("unreadable registry".to_owned()),
+        };
+        assert!(matches!(
+            font_in(Platform::Windows, locations, "font.ttf"),
+            Presence::Broken {
+                fault: Fault::Unreadable(_),
+                ..
+            }
+        ));
     }
 }
