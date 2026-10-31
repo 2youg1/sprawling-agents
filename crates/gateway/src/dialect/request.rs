@@ -353,6 +353,36 @@ mod tests {
     }
 
     #[test]
+    fn anthropic_rewrites_redacted_tool_ids_to_accepted_ids() {
+        let mut req = sample_request();
+        let redacted = "secret:redacted/0123456789abcdef";
+        if let ContentBlock::ToolUse { id, .. } = &mut req.messages.to_mut()[1].content[1] {
+            *id = redacted.to_owned();
+        }
+        if let ContentBlock::ToolResult { tool_use_id, .. } =
+            &mut req.messages.to_mut()[2].content[0]
+        {
+            *tool_use_id = redacted.to_owned();
+        }
+
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
+        assert_eq!(
+            wire["messages"][1]["content"][1]["id"],
+            "toolu_0123456789abcdef"
+        );
+        assert_eq!(
+            wire["messages"][2]["content"][0]["tool_use_id"],
+            "toolu_0123456789abcdef"
+        );
+    }
+
+    #[test]
     fn openai_drops_thinking_because_it_cannot_spell_it() {
         // Chat Completions has no counterpart and demands no round trip.
         // The canonical record keeps the block; only the wire loses it,

@@ -47,6 +47,19 @@ fn role_str(role: Role) -> &'static str {
     }
 }
 
+/// Gives a redacted ledger tool id an Anthropic-safe spelling while
+/// leaving every other id unchanged.
+fn tool_id_wire(id: &str) -> String {
+    let Some(fingerprint) = id.strip_prefix("secret:redacted/") else {
+        return id.to_owned();
+    };
+    if fingerprint.len() == 16 && fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        format!("toolu_{fingerprint}")
+    } else {
+        id.to_owned()
+    }
+}
+
 /// One picture, as this wire spells it.
 fn image_wire(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
     Ok(json!({
@@ -73,7 +86,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
             Ok(json!({ "type": "redacted_thinking", "data": data }))
         }
         ContentBlock::ToolUse { id, name, input } => Ok(json!({
-            "type": "tool_use", "id": id, "name": name.as_str(),
+            "type": "tool_use", "id": tool_id_wire(id), "name": name.as_str(),
             "input": serde_json::to_value(input)
                 .map_err(|err| mismatch("tool_use.input", &err.to_string()))?,
         })),
@@ -97,7 +110,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
                 Value::Array(parts)
             };
             Ok(json!({
-                "type": "tool_result", "tool_use_id": tool_use_id,
+                "type": "tool_result", "tool_use_id": tool_id_wire(tool_use_id),
                 "content": carried, "is_error": is_error,
             }))
         }
