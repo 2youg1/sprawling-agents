@@ -84,7 +84,7 @@ export const LIGHTING_WORDS: Record<Lighting, Key> = {
   light: "appearance_lighting_light",
 };
 export const FACE_WORDS: Record<Face, Key> = {
-  geist: "appearance_face_geist",
+  maple: "appearance_face_maple",
   system: "appearance_face_system",
   custom: "appearance_face_custom",
 };

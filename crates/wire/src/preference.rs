@@ -64,8 +64,10 @@ pub enum Lighting {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Face {
-    /// The family this build ships.
-    Geist,
+    /// The family this build ships. `geist` remains accepted only so
+    /// preferences written before Maple Mono still read (D63).
+    #[serde(alias = "geist")]
+    Maple,
     /// Whatever this machine calls its interface font.
     System,
     /// The stack the person wrote out.
@@ -290,8 +292,8 @@ impl Default for Appearance {
     fn default() -> Self {
         Appearance {
             lighting: Lighting::System,
-            sans: Face::Geist,
-            mono: Face::Geist,
+            sans: Face::Maple,
+            mono: Face::Maple,
             sans_stack: String::new(),
             mono_stack: String::new(),
             reading: None,
@@ -434,6 +436,27 @@ mod tests {
         assert_eq!(held.appearance, Appearance::default());
     }
 
+    /// The built-in face has a new name, while a person's old file still
+    /// reads: the alias is accepted on input only, and new output uses
+    /// Maple Mono (`crates/wire/spec/Preference.lean` D63).
+    #[test]
+    fn the_shipped_face_is_maple_and_an_old_geist_file_still_reads() {
+        let old = r#"{"appearance":{"lighting":"dark","sans":"geist","mono":"geist","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#;
+        let held: PreferencesAnswer = serde_json::from_str(old).unwrap();
+        assert_eq!(
+            serde_json::to_value(&held)
+                .unwrap()
+                .pointer("/appearance/sans"),
+            Some(&serde_json::json!("maple"))
+        );
+        assert_eq!(
+            serde_json::to_value(PreferencesAnswer::default())
+                .unwrap()
+                .pointer("/appearance/mono"),
+            Some(&serde_json::json!("maple"))
+        );
+    }
+
     /// A section written before the page's glass, blend opacity and
     /// tier reached the city still reads, with the three absent: every
     /// person's file predates them.
@@ -464,7 +487,7 @@ mod tests {
     fn a_body_size_under_the_floor_is_refused_and_any_size_above_it_reads() {
         let appearance = |px: u32| {
             serde_json::json!({ "appearance": {
-                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "lighting": "dark", "sans": "maple", "mono": "maple",
                 "sans_stack": "", "mono_stack": "", "body_px": px,
                 "density": "compact", "chroma": "full", "motion": "system",
             }})
@@ -489,7 +512,7 @@ mod tests {
     fn the_reading_face_reads_back_as_stated_and_absent_as_never_said() {
         let appearance = |reading: Option<&str>| {
             let mut stated = serde_json::json!({
-                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "lighting": "dark", "sans": "maple", "mono": "maple",
                 "sans_stack": "", "mono_stack": "", "body_px": null,
                 "density": "compact", "chroma": "full", "motion": "system",
             });

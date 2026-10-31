@@ -65,13 +65,24 @@
 
 /-! D52 阅读正文的字体是外观里的一格 `reading`，两个值，缺席即没说过
 
-**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Geist Mono）；`libron`——随包发的衬线字体 Libron（`client/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`client/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到设备自带的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Maple Mono）；`libron`——随包发的衬线字体 Libron（`client/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`client/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到设备自带的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
 
-**理由**：Geist Mono 适合大部分界面，长段的阅读正文换一种衬线字体是人的要求（人的决定），而它只管读的那部分字，所以是一格自己的选择，不是 `sans` 的第四个值：`sans` 换的是整个界面，把衬线字体放进去会把按钮与数字一起换掉。两个值而不是「字体名加一段自写的栈」：随包的衬线字体只有一种，`sans` 已经有自写栈的门，再开一扇就是第二个家。
+**理由**：Maple Mono 适合大部分界面，长段的阅读正文换一种衬线字体是人的要求（人的决定），而它只管读的那部分字，所以是一格自己的选择，不是 `sans` 的第四个值：`sans` 换的是整个界面，把衬线字体放进去会把按钮与数字一起换掉。两个值而不是「字体名加一段自写的栈」：随包的衬线字体只有一种，`sans` 已经有自写栈的门，再开一扇就是第二个家。
 
 **被否**：①`Face` 加一个 `libron`——`Face` 是 `sans` 与 `mono` 共用的词表，等宽那一格选衬线字体没有意义，而界面那一格选它会换掉控件的字；②把选择只存在浏览器里——换浏览器就丢，与 D14 同理；③非可缺的默认值——那是页面姿态的第二个家（D14 ③）。
 
 **重开参数**：随包的阅读字体多于一种，或人要给阅读正文写自己的字体栈时，`ReadingFace` 换成与 `Face` 同形的「来源加自写栈」。
+-/
+
+/-! D63 内置界面字体是 Maple Mono，旧偏好中的 `geist` 只作读取别名
+
+**决定**：`Face::Geist` 改为 `Face::Maple`，线上的新拼写是 `maple`，`Appearance::default()` 的 `sans` 与 `mono` 都是它。serde 在 `Maple` 上保留 `alias = "geist"`：旧版写下的个人配置仍读成 Maple Mono，下一次序列化只写 `maple`。`Face` 的枚举值换词是 D1 所说「名字不变而形状变」，`WIRE_V` 70 → 71，schema golden、shape golden 与 `client/src/wire.ts` 同集重生。
+
+**理由**：人决定把内置字体从 Geist Mono 换成 Maple Mono。个人配置是长期数据，不能因为资源换代而整份拒读；别名只兼容输入，不让旧字体名继续成为新输出的第二个权威。
+
+**被否**：①线上仍写 `geist`、只换字体资源——新偏好会持续写下已经不存在的选择，也与本次更名的要求不符；②直接删除旧词且不留别名——旧配置在 `[ui.appearance]` 处解析失败，人的其他偏好也一起读不到。
+
+**重开参数**：需要回退到 Geist Mono 或再增加一种内置字体时，`Face` 恢复显式的多值选择，并再次按 D1 处理线形。
 -/
 
 /-!

@@ -230,6 +230,9 @@ pub(crate) enum Detection {
     /// Any member of one browser family, the first that answers.
     /// `SPRAWLING_BROWSER` overrides it (`doctor::family`).
     Family(Family),
+    /// A font installed in one of the platform's user or system font
+    /// directories, named by its regular face's file (`doctor::probe::font_at`).
+    Font { file: &'static str },
 }
 
 /// One thing this city needs, and everything that can be said about it

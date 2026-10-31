@@ -287,7 +287,7 @@ def Verb.frame : Verb → String
                 -- says the person wrote one; any other face makes this
                 -- field a value the product is free to drop.
               , ("sans", .str "custom")
-              , ("mono", .str "geist")
+              , ("mono", .str "maple")
               , ("sans_stack", .str sansStack)
               , ("mono_stack", .str "")
               , ("body_px", Json.null)

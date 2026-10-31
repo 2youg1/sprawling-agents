@@ -55,9 +55,9 @@
     "en": "a stack I write",
     "zh": "自己写字体栈"
   },
-  "appearance_face_geist": {
-    "en": "Geist Mono",
-    "zh": "Geist Mono 等宽字"
+  "appearance_face_maple": {
+    "en": "Maple Mono",
+    "zh": "Maple Mono 等宽字"
   },
   "appearance_face_system": {
     "en": "the system face",
@@ -4830,6 +4830,10 @@
   "machine_enables_kani": {
     "en": "just proof, proving a property against real MIR, on Linux only",
     "zh": "just proof，对真实的 MIR 证明性质，只在 Linux 上可用"
+  },
+  "machine_enables_maple_mono_nf_cn": {
+    "en": "Chinese glyphs and Nerd Font icons in terminals and tools that use Maple Mono NF CN",
+    "zh": "为使用 Maple Mono NF CN 的终端与工具补齐中文字形和 Nerd Font 图标"
   },
   "machine_enables_msedgedriver": {
     "en": "the browser tool against Edge, which every Windows machine already has",

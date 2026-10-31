@@ -52,17 +52,33 @@ pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
 /// `ToolUnavailable` when the record is unreadable or names a relative
 /// path; nothing is started then.
 pub(crate) fn system32(program: &str) -> Result<std::path::PathBuf, AxError> {
+    Ok(system_root()?.join("System32").join(program))
+}
+
+/// The absolute Windows installation root recorded in HKLM.
+///
+/// # Errors
+/// As [`system32`].
+pub(crate) fn system_root() -> Result<std::path::PathBuf, AxError> {
     let installation = current_version()
         .and_then(|key| key.get_value::<std::ffi::OsString, _>("SystemRoot"))
         .map_err(|_| unlocated("protected Windows installation path unavailable"))?;
-    let executable = std::path::PathBuf::from(installation)
-        .join("System32")
-        .join(program);
-    if executable.is_absolute() {
-        Ok(executable)
+    let root = std::path::PathBuf::from(installation);
+    if root.is_absolute() {
+        Ok(root)
     } else {
         Err(unlocated("Windows installation path is not absolute"))
     }
+}
+
+/// Where [`system_root`] reads its value, in the form a report names it
+/// to a person.
+///
+/// This module decides the value's address, so it also spells it: a
+/// caller that reported a key of its own would go on naming a key this
+/// reader had stopped opening.
+pub(crate) fn system_root_location() -> std::path::PathBuf {
+    std::path::PathBuf::from(format!(r"HKLM\{CURRENT_VERSION}\SystemRoot"))
 }
 
 /// The edition and build this host reports, as the privacy page shows

@@ -141,6 +141,9 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
                 }
             }
             Detection::Built { .. } => {}
+            Detection::Font { file } => {
+                assert!(!file.is_empty(), "{name} names no font file");
+            }
             Detection::Family(family) => {
                 assert!(
                     !family.members().is_empty(),
@@ -195,6 +198,7 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "sandbox-engine",
         "shell",
         "ffmpeg",
+        "maple-mono-nf-cn",
     ] {
         assert!(named.contains(needed), "the table does not carry {needed}");
     }
@@ -385,7 +389,8 @@ fn the_shell_every_recipe_runs_in_is_a_required_develop_row() {
             Detection::Component { .. }
             | Detection::Interpreter { .. }
             | Detection::Built { .. }
-            | Detection::Family(_) => false,
+            | Detection::Family(_)
+            | Detection::Font { .. } => false,
         })
         .map(|row| row.name)
         .collect();

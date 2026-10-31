@@ -3,22 +3,41 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
-/* `optional` rather than `swap`, because the file is beside the page
+/* `optional` rather than `swap`, because the files are beside the page
  * rather than across a network: the browser is given a moment to use
- * Geist and never swaps the face afterwards. A face that arrives late
+ * Maple Mono and never swaps the face afterwards. A face that arrives late
  * therefore costs the first paint nothing and moves no text a person is
  * already reading, which is what `swap` could not promise. `index.html`
- * preloads the file so that moment is long enough. */
+ * preloads the two files the first screen is set in, regular for running
+ * text and notes and semibold for titles, headings, labels and figures,
+ * so that moment is long enough. Bold is not preloaded, because no rule
+ * asks for it: only a `strong` span in rendered text does, and that file
+ * is fetched when the span appears. The three weights are the
+ * interface's 400, 600 and 700, unmodified from upstream. */
 @font-face {
-  font-family: "Geist Mono";
-  src: url("../fonts/GeistMono-Variable.woff2") format("woff2");
-  font-weight: 100 900;
+  font-family: "Maple Mono";
+  src: url("../fonts/MapleMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: optional;
+}
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../fonts/MapleMono-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: optional;
+}
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../fonts/MapleMono-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-style: normal;
   font-display: optional;
 }
 
 /* Libron, the serif face reading text may be set in (wire D52), one
- * declaration per file the release ships. `swap` rather than Geist's
+ * declaration per file the release ships. `swap` rather than Maple Mono's
  * `optional`: these files are fetched only once a person has chosen
  * Libron, usually mid-visit, and `optional` would let the browser keep
  * the fallback for the rest of that visit, so the choice would show

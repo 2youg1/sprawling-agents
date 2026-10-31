@@ -76,6 +76,8 @@ pub(crate) enum Absence {
     },
     NoHome,
     NotInThisBuild,
+    /// None of the platform's font directories holds the requested face.
+    NotInstalled,
 }
 
 impl Presence {
@@ -177,6 +179,7 @@ impl Absence {
             Absence::NoComponent { dir } => format!("no component at {}", dir.display()),
             Absence::NoHome => accounting::home::NO_HOME.to_owned(),
             Absence::NotInThisBuild => "not in this build".to_owned(),
+            Absence::NotInstalled => "not installed in the platform's font directories".to_owned(),
         }
     }
 }

@@ -92,8 +92,12 @@ budget_bytes = 2097152
 # (wire D52); Libron's four woff2 files are 334,684 B of that, because
 # woff2 is already compressed and gzip takes nothing off a face. The
 # browser fetches those files only after a person chooses Libron, so a
-# page that reads in the interface's face never downloads them.
-best_bytes = 2951712
+# page that reads in the interface's face never downloads them. Replacing
+# Geist Mono with Maple Mono moved the reading to 3,240,562 B: Maple's
+# regular, semibold and bold faces keep the interface's actual 400/600/700
+# weights and add 157,892 B over the one face they replace; the rest is
+# generated bundle and notice variation. NF CN is not embedded.
+best_bytes = 3240562
 measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
 status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, then cargo xtask budget retakes it"
 
