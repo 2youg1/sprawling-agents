@@ -121,6 +121,126 @@ fn a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call() {
     );
 }
 
+/// A dependency a split writes is a real edge: the child stays out of
+/// the ready set until the row it names is done, the claim says which
+/// row it waits for, and finishing that row lets the child in. The
+/// grown table is judged by `PlanTree::build` before a byte is written,
+/// so a name the plan does not carry is refused at the call.
+#[test]
+fn a_split_writes_its_dependencies_and_the_ready_set_reads_them() {
+    let plan = format!(
+        "# Roadmap\n\n| # | Item | Weight | Needs | Status | Evidence |\n\
+         |---|------|--------|-------|--------|----------|\n\
+         | 1 | foundations | 1 |  | Done | cas:b3-{h} |\n\
+         | 2 | build | 1 |  | Not started |  |\n\
+         | 3 | ship | 1 | 1 | Not started |  |\n",
+        h = "ab".repeat(32)
+    );
+    let shared = Arc::new(Mutex::new(ClaimDesk::new(
+        "potter@lab.1".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        plan,
+        Booking::new(|_| Ok(())),
+    )));
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let ready = |tool: &ClaimTool| {
+        let listed = tool
+            .invoke(&call(serde_json::json!({ "action": "list" })))
+            .expect("the plan lists")
+            .result;
+        listed
+            .as_map()
+            .get("ready")
+            .and_then(Value::as_array)
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|row| row.get("node").and_then(Value::as_str))
+                    .map(str::to_owned)
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default()
+    };
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "2" })))
+        .expect("2 is ready: it waits for nothing, and 1 is done");
+    tool.invoke(&call(serde_json::json!({
+        "action": "split",
+        "node": "2",
+        "parts": [{"item": "frame", "needs": ["3"]}, {"item": "roof", "needs": ""}]
+    })))
+    .expect("the split lands on the desk");
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert!(
+        text.contains("| 2.1 | frame | 1 | 3 | Not started |  |"),
+        "the needs column carries the edge: {text}"
+    );
+    assert!(
+        text.contains("| 2.2 | roof | 1 |  | Not started |  |"),
+        "an empty `needs` writes an empty cell: {text}"
+    );
+    assert_eq!(ready(&tool), ["2.2", "3"], "2.1 waits for 3");
+    let refused = tool
+        .invoke(&call(
+            serde_json::json!({ "action": "claim", "node": "2.1" }),
+        ))
+        .expect_err("2.1 waits for 3, which nobody has finished");
+    assert!(
+        refused.subject().contains("waits for 3"),
+        "the refusal names the row being waited for: {}",
+        refused.subject()
+    );
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "3" })))
+        .expect("3 is ready");
+    tool.invoke(&call(serde_json::json!({
+        "action": "finish",
+        "node": "3",
+        "evidence": format!("cas:b3-{}", "cd".repeat(32)),
+    })))
+    .expect("3 lands with a locator");
+    assert_eq!(
+        ready(&tool),
+        ["2.1", "2.2"],
+        "finishing the row 2.1 waits for lets it in"
+    );
+}
+
+/// A dependency the grown table cannot hang is refused at the call, by
+/// the same judgement that reads the plan, and the desk keeps the copy
+/// it had.
+#[test]
+fn a_split_that_needs_a_row_the_plan_lacks_is_refused_before_it_is_written() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .expect("1 is ready");
+    let before = shared.lock().unwrap().roadmap().map(str::to_owned);
+    let refused = tool
+        .invoke(&call(serde_json::json!({
+            "action": "split",
+            "node": "1",
+            "parts": [{"item": "frame", "needs": ["9"]}]
+        })))
+        .expect_err("row 9 is not in the plan");
+    assert_eq!(
+        refused.subject(),
+        "1.1 needs 9, which the table does not carry",
+        "the refusal names the row and the dependency"
+    );
+    assert_eq!(
+        shared.lock().unwrap().roadmap().map(str::to_owned),
+        before,
+        "a refused split leaves the desk's copy as the claim left it"
+    );
+    assert!(
+        shared
+            .lock()
+            .unwrap()
+            .take_effects()
+            .iter()
+            .all(|effect| effect.kind() != Some(kernel::EventKind::RoadmapSplit)),
+        "and queues no split"
+    );
+}
+
 /// A plan with a header and no rows: what a building starts with.
 const EMPTY_PLAN: &str = "\
 # Roadmap

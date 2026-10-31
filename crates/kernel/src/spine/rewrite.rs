@@ -222,8 +222,14 @@ fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<Str
              anybody",
         ));
     }
+    let needs = child
+        .needs
+        .iter()
+        .map(NodeId::to_string)
+        .collect::<Vec<String>>()
+        .join(", ");
     Ok(format!(
-        "| {id} | {} | {} |  | {} |  |",
+        "| {id} | {} | {} | {needs} | {} |  |",
         child.item.trim(),
         child.weight,
         RoadmapStatus::NotStarted.spelling()
