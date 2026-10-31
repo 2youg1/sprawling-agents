@@ -19,6 +19,17 @@ import { memory } from "./rows";
 const GLASS = "sprawling.appearance.glass";
 const BLEND = "sprawling.appearance.blend";
 
+describe("the built-in face", () => {
+  test("is Maple Mono, and the old cached Geist value reads back as that same built-in slot", () => {
+    const rows = memory();
+    expect(get(loadPreferences(rows, "en").held).appearance.sans).toBe("maple");
+    rows.setItem("sprawling.appearance.sans", "geist");
+    rows.setItem("sprawling.appearance.mono", "geist");
+    const appearance = get(loadPreferences(rows, "en").held).appearance;
+    expect([appearance.sans, appearance.mono]).toEqual(["maple", "maple"]);
+  });
+});
+
 describe("glass", () => {
   test("is drawn until the person turns it off, and an unknown word reads as drawn", () => {
     const rows = memory();
@@ -77,7 +88,7 @@ describe("the city's answer", () => {
       appearance: {
         lighting: "light" as const,
         sans: "system" as const,
-        mono: "geist" as const,
+        mono: "maple" as const,
         sans_stack: "",
         mono_stack: "",
         body_px: null,
@@ -89,7 +100,7 @@ describe("the city's answer", () => {
     expect(adopted(held, answer).appearance).toEqual({
       lighting: "light",
       sans: "system",
-      mono: "geist",
+      mono: "maple",
       sansStack: "",
       monoStack: "",
       reading: "libron",

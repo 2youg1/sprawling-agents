@@ -75,11 +75,11 @@
   /* What a number is set with when its columns have to hold still: one
    * advance per digit, and a zero that cannot be read as a letter. */
   --figures: tabular-nums slashed-zero;
-  /* The face each stack starts with. Geist Mono for the whole page
+  /* The face each stack starts with. Maple Mono for the whole page
    * while the person says nothing; the appearance section writes a
    * generic family or a stack they typed. */
-  --face-sans: "Geist Mono";
-  --face-mono: "Geist Mono";
+  --face-sans: "Maple Mono";
+  --face-mono: "Maple Mono";
   /* How much of the glass role covers what is behind it. A percentage
    * because `color-mix` takes one, and the number the colour gate reads:
    * over the brightest surface the page draws, text on glass still

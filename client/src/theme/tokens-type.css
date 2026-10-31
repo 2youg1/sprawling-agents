@@ -40,7 +40,7 @@
   --font-mono:
     var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono",
     monospace;
-  /* Mono text is text a person copies: a command, a path, a code. Geist
+  /* Mono text is text a person copies: a command, a path, a code. Maple
    * Mono's ligatures and contextual alternates draw ` --` and `->` as
    * other shapes, so what the screen shows is not what the shell runs.
    * Tailwind carries this to `font-mono` and to `code`, `kbd`, `samp`
@@ -51,7 +51,7 @@
    * the interface's own face until the person chooses Libron for it
    * (`theme/preference.css`, wire D52), so the default page is still
    * one face. The ligature rule follows the face: it is there so a
-   * command reads as typed, which holds for Geist and has nothing to
+   * command reads as typed, which holds for Maple Mono and has nothing to
    * say about a serif paragraph. */
   --font-read: var(--font-sans);
   --font-read--font-feature-settings: var(--font-sans--font-feature-settings);

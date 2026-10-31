@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
-/* The faces a person may choose instead of the shipped one. Geist Mono
+/* The faces a person may choose instead of the shipped one. Maple Mono
  * is the absent case, so a root element saying nothing is already right.
  * A stack somebody typed is the one value the theme cannot hold, and
  * arrives as `--face-sans` set on the root element itself. */

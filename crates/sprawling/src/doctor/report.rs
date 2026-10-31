@@ -316,6 +316,9 @@ fn state(presence: &Presence) -> wire::DoctorState {
                 },
                 Absence::NoHome => wire::DoctorAbsence::NoHome,
                 Absence::NotInThisBuild => wire::DoctorAbsence::NotInThisBuild,
+                Absence::NotInstalled => wire::DoctorAbsence::NoComponent {
+                    dir: "the platform's font directories".to_owned(),
+                },
             },
         },
     }

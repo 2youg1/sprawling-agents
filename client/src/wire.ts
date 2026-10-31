@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 70 as const;
+export const WIRE_V = 71 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "8bc47ef8ba6c205a854f7796b5c85e210b548763f9035a51636aae079c613c03" as const;
+export const WIRE_HASH = "8f3b5e976be5480948d7d16772e20267e66466b6ecb99ce33407a1f270e22389" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -3278,7 +3278,7 @@ export type Density = typeof Density.Type;
  * Where one of the two typefaces comes from.
  */
 export const Face = Schema.Union([
-  Schema.Literal("geist"),
+  Schema.Literal("maple"),
   Schema.Literal("system"),
   Schema.Literal("custom"),
 ]).annotate({ identifier: "Face" });

@@ -13,14 +13,16 @@ import type { Plugin } from "vite";
 
 import { thirdPartyNotices } from "./scripts/notices";
 
-// The files the shipped faces are made of: Geist Mono's one variable
-// woff2, Libron's four static ones, and the licence each is given
+// The files the shipped faces are made of: Maple Mono's regular,
+// semibold and bold woff2, Libron's four static ones, and the licence each is given
 // under. `theme/fonts.css` names every woff2 file, so the asset pipeline
 // emits them by itself; the licences are named by nothing, and OFL-1.1
 // requires each to travel with its font, so this plugin puts them in the
 // bundle beside them.
 const FACES = [
-  "GeistMono-Variable.woff2",
+  "MapleMono-Regular.woff2",
+  "MapleMono-SemiBold.woff2",
+  "MapleMono-Bold.woff2",
   "Libron-Regular.woff2",
   "Libron-Italic.woff2",
   "Libron-Bold.woff2",

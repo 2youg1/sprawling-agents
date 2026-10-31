@@ -655,7 +655,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 /-! D12 视图栈是 Svelte 5，打包器是 Vite；对手是 Solid
 
 - **决策**（换栈由人选定）：视图写成 Svelte 5 组件，由 Vite 与 `@sveltejs/vite-plugin-svelte` 打包。
-- **理由**：参数是构建产物的大小与每个 token 的更新开销，因为一个流式对话客户端在每个 token 上都要更新页面。Svelte 5 与 Solid 在这两件事上是同一类设计——响应式编译进产物、没有虚拟 DOM、一次更新只重算碰过的信号——所以两者只能由读数分高下，分类分不出来。仓库里的读数都是 Svelte 一臂：整个客户端（含随包字体与 `#/gallery` 夹具）gzip 后 <!-- xtask:begin budget_reading:frontend_artifact -->2,951,712 B<!-- xtask:end -->（`tools/xtask/budgets.toml` 的 `frontend_artifact`，`just build-web` 之后称整个 dist 目录）；R = 1e4、一帧 50 个 delta、一个读全表的订阅者时，每帧折叠约 30–40 µs（D2，`belief/fold_cost.test.ts`）。Solid 一臂的两个读数还没有（§3-4）。在读数出来之前，选择由两件已有的事定：`.svelte` 组件与 `core/` 的 `$state` 模块（`belief/runs.svelte.ts`）由同一个编译器处理，测试经 `scripts/runes.ts` 走同一条编译路径；4-1 的类型车道与 4-5 的 eslint 配置都按 `.svelte` 定型，换成 Solid 的 JSX 要换掉这两条车道。**组件生态不是参数**：`parts/` 的控件全部自绘（§9 判定），平台已给 `<dialog>`、Popover 与提示语义。Vite 保留的理由是产物：`@sveltejs/vite-plugin-svelte` 支持当前的 Vite 主版本，换打包器不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。
+- **理由**：参数是构建产物的大小与每个 token 的更新开销，因为一个流式对话客户端在每个 token 上都要更新页面。Svelte 5 与 Solid 在这两件事上是同一类设计——响应式编译进产物、没有虚拟 DOM、一次更新只重算碰过的信号——所以两者只能由读数分高下，分类分不出来。仓库里的读数都是 Svelte 一臂：整个客户端（含随包字体与 `#/gallery` 夹具）gzip 后 <!-- xtask:begin budget_reading:frontend_artifact -->3,240,562 B<!-- xtask:end -->（`tools/xtask/budgets.toml` 的 `frontend_artifact`，`just build-web` 之后称整个 dist 目录）；R = 1e4、一帧 50 个 delta、一个读全表的订阅者时，每帧折叠约 30–40 µs（D2，`belief/fold_cost.test.ts`）。Solid 一臂的两个读数还没有（§3-4）。在读数出来之前，选择由两件已有的事定：`.svelte` 组件与 `core/` 的 `$state` 模块（`belief/runs.svelte.ts`）由同一个编译器处理，测试经 `scripts/runes.ts` 走同一条编译路径；4-1 的类型车道与 4-5 的 eslint 配置都按 `.svelte` 定型，换成 Solid 的 JSX 要换掉这两条车道。**组件生态不是参数**：`parts/` 的控件全部自绘（§9 判定），平台已给 `<dialog>`、Popover 与提示语义。Vite 保留的理由是产物：`@sveltejs/vite-plugin-svelte` 支持当前的 Vite 主版本，换打包器不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。
 - **被击败的备选**：Solid（`solid-js` 与 `vite-plugin-solid`）。它输在上面两件编译与车道的事上，不是输在一个读数上。SvelteKit（仍是 Vite，外加路由、SSR、`load`、服务端 endpoint 与 adapter）。它的主要能力都假定有一个 JS 进程在服务端跑页面，而这里的服务端是 Rust：产物在构建时嵌进二进制，城原样答它，数据全走 `/ws`，能用的只剩 adapter-static 加 hash 路由。代价有三：URL 文法从 `core/route.ts` 的穷尽 `View` 搬进目录名与 param matcher，成为同一事实的第二个家；十几个同名 `+page.svelte` 违反「一个模块一个文件、按它拥有的东西命名」；`$app/*` 虚拟模块在 `bun test --conditions=browser`（4-2）下跑不起来。它能给的按路由拆包由动态 `import()` 给出（`#/gallery` 已是这样），PWA 的 service worker 读 Vite 的 build manifest 手写。
 - **重开参数**：§3-4 的两个读数量出来以后，同一仪表、同一机器上 Solid 一臂的产物不到 Svelte 一臂的一半，或每帧折叠开销不到一半，就重新论证本条。出现第一个真正需要组件库的需求时，先过 §9 的 `RUNTIME` 判定与 7-9。SvelteKit 一条在以下任一情况出现时重开：客户端改由一个 JS 服务端托管（例如远程门另起一个 Node 或 Bun 站点）；需要服务端渲染或预渲染的页面；页面数多到手写的 `route.ts` 本身成了负担。
 -/
@@ -939,7 +939,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 - **决策**：refrain S7.12 的三种格式：PDF 用 `pdfjs-dist`（Apache-2.0），DOCX 用 `docx-preview`（Apache-2.0，带进 jszip，许可证 `MIT OR GPL-3.0-or-later` 取 MIT 一支），HTML 不引库，用本浏览器与一个 `sandbox=""` 的 `iframe` 加注入的 CSP（4-54）。两个库只由 `views/refrain/formats/` 读，各自懒加载。pdf.js 的资源随 bundle 走、经页面一侧的资源门交给 worker：全部 Adobe CMap、FoxitSymbol 与 FoxitDingbats 两种符号字体、OpenJPEG、JBIG2 与 qcms 三个 WebAssembly 解码器；它们各自的许可证文件（BSD-3-Clause、BSD-2-Clause、MIT）由 `client/scripts/notices.ts` 从资源所在的目录读进 `THIRD-PARTY-NOTICES.txt`（D13）。不引 Mermaid（路线图 S05 Q2）与 Mammoth；KaTeX 由公式引入（4-64a、D42a）。
 - **理由**：平台给不了 PDF 与 DOCX 的页：浏览器自带的 PDF 阅读器在 `iframe` 里不受页面控制，拿不到文字来比较，三家引擎的行为也各不相同（refrain 附录 F：原生 iframe 的内部控制不宜成为 diff 契约）；DOCX 没有任何引擎会画。HTML 正是平台本身会画的东西，库只会成为第二个画法。DOCX 画进沙箱框而不是客户端页面本身，因为文件里的样式会进入客户端的层叠，而 docx-preview 画 `altChunk` 用的是一个不带 sandbox 的框。资源经资源门而不是 `cMapUrl` 目录交给 worker，因为 Vite 只发出被导入的文件、不复制目录，而走 CDN 要向城外的主机发请求。标准 14 种字体里只随包两种符号字体：`useSystemFonts` 在浏览器里默认打开时，pdf.js 只为 Symbol 与 ZapfDingbats 取字体，其余用设备自带的字体；随 pdfjs-dist 发来的 Liberation 字体的许可证（GPL-2.0 加字体例外）也不在 `deny.toml` 的清单上。
-- **被击败的备选**：①`<iframe src>` 指向 PDF、用浏览器自带的阅读器——见理由；②Mammoth 抽 DOCX——只给语义 HTML，不排页，「预览」名不副实；③docx-preview 直接画进客户端页面——文件里的 CSS 进入客户端的层叠，`altChunk` 开一个不带 sandbox 的框；④自写 PDF 或 DOCX 排版——这两个库已经做完的事，自写的那一份要在三家引擎上重测一遍；⑤pdf.js 资源走 CDN——城外的主机会知道有一座城打开了一份 PDF，没有外网的机器上什么都画不出（与 `theme/fonts.css` 不从字体主机取 Geist Mono 的理由相同）。
+- **被击败的备选**：①`<iframe src>` 指向 PDF、用浏览器自带的阅读器——见理由；②Mammoth 抽 DOCX——只给语义 HTML，不排页，「预览」名不副实；③docx-preview 直接画进客户端页面——文件里的 CSS 进入客户端的层叠，`altChunk` 开一个不带 sandbox 的框；④自写 PDF 或 DOCX 排版——这两个库已经做完的事，自写的那一份要在三家引擎上重测一遍；⑤pdf.js 资源走 CDN——城外的主机会知道有一座城打开了一份 PDF，没有外网的机器上什么都画不出（与 `theme/fonts.css` 不从字体主机取 Maple Mono 的理由相同）。
 - **读数**：`frontend_artifact`（`just build-web` 之后每个文件 `gzip -9` 后相加）引入前 676,051 B，引入后 2,416,686 B，超过 `tools/xtask/budgets.toml` 记的 2 MiB；那一行是读数，不是门。最大的一块是 CMap（约 1.4 MB，`.bcmap` 本身已压缩，gzip 几乎不再缩小它），其次是 pdf.js 的 worker（约 1.27 MB，gzip 后约 0.35 MB）。分块与资源都懒加载，首屏一个字节都不多付。
 - **重开参数**：整份 dist 的字节成为要守的数时，第一步是把 CMap 做成可选的资源包，由城从自己的目录提供，只在一份 PDF 要某一张 CMap 时才取；其次是只留中日韩常用的 UCS2／UTF16 那几族。一份文件没带标准字体、设备上又没有度量相近的字体而画错时，重新考虑随包 Liberation 字体，那要先在 `deny.toml` 上论证它的许可证。
 -/
@@ -1161,6 +1161,17 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：多项目使用者需要从 city 与 hall 发现已有能力；skill、hook plugin、MCP、CLI 或 ACP 不能在这些客户端页面放入口，后端也不增加所需保证，所以客户端是合适的归属。共享一个判定让 `/cd`、hall 选择器与建楼表不会对同一地址作出不同分类，而明确确认仍是建楼与收编的唯一写入门。
 - **被击败的备选**：在 `/cd` 与 `raisingOf` 各写一份分类——两处会漂移；让 `/cd` 直接建楼——未知名字或一次手误会不经确认写入；恢复 composer workspace chip 或给 Main 加按钮——违背既定的一屏一处与本次范围；从 city 外复制任意目录——不在本功能内。
 - **重开参数**：建楼页不再是建楼与收编的唯一确认门，或 `BuildingProgress.adoptable` 的分类权威改变时，重审这个接口；需要导入 city 外目录时另立需求与其安全保证。
+-/
+
+/-! D105 默认界面字体是 Maple Mono，旧浏览器缓存按未知值落回它
+
+**决定**：`core/appearance.ts` 的 `Face` 与 `FACES` 以 `maple` 取代 `geist`，`core/prefs.ts` 的 `sans` 与 `mono` 缺省值也都是 `maple`。旧浏览器缓存中的 `geist` 不另设迁移通道：它已经不在 `FACES` 中，`readOne` 按既有规则把它读成缺省 `maple`，下一次写缓存只留新词。城市回答的旧配置由 wire D63 在读入处兼容。
+
+**理由**：缓存只是城市偏好之前的加速层，不是第二个权威；未知值落回本 build 的姿态正是它已有的规则。为旧缓存增加永久别名会多一条输入路径，却不能多保住任何人的选择，因为旧词与新词指的是同一个内置槽位。
+
+**被击败的备选**：①缓存继续接受 `geist` 并在使用时映射——同义词会留在所有后续读写路径里；②城市也不兼容旧配置——见 wire D63，拒绝整份个人配置的代价不可接受。
+
+**重开参数**：`geist` 再次成为一个与 Maple Mono 不同的可选内置字体时，它才重新进入 `Face` 与 `FACES`。
 -/
 
 /-! ## 11 边界枚举

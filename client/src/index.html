@@ -15,21 +15,33 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <!-- The face the page is drawn with, fetched beside the stylesheet
-     rather than after it. theme/fonts.css declares it font-display:
+    <!-- The faces the page is drawn with, fetched beside the stylesheet
+     rather than after it. theme/fonts.css declares them font-display:
      optional, which gives a face one short moment to arrive and never
-     swaps it in afterwards; without this line that moment begins
+     swaps it in afterwards; without these lines that moment begins
      only once the stylesheet has been parsed, and a cold load would set
-     the whole visit in the fallback face. crossorigin is not decoration
-     on a font preload: a fetch made without it is a different fetch from
-     the one the stylesheet makes, so the file would be downloaded twice
-     and the preload would have bought nothing. -->
+     the whole visit in the fallback face. Two files, because the first
+     screen is set in both: regular carries running text and notes,
+     semibold carries titles, headings, labels and figures. Bold sets no
+     chrome, so it is not preloaded: a strong span in rendered text
+     fetches it when that span appears.
+     crossorigin is not decoration on a font preload: a fetch made
+     without it is a different fetch from the one the stylesheet makes,
+     so the file would be downloaded twice and the preload would have
+     bought nothing. -->
     <link
       rel="preload"
       as="font"
       type="font/woff2"
       crossorigin
-      href="./fonts/GeistMono-Variable.woff2"
+      href="./fonts/MapleMono-Regular.woff2"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="./fonts/MapleMono-SemiBold.woff2"
     />
     <!-- What lets a phone put this page on its home screen: the manifest
      and its icon, copied into the bundle as they are (client/Spec.lean §4-57). -->

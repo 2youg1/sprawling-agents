@@ -606,7 +606,7 @@ priority = \"normal\"
         let file = dir.path().join("config.toml");
         let ui = |px: u32| {
             format!(
-                "[ui.appearance]\nlighting = \"dark\"\nsans = \"geist\"\nmono = \"geist\"\n\
+                "[ui.appearance]\nlighting = \"dark\"\nsans = \"maple\"\nmono = \"maple\"\n\
                  sans_stack = \"\"\nmono_stack = \"\"\nbody_px = {px}\n\
                  density = \"compact\"\nchroma = \"full\"\nmotion = \"system\"\n"
             )

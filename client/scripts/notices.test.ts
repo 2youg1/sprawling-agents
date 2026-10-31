@@ -35,7 +35,7 @@ describe("third-party notices", () => {
         "C:/w/client/node_modules/pdfjs-dist/wasm/openjpeg.wasm",
         "C:/w/client/node_modules/pdfjs-dist/README.md",
         "C:/w/client/node_modules/pdfjs-distant/x/y.js",
-        "C:/w/client/src/fonts/GeistMono-Variable.woff2",
+        "C:/w/client/src/fonts/MapleMono-Regular.woff2",
       ]),
     ).toEqual(["cmaps", "wasm"]);
   });
@@ -59,7 +59,7 @@ describe("third-party notices", () => {
     ).toBe(
       [
         "The npm packages this bundle was built from, each with the licence text it ships.",
-        "The licences of the fonts are fonts/OFL.txt (Geist Mono) and fonts/Libron-OFL.txt (Libron).",
+        "The licences of the fonts are fonts/OFL.txt (Maple Mono) and fonts/Libron-OFL.txt (Libron).",
         "",
         "-".repeat(72),
         "",
