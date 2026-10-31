@@ -23,11 +23,12 @@
 )]
 
 use kernel::event::record::{
-    ModelReturned, RunStarted, SteerReceived, ToolAnswer, ToolCalled, ToolResult,
+    ModelReturned, Rendering, RunStarted, SteerReceived, ToolAnswer, ToolCalled, ToolResult,
 };
 use kernel::{Address, ContentBlock, EventDraft, EventKind, Payload, Role, RunId, Seq, TimeMs};
 
 use super::Inherited;
+use serde_json::json;
 
 fn room() -> Address {
     Address::parse("lab/room1").unwrap()
@@ -140,6 +141,59 @@ fn mother_drafts() -> Vec<EventDraft> {
             .unwrap(),
         ),
     ]
+}
+
+/// A branch starts knowing which rule files its mother's reads already
+/// handed her, and reads those notes in the inherited conversation: a
+/// rule the mother was given must not arrive again on the branch's first
+/// read of that part of the tree
+/// (`crates/runtime/spec/Tools/Read.lean` §8-29-7).
+#[test]
+fn a_branch_inherits_the_rules_its_mother_was_already_given() {
+    let mut drafts = mother_drafts();
+    let note = "## lab/pkg/AGENTS.md\n\nThe package logs in kelvin.\n";
+    let answer = ToolAnswer::Answered {
+        result: Payload::new(
+            [
+                ("path".to_owned(), json!("lab/pkg/probe.rs")),
+                ("bytes".to_owned(), json!(3)),
+                ("text".to_owned(), json!("hi\n")),
+                (
+                    "rules".to_owned(),
+                    json!({"delivered": ["lab/pkg"], "text": note}),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        )
+        .unwrap(),
+    };
+    let last = drafts.last_mut().unwrap();
+    let (name, took_us, shown_bytes) = (
+        kernel::ToolName::parse("read").unwrap(),
+        last.data.read::<ToolResult>().unwrap().took_us,
+        last.data.read::<ToolResult>().unwrap().shown_bytes,
+    );
+    last.data = Payload::of(&ToolResult {
+        tool_use_id: "tu_1".to_owned(),
+        name,
+        answer,
+        took_us,
+        rendered: Some(Rendering::V4),
+        shown_bytes,
+    })
+    .unwrap();
+    let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+    assert_eq!(
+        inherited.delivered,
+        [Address::parse("lab/pkg").unwrap()].into_iter().collect(),
+        "the rule the mother's read delivered is part of what the branch inherits"
+    );
+    let printed = serde_json::to_string(&inherited.messages).unwrap();
+    assert!(
+        printed.contains("The package logs in kelvin."),
+        "and the note is in the conversation, as the bytes the mother read"
+    );
 }
 
 /// A mother run with a line of a newer kind inside it: the rebuild skips

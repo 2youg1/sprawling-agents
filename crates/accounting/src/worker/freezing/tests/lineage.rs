@@ -191,7 +191,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
     assert!(
         inherited
             .as_ref()
-            .is_ok_and(|messages| !messages.is_empty()),
+            .is_ok_and(|rebuilt| !rebuilt.messages.is_empty()),
         "a branch rebuild verified the history, or inherited nothing: {inherited:?}"
     );
 }

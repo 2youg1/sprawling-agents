@@ -197,6 +197,33 @@ fn version_three_numbers_a_read_from_one() {
     );
 }
 
+/// V4 (D126) draws the project's rules a read carried after the numbered
+/// body, and V3 draws the same payload without them: a line written
+/// before that version keeps the bytes its model read.
+#[test]
+fn version_four_draws_the_rules_a_read_carried_and_older_versions_do_not() {
+    let note = "## lab/pkg/AGENTS.md\n\nThe package logs in kelvin.\n";
+    let answer = answered(json!({
+        "path": "lab/pkg/probe.rs", "bytes": 3, "text": "hi\n",
+        "rules": {"delivered": ["lab/pkg"], "text": note},
+    }));
+    assert_eq!(
+        shown(Rendering::V4, &read(), &answer).unwrap(),
+        format!("lab/pkg/probe.rs lines 1-1 of 1\n1|hi\n\n{note}")
+    );
+    assert_eq!(
+        shown(Rendering::V3, &read(), &answer).unwrap(),
+        "lab/pkg/probe.rs lines 1-1 of 1\n1|hi\n",
+        "a version that never drew rules keeps drawing the body alone"
+    );
+    let plain = answered(json!({"path": "lab/a.md", "bytes": 3, "text": "hi\n"}));
+    assert_eq!(
+        shown(Rendering::V4, &read(), &plain).unwrap(),
+        shown(Rendering::V3, &read(), &plain).unwrap(),
+        "a read with no rules is the same bytes under both versions"
+    );
+}
+
 /// A search hit block is numbered the way a V3 read from its first line
 /// is, so its line numbers are the offsets `read` takes.
 #[test]

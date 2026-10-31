@@ -15,6 +15,7 @@ use runtime::{EditTool, Namespace, SearchTool, StatusTool};
 
 use super::super::Assignment;
 use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
+use crate::prompt_chain;
 
 mod endpoints;
 mod execution;
@@ -130,7 +131,8 @@ impl Laying {
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
-        .noting(stamps);
+        .noting(stamps)
+        .annotating(self.nested_rules(site, addr)?);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
@@ -255,6 +257,43 @@ impl Laying {
                 locks: self.edits.clone(),
             },
         )
+    }
+
+    /// What a `read` appends once per run: the project's rules for the
+    /// part of the tree the file sits in, read through the same door and
+    /// the same read bound as the file itself
+    /// (`crates/runtime/spec/Tools/Read.lean` §8-29-7).
+    ///
+    /// The set opens with the two things the run has already been given:
+    /// the mother's reads, when this session branched, and the chain of
+    /// rooms the resident slot carries between the building's root and
+    /// this run's own address. A rule the frozen prefix already holds
+    /// must not arrive a second time at the end of the conversation.
+    ///
+    /// # Errors
+    /// Propagates a run address the grammar refuses.
+    fn nested_rules(&self, site: &Site, addr: &Address) -> Result<runtime::Notes, AxError> {
+        let mut delivered = self.delivered.clone();
+        for (room, _) in city::room_agents_paths(&self.city_root, site.building.addr(), addr)? {
+            delivered.insert(room);
+        }
+        let delivered = Arc::new(Mutex::new(delivered));
+        let root = site.write_root.clone();
+        let building = site.building.addr().clone();
+        Ok(runtime::Notes::new(move |at| {
+            let mut held = delivered.lock().map_err(|_| {
+                AxError::failure(
+                    kernel::AxCode::StorageFatal,
+                    "read a project's conventions",
+                    "the note table was left locked by a thread that died",
+                )
+                .with_recovery(
+                    "end this run and resume it: the table cannot be trusted again inside a \
+                     process where a thread died holding it",
+                )
+            })?;
+            prompt_chain::nested_rules(&root, &building, at, &mut held)
+        }))
     }
 
     /// The run's `plan`, whose `finish` takes the path of the file that
