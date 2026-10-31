@@ -19,6 +19,17 @@ import { memory } from "./rows";
 const GLASS = "sprawling.appearance.glass";
 const BLEND = "sprawling.appearance.blend";
 
+describe("the built-in face", () => {
+  test("is Maple Mono, and the old cached Geist value reads back as that same built-in slot", () => {
+    const rows = memory();
+    expect(get(loadPreferences(rows, "en").held).appearance.sans).toBe("maple");
+    rows.setItem("sprawling.appearance.sans", "geist");
+    rows.setItem("sprawling.appearance.mono", "geist");
+    const appearance = get(loadPreferences(rows, "en").held).appearance;
+    expect([appearance.sans, appearance.mono]).toEqual(["maple", "maple"]);
+  });
+});
+
 describe("glass", () => {
   test("is drawn until the person turns it off, and an unknown word reads as drawn", () => {
     const rows = memory();

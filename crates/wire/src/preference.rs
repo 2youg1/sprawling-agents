@@ -434,6 +434,27 @@ mod tests {
         assert_eq!(held.appearance, Appearance::default());
     }
 
+    /// The built-in face has a new name, while a person's old file still
+    /// reads: the alias is accepted on input only, and new output uses
+    /// Maple Mono (`crates/wire/spec/Preference.lean` D63).
+    #[test]
+    fn the_shipped_face_is_maple_and_an_old_geist_file_still_reads() {
+        let old = r#"{"appearance":{"lighting":"dark","sans":"geist","mono":"geist","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#;
+        let held: PreferencesAnswer = serde_json::from_str(old).unwrap();
+        assert_eq!(
+            serde_json::to_value(&held)
+                .unwrap()
+                .pointer("/appearance/sans"),
+            Some(&serde_json::json!("maple"))
+        );
+        assert_eq!(
+            serde_json::to_value(PreferencesAnswer::default())
+                .unwrap()
+                .pointer("/appearance/mono"),
+            Some(&serde_json::json!("maple"))
+        );
+    }
+
     /// A section written before the page's glass, blend opacity and
     /// tier reached the city still reads, with the three absent: every
     /// person's file predates them.

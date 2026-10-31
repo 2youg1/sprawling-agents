@@ -195,6 +195,7 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "sandbox-engine",
         "shell",
         "ffmpeg",
+        "maple-mono-nf-cn",
     ] {
         assert!(named.contains(needed), "the table does not carry {needed}");
     }
