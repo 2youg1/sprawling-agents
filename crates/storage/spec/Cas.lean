@@ -17,8 +17,10 @@ pub struct Cas { /* Box<dyn Vfs>、dir —— 非泛型，理由同 jsonl（Vfs 
 impl Cas {
     pub fn open(dir: &Path) -> Result<Self, StorageError>;           // RealFs；建目录＋清别的进程留下的 tmp/*.part
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path) -> …;    // 测试注入点
-    /// Content-addressed put: tmp + rename, dedup by existence.
+    /// Content-addressed put: tmp + rename, dedup by existence, then read-only.
     pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError>;
+    /// E_CAS_CORRUPT 的恢复门：先校验已有对象再决定去重或替换；普通路径不付这次读取。
+    pub fn put_repair(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError>;
     /// put＋记下这块是为哪个 run、哪栋楼存的；两者都落盘才返回 Ok。
     pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, StorageError>;
     /// 这块的全部来源，先存先列；没记过来源的块与没见过的哈希都是空表。
@@ -44,7 +46,7 @@ pub struct BlockOrigin { pub run: RunId, pub building: Address }
 
 **块的来源在存块时记下，不事后推断。** 为一个 run 存块的调用方（转录、卸载、截图）走 `put_for`；上架的技能包是全城的，走 `put`，不带来源。来源记录在 `<dir>/from/<hex 前 2>/<hex64>`，一行一个 `<run> <address>`：同一份字节可能为两栋楼各存一次，所以一个块可以有多个来源，同一来源再存不重复记。记录追加后 `sync_data`＋`sync_dir`。读回来不成形的行（崩溃截断的追加尾）不授予任何东西——读取界往关的一侧失败。已有字节不以换行结尾时（一次崩溃截断的追加尾），新记录前先补一个换行：否则新行接在残尾后面，读回时与残尾一起被丢，而 `put_for` 已经返回了 `Ok`。另一条路是按账本里哪一行写了这个哈希来推断来源，落选：模型写的文字会落进带地址的行，那样的归属可以伪造。
 
-布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.<pid>.<本进程第几次 put>.part`（每次 put 一个自己的名字：同内容并发写者各自写满、各自 rename 到同一目标，无随机源；开句柄只清 pid 不是本进程的 tmp，理由见 D1；同名残留先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
+布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.<pid>.<本进程第几次 put>.part`（每次 put 一个自己的名字：同内容并发写者各自写满、各自 rename 到同一目标，无随机源；开句柄只清 pid 不是本进程的 tmp，理由见 D1；同名残留先 truncate 再写）。put 五步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`→标只读＋`sync_dir`（分片目录）。`put_repair` 仅在 `E_CAS_CORRUPT` 恢复中调用：已有对象先经 `get` 全读校验，相符才去重，`CasCorrupt` 才写临时件并替换，其他错误照返。普通 `put` 不读取已有对象。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
 -/
 
@@ -266,6 +268,17 @@ theorem a_second_put_of_the_same_bytes_writes_nothing (hash : Bytes → H) (name
   simp [step, idle, present]
 
 end Storage.Cas
+
+/-! D37 损坏对象的修复写入先校验再去重，普通对象落位后只读
+
+**决定**：`put` 保持按存在去重，不让每次写入都付一次全读；另设 `put_repair`，只对 `E_CAS_CORRUPT` 的恢复调用，先 `get` 校验已有对象，损坏才替换。每个新对象 rename 后标只读，防止编辑器或粗心工具原地改动；蓄意进程仍可能改写，所以 `get` 的全读校验仍是实际保证。
+
+**理由**：#131 需要能重装正确字节修复损坏对象，而按存在去重会永远留下坏字节。只读是便宜的附加防线，不能代替内容校验。
+
+**被否**：所有 put 都先校验——热路径为极少发生的损坏付全读；靠只读断言对象不会变——同一 User 的进程仍可改写权限。
+
+**重开参数**：对象由独立账户持有并挂载只读时，文件系统权限才能成为真正的写入边界，而不是辅助防线。
+-/
 
 /-! D2 文档的版本不另设存放处，进的就是内容库
 

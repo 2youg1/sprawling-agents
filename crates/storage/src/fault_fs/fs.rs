@@ -336,6 +336,15 @@ impl Vfs for FaultFs {
         self.charge("copy_permissions")
     }
 
+    /// The model carries no permission bits; the operation and its
+    /// failure point still exist, as they do on a real disk.
+    fn make_readonly(&mut self, path: &Path) -> io::Result<()> {
+        if !self.exists(path) {
+            return Err(not_found(path));
+        }
+        self.charge("make_readonly")
+    }
+
     fn exists(&self, path: &Path) -> bool {
         self.state().files.contains_key(path)
     }

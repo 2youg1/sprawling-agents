@@ -83,12 +83,23 @@ impl Cas {
     }
 
     /// Content-addressed put: hash, dedup by existence, tmp + sync +
-    /// rename + dir sync. `Ok` means the named object is durable.
+    /// rename + read-only + dir sync. `Ok` means the named object is durable.
     pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError> {
+        self.write(bytes, false)
+    }
+
+    fn write(&mut self, bytes: &[u8], repair: bool) -> Result<B3Hash, StorageError> {
         let hash = B3Hash::from_bytes(*blake3::hash(bytes).as_bytes());
         let (shard_dir, path) = self.object_path(&hash);
         if self.vfs.exists(&path) {
-            return Ok(hash);
+            if !repair {
+                return Ok(hash);
+            }
+            match self.get(&hash) {
+                Ok(_) => return Ok(hash),
+                Err(StorageError::CasCorrupt { .. }) => {}
+                Err(stopped) => return Err(stopped),
+            }
         }
         self.vfs
             .create_dir_all(&shard_dir)
@@ -109,9 +120,18 @@ impl Cas {
             .rename(&tmp, &path)
             .map_err(io_err("rename cas object", &path))?;
         self.vfs
+            .make_readonly(&path)
+            .map_err(io_err("make cas object read-only", &path))?;
+        self.vfs
             .sync_dir(&shard_dir)
             .map_err(io_err("sync cas shard", &shard_dir))?;
         Ok(hash)
+    }
+
+    /// Repair an object after `get` reported `E_CAS_CORRUPT`: only this
+    /// recovery path pays to verify an existing object before deduping.
+    pub fn put_repair(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError> {
+        self.write(bytes, true)
     }
 
     /// Existence judgment; no failure surface.
@@ -208,6 +228,7 @@ impl TmpName {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::permissions_set_readonly_false,
     reason = "test code"
 )]
 mod tests {
@@ -281,6 +302,12 @@ mod tests {
         assert_eq!(left, vec![in_flight]);
     }
 
+    fn make_writable(path: &Path) {
+        let mut permissions = fs::metadata(path).unwrap().permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+
     #[test]
     fn get_reverifies_and_reports_corruption() {
         let dir = tempfile::tempdir().unwrap();
@@ -288,11 +315,34 @@ mod tests {
         let hash = cas.put(b"precious").unwrap();
         let hex = hash.to_string();
         let path = dir.path().join("b3").join(hex.get(..2).unwrap()).join(&hex);
+        make_writable(&path);
         let mut bytes = fs::read(&path).unwrap();
         bytes[0] ^= 0xFF;
         fs::write(&path, &bytes).unwrap();
         let err = cas.get(&hash).unwrap_err();
         assert_eq!(err.into_ax().code(), &AxCode::CasCorrupt);
+    }
+
+    #[test]
+    fn repair_put_replaces_corrupt_bytes_and_objects_are_read_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cas = Cas::open(dir.path()).unwrap();
+        let hash = cas.put(b"precious").unwrap();
+        let hex = hash.to_string();
+        let path = dir.path().join("b3").join(hex.get(..2).unwrap()).join(&hex);
+        assert!(fs::metadata(&path).unwrap().permissions().readonly());
+
+        make_writable(&path);
+        fs::write(&path, b"corrupt").unwrap();
+        assert_eq!(cas.put(b"precious").unwrap(), hash);
+        assert!(
+            cas.get(&hash).is_err(),
+            "existence dedup keeps the hot path and cannot repair"
+        );
+
+        assert_eq!(cas.put_repair(b"precious").unwrap(), hash);
+        assert_eq!(cas.get(&hash).unwrap(), b"precious");
+        assert!(fs::metadata(&path).unwrap().permissions().readonly());
     }
 
     #[test]
