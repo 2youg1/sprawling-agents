@@ -113,6 +113,82 @@ pub fn catalog_for_session(
     })
 }
 
+/// Fills a legacy connector reference in this session only. A missing
+/// selection is left absent: migration never admits another server.
+pub fn migrate_session_mcp_reference(
+    city_root: &Path,
+    addr: &Address,
+    reference: &McpReference,
+) -> Result<(), AxError> {
+    migrate(city_root, addr, |frozen| {
+        if let Some(selected) = frozen
+            .mcp_references
+            .iter_mut()
+            .find(|selected| selected.label == reference.label)
+        {
+            if selected.definition.is_none() {
+                selected.definition = reference.definition;
+            }
+            if selected.tools.is_none() {
+                selected.tools.clone_from(&reference.tools);
+            }
+        }
+    })
+}
+
+/// Fills one legacy skill pin already named by this session's Reading Room.
+pub fn migrate_session_skill_pin(
+    city_root: &Path,
+    addr: &Address,
+    name: &str,
+    digest: B3Hash,
+) -> Result<(), AxError> {
+    migrate(city_root, addr, |frozen| {
+        if frozen.reading_room.iter().any(|named| named == name) {
+            frozen.skill_pins.entry(name.to_owned()).or_insert(digest);
+        }
+    })
+}
+
+/// Applies a first-run pin fill under the session document lock. A session
+/// removed by `/new` concurrently has no record left to migrate.
+fn migrate(
+    city_root: &Path,
+    addr: &Address,
+    change: impl FnOnce(&mut SessionCatalog),
+) -> Result<(), AxError> {
+    let path = CityLayout::new(city_root).session_catalog(addr);
+    document::edit(&path, |held| match std::fs::read_to_string(&path) {
+        Ok(text) => {
+            let mut frozen: SessionCatalog = toml::from_str(&text).map_err(|err| {
+                AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "migrate a session catalog",
+                    format!("{}: {err}", path.display()),
+                )
+                .with_recovery("repair CATALOG.toml, or start a new session")
+            })?;
+            change(&mut frozen);
+            let rendered = toml::to_string_pretty(&frozen).map_err(|err| {
+                AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "migrate a session catalog",
+                    format!("{}: {err}", path.display()),
+                )
+                .with_recovery("report this: the session catalog must remain serialisable")
+            })?;
+            held.replace(rendered.as_bytes())
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "migrate a session catalog",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("make CATALOG.toml readable, then dispatch again")),
+    })
+}
+
 /// Forgets the frozen selection when `/new` starts another session.
 pub fn forget(city_root: &Path, addr: &Address) -> Result<(), AxError> {
     let path = CityLayout::new(city_root).session_catalog(addr);

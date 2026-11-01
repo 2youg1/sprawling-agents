@@ -14,7 +14,9 @@ use runtime::bench::ToolBench;
 use runtime::{EditTool, Namespace, SearchTool, StatusTool};
 
 use super::super::Assignment;
-use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
+use super::{
+    BenchDesks, ConnectorJob, Laying, Reach, Site, Situation, Workbench, held, status_snapshot,
+};
 
 mod endpoints;
 mod execution;
@@ -345,7 +347,7 @@ impl Laying {
             filed.push((Namespace::Own(ReservedNamespace::Web), Box::new(search)));
         }
         filed.extend(
-            self.outside_tools(site)?
+            self.outside_tools(site, addr)?
                 .into_iter()
                 .map(|tool| (outside_namespace(tool.meta()), tool)),
         );
@@ -372,7 +374,11 @@ impl Laying {
     /// # Errors
     /// Propagates a browser the building's rules ask for and that will
     /// not start.
-    fn outside_tools(&self, site: &Site) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
+    fn outside_tools(
+        &self,
+        site: &Site,
+        addr: &Address,
+    ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
         // The browsers this building's rules ask for: its own, then the
         // person's when they declared one. They follow the built-ins,
         // because a provider caches the tool array by position.
@@ -391,11 +397,15 @@ impl Laying {
         // the table here, before the catalogue is rendered, because the
         // tool table is frozen with the run: what the model is told
         // exists is decided once.
-        for server in self.mcp_tools(
-            &self.servers(site),
-            &site.write_root,
-            site.rules.policy().confidential,
-        ) {
+        let servers = self.servers(site);
+        for server in self.mcp_tools(ConnectorJob {
+            servers: &servers,
+            references: &site.config.mcp_references,
+            building: site.building.addr(),
+            session: addr,
+            write_root: &site.write_root,
+            confidential: site.rules.policy().confidential,
+        }) {
             let tool: Box<dyn kernel::Tool> = Box::new(server);
             outside.push(tool);
         }

@@ -169,31 +169,20 @@ fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
     .unwrap();
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
-    let offered = worker
-        .laying("")
-        .unwrap()
-        .mcp_tools(&config.mcp, dir.path(), false);
+    let offered = admitted(&worker, &config, dir.path(), false);
     assert_eq!(offered.len(), 1);
     assert_eq!(kernel::Tool::meta(&offered[0]).name.as_str(), "apps_ping");
     assert_eq!(offered[0].remote(), "ping");
 
     assert!(
-        worker
-            .laying("")
-            .unwrap()
-            .mcp_tools(&config.mcp, dir.path(), true)
-            .is_empty(),
+        admitted(&worker, &config, dir.path(), true).is_empty(),
         "a confidential building holds no outbound tool, and starts nothing to hold one"
     );
 
     write_server_table(dir.path(), "lab", "sprawling-no-such-server", &[]);
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
     assert!(
-        worker
-            .laying("")
-            .unwrap()
-            .mcp_tools(&config.mcp, dir.path(), false)
-            .is_empty(),
+        admitted(&worker, &config, dir.path(), false).is_empty(),
         "a service that is down today does not stop the building from working today"
     );
 }
@@ -209,6 +198,26 @@ fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::
             env: Vec::new(),
         },
     }
+}
+
+/// Runs the production admission path with one test building's frozen references.
+fn admitted(
+    worker: &RunWorker,
+    config: &kernel::FrozenConfig,
+    root: &Path,
+    confidential: bool,
+) -> Vec<agent_protocols::McpTool> {
+    worker
+        .laying("")
+        .unwrap()
+        .mcp_tools(crate::worker::workbench::ConnectorJob {
+            servers: &config.mcp,
+            references: &config.mcp_references,
+            building: &Address::parse("lab").unwrap(),
+            session: &Address::parse("lab").unwrap(),
+            write_root: root,
+            confidential,
+        })
 }
 
 fn no_secrets() -> gateway::SecretResolver {
@@ -286,15 +295,9 @@ fn a_second_dispatch_reaches_the_server_the_first_one_started() {
     .unwrap();
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
-    let first = worker
-        .laying("")
-        .unwrap()
-        .mcp_tools(&config.mcp, dir.path(), false);
+    let first = admitted(&worker, &config, dir.path(), false);
     drop(first);
-    let second = worker
-        .laying("")
-        .unwrap()
-        .mcp_tools(&config.mcp, dir.path(), false);
+    let second = admitted(&worker, &config, dir.path(), false);
 
     assert_eq!(
         second.len(),

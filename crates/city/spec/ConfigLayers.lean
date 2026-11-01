@@ -298,7 +298,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 /-! D114 会话目录由 `CATALOG.toml` 固定，楼保存只影响新会话
 
-**决定**：`catalog_for_session(city_root, addr, rules, config)` 在会话第一次 run 将当前 `CatalogExposure`、Reading Room 名字、`mcp_references` 与 `skill_pins` 写成 `<addr>/.sprawling/CATALOG.toml`，之后覆盖 `FrozenConfig` 的对应字段并回答会话的 Reading Room；文件已存在则不重写。`clear_session` 删除它。`Query::Catalog` 对每个当前会话比较这份冻结值与楼当前值的 digest，得到仍用旧选择的 open session 数。
+**决定**：`catalog_for_session(city_root, addr, rules, config)` 在会话第一次 run 将当前 `CatalogExposure`、Reading Room 名字、`mcp_references` 与 `skill_pins` 写成 `<addr>/.sprawling/CATALOG.toml`，之后覆盖 `FrozenConfig` 的对应字段并回答会话的 Reading Room；文件已存在则不重写，只有首次 legacy 迁移例外：lane 初次看到列表或候选时，把当时采用的 connector/skill pin 同时补进楼配置和这个会话的冻结记录，两个迁移门都只填 `None`，不覆盖已接受的版本，也不添加会话原未选择的项目。`clear_session` 删除它。`Query::Catalog` 对每个当前会话比较这份冻结值与楼当前值的 digest，得到仍用旧选择的 open session 数。
 
 **理由**：这是“保存后旧会话不变、`/new` 得到新选择”的唯一持久边界；进程重启也不能让旧会话悄悄升级。比较整个冻结值而不是最后活动时间，避免旧会话在保存后继续活动时从旧选择计数中消失。
 

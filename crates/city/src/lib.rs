@@ -64,6 +64,7 @@ pub use config_layers::{city_search, default_search_supplier};
 pub use config_layers::{city_shelves, settled_effort, settled_second, write_mcp, write_sandbox};
 pub use config_layers::{freeze_naming, keep_warm, own_layer, settled_harness, write_session};
 pub use config_layers::{migrate_mcp, migrate_mcp_reference, migrate_skill_pin};
+pub use config_layers::{migrate_session_mcp_reference, migrate_session_skill_pin};
 pub use config_layers::{search_supplier, settled_search, write_search};
 pub use config_layers::{write_mcp_references, write_skill_pins};
 pub use document::{Held, edit as edit_document, edit_against, revise as revise_document};

@@ -54,7 +54,10 @@ pub use agents::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use cache::keep_warm;
 pub use catalog::{check as check_catalog, write_catalog};
 pub(crate) use catalog_session::forget as forget_catalog_session;
-pub use catalog_session::{SessionCatalog, catalog_for_session, previous_sessions};
+pub use catalog_session::{
+    SessionCatalog, catalog_for_session, migrate_session_mcp_reference, migrate_session_skill_pin,
+    previous_sessions,
+};
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};

@@ -95,6 +95,18 @@ impl DriftBook {
     }
 }
 
+/// One connector admission job: the selected definitions, their matching
+/// references and the building whose pins decide what may be offered.
+pub(in crate::worker) struct ConnectorJob<'a> {
+    pub(in crate::worker) servers: &'a [kernel::McpServer],
+    pub(in crate::worker) references: &'a [kernel::McpReference],
+    pub(in crate::worker) building: &'a Address,
+    /// The room whose frozen legacy reference adopts this first listing too.
+    pub(in crate::worker) session: &'a Address,
+    pub(in crate::worker) write_root: &'a Path,
+    pub(in crate::worker) confidential: bool,
+}
+
 pub(in crate::worker) struct Laying {
     pub(in crate::worker) city_root: PathBuf,
     /// The city's genesis line, which signs every checkpoint.

@@ -99,6 +99,7 @@ impl Laying {
             })?;
             if pinned.is_none() {
                 city::migrate_skill_pin(&self.city_root, site.building.addr(), name, digest)?;
+                city::migrate_session_skill_pin(&self.city_root, addr, name, digest)?;
             }
         }
         Ok(())
