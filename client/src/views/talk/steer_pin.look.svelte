@@ -13,6 +13,12 @@ Drawn with borders rather than a fill, so a forced-colours mode keeps the
 shape when it repaints the ink. Its size is the status dot's: half of it
 tall on each side of the point and three quarters of it long, so the pin
 and the dot beside it read as one family of marks. -->
+<!-- The empty script block keeps the classic svelte-check lane able to
+     declare this module: its typescript@6 backend finds no declaration for
+     a component written without a script, and every importer then fails
+     with TS7016. The compiled component is the same with and without it. -->
+<script lang="ts"></script>
+
 <span class="steer-pin" aria-hidden="true"></span>
 
 <style>

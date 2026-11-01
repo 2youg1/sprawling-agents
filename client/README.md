@@ -15,12 +15,11 @@ state of its own beyond the browser cache behind `core/prefs.ts`.
 
 | Tool | Role |
 |---|---|
-| [**bun**](https://github.com/oven-sh/bun) | the one JavaScript runtime: installs, runs `bun test` against `src/core/`, lints, typechecks and builds. `just check-client` and `just build-web` both go through it; there is no node here. |
+| [**bun**](https://github.com/oven-sh/bun) | the one JavaScript runtime: installs, runs `bun test` against `src/core/`, lints, typechecks (`bun check`, the TypeScript 7 checker built into the runtime) and builds. `just check-client` and `just build-web` both go through it; there is no node here. |
 | [**Svelte 5**](https://github.com/sveltejs/svelte) | the view layer: every screen under `src/views/` is a component written with runes (`$props`/`$derived`/`$state`), no legacy `$:` reactivity. |
 | [**Vite 8**](https://github.com/vitejs/vite) | the build, through [`@sveltejs/vite-plugin-svelte`](https://github.com/sveltejs/vite-plugin-svelte). `crates/sprawling/build.rs` embeds `dist/` as it is written, so the output paths are a contract with the binary. |
 | [**Tailwind CSS 4**](https://github.com/tailwindlabs/tailwindcss) | utilities compiled from `@import "tailwindcss"` in `src/theme.css`. Scanning is automatic and covers `.svelte`; do not configure content paths, and keep colour literals out — only the theme files may hold them. |
-| [**TypeScript 7 (`@typescript/native`)**](https://github.com/microsoft/typescript-go) | the strict checking lane, driven by `scripts/typecheck.ts` (the `--tsgo` path) together with `svelte-check`. The wrapper pins the lane: a run with findings exits non-zero, and a toolchain that failed to load cannot read as clean. |
-| [**typescript-eslint**](https://github.com/typescript-eslint/typescript-eslint) | the lint lane (`bun run lint`, zero warnings). `typescript@6` exists only to version-gate it and `svelte-check`; it is never the checking lane. |
+| [**typescript-eslint**](https://github.com/typescript-eslint/typescript-eslint) | the lint lane (`bun run lint`, zero warnings). Its type-aware rules read the JS compiler API of `typescript@6`, which is also svelte-check's checking backend; it is never the project's `.ts` checker. |
 | [**effect**](https://github.com/Effect-TS/effect) | schema decoding on the wire: every frame in `src/wire.ts` decodes through it before a view may touch it, and a frame that fails to decode stops at the boundary. With `svelte`, the only runtime dependency. |
 
 ## Commands
@@ -28,7 +27,7 @@ state of its own beyond the browser cache behind `core/prefs.ts`.
 ```bash
 bun install        # once
 bun run lint       # eslint, zero warnings allowed
-bun run typecheck  # svelte-check + the TS7 lane, both strict
+bun run typecheck  # two sealed lanes: bun check (.ts) + svelte-check (.svelte)
 bun run test [file...]          # the logic next to what it judges
 bun run build      # dist/ for build.rs to embed
 ```
