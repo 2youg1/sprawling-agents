@@ -50,7 +50,7 @@
         section: "engineering",
         // A holding on the city's stock: its address is a path under
         // the city root, which is what `Library::address_of` produces.
-        shelf: { library: Address.make(".sprawling/library/engineering/diagnosing-bugs.md") },
+        shelf: "library",
         disclosure:
           "Find the defect from the evidence, then write the test that would have caught it.",
         hash: B3Hash.make("af3c1d2e4b5a69780c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
@@ -60,9 +60,7 @@
       {
         name: "resolving-merge-conflicts",
         section: "engineering",
-        shelf: {
-          library: Address.make(".sprawling/library/engineering/resolving-merge-conflicts.md"),
-        },
+        shelf: "library",
         disclosure: "Replay both sides against the tests before choosing either.",
         hash: B3Hash.make("b1c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f901"),
         admitted: false,

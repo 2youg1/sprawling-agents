@@ -32,6 +32,9 @@ describe("configureSandbox", () => {
       desktop: null,
       context_second_threshold: null,
       catalog: null,
+      mcp_references: null,
+      skill_pins: null,
+      reading_room: null,
       idem: "-",
     });
   });

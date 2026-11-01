@@ -13,10 +13,23 @@
 
 import { describe, expect, test } from "bun:test";
 
-import type { CatalogAnswer, Exposure } from "../../wire";
-import { Address } from "../../wire";
-import { draftOf, effectiveOf, meterOf, pressGroup, pressRow, rowsOf, sameTable } from "./catalog";
-import type { Row, Table } from "./catalog";
+import type { CatalogAnswer, CatalogSkill, Exposure } from "../../wire";
+import { Address, B3Hash, ServerLabel } from "../../wire";
+import {
+  acceptSkill,
+  acceptTool,
+  draftOf,
+  effectiveOf,
+  keepSkill,
+  meterOf,
+  pressGroup,
+  pressRow,
+  pressSkill,
+  rowsOf,
+  sameTable,
+  skillMeterOf,
+} from "./catalog";
+import type { Row, Selection, Table } from "./catalog";
 
 // The model's fixture, tool `n` spelled `t<n>` and namespace `n` spelled
 // `n<n>`.
@@ -32,8 +45,15 @@ function row(
     tool: {
       name: `t${String(name)}`,
       namespace: `n${String(ns)}`,
-      hint: "",
-      bytes,
+      current: {
+        bytes,
+        hint: "",
+        description: "",
+        digest: B3Hash.make(name.toString(16).padStart(64, "0")),
+        input_schema: {},
+      },
+      pinned: null,
+      change: null,
       exposure: inherited,
       from: fixed ? "fixed" : "default",
       fallback: inherited,
@@ -54,7 +74,7 @@ const ROWS: readonly Row[] = [
   row(4, 1, 40, false, "dormant", "off"),
 ];
 
-const EMPTY: Table = { tools: {}, namespaces: {} };
+const EMPTY: Table = { tools: {}, namespaces: {}, skills: {} };
 
 type Edit =
   { readonly row: readonly [number, Exposure] } | { readonly group: readonly [number, Exposure] };
@@ -83,7 +103,17 @@ describe("the capabilities draft", () => {
       run: null,
       core_bytes: 0,
       index_bytes: 0,
+      reading_bytes: 0,
+      always: 0,
+      dormant: 0,
+      skills: 0,
+      changed: 0,
+      open_sessions: 0,
       runs_seen: 0,
+      skill_rows: [],
+      references: [],
+      skill_pins: {},
+      reading_room: [],
       tools: [{ ...row(0, 0, 10, false, "dormant").tool, name: "plan", namespace: "sprawling" }],
       city: { tools: { plan: "core" } },
       stated: { namespaces: { sprawling: "off" } },
@@ -100,9 +130,9 @@ describe("the capabilities draft", () => {
         each.nearer,
       ]),
     ).toEqual([["off", "off"]]);
-    expect(sameTable(draftOf(answer, "city"), { tools: { plan: "core" }, namespaces: {} })).toBe(
-      true,
-    );
+    expect(
+      sameTable(draftOf(answer, "city"), { tools: { plan: "core" }, namespaces: {}, skills: {} }),
+    ).toBe(true);
   });
 
   // Each vector: the edits, the table they leave (keys and values, in no
@@ -165,6 +195,127 @@ describe("the capabilities draft", () => {
       meter: 0,
     },
   ];
+
+  test("tool edits leave the skill positions alone", () => {
+    const first = ROWS.find((row) => row.tool.name === "t0");
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    const table: Table = { ...EMPTY, skills: { how: "core" } };
+    expect(pressRow(table, first, "off").skills).toEqual({ how: "core" });
+    expect(pressGroup(ROWS, table, "n0", "off").skills).toEqual({ how: "core" });
+  });
+
+  test("a new skill starts on call with its candidate pinned", () => {
+    const candidate = B3Hash.make("1".padStart(64, "0"));
+    const skill: CatalogSkill = {
+      name: "how",
+      section: "engineering",
+      disclosure: "how",
+      current_document: "# How\n",
+      pinned_document: null,
+      candidate,
+      pinned: null,
+      change: "added",
+      exposure: "off",
+      from: "default",
+      audit: null,
+      audit_stale: false,
+      runs_used: 0,
+      last_used: null,
+    };
+    const next = pressSkill(
+      { catalog: EMPTY, references: [], skillPins: {}, readingRoom: [] },
+      { skill, inherited: "dormant", nearer: undefined },
+      "dormant",
+      "building",
+    );
+    expect(next.catalog.skills).toEqual({});
+    expect(next.readingRoom).toEqual(["how"]);
+    expect(next.skillPins).toEqual({ how: candidate });
+  });
+
+  test("Accept moves only the intended pin and Keep restores it", () => {
+    const old = B3Hash.make("1".padStart(64, "0"));
+    const current = B3Hash.make("2".padStart(64, "0"));
+    const skill: CatalogSkill = {
+      name: "how",
+      section: "engineering",
+      disclosure: "how",
+      current_document: "# New\n",
+      pinned_document: "# Old\n",
+      candidate: current,
+      pinned: old,
+      change: "changed",
+      exposure: "dormant",
+      from: "default",
+      audit: "pass",
+      audit_stale: false,
+      runs_used: 0,
+      last_used: null,
+    };
+    const selection = {
+      catalog: EMPTY,
+      references: [
+        {
+          label: ServerLabel.make("n0"),
+          definition: old,
+          tools: { t0: old },
+        },
+      ],
+      skillPins: { how: old },
+      readingRoom: ["how"],
+    };
+    const acceptedSkill = acceptSkill(selection, skill);
+    expect(acceptedSkill.skillPins).toEqual({ how: current });
+    expect(keepSkill(acceptedSkill, skill).skillPins).toEqual({ how: old });
+    const first = ROWS.find((row) => row.tool.name === "t0");
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    const digest = first.tool.current?.digest;
+    expect(digest).toBeDefined();
+    if (digest === undefined) return;
+    expect(acceptTool(selection, first.tool).references[0]?.tools).toEqual({ t0: digest });
+  });
+
+  test("Accept counts the new version's bytes, not the old version's twice", () => {
+    const first = ROWS.find((row) => row.tool.name === "t0");
+    expect(first).toBeDefined();
+    if (first?.tool.current == null) return;
+    const current = { ...first.tool.current, bytes: 120 };
+    const pinned = { ...first.tool.current, bytes: 100 };
+    const table: Table = { ...EMPTY, tools: { t0: "core" } };
+    expect(meterOf(table, table, [{ ...first, tool: { ...first.tool, current, pinned } }])).toBe(
+      20,
+    );
+
+    const skill: CatalogSkill = {
+      name: "how",
+      section: "engineering",
+      disclosure: "how",
+      current_document: "new version\n",
+      pinned_document: "old\n",
+      candidate: current.digest,
+      pinned: pinned.digest,
+      change: "changed",
+      exposure: "core",
+      from: "default",
+      audit: null,
+      audit_stale: false,
+      runs_used: 0,
+      last_used: null,
+    };
+    const selection: Selection = {
+      catalog: { ...EMPTY, skills: { how: "core" } },
+      references: [],
+      skillPins: {},
+      readingRoom: ["how"],
+    };
+    expect(
+      skillMeterOf(selection, selection, [{ skill, inherited: "core", nearer: undefined }]),
+    ).toBe(
+      new TextEncoder().encode("new version\n").length - new TextEncoder().encode("old\n").length,
+    );
+  });
 
   test("follows the model on every edit sequence it prints", () => {
     for (const vector of VECTORS) {

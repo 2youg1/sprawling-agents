@@ -10,21 +10,9 @@
   // own shelf, in one list with the shelf named on each row. A row says
   // whether the reading room admits it, how many runs were frozen with
   // it, and whether the building's newest run was frozen with another
-  // version of it; opening one shows the document itself, through the
-  // same file view the tree opens a file with. It is the lower half of
-  // the capabilities section (`./catalog.svelte`).
-  //
-  // Where a shelved skill lives, in the two readings this page needs at
-  // once: the word for which shelf it is on, and the address to open.
-  //
-  // **One function for both, because an external shelf has no
-  // address.** A skill mounted from a directory outside the city is
-  // named by which shelf it came from and by its path inside that
-  // shelf; there is no city address to hand `Query::Document`, and
-  // inventing one that looks like an address would be a lie the file
-  // view would then fail to open. Returning the word and the address
-  // together is what stops a caller from having a shelf it can name and
-  // an address it cannot.
+  // version of it. City and building shelves are CAS indexes, and an
+  // external shelf is outside the city: none is a document address to
+  // hand `Query::Document`, so the row names its source without a file link.
   import type { Lang } from "../../core/lang";
   import { fill, say } from "../../core/lang";
   import type { Address, SkillLine, SkillShelf } from "../../wire";
@@ -32,13 +20,13 @@
   interface Place {
     // Already in the person's language.
     readonly word: string;
-    // Absent for an external shelf, which is not in this city.
+    // Absent for every CAS-indexed shelf, which is not a document address.
     readonly at: Address | null;
   }
 
   function placeOf(shelf: SkillShelf, lang: Lang): Place {
-    if ("building" in shelf) return { word: say(lang, "skills_shelf"), at: shelf.building };
-    if ("library" in shelf) return { word: say(lang, "skills_library"), at: shelf.library };
+    if (shelf === "library") return { word: say(lang, "skills_library"), at: null };
+    if ("building" in shelf) return { word: say(lang, "skills_shelf"), at: null };
     return {
       word: fill(say(lang, "skills_external"), {
         n: String(shelf.external.index),
@@ -52,8 +40,8 @@
   // alone is not the row.
   function skillId(skill: SkillLine): string {
     const shelf = skill.shelf;
+    if (shelf === "library") return `library·${skill.name}`;
     if ("building" in shelf) return `${shelf.building}·${skill.name}`;
-    if ("library" in shelf) return `${shelf.library}·${skill.name}`;
     return `external:${String(shelf.external.index)}·${skill.name}`;
   }
 </script>

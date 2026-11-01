@@ -84,9 +84,11 @@
     // nobody opened anything; the page itself shows only what somebody
     // opened, having no run in front of it to follow.
     readonly beside?: readonly RightItem[] | undefined;
+    // A direct link to the unified catalog, used by the composer chip.
+    readonly initialSection?: "catalog" | undefined;
   }
 
-  const { address, rank = "page", beside = [] }: Props = $props();
+  const { address, rank = "page", beside = [], initialSection }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -95,6 +97,9 @@
   // What the middle column shows: a section of the index, or - when
   // `section` is `null` - what the tree picked.
   let section = $state<Section | null>("plan");
+  $effect(() => {
+    if (initialSection !== undefined) section = initialSection;
+  });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
   let picked = $state.raw<Picked | null>(null);
 
@@ -104,6 +109,12 @@
     readAnswer($asked, (answer) => ("building" in answer ? answer.building : undefined)),
   );
   const building = $derived(read.kind === "held" ? read.value : undefined);
+  const catalogQuestion = $derived<Query>({ catalog: { building: address } });
+  const catalogAsked = $derived(u.conn.asking.ask(catalogQuestion));
+  const catalogRead = $derived(
+    readAnswer($catalogAsked, (answer) => ("catalog" in answer ? answer.catalog : undefined)),
+  );
+  const changed = $derived(catalogRead.kind === "held" ? catalogRead.value.changed : 0);
 
   const halted = $derived(buildingIsShut($belief.halted, address));
   const removal = $derived(removalOf(address, livingIn(address)));
@@ -136,7 +147,13 @@
 
   const index = $derived(
     sectionsLookOf(
-      SECTIONS.map((key) => ({ key, label: say($lang, SECTION_WORD[key]) })),
+      SECTIONS.map((key) => ({
+        key,
+        label:
+          key === "catalog" && changed > 0
+            ? fill(say($lang, "catalog_nav_changed"), { n: String(changed) })
+            : say($lang, SECTION_WORD[key]),
+      })),
       section,
       (next) => {
         section = next;
@@ -221,7 +238,7 @@
       {:else if section === "prompts"}
         <Prompts building={address} rooms={building?.rooms ?? []} />
       {:else if section === "catalog"}
-        <Catalog building={address} onPick={pick} />
+        <Catalog building={address} />
       {:else if section === "sandbox"}
         <Sandbox {address} held={building?.sandbox ?? null} known={building !== undefined} />
       {:else if picked?.kind === "file"}

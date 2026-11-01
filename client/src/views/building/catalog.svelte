@@ -6,40 +6,31 @@
 -->
 
 <script lang="ts">
-  // The building page's capabilities section (client/Spec.lean 4-50, its
-  // tenth part): how each tool this building admits reaches its runs, and
-  // the skills its reading room admits. The rows are the newest run's
-  // tool table read against the `[catalog]` tables on disk
-  // (`Query::Catalog`); a press edits one draft of one layer's table,
-  // this building's or the city's, and one save sends that table whole.
-  //
-  // The card calls itself saved only once the city's answer holds what
-  // it sent; a refusal is the city's toast and the draft stays as it
-  // was, so saving again sends the same table.
+  // The unified building catalog: one answer, one draft and one save.
+  // A refusal leaves the draft untouched; only an answer equal to what
+  // was sent marks it saved.
   import { untrack } from "svelte";
+  import { readable } from "svelte/store";
 
   import { readAnswer } from "../../core/answered";
   import { configureCatalog, configureCityCatalog } from "../../core/commands";
   import { say } from "../../core/lang";
-  import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
-  import type { Address, Query } from "../../wire";
+  import type { Address, Answer, CatalogAnswer, Query } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
-  import { catalogLook, draftOf, sameTable } from "./catalog";
-  import type { Scope, Table } from "./catalog";
+  import { useBuildings } from "../shared/buildings";
+  import { catalogLook, draftOf, sameSelection, sameTable, selectionOf } from "./catalog";
+  import type { Scope, Selection } from "./catalog";
   import Look from "./catalog.look.svelte";
-  import Skills from "./skills.svelte";
-  import type { Picked } from "./tree.svelte";
 
   interface Props {
     readonly building: Address;
-    readonly onPick: (picked: Picked) => void;
   }
 
-  const { building, onPick }: Props = $props();
-
+  const { building }: Props = $props();
   const u = ui();
   const { lang } = u;
+  const buildings = useBuildings();
 
   const question = $derived<Query>({ catalog: { building } });
   const asked = $derived(u.conn.asking.ask(question));
@@ -49,53 +40,110 @@
   const answer = $derived(read.kind === "held" ? read.value : undefined);
 
   let scope = $state<Scope>("building");
-  let draft = $state.raw<Table>({ tools: {}, namespaces: {} });
+  let draft = $state.raw<Selection>({
+    catalog: { tools: {}, namespaces: {}, skills: {} },
+    references: [],
+    skillPins: {},
+    readingRoom: [],
+  });
   let edited = $state(false);
-  // What the last save sent, until the city's answer holds it.
-  let sent = $state.raw<Table | null>(null);
+  let sent = $state.raw<Selection | null>(null);
   let saved = $state(false);
+  let unusedOnly = $state(false);
+  let copyFrom = $state<Address | null>(null);
 
-  // The draft follows the city's answer until somebody edits it, and
-  // follows it again once their edit has landed or the layer changes.
+  function initial(answer: CatalogAnswer, layer: Scope): Selection {
+    const selection = selectionOf(answer);
+    return layer === "city" ? { ...selection, catalog: draftOf(answer, "city") } : selection;
+  }
+
   $effect(() => {
     const now = answer;
     const layer = scope;
     if (now === undefined) return;
-    const held = draftOf(now, layer);
+    const held = initial(now, layer);
     const waiting = untrack(() => sent);
-    if (waiting !== null && sameTable(held, waiting)) {
-      sent = null;
-      edited = false;
-      saved = true;
+    if (waiting !== null) {
+      const landed =
+        layer === "building"
+          ? sameSelection(held, waiting)
+          : sameTable(held.catalog, waiting.catalog);
+      if (landed) {
+        sent = null;
+        edited = false;
+        saved = true;
+      }
     }
     if (!untrack(() => edited)) draft = held;
   });
 
+  const copyAsked = $derived(
+    copyFrom === null
+      ? readable<Answer | undefined>(undefined)
+      : u.conn.asking.ask({ catalog: { building: copyFrom } }),
+  );
+  const copied = $derived(
+    readAnswer($copyAsked, (held) => ("catalog" in held ? held.catalog : undefined)),
+  );
+
+  $effect(() => {
+    if (copyFrom === null || copied.kind !== "held") return;
+    draft = selectionOf(copied.value);
+    edited = true;
+    saved = false;
+    sent = null;
+    copyFrom = null;
+  });
+
   function save(): void {
-    const table = { tools: draft.tools, namespaces: draft.namespaces };
     const command =
-      scope === "building" ? configureCatalog(building, table) : configureCityCatalog(table);
+      scope === "building"
+        ? configureCatalog(building, {
+            catalog: draft.catalog,
+            mcp_references: draft.references,
+            skill_pins: draft.skillPins,
+            reading_room: draft.readingRoom,
+          })
+        : configureCityCatalog(draft.catalog);
     if (u.send(command)) sent = draft;
   }
 
   const look = $derived(
     answer === undefined
       ? undefined
-      : catalogLook({ answer, scope, draft, edited, now: u.now() }, $lang, {
-          scope: (next) => {
-            scope = next;
-            edited = false;
-            saved = false;
-            sent = null;
-            draft = draftOf(answer, next);
+      : catalogLook(
+          {
+            answer,
+            scope,
+            draft,
+            edited,
+            now: u.now(),
+            unusedOnly,
+            buildings: $buildings,
           },
-          edit: (next) => {
-            draft = next;
-            edited = true;
-            saved = false;
+          $lang,
+          {
+            scope: (next) => {
+              scope = next;
+              edited = false;
+              saved = false;
+              sent = null;
+              draft = initial(answer, next);
+            },
+            edit: (next) => {
+              draft = next;
+              edited = true;
+              saved = false;
+            },
+            save,
+            unused: (only) => {
+              unusedOnly = only;
+            },
+            copy: (source) => {
+              copyFrom = source;
+            },
           },
-          save,
-        }),
+        ),
   );
 </script>
 
@@ -111,16 +159,4 @@
       <p class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</p>
     {/if}
   {/if}
-  <div class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
-    <p class="text-note text-text-faint">
-      {say($lang, "catalog_skills_rules")}
-      <a
-        class="text-accent underline-offset-2 hover:underline"
-        href={toFragment({ kind: "setup", group: "rules" })}
-      >
-        {say($lang, "catalog_skills_rules_link")}
-      </a>
-    </p>
-    <Skills {building} {onPick} newest={answer?.run ?? undefined} />
-  </div>
 </section>

@@ -96,7 +96,7 @@
         {
           audit,
           digest: digest(name.length),
-          shelf: { library: Address.make(`.sprawling/library/engineering/${name}.md`) },
+          shelf: "library",
         },
       ],
       per_day: perDay,

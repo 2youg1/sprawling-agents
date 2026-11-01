@@ -45,6 +45,7 @@ structure Row where
 structure Table where
   tools : List (Nat × Exposure)
   namespaces : List (Nat × Exposure)
+  skills : List (Nat × Exposure)
   deriving DecidableEq, Repr
 
 def find (k : Nat) : List (Nat × Exposure) → Option Exposure
@@ -104,7 +105,16 @@ def pressGroup (rows : List Row) (t : Table) (ns : Nat) (v : Exposure) : Table :
   { tools := members.foldl (fun acc r => drop r.name acc) t.tools
     namespaces :=
       if members.all (fun r => r.inherited = v) then drop ns t.namespaces
-      else put ns v t.namespaces }
+      else put ns v t.namespaces
+    skills := t.skills }
+
+theorem tool_edits_keep_skill_positions (rows : List Row) (t : Table) (r : Row) (ns : Nat) (v : Exposure) :
+    (pressRow t r v).skills = t.skills ∧ (pressGroup rows t ns v).skills = t.skills := by
+  constructor
+  · by_cases h : r.fixed = true
+    · simp [pressRow, h]
+    · by_cases hv : v = without t r <;> simp [pressRow, h, hv]
+  · rfl
 
 theorem a_row_is_written_only_when_it_departs (t : Table) (r : Row) (v : Exposure) (h : r.fixed = false) :
     find r.name (pressRow t r v).tools = if v = without t r then none else some v := by
@@ -268,7 +278,7 @@ def rows : List Row :=
     ⟨3, 1, 20, true, .core, none⟩,
     ⟨4, 1, 40, false, .dormant, some .off⟩ ]
 
-def empty : Table := ⟨[], []⟩
+def empty : Table := ⟨[], [], []⟩
 
 def vectors : List (List Edit) :=
   [ [.row 1 .core],

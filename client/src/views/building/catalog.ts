@@ -3,60 +3,95 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The properties this module must hold are proved in `client/spec/Views/Catalog.lean`.
-//
-// The building page's capabilities section (client/Spec.lean 4-50, its
-// tenth part): the draft of one `[catalog]` table, the exposure each
-// tool takes under it, the bytes a save would add or take from every
-// request, and the value `catalog.look.svelte` draws. The page edits one
-// layer at a time, this building's or the city's, and saves that layer's
-// whole table (`crates/wire/Spec.lean` §8-99).
-//
-// A row's exposure is read the way the city reads it
-// (`kernel::config::CatalogExposure::stated`): a fixed tool is core; a
-// nearer layer's statement wins over the draft; then the draft's tool
-// key, then its namespace key, then what the row inherits from the
-// layers farther than the one being edited. `rowsOf` works out the
-// inherited and the nearer values from the city's answer, so the order
-// is spelled here once more only for the draft the city has not seen.
+// The unified building catalog draft. Tool exposure proofs live in
+// `client/spec/Views/Catalog.lean`; skill pins, connector references and
+// Reading Room names travel beside that table so one save writes one selection.
 
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { ago, count } from "../../core/time";
-import type { CatalogAnswer, CatalogTool, Exposure, ExposureFrom, ExposureTable } from "../../wire";
+import { toFragment } from "../../core/route";
+import type {
+  Address,
+  B3Hash,
+  CatalogAnswer,
+  CatalogChange,
+  CatalogSkill,
+  CatalogTool,
+  Exposure,
+  ExposureFrom,
+  ExposureTable,
+  McpReference,
+} from "../../wire";
 import type { Choice } from "../parts/segmented";
 
-// Which layer a save writes.
 export type Scope = "building" | "city";
 
-// One layer's table as the page edits it: both maps always present.
 export interface Table {
   readonly tools: Readonly<Record<string, Exposure>>;
   readonly namespaces: Readonly<Record<string, Exposure>>;
+  readonly skills: Readonly<Record<string, Exposure>>;
 }
 
-// One tool as the draft reads it.
+export interface Selection {
+  readonly catalog: Table;
+  readonly references: readonly McpReference[];
+  readonly skillPins: Readonly<Record<string, B3Hash>>;
+  readonly readingRoom: readonly string[];
+}
+
 export interface Row {
   readonly tool: CatalogTool;
   readonly fixed: boolean;
-  // What the row is when the edited layer states nothing about it.
   readonly inherited: Exposure;
-  // What a layer nearer than the edited one states, which wins.
+  readonly nearer: Exposure | undefined;
+}
+
+export interface SkillRow {
+  readonly skill: CatalogSkill;
+  readonly inherited: Exposure;
   readonly nearer: Exposure | undefined;
 }
 
 export const EXPOSURES: readonly Exposure[] = ["core", "dormant", "off"];
 
 export function tableOf(table: ExposureTable): Table {
-  return { tools: { ...table.tools }, namespaces: { ...table.namespaces } };
+  return {
+    tools: { ...table.tools },
+    namespaces: { ...table.namespaces },
+    skills: { ...table.skills },
+  };
 }
 
-// The draft a scope starts from: that layer's table as written.
 export function draftOf(answer: CatalogAnswer, scope: Scope): Table {
   return tableOf(scope === "building" ? answer.stated : answer.city);
 }
 
-// The rows of the answer, read for the layer being edited.
+export function selectionOf(answer: CatalogAnswer): Selection {
+  return {
+    catalog: draftOf(answer, "building"),
+    references: answer.references.map((reference) => ({
+      ...reference,
+      tools: reference.tools == null ? reference.tools : { ...reference.tools },
+    })),
+    skillPins: { ...answer.skill_pins },
+    readingRoom: [...answer.reading_room],
+  };
+}
+
+export function sameSelection(left: Selection, right: Selection): boolean {
+  return canonicalSelection(left) === canonicalSelection(right);
+}
+
+function canonicalSelection(selection: Selection): string {
+  return JSON.stringify({
+    catalog: canonical(selection.catalog),
+    references: selection.references,
+    pins: sorted(selection.skillPins),
+    reading: selection.readingRoom,
+  });
+}
+
 export function rowsOf(answer: CatalogAnswer, scope: Scope): readonly Row[] {
   const city = tableOf(answer.city);
   const building = tableOf(answer.stated);
@@ -72,25 +107,30 @@ export function rowsOf(answer: CatalogAnswer, scope: Scope): readonly Row[] {
   });
 }
 
-// The row's exposure with its tool key left out of the draft.
-function without(table: Table, row: Row): Exposure {
-  return table.namespaces[row.tool.namespace] ?? row.inherited;
-}
-
-// The row's exposure under the draft.
-export function effectiveOf(table: Table, row: Row): Exposure {
-  if (row.fixed) return "core";
-  if (row.nearer !== undefined) return row.nearer;
-  return table.tools[row.tool.name] ?? without(table, row);
+export function skillRowsOf(answer: CatalogAnswer, scope: Scope): readonly SkillRow[] {
+  const city = tableOf(answer.city);
+  const building = tableOf(answer.stated);
+  return answer.skill_rows.map((skill) => ({
+    skill,
+    inherited: scope === "building" ? (city.skills[skill.name] ?? "dormant") : "dormant",
+    nearer: scope === "building" ? undefined : building.skills[skill.name],
+  }));
 }
 
 function omit(record: Readonly<Record<string, Exposure>>, key: string): Record<string, Exposure> {
   return Object.fromEntries(Object.entries(record).filter(([held]) => held !== key));
 }
 
-// One press on a row: the tool key is written only when it departs from
-// what the row would be without it, so setting a row back to what it
-// inherits takes the key out rather than writing the same value again.
+function without(table: Table, row: Row): Exposure {
+  return table.namespaces[row.tool.namespace] ?? row.inherited;
+}
+
+export function effectiveOf(table: Table, row: Row): Exposure {
+  if (row.fixed) return "core";
+  if (row.nearer !== undefined) return row.nearer;
+  return table.tools[row.tool.name] ?? without(table, row);
+}
+
 export function pressRow(table: Table, row: Row, value: Exposure): Table {
   if (row.fixed) return table;
   const tools = omit(table.tools, row.tool.name);
@@ -100,8 +140,6 @@ export function pressRow(table: Table, row: Row, value: Exposure): Table {
   };
 }
 
-// One press on a namespace: every member's tool key goes, and the
-// namespace key is written unless every member inherits that value.
 export function pressGroup(
   rows: readonly Row[],
   table: Table,
@@ -113,28 +151,99 @@ export function pressGroup(
   const namespaces = members.every((row) => row.inherited === value)
     ? omit(table.namespaces, namespace)
     : { ...table.namespaces, [namespace]: value };
-  return { tools, namespaces };
+  return { ...table, tools, namespaces };
 }
 
-// The bytes every request gains under the draft against the saved
-// table: what moves into the core, less what moves out of it.
+export function effectiveSkill(table: Table, row: SkillRow, admitted: boolean): Exposure {
+  if (!admitted) return "off";
+  if (row.nearer !== undefined) return row.nearer;
+  return table.skills[row.skill.name] ?? row.inherited;
+}
+
+export function pressSkill(
+  selection: Selection,
+  row: SkillRow,
+  value: Exposure,
+  scope: Scope,
+): Selection {
+  const inherited = row.inherited;
+  const skills = omit(selection.catalog.skills, row.skill.name);
+  const catalog = {
+    ...selection.catalog,
+    skills: value === inherited ? skills : { ...skills, [row.skill.name]: value },
+  };
+  if (scope === "city") return { ...selection, catalog };
+  const readingRoom =
+    value === "off"
+      ? selection.readingRoom.filter((name) => name !== row.skill.name)
+      : [...new Set([...selection.readingRoom, row.skill.name])];
+  const skillPins =
+    value !== "off" &&
+    selection.skillPins[row.skill.name] === undefined &&
+    row.skill.candidate != null
+      ? { ...selection.skillPins, [row.skill.name]: row.skill.candidate }
+      : selection.skillPins;
+  return { ...selection, catalog, skillPins, readingRoom };
+}
+
+export function acceptTool(selection: Selection, tool: CatalogTool): Selection {
+  if (tool.current == null) return selection;
+  const digest = tool.current.digest;
+  return {
+    ...selection,
+    references: selection.references.map((reference) => {
+      if (reference.label !== tool.namespace) return reference;
+      return { ...reference, tools: { ...reference.tools, [tool.name]: digest } };
+    }),
+  };
+}
+
+export function acceptSkill(selection: Selection, skill: CatalogSkill): Selection {
+  return skill.candidate == null
+    ? selection
+    : { ...selection, skillPins: { ...selection.skillPins, [skill.name]: skill.candidate } };
+}
+
+export function keepSkill(selection: Selection, skill: CatalogSkill): Selection {
+  const skillPins = Object.fromEntries(
+    Object.entries(selection.skillPins).filter(([name]) => name !== skill.name),
+  );
+  if (skill.pinned != null) skillPins[skill.name] = skill.pinned;
+  return { ...selection, skillPins };
+}
+
 export function meterOf(saved: Table, draft: Table, rows: readonly Row[]): number {
   return rows.reduce((sum, row) => {
-    const now = effectiveOf(draft, row) === "core" ? row.tool.bytes : 0;
-    const was = effectiveOf(saved, row) === "core" ? row.tool.bytes : 0;
+    const now = effectiveOf(draft, row) === "core" ? bytesOf(row.tool) : 0;
+    const was = effectiveOf(saved, row) === "core" ? savedBytesOf(row.tool) : 0;
     return sum + now - was;
   }, 0);
 }
 
-// Whether two tables state the same thing.
+export function skillMeterOf(
+  saved: Selection,
+  draft: Selection,
+  rows: readonly SkillRow[],
+): number {
+  return rows.reduce((sum, row) => {
+    const nowBytes = skillDocumentBytes(row.skill);
+    const wasBytes = textBytes(row.skill.pinned_document ?? row.skill.current_document ?? "");
+    const now = effectiveSkill(draft.catalog, row, draft.readingRoom.includes(row.skill.name));
+    const was = effectiveSkill(saved.catalog, row, saved.readingRoom.includes(row.skill.name));
+    return sum + (now === "core" ? nowBytes : 0) - (was === "core" ? wasBytes : 0);
+  }, 0);
+}
+
 export function sameTable(left: Table, right: Table): boolean {
   return canonical(left) === canonical(right);
 }
 
 function canonical(table: Table): string {
-  const sorted = (record: Readonly<Record<string, Exposure>>): [string, Exposure][] =>
-    Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return JSON.stringify([sorted(table.tools), sorted(table.namespaces)]);
+  return JSON.stringify([sorted(table.tools), sorted(table.namespaces), sorted(table.skills)]);
+}
+
+function sorted<T>(record: Readonly<Record<string, T>>): [string, T][] {
+  return Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 const EXPOSURE_WORD: Record<Exposure, Key> = {
@@ -150,16 +259,19 @@ const FROM_WORD: Record<ExposureFrom, Key> = {
   building: "catalog_from_building",
 };
 
-// Everything `catalog.look.svelte` draws, already worded by the seat.
+const CHANGE_WORD: Record<CatalogChange, Key> = {
+  added: "catalog_added",
+  changed: "catalog_changed",
+  removed: "catalog_removed",
+};
+
 export interface CatalogLook {
   readonly scopeLabel: string;
   readonly scopes: readonly Choice<Scope>[];
   readonly scope: Scope;
   readonly onScope: (scope: Scope) => void;
-  // The bytes the newest run carried, and what the draft would change.
   readonly meter: string;
   readonly delta: string | undefined;
-  // Said instead of the rows before the building's first run.
   readonly empty: string | undefined;
   readonly groups: readonly GroupLook[];
   readonly save: {
@@ -167,7 +279,22 @@ export interface CatalogLook {
     readonly why: string | undefined;
     readonly onPress: () => void;
   };
-  readonly note: string;
+  readonly openSessions:
+    { readonly text: string; readonly href: string; readonly label: string } | undefined;
+  readonly unused: {
+    readonly label: string;
+    readonly pressed: boolean;
+    readonly onPress: () => void;
+    readonly offLabel: string;
+    readonly onOff: () => void;
+  };
+  readonly copy:
+    | {
+        readonly label: string;
+        readonly options: readonly Address[];
+        readonly onPick: (addr: Address) => void;
+      }
+    | undefined;
 }
 
 export interface GroupLook {
@@ -176,7 +303,6 @@ export interface GroupLook {
   readonly summary: string;
   readonly open: boolean;
   readonly choices: readonly Choice<Exposure>[];
-  // The value every member holds, or `null` when they differ.
   readonly held: Exposure | null;
   readonly onPick: (value: Exposure) => void;
   readonly rows: readonly RowLook[];
@@ -191,37 +317,63 @@ export interface RowLook {
   readonly held: Exposure;
   readonly onPick: (value: Exposure) => void;
   readonly facts: string;
+  readonly change: string | undefined;
+  readonly comparison:
+    | { readonly pinned: string; readonly current: string; readonly audit: string | undefined }
+    | undefined;
+  readonly actions: readonly {
+    readonly key: string;
+    readonly label: string;
+    readonly why: string | undefined;
+    readonly onPress: () => void;
+  }[];
 }
 
-// What the seat holds and does.
 export interface Seat {
   readonly answer: CatalogAnswer;
   readonly scope: Scope;
-  readonly draft: Table;
+  readonly draft: Selection;
   readonly edited: boolean;
   readonly now: number;
+  readonly unusedOnly: boolean;
+  readonly buildings: readonly Address[];
 }
 
 export interface Hands {
   readonly scope: (scope: Scope) => void;
-  readonly edit: (draft: Table) => void;
+  readonly edit: (draft: Selection) => void;
   readonly save: () => void;
+  readonly unused: (only: boolean) => void;
+  readonly copy: (building: Address) => void;
 }
 
-// A group draws open when it is short enough to read at a glance.
 const OPEN_GROUP = 12;
 
 export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
-  const rows = rowsOf(seat.answer, seat.scope);
-  const saved = draftOf(seat.answer, seat.scope);
-  const delta = meterOf(saved, seat.draft, rows);
+  const allTools = rowsOf(seat.answer, seat.scope);
+  const allSkills = skillRowsOf(seat.answer, seat.scope);
+  const tools = seat.unusedOnly
+    ? allTools.filter((row) => row.tool.runs_used === 0 && row.tool.exposure !== "off")
+    : allTools;
+  const skills = seat.unusedOnly
+    ? allSkills.filter((row) => row.skill.runs_used === 0 && row.skill.exposure !== "off")
+    : allSkills;
+  const saved = selectionOf(seat.answer);
+  const delta =
+    meterOf(saved.catalog, seat.draft.catalog, allTools) +
+    skillMeterOf(saved, seat.draft, allSkills);
   const choices = (why: string | undefined): readonly Choice<Exposure>[] =>
     EXPOSURES.map((value) => ({
       value,
       label: say(lang, EXPOSURE_WORD[value]),
       ...(why === undefined ? {} : { why }),
     }));
-  const namespaces = [...new Set(rows.map((row) => row.tool.namespace))];
+  const namespaces = [...new Set(tools.map((row) => row.tool.namespace))];
+  const groups = namespaces.map((namespace) => {
+    const members = tools.filter((row) => row.tool.namespace === namespace);
+    return toolGroup(namespace, members, seat, lang, hands, choices);
+  });
+  if (skills.length > 0) groups.push(skillGroup(skills, seat, lang, hands, choices));
   return {
     scopeLabel: say(lang, "catalog_scope"),
     scopes: [
@@ -230,9 +382,13 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     ],
     scope: seat.scope,
     onScope: hands.scope,
-    meter: fill(say(lang, "catalog_meter"), {
+    meter: fill(say(lang, "catalog_meter_unified"), {
+      always: String(seat.answer.always),
+      dormant: String(seat.answer.dormant),
+      skills: String(seat.answer.skills),
       core: count(seat.answer.core_bytes),
       index: count(seat.answer.index_bytes),
+      reading: count(seat.answer.reading_bytes),
     }),
     delta:
       seat.edited && delta !== 0
@@ -240,72 +396,296 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
             n: count(Math.abs(delta)),
           })
         : undefined,
-    empty: seat.answer.run == null ? say(lang, "catalog_no_run") : undefined,
-    groups: namespaces.map((namespace) => {
-      const members = rows.filter((row) => row.tool.namespace === namespace);
-      const held = members.map((row) => effectiveOf(seat.draft, row));
-      const tally = EXPOSURES.map((value) => held.filter((each) => each === value).length);
-      return {
-        key: namespace,
-        title: namespace,
-        summary: fill(say(lang, "catalog_group"), {
-          n: String(members.length),
-          core: String(tally[0] ?? 0),
-          dormant: String(tally[1] ?? 0),
-          off: String(tally[2] ?? 0),
-        }),
-        open: members.length <= OPEN_GROUP,
-        choices: choices(
-          members.every((row) => row.fixed) ? say(lang, "catalog_fixed") : undefined,
-        ),
-        held: held.every((each) => each === held[0]) ? (held[0] ?? null) : null,
-        onPick: (value) => {
-          hands.edit(pressGroup(rows, seat.draft, namespace, value));
-        },
-        rows: members.map((row) => rowLook(row, seat, lang, { choices, edit: hands.edit })),
-      };
-    }),
+    empty:
+      seat.answer.run == null && groups.length === 0
+        ? say(lang, "catalog_no_run")
+        : groups.length === 0 && seat.unusedOnly
+          ? say(lang, "catalog_no_unused")
+          : undefined,
+    groups,
     save: {
       label: say(lang, seat.scope === "building" ? "catalog_save_building" : "catalog_save_city"),
       why: seat.edited ? undefined : say(lang, "catalog_unchanged"),
       onPress: hands.save,
     },
-    note: say(lang, "catalog_next_run"),
+    openSessions:
+      seat.answer.open_sessions > 0
+        ? {
+            text: fill(say(lang, "catalog_open_sessions"), {
+              n: String(seat.answer.open_sessions),
+            }),
+            href: toFragment({ kind: "talk", address: seat.answer.building }),
+            label: "/new",
+          }
+        : undefined,
+    unused: {
+      label: say(lang, "catalog_unused_filter"),
+      pressed: seat.unusedOnly,
+      onPress: () => {
+        hands.unused(!seat.unusedOnly);
+      },
+      offLabel: say(lang, "catalog_turn_off_unused"),
+      onOff: () => {
+        let next = seat.draft;
+        for (const row of tools) next = { ...next, catalog: pressRow(next.catalog, row, "off") };
+        for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
+        hands.edit(next);
+      },
+    },
+    copy:
+      seat.scope === "building"
+        ? {
+            label: say(lang, "catalog_copy_selection"),
+            options: seat.buildings.filter((addr) => addr !== seat.answer.building),
+            onPick: hands.copy,
+          }
+        : undefined,
   };
 }
 
-function rowLook(
+function toolGroup(
+  namespace: string,
+  members: readonly Row[],
+  seat: Seat,
+  lang: Lang,
+  hands: Hands,
+  choices: (why: string | undefined) => readonly Choice<Exposure>[],
+): GroupLook {
+  const held = members.map((row) => effectiveOf(seat.draft.catalog, row));
+  return {
+    key: namespace,
+    title: namespace,
+    summary: groupSummary(members.length, held, lang),
+    open: members.length <= OPEN_GROUP,
+    choices: choices(members.every((row) => row.fixed) ? say(lang, "catalog_fixed") : undefined),
+    held: held.every((each) => each === held[0]) ? (held[0] ?? null) : null,
+    onPick: (value) => {
+      hands.edit({
+        ...seat.draft,
+        catalog: pressGroup(members, seat.draft.catalog, namespace, value),
+      });
+    },
+    rows: members.map((row) => toolLook(row, seat, lang, hands, choices)),
+  };
+}
+
+function skillGroup(
+  members: readonly SkillRow[],
+  seat: Seat,
+  lang: Lang,
+  hands: Hands,
+  choices: (why: string | undefined) => readonly Choice<Exposure>[],
+): GroupLook {
+  const held = members.map((row) =>
+    effectiveSkill(seat.draft.catalog, row, seat.draft.readingRoom.includes(row.skill.name)),
+  );
+  return {
+    key: "skill",
+    title: say(lang, "bld_skills"),
+    summary: groupSummary(members.length, held, lang),
+    open: members.length <= OPEN_GROUP,
+    choices: choices(undefined),
+    held: held.every((each) => each === held[0]) ? (held[0] ?? null) : null,
+    onPick: (value) => {
+      let next = seat.draft;
+      for (const row of members) next = pressSkill(next, row, value, seat.scope);
+      hands.edit(next);
+    },
+    rows: members.map((row) => skillLook(row, seat, lang, hands, choices)),
+  };
+}
+
+function groupSummary(n: number, held: readonly Exposure[], lang: Lang): string {
+  const tally = EXPOSURES.map((value) => held.filter((each) => each === value).length);
+  return fill(say(lang, "catalog_group"), {
+    n: String(n),
+    core: String(tally[0] ?? 0),
+    dormant: String(tally[1] ?? 0),
+    off: String(tally[2] ?? 0),
+  });
+}
+
+function toolLook(
   row: Row,
   seat: Seat,
   lang: Lang,
-  hands: {
-    readonly choices: (why: string | undefined) => readonly Choice<Exposure>[];
-    readonly edit: (draft: Table) => void;
-  },
+  hands: Hands,
+  choices: (why: string | undefined) => readonly Choice<Exposure>[],
 ): RowLook {
-  const last = row.tool.last_used;
+  const tool = row.tool;
+  const current = tool.current ?? tool.pinned;
+  const actions =
+    seat.scope === "building" && tool.change != null && tool.current != null
+      ? [
+          {
+            key: "accept",
+            label: say(lang, "catalog_accept"),
+            why: selectionPinsTool(seat.draft, tool) ? say(lang, "catalog_accepted") : undefined,
+            onPress: () => {
+              hands.edit(acceptTool(seat.draft, tool));
+            },
+          },
+        ]
+      : [];
+  return {
+    key: tool.name,
+    name: tool.name,
+    hint: current?.hint ?? "",
+    label: fill(say(lang, "catalog_row"), { name: tool.name }),
+    choices: choices(row.fixed ? say(lang, "catalog_fixed") : undefined),
+    held: effectiveOf(seat.draft.catalog, row),
+    onPick: (value) => {
+      hands.edit({ ...seat.draft, catalog: pressRow(seat.draft.catalog, row, value) });
+    },
+    facts: factsOf(
+      tool.from,
+      tool.runs_used,
+      tool.last_used,
+      seat,
+      lang,
+      current?.bytes ?? 0,
+      current?.hint ?? "",
+    ),
+    change: tool.change == null ? undefined : say(lang, CHANGE_WORD[tool.change]),
+    comparison: comparisonOf(
+      tool.pinned?.description,
+      tool.current?.description,
+      tool.pinned?.input_schema,
+      tool.current?.input_schema,
+      undefined,
+    ),
+    actions,
+  };
+}
+
+function skillLook(
+  row: SkillRow,
+  seat: Seat,
+  lang: Lang,
+  hands: Hands,
+  choices: (why: string | undefined) => readonly Choice<Exposure>[],
+): RowLook {
+  const skill = row.skill;
+  const accepted = skill.candidate != null && seat.draft.skillPins[skill.name] === skill.candidate;
+  const kept = seat.draft.skillPins[skill.name] === skill.pinned;
+  const actions =
+    seat.scope === "building" && skill.change != null
+      ? [
+          {
+            key: "accept",
+            label: say(lang, "catalog_accept"),
+            why: accepted ? say(lang, "catalog_accepted") : undefined,
+            onPress: () => {
+              hands.edit(acceptSkill(seat.draft, skill));
+            },
+          },
+          {
+            key: "keep",
+            label: say(lang, "catalog_keep"),
+            why: kept ? say(lang, "catalog_kept") : undefined,
+            onPress: () => {
+              hands.edit(keepSkill(seat.draft, skill));
+            },
+          },
+        ]
+      : [];
+  const audit =
+    skill.audit == null
+      ? undefined
+      : fill(say(lang, skill.audit_stale ? "catalog_audit_stale" : "catalog_audit"), {
+          verdict: skill.audit,
+        });
+  return {
+    key: `skill:${skill.name}`,
+    name: skill.name,
+    hint: skill.disclosure,
+    label: fill(say(lang, "catalog_row"), { name: skill.name }),
+    choices: choices(undefined),
+    held: effectiveSkill(seat.draft.catalog, row, seat.draft.readingRoom.includes(skill.name)),
+    onPick: (value) => {
+      hands.edit(pressSkill(seat.draft, row, value, seat.scope));
+    },
+    facts: factsOf(
+      skill.from,
+      skill.runs_used,
+      skill.last_used,
+      seat,
+      lang,
+      skillDocumentBytes(skill),
+      skill.disclosure,
+    ),
+    change: skill.change == null ? undefined : say(lang, CHANGE_WORD[skill.change]),
+    comparison:
+      skill.change == null
+        ? undefined
+        : {
+            pinned: skill.pinned_document ?? "",
+            current: skill.current_document ?? "",
+            audit,
+          },
+    actions,
+  };
+}
+
+function factsOf(
+  from: ExposureFrom,
+  runs: number,
+  last: number | null | undefined,
+  seat: Seat,
+  lang: Lang,
+  coreBytes: number,
+  hint: string,
+): string {
   const used =
-    row.tool.runs_used > 0 && last != null
+    runs > 0 && last != null
       ? fill(say(lang, "catalog_used"), {
-          n: String(row.tool.runs_used),
+          n: String(runs),
           of: String(seat.answer.runs_seen),
           when: ago(lang, last, seat.now),
         })
       : fill(say(lang, "catalog_unused"), { of: String(seat.answer.runs_seen) });
+  return [
+    say(lang, FROM_WORD[from]),
+    used,
+    fill(say(lang, "catalog_costs"), { core: count(coreBytes), dormant: count(textBytes(hint)) }),
+  ].join(" · ");
+}
+
+function comparisonOf(
+  pinnedText: string | undefined,
+  currentText: string | undefined,
+  pinnedSchema: Readonly<Record<string, unknown>> | undefined,
+  currentSchema: Readonly<Record<string, unknown>> | undefined,
+  audit: string | undefined,
+): RowLook["comparison"] {
+  if (pinnedText === undefined && currentText === undefined) return undefined;
   return {
-    key: row.tool.name,
-    name: row.tool.name,
-    hint: row.tool.hint,
-    label: fill(say(lang, "catalog_row"), { name: row.tool.name }),
-    choices: hands.choices(row.fixed ? say(lang, "catalog_fixed") : undefined),
-    held: effectiveOf(seat.draft, row),
-    onPick: (value) => {
-      hands.edit(pressRow(seat.draft, row, value));
-    },
-    facts: [
-      say(lang, FROM_WORD[row.tool.from]),
-      used,
-      fill(say(lang, "run_prompt_bytes"), { n: count(row.tool.bytes) }),
-    ].join(" · "),
+    pinned: `${pinnedText ?? ""}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
+    current: `${currentText ?? ""}\n${JSON.stringify(currentSchema ?? {}, null, 2)}`,
+    audit,
   };
+}
+
+function selectionPinsTool(selection: Selection, tool: CatalogTool): boolean {
+  if (tool.current == null) return true;
+  return selection.references.some(
+    (reference) =>
+      reference.label === tool.namespace && reference.tools?.[tool.name] === tool.current?.digest,
+  );
+}
+
+function bytesOf(tool: CatalogTool): number {
+  return tool.current?.bytes ?? tool.pinned?.bytes ?? 0;
+}
+
+function savedBytesOf(tool: CatalogTool): number {
+  return tool.pinned?.bytes ?? tool.current?.bytes ?? 0;
+}
+
+function skillDocumentBytes(skill: CatalogSkill): number {
+  return textBytes(skill.current_document ?? skill.pinned_document ?? "");
+}
+
+function textBytes(text: string): number {
+  return new TextEncoder().encode(text).length;
 }

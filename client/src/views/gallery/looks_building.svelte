@@ -34,10 +34,10 @@
   import Prompts from "../building/prompts.look.svelte";
   import { actionName, actionWord, cardsOf } from "../building/prompts";
   import type { PromptsLook } from "../building/prompts";
-  import { Address, B3Hash, RunId } from "../../wire";
+  import { Address, B3Hash, RunId, ServerLabel } from "../../wire";
   import type { CatalogAnswer, LayerDocument } from "../../wire";
   import Catalog from "../building/catalog.look.svelte";
-  import { catalogLook, draftOf, pressGroup, rowsOf } from "../building/catalog";
+  import { catalogLook, draftOf, pressGroup, rowsOf, selectionOf } from "../building/catalog";
   import Case from "./case.svelte";
 
   const { lang } = ui();
@@ -131,18 +131,37 @@
   // with a fixed row and an edited one, and a server the building turned
   // off; the draft moves `plan` into the core and the server back on, so
   // the meter shows what the save would add.
+  function digest(tag: string): B3Hash {
+    return B3Hash.make(tag.padStart(64, "0"));
+  }
+  function version(hint: string, bytes: number, tag: string) {
+    return {
+      hint,
+      bytes,
+      description: hint,
+      digest: digest(tag),
+      input_schema: { type: "object" },
+    };
+  }
   const ANSWER: CatalogAnswer = {
     building: SHOP,
     run: null,
     core_bytes: 2840,
     index_bytes: 412,
+    reading_bytes: 96,
+    always: 4,
+    dormant: 18,
+    skills: 6,
+    changed: 2,
+    open_sessions: 1,
     runs_seen: 12,
     tools: [
       {
         name: "edit",
         namespace: "sprawling",
-        hint: "Replace text in a file you have read",
-        bytes: 980,
+        current: version("Replace text in a file you have read", 980, "1"),
+        pinned: null,
+        change: null,
         exposure: "core",
         from: "default",
         fallback: "core",
@@ -152,8 +171,9 @@
       {
         name: "plan",
         namespace: "sprawling",
-        hint: "Claim a node of the roadmap",
-        bytes: 640,
+        current: version("Claim a node of the roadmap", 640, "2"),
+        pinned: null,
+        change: null,
         exposure: "dormant",
         from: "default",
         fallback: "dormant",
@@ -163,8 +183,9 @@
       {
         name: "read",
         namespace: "sprawling",
-        hint: "Open one file by its path",
-        bytes: 860,
+        current: version("Open one file by its path", 860, "3"),
+        pinned: null,
+        change: null,
         exposure: "core",
         from: "fixed",
         fallback: "core",
@@ -174,8 +195,9 @@
       {
         name: "github_create_issue",
         namespace: "github",
-        hint: "create a issue on the forge",
-        bytes: 310,
+        current: version("create an issue on the forge", 310, "4"),
+        pinned: version("create an issue, old schema", 300, "5"),
+        change: "changed",
         exposure: "off",
         from: "building",
         fallback: "dormant",
@@ -185,8 +207,9 @@
       {
         name: "github_list_issue",
         namespace: "github",
-        hint: "list a issue on the forge",
-        bytes: 290,
+        current: version("list an issue on the forge", 290, "6"),
+        pinned: null,
+        change: null,
         exposure: "off",
         from: "building",
         fallback: "dormant",
@@ -194,13 +217,44 @@
         last_used: null,
       },
     ],
+    skill_rows: [
+      {
+        name: "how",
+        section: "engineering",
+        disclosure: "Investigate before changing a subsystem",
+        current_document: "# How\n\nnew guidance\n",
+        pinned_document: "# How\n\nold guidance\n",
+        candidate: digest("7"),
+        pinned: digest("8"),
+        change: "changed",
+        exposure: "dormant",
+        from: "default",
+        audit: "warn",
+        audit_stale: true,
+        runs_used: 0,
+        last_used: null,
+      },
+    ],
+    references: [
+      {
+        label: ServerLabel.make("github"),
+        definition: digest("9"),
+        tools: { github_create_issue: digest("5"), github_list_issue: digest("6") },
+      },
+    ],
+    skill_pins: { how: digest("8") },
+    reading_room: ["how"],
     city: {},
     stated: { namespaces: { github: "off" } },
   };
   const ROWS = rowsOf(ANSWER, "building");
   const DRAFT = pressGroup(
     ROWS,
-    { tools: { plan: "core" }, namespaces: draftOf(ANSWER, "building").namespaces },
+    {
+      tools: { plan: "core" },
+      namespaces: draftOf(ANSWER, "building").namespaces,
+      skills: {},
+    },
     "github",
     "dormant",
   );
@@ -209,23 +263,35 @@
       {
         answer: { ...ANSWER, run: RunId.make("00000000-0000-4000-8000-000000000001") },
         scope: "building",
-        draft: DRAFT,
+        draft: { ...selectionOf(ANSWER), catalog: DRAFT },
         edited: true,
         now: 0,
+        unusedOnly: false,
+        buildings: [SHOP, Address.make("mill")],
       },
       $lang,
       {
         scope: still,
         edit: still,
         save: still,
+        unused: still,
+        copy: still,
       },
     ),
   );
   const EMPTY = $derived(
     catalogLook(
-      { answer: ANSWER, scope: "city", draft: draftOf(ANSWER, "city"), edited: false, now: 0 },
+      {
+        answer: { ...ANSWER, tools: [], skill_rows: [], run: null },
+        scope: "city",
+        draft: { ...selectionOf(ANSWER), catalog: draftOf(ANSWER, "city") },
+        edited: false,
+        now: 0,
+        unusedOnly: false,
+        buildings: [SHOP],
+      },
       $lang,
-      { scope: still, edit: still, save: still },
+      { scope: still, edit: still, save: still, unused: still, copy: still },
     ),
   );
   const TASK = "fix the checkout total";

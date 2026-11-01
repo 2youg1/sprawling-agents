@@ -235,6 +235,78 @@
     "en": "the newest run carried {core} bytes of core tools and a {index}-byte dormant index",
     "zh": "最新的 run 带了 {core} 字节常驻工具与 {index} 字节休眠索引"
   },
+  "catalog_meter_unified": {
+    "en": "{always} Always · {dormant} On call · {skills} skills · {core} core B · {index} index B · {reading} reading B",
+    "zh": "{always} 常驻 · {dormant} 按需 · {skills} 个 skill · 常驻 {core} B · 索引 {index} B · 正文 {reading} B"
+  },
+  "catalog_added": {
+    "en": "Added",
+    "zh": "新增"
+  },
+  "catalog_changed": {
+    "en": "Changed",
+    "zh": "已变更"
+  },
+  "catalog_removed": {
+    "en": "Removed",
+    "zh": "已移除"
+  },
+  "catalog_accept": {
+    "en": "Accept",
+    "zh": "接受"
+  },
+  "catalog_accepted": {
+    "en": "The current version is in the draft.",
+    "zh": "草稿已是当前版本。"
+  },
+  "catalog_keep": {
+    "en": "Keep",
+    "zh": "保留"
+  },
+  "catalog_kept": {
+    "en": "The old pin is kept.",
+    "zh": "仍保留旧 pin。"
+  },
+  "catalog_audit": {
+    "en": "audit: {verdict}",
+    "zh": "审核：{verdict}"
+  },
+  "catalog_audit_stale": {
+    "en": "stale audit: {verdict}",
+    "zh": "过期审核：{verdict}"
+  },
+  "catalog_costs": {
+    "en": "Always {core} B · On call {dormant} B",
+    "zh": "常驻 {core} B · 按需 {dormant} B"
+  },
+  "catalog_unused_filter": {
+    "en": "admitted, unused for 30 days",
+    "zh": "已准入、30 天未使用"
+  },
+  "catalog_turn_off_unused": {
+    "en": "turn these off",
+    "zh": "将这些设为关"
+  },
+  "catalog_no_unused": {
+    "en": "No admitted item is unused for 30 days.",
+    "zh": "没有已准入且 30 天未使用的项目。"
+  },
+  "catalog_copy_selection": {
+    "en": "use the selection of building…",
+    "zh": "沿用另一栋楼的选择…"
+  },
+  "catalog_open_sessions": {
+    "en": "{n} open sessions use the previous selection; start a new one with ",
+    "zh": "{n} 个打开的会话仍用之前的选择；用 "
+  },
+  "catalog_nav_changed": {
+    "en": "capabilities · {n} changed",
+    "zh": "能力 · {n} 已变更"
+  },
+  "catalog_chip": {
+    "en": "{always} Always · {dormant} On call · {skills} skills · {changed} Changed",
+    "zh": "{always} 常驻 · {dormant} 按需 · {skills} 个 skill · {changed} 已变更"
+  },
   "catalog_more": {
     "en": "{n} bytes more in every request",
     "zh": "每次请求多 {n} 字节"

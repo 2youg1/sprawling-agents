@@ -59,7 +59,7 @@
   {#if view.kind === "city"}
     <City />
   {:else if view.kind === "building"}
-    <Building address={view.address} />
+    <Building address={view.address} initialSection={view.section} />
   {:else if view.kind === "raise"}
     {#key view.address}<Raise address={view.address} />{/key}
   {:else if view.kind === "run"}

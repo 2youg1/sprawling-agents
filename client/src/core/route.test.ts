@@ -49,6 +49,7 @@ const EVERY_VIEW: readonly View[] = [
   { kind: "setup" },
   ...SETUP_GROUPS.map((group): View => ({ kind: "setup", group })),
   { kind: "building", address: lab },
+  { kind: "building", address: lab, section: "catalog" },
   { kind: "raise" },
   { kind: "raise", address: Address.make("notes") },
   { kind: "monitor" },

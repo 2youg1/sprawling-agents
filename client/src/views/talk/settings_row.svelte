@@ -28,6 +28,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   import { permissionsOf } from "./policy";
   import { RECENT_COMBINATIONS } from "./recent.svelte";
   import Sandbox from "./sandbox.svelte";
+  import CatalogChip from "./catalog_chip.svelte";
   import { menuOf, sameBinding } from "./settings_row";
   import type { RowDraws, RowMenu, RowStarts, SettingsRowLook } from "./settings_row";
   import Look from "./settings_row.look.svelte";
@@ -161,6 +162,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   };
 
   const look: SettingsRowLook = $derived({
+    catalog,
     facts: draws === "everything" ? facts : undefined,
     notLive: kept ? say($lang, "talk_not_live") : undefined,
     model:
@@ -258,6 +260,10 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
 </script>
 
 <svelte:window onpointerdown={outside} />
+
+{#snippet catalog()}
+  {#if room !== null}<CatalogChip {room} />{/if}
+{/snippet}
 
 {#snippet facts()}
   <Sandbox {room} />
