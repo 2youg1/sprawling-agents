@@ -7363,6 +7363,10 @@
     "en": "role",
     "zh": "角色"
   },
+  "setup_model_role_taken": {
+    "en": "{id} is {role}; choose another {role} first",
+    "zh": "{id} 是 {role}；先另选 {role}"
+  },
   "setup_model_search": {
     "en": "search the models",
     "zh": "搜索模型"
@@ -7370,6 +7374,54 @@
   "setup_models": {
     "en": "which model thinks",
     "zh": "哪个模型来想"
+  },
+  "setup_models_empty": {
+    "en": "choose at least one model",
+    "zh": "至少选择一个模型"
+  },
+  "setup_models_not_sent": {
+    "en": "the model change could not be sent; check the connection",
+    "zh": "模型改动未能发出，请检查连接"
+  },
+  "setup_models_probe_busy": {
+    "en": "refreshing the model list…",
+    "zh": "正在刷新模型列表…"
+  },
+  "setup_models_refresh": {
+    "en": "refresh the model list",
+    "zh": "刷新模型列表"
+  },
+  "setup_models_role_required": {
+    "en": "choose another {role} before saving",
+    "zh": "保存前先另选 {role}"
+  },
+  "setup_models_save": {
+    "en": "save models",
+    "zh": "保存模型"
+  },
+  "setup_models_save_busy": {
+    "en": "saving the model selection…",
+    "zh": "正在保存模型选择…"
+  },
+  "setup_models_saved": {
+    "en": "saved models: {models}",
+    "zh": "已保存模型：{models}"
+  },
+  "setup_models_toggle": {
+    "en": "models · {n}",
+    "zh": "模型 · {n}"
+  },
+  "setup_models_unchanged": {
+    "en": "no model changes to save",
+    "zh": "模型没有改动"
+  },
+  "setup_models_will_remove": {
+    "en": "will remove: {models}",
+    "zh": "将移除：{models}"
+  },
+  "setup_endpoint_busy": {
+    "en": "another change to this endpoint is still being saved",
+    "zh": "这个端点的另一项改动仍在保存"
   },
   "setup_network_default": {
     "en": "the rule a new endpoint starts with",

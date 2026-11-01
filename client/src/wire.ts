@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 72 as const;
+export const WIRE_V = 73 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "5b01613af1bb74f4bc51cf454c0517b8f0186a27ab3899a46bcd8708305da49e" as const;
+export const WIRE_HASH = "4e33acd116e27ade6d257264340b4b20666133174a9d6c6ad3ac2f30595d04cd" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -3209,6 +3209,16 @@ export const CeilingLine = Schema.Union([
 export type CeilingLine = typeof CeilingLine.Type;
 
 /**
+ * What a model accepts as input: a closed judgement rather than a set of
+ * flags. Every row answers it,
+ * and the answer decides whether a picture may be sent at all. The
+ * default is the narrow one, because guessing narrow costs a refusal a
+ * person can act on and guessing wide costs a 400 from the provider.
+ */
+export const InputKinds = Schema.Literals(["text", "text_image"]).annotate({ identifier: "InputKinds" });
+export type InputKinds = typeof InputKinds.Type;
+
+/**
  * A window and the rung that stated it.
  */
 export const WindowLine = Schema.Struct({
@@ -3223,6 +3233,7 @@ export type WindowLine = typeof WindowLine.Type;
 export const FiguresLine = Schema.Struct({
   ceiling: Schema.optional(Schema.NullOr(CeilingLine)),
   id: Schema.String,
+  input: InputKinds,
   window: Schema.optional(Schema.NullOr(WindowLine)),
 }).annotate({ identifier: "FiguresLine" });
 export type FiguresLine = typeof FiguresLine.Type;
@@ -5600,17 +5611,6 @@ export const IdentityCard = Schema.Union([
   }),
 ]).annotate({ identifier: "IdentityCard" });
 export type IdentityCard = typeof IdentityCard.Type;
-
-/**
- * What a model accepts as input.
- * 
- * A closed judgement rather than a set of flags: every row answers it,
- * and the answer decides whether a picture may be sent at all. The
- * default is the narrow one, because guessing narrow costs a refusal a
- * person can act on and guessing wide costs a 400 from the provider.
- */
-export const InputKinds = Schema.Literals(["text", "text_image"]).annotate({ identifier: "InputKinds" });
-export type InputKinds = typeof InputKinds.Type;
 
 export const NoSecret = Schema.Never.annotate({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;

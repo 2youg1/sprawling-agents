@@ -13,6 +13,8 @@
   export interface EndpointListLookProps extends EndpointListLook {
     // A row's account editor, drawn by the seat under the endpoint's id.
     readonly accounts: Snippet<[string]>;
+    // The second native disclosure, drawn by the model editor's seat.
+    readonly models: Snippet<[string]>;
   }
 </script>
 
@@ -60,6 +62,8 @@
             {@render look.accounts(row.name)}
           </div>
         </details>
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+        {@render look.models(row.name)}
       </li>
     {/each}
   </ul>

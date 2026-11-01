@@ -82,6 +82,9 @@
     {#if row.named !== undefined}
       <span class="whitespace-nowrap text-note text-text-faint">{row.named}</span>
     {/if}
+    {#if row.refusal !== undefined}
+      <span role="alert" class="text-note text-alert">{row.refusal}</span>
+    {/if}
   </div>
 {/snippet}
 

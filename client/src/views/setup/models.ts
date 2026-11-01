@@ -15,7 +15,7 @@
 import type { Stated } from "../../core/commands";
 import type { ModelFact } from "../../core/probed";
 import type { ModelTag } from "../../wire";
-import type { TableAbout } from "./model_rows";
+import type { TableAbout, TableState } from "./model_rows";
 
 export { default as ModelChoice } from "./models.svelte";
 export { default as ModelTable } from "./model_table.svelte";
@@ -33,5 +33,9 @@ export interface ModelTableProps {
   // What the table's rows are asked about, or `null` while the form
   // names no endpoint the city could be asked about.
   readonly about: TableAbout | null;
+  // An attached endpoint's editor lends the table state so refresh and
+  // save can preserve named rows and inspect the whole draft. The attach
+  // form leaves it absent and the seat owns a fresh one.
+  readonly state?: TableState;
   readonly onChosen: (rows: readonly ModelRow[]) => void;
 }

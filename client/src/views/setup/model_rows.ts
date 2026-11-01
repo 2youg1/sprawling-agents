@@ -45,24 +45,49 @@ export interface TableState {
   readonly ticked: Record<string, boolean>;
   readonly context: Record<string, string>;
   readonly output: Record<string, string>;
-  readonly role: Record<string, string>;
+  role: Record<string, string>;
+  // The roles the city holds, kept apart from the draft role so clearing
+  // a combobox cannot make an occupied model removable.
+  heldRole: Record<string, ModelTag>;
   readonly input: Record<string, InputKinds | null>;
+  refusal: { readonly id: string; readonly role: ModelTag } | null;
   search: string;
   textOnly: boolean;
   manual: string;
 }
 
-export function freshTable(): TableState {
+export interface TableSeed {
+  readonly ticked?: readonly string[];
+  readonly named?: readonly string[];
+  readonly roles?: Readonly<Record<string, ModelTag>>;
+}
+
+export function freshTable(seed: TableSeed = {}): TableState {
+  const roles = seed.roles ?? {};
   return {
-    ticked: {},
+    ticked: Object.fromEntries((seed.ticked ?? []).map((id) => [id, true])),
     context: {},
     output: {},
-    role: {},
+    role: { ...roles },
+    heldRole: { ...roles },
     input: {},
+    refusal: null,
     search: "",
     textOnly: true,
-    manual: "",
+    manual: (seed.named ?? []).join(", "),
   };
+}
+
+// A tick never removes a model the city still gives a role. The draft
+// role is irrelevant: clearing it does not clear the city's registration.
+export function setTick(state: TableState, id: string, on: boolean): void {
+  const held = state.heldRole[id];
+  if (!on && held !== undefined) {
+    state.refusal = { id, role: held };
+    return;
+  }
+  state.refusal = null;
+  state.ticked[id] = on;
 }
 
 function looksTextual(row: ModelFact): boolean {

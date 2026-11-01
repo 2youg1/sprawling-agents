@@ -178,6 +178,7 @@ fn figures_of(
                 max_output_tokens: row.max_output_tokens,
                 ..ModelFacts::default()
             };
+            let pinned = catalogue.lookup(&row.id);
             let figures = gateway::Figures::resolve(
                 gateway::Statements {
                     listed: Some(&listed),
@@ -186,7 +187,7 @@ fn figures_of(
                         .and_then(|tag| book.registered(tag, asked.endpoint, &row.id)),
                     ..gateway::Statements::default()
                 },
-                catalogue.lookup(&row.id),
+                pinned,
                 gateway::Target {
                     base_url: &called.base_url,
                     id: &row.id,
@@ -200,6 +201,12 @@ fn figures_of(
                     from: figure_from(window.from),
                 }),
                 ceiling: figures.ceiling.map(ceiling_line),
+                input: gateway::accepted_input(
+                    None,
+                    pinned.map(|entry| entry.input),
+                    &called.base_url,
+                    &row.id,
+                ),
             }
         })
         .collect())
@@ -586,7 +593,7 @@ mod tests {
                 },
             )
         };
-        let line = |window: Option<u64>, ceiling| {
+        let line = |window: Option<u64>, ceiling, input| {
             wire::Answer::ModelFigures(wire::ModelFiguresAnswer {
                 models: vec![wire::FiguresLine {
                     id: "claude-sonnet-4-5".to_owned(),
@@ -597,6 +604,7 @@ mod tests {
                             from: wire::FigureFrom::Preset,
                         }),
                     ceiling: Some(ceiling),
+                    input,
                 }],
             })
         };
@@ -611,9 +619,17 @@ mod tests {
                 ask("http://127.0.0.1:8811/v1", DialectKind::OpenAi),
             ],
             [
-                line(Some(200_000), wire::CeilingLine::ProviderDefault),
-                line(Some(200_000), vendor),
-                line(None, wire::CeilingLine::ProviderDefault),
+                line(
+                    Some(200_000),
+                    wire::CeilingLine::ProviderDefault,
+                    kernel::InputKinds::TextImage,
+                ),
+                line(Some(200_000), vendor, kernel::InputKinds::TextImage),
+                line(
+                    None,
+                    wire::CeilingLine::ProviderDefault,
+                    kernel::InputKinds::Text,
+                ),
             ]
         );
         assert!(matches!(

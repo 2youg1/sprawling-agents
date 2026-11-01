@@ -33,6 +33,7 @@ pub struct FiguresLine {
     pub id: String,
     pub window: Option<WindowLine>,          // 缺席：没有一级说出窗口，窗口未知，上下文提醒不响
     pub ceiling: Option<CeilingLine>,        // 缺席只在策略缺省本身为零时，那一态由策略模块自己的测试禁止
+    pub input: InputKinds,                   // 这次选择会登记的输入类型；无人陈述时为 text
 }
 pub struct WindowLine { pub tokens: Window, pub from: FigureFrom }
 pub enum CeilingLine {                       // 线上 snake_case
@@ -42,7 +43,7 @@ pub enum CeilingLine {                       // 线上 snake_case
 pub enum FigureFrom { Person, Upstream, Registered, Preset, Policy }   // 线上 snake_case，与 `gateway::FigureSource::as_str` 同拼
 ```
 
-- **答的是选型点会登记的那两个数**：每一行由 `gateway::Figures::resolve` 求出（gateway D37），与 `accounting::worker::credentials::endpoints::choosing` 在 `SelectModel` 不带数字时调的是同一个函数、同样的四级陈述：人填的两格（这一问恒为空，因为占位只在格子空着时显示），provider 的列表行（`FiguresAsked` 的两个数），此前登记（端点账本里 `tag` 指着同一端点、同一模型的那一次选择，`EndpointBook::registered`），目录行与预置表。客户端不抄梯子，只画答案。
+- **答的是选型点会登记的窗口、上限与输入类型**：窗口与上限由 `gateway::Figures::resolve` 求出（gateway D37），输入类型由选型点同一个 `gateway::accepted_input` 求出；与 `accounting::worker::credentials::endpoints::choosing` 在 `SelectModel` 不带这些值时调的是同一组函数、同样的陈述：人填的格子（这一问恒为空，因为占位只在格子空着时显示），provider 的列表行（`FiguresAsked` 的两个数），此前登记（端点账本里 `tag` 指着同一端点、同一模型的那一次选择，`EndpointBook::registered`），目录行与预置表。客户端不抄梯子，只画答案。
 - **base URL 与兼容格式由城归一化**：`gateway::normalise_entered` 加 `Normalised::face`，与 `Entered::resolved` 在 probe 与 attach 上走的是同一条路，所以表上问的主机与登记时调用的主机是同一个。归一化拒绝的文字整问答 `Unavailable`，带它的原因（D47）。
 - **目录一问建一次**：`MarketSnapshot::builtin()` 在一问开头建一次，每一行用 `lookup` 取自己的目录行；没有一级碰网络或磁盘。
 - **列表行由页面带来**：表单在登记之前就要画占位，而这时 provider 的列表只在 `endpoint_probed` 的记录里，视图不折这条记录。页面把它读到的两个数送回来，问「这样的一行会登记成什么」。
@@ -52,9 +53,9 @@ pub enum FigureFrom { Person, Upstream, Registered, Preset, Policy }   // 线上
 
 /-! D58 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举
 
-**决定**：(a) 一条 `Query::ModelFigures`，按端点名、框里的 base URL、兼容格式与表上的行作答，每行答窗口及其来源、上限（`Sent` 带来源，或 `ProviderDefault`）；(b) 来源在线上是闭集枚举 `FigureFrom`，拼写与账本里 `model_selected.window_from`／`ceiling_from` 的词相同，由 `accounting::views::providers` 的穷尽映射从 `gateway::FigureSource` 写出；(c) provider 列表的两个数由页面带来。
+**决定**：(a) 一条 `Query::ModelFigures`，按端点名、框里的 base URL、兼容格式与表上的行作答，每行答窗口及其来源、上限（`Sent` 带来源，或 `ProviderDefault`）与选型点会登记的 `input`；(b) 来源在线上是闭集枚举 `FigureFrom`，拼写与账本里 `model_selected.window_from`／`ceiling_from` 的词相同，由 `accounting::views::providers` 的穷尽映射从 `gateway::FigureSource` 写出；(c) provider 列表的两个数由页面带来。
 
-**理由**：(a) 占位要说的是「空着时城会登记什么」，那是选型点的梯子的答案，只有调同一个函数才不会与登记分岔；按行带 `tag`，此前登记那一级才答得出来。(b) 页面按来源选一句话，闭集让它的 switch 是穷尽的，城多一级时页面编译不过，而不是落到一个默认分支；思考档的 `OfferSource` 已是这个写法。(c) 列表行只在 `endpoint_probed` 里，让视图为一个占位折这条记录，要多持一份每个端点最后一次探测的状态。
+**理由**：(a) 占位要说的是「空着时城会登记什么」，那是选型点的梯子的答案，只有调同一组函数才不会与登记分岔；按行带 `tag`，此前登记那一级才答得出来。输入类型与两个数字一样，客户端不另排一级阶梯。(b) 页面按来源选一句话，闭集让它的 switch 是穷尽的，城多一级时页面编译不过，而不是落到一个默认分支；思考档的 `OfferSource` 已是这个写法。(c) 列表行只在 `endpoint_probed` 里，让视图为一个占位折这条记录，要多持一份每个端点最后一次探测的状态。
 
 **被否**：①把数字与来源加进 `endpoint_probed`——见 §8-97，账本会留下一份随版本过时的副本；②来源在线上是账本的词（字符串）——页面的 switch 要一个默认分支，一个新来源会被画成别的句子；③客户端照抄梯子（人、provider、目录）——梯子有两个权威，下一次改梯子时页面与登记会说不同的话；④只按 `(base URL, face, id)` 问、不带列表行与角色——provider 列表与此前登记两级答不出来，占位会与登记不同。
 

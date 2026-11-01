@@ -10,6 +10,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { providerName } from "../../core/commands";
+import { fill, say } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
 import { Ceiling, Window } from "../../wire";
 import type { FigureFrom, FiguresLine } from "../../wire";
@@ -47,6 +48,7 @@ const line = (
   ceiling: readonly [number, FigureFrom] | "provider_default",
 ): FiguresLine => ({
   id,
+  input: "text",
   window: window === null ? null : { tokens: Window.make(window[0]), from: window[1] },
   ceiling:
     ceiling === "provider_default"
@@ -112,6 +114,63 @@ describe("which rows the table offers", () => {
 });
 
 describe("what a press writes and what is handed back", () => {
+  test("an attached endpoint opens with its admitted and named rows ticked and its roles held", () => {
+    const state = freshTable({
+      ticked: ["vendor/writer", "typed/one"],
+      named: ["typed/one"],
+      roles: { "vendor/writer": "main" },
+    });
+    expect(chosenRows(state, SERVED)).toEqual([
+      {
+        id: "vendor/writer",
+        stated: { contextTokens: null, maxOutputTokens: null, input: null },
+        tag: "main",
+      },
+      {
+        id: "typed/one",
+        stated: { contextTokens: null, maxOutputTokens: null, input: null },
+        tag: null,
+      },
+    ]);
+  });
+
+  test("unticking a model that holds a role keeps it ticked and names the role inline", () => {
+    const state = freshTable({ ticked: ["vendor/writer"], roles: { "vendor/writer": "main" } });
+    const look = lookOf(state, SERVED, [], "en");
+    const row = rowOf(look, "vendor/writer");
+    if (row !== undefined) look.table?.tick.onPick(row, false);
+    const after = lookOf(state, SERVED, [], "en");
+    const current = rowOf(after, "vendor/writer");
+    expect({
+      ticked: current === undefined ? undefined : after.table?.tick.picked(current),
+      refusal: current?.refusal,
+      chosen: chosenRows(state, SERVED).map((each) => each.id),
+    }).toEqual({
+      ticked: true,
+      refusal: fill(say("en", "setup_model_role_taken"), {
+        id: "vendor/writer",
+        role: say("en", "setup_main"),
+      }),
+      chosen: ["vendor/writer"],
+    });
+  });
+
+  test("choosing a role on another row clears the previous holder, and an unheld row can be unticked", () => {
+    const state = freshTable({
+      ticked: ["vendor/writer", "vendor/seer"],
+      roles: { "vendor/writer": "main" },
+    });
+    rowOf(lookOf(state, SERVED, [], "en"), "vendor/seer")?.role.pick("main");
+    expect(chosenRows(state, SERVED).map((row) => [row.id, row.tag])).toEqual([
+      ["vendor/writer", null],
+      ["vendor/seer", "main"],
+    ]);
+    const look = lookOf(state, SERVED, [], "en");
+    const row = rowOf(look, "vendor/seer");
+    if (row !== undefined) look.table?.tick.onPick(row, false);
+    expect(chosenRows(state, SERVED).map((each) => each.id)).toEqual(["vendor/writer"]);
+  });
+
   test("an untouched box hands back no figure, so the city decides it and records the rung", () => {
     const state = freshTable();
     tick(lookOf(state, SERVED, [], "en"), "vendor/writer");
@@ -268,6 +327,7 @@ describe("what an untouched box says the city will register", () => {
       { placeholder: "50000", source: "as registered before" },
       { placeholder: "64000", source: "from the city's catalogue" },
     ]);
+    expect(rowOf(look, "a")?.input.placeholder).toBe(say("en", "setup_input_text"));
     expect(rowOf(look, "c")?.window).toMatchObject({ placeholder: "", source: "" });
   });
 

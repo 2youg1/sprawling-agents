@@ -123,17 +123,20 @@ export const TYPED = "house/hidden-1";
 export const FIGURED: readonly FiguresLine[] = [
   {
     id: FABLE,
+    input: "text_image",
     window: { tokens: Window.make(204_800), from: "upstream" },
     ceiling: { sent: { tokens: Ceiling.make(64_000), from: "upstream" } },
   },
   {
     id: NUCLEUS,
+    input: "text",
     window: { tokens: Window.make(400_000), from: "upstream" },
     ceiling: "provider_default",
   },
-  { id: MUSE, window: null, ceiling: "provider_default" },
+  { id: MUSE, input: "text", window: null, ceiling: "provider_default" },
   {
     id: TYPED,
+    input: "text",
     window: { tokens: Window.make(200_000), from: "preset" },
     ceiling: { sent: { tokens: Ceiling.make(8192), from: "registered" } },
   },

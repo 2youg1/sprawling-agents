@@ -18,9 +18,11 @@
   // its own: the corner is for refusals no open page is responsible for.
 
   import type { Roster } from "./account_editor";
+  import type { FlightState } from "./flight";
 
   export interface AccountsProps {
     readonly roster: Roster;
+    readonly flight?: FlightState;
   }
 </script>
 
@@ -36,7 +38,7 @@
   import type { Holds } from "./accounts";
   import Look from "./accounts.look.svelte";
 
-  const { roster }: AccountsProps = $props();
+  const { roster, flight }: AccountsProps = $props();
   const u = ui();
   const lang = u.lang;
   const belief = u.conn.belief;
@@ -50,7 +52,7 @@
   const held: Record<string, HTMLElement | undefined> = {};
   const attachments: Record<string, Attachment<HTMLElement> | undefined> = {};
 
-  const hands: Hands = {
+  const hands: Hands = $derived.by((): Hands => ({
     roster: () => roster,
     lang: () => $lang,
     reach: () => ({ origin: u.origin, token: u.credential() }),
@@ -62,7 +64,8 @@
     focusHeading: () => {
       void tick().then(() => heading?.focus());
     },
-  };
+    ...(flight === undefined ? {} : { flight }),
+  }));
 
   // One attachment per control for the life of the seat, so a redraw
   // does not let go of an element and take it again.
