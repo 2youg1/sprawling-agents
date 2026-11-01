@@ -1,0 +1,188 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use kernel::{Address, B3Hash, RunId, Seq};
+
+fn city_with_lab() -> (tempfile::TempDir, Address) {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let lab = Address::parse("lab").unwrap();
+    city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
+    (dir, lab)
+}
+
+fn install(city_root: &Path, lab: &Address, name: &str, text: &str) -> B3Hash {
+    let source = city_root.join("fixtures").join(format!("{name}.md"));
+    std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+    std::fs::write(&source, text).unwrap();
+    let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
+    city::install_skill(
+        city_root,
+        &city::Slot::building(lab, "catalog-tests").unwrap(),
+        &source,
+        &mut |bytes| cas.put(bytes).map_err(storage::StorageError::into_ax),
+    )
+    .unwrap()
+    .hash
+}
+
+fn admit(city_root: &Path, lab: &Address, names: &[&str]) {
+    let path = city::rules_path(city_root, lab);
+    let base = std::fs::read_to_string(&path).unwrap();
+    let mut document: toml::Table = toml::from_str(&base).unwrap();
+    document.insert(
+        "reading_room".to_owned(),
+        toml::Value::Array(
+            names
+                .iter()
+                .map(|name| toml::Value::String((*name).to_owned()))
+                .collect(),
+        ),
+    );
+    let body = toml::to_string_pretty(&document).unwrap();
+    city::write_rules_against(city_root, lab, &base, &body).unwrap();
+}
+
+fn save_pins(city_root: &Path, lab: &Address, name: &str, pin: B3Hash) {
+    let mut worker = crate::worker::RunWorker::new(
+        city_root,
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+            addr: lab.clone(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: None,
+            skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
+            reading_room: Some(vec![name.to_owned()]),
+            idem: kernel::IdemKey::derive(
+                &RunId::CITY,
+                Seq::FIRST,
+                format!("{name}:{pin}").as_bytes(),
+            ),
+        }))
+        .unwrap();
+}
+
+fn catalog(city_root: &Path, lab: &Address) -> wire::CatalogAnswer {
+    let wire::Answer::Catalog(answer) = crate::views::ask(
+        city_root,
+        &wire::Query::Catalog {
+            building: lab.clone(),
+        },
+    )
+    .unwrap() else {
+        panic!("Catalog answered another shape")
+    };
+    *answer
+}
+
+fn skill<'a>(answer: &'a wire::CatalogAnswer, name: &str) -> &'a wire::CatalogSkill {
+    answer
+        .skill_rows
+        .iter()
+        .find(|row| row.name == name)
+        .unwrap()
+}
+
+fn candidate(city_root: &Path, lab: &Address, name: &str) -> B3Hash {
+    let home = crate::home::Home::detect().unwrap();
+    let cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
+    city::Library::scan(city_root, Some(lab), home.path(), &|digest| {
+        cas.get(digest).map_err(storage::StorageError::into_ax)
+    })
+    .unwrap()
+    .all()
+    .into_iter()
+    .find(|holding| holding.name == name)
+    .unwrap()
+    .hash
+}
+
+#[test]
+fn an_internal_skill_compares_two_cas_documents_and_accept_moves_the_pin() {
+    let (dir, lab) = city_with_lab();
+    let old = install(dir.path(), &lab, "guide", "# Old guide\n\nold body\n");
+    admit(dir.path(), &lab, &["guide"]);
+    save_pins(dir.path(), &lab, "guide", old);
+    let new = install(dir.path(), &lab, "guide", "# New guide\n\nnew body\n");
+
+    let answer = catalog(dir.path(), &lab);
+    let row = skill(&answer, "guide");
+    assert_eq!(row.change, Some(wire::CatalogChange::Changed));
+    assert_eq!(row.candidate, Some(new));
+    assert_eq!(row.pinned, Some(old));
+    assert_eq!(
+        row.current_document.as_deref(),
+        Some("# New guide\n\nnew body\n")
+    );
+    assert_eq!(
+        row.pinned_document.as_deref(),
+        Some("# Old guide\n\nold body\n")
+    );
+    assert_eq!(answer.changed, 1);
+    assert_eq!(answer.reading_room, ["guide"]);
+
+    save_pins(dir.path(), &lab, "guide", new);
+    let answer = catalog(dir.path(), &lab);
+    assert_eq!(skill(&answer, "guide").change, None);
+    assert_eq!(answer.changed, 0);
+}
+
+#[test]
+fn an_external_accept_copies_the_candidate_and_keep_leaves_the_old_pin() {
+    let (dir, lab) = city_with_lab();
+    let outside = dir.path().join("outside-skills");
+    let package = outside.join("roam");
+    std::fs::create_dir_all(&package).unwrap();
+    std::fs::write(package.join("SKILL.md"), "# Outside one\n").unwrap();
+    std::fs::write(
+        dir.path()
+            .join(kernel::RESERVED_PREFIX)
+            .join(city::CONFIG_FILE),
+        format!(
+            "[skills]\nshelves = [{}]\n",
+            serde_json::to_string(&outside.to_string_lossy()).unwrap()
+        ),
+    )
+    .unwrap();
+    admit(dir.path(), &lab, &["roam"]);
+    let old = candidate(dir.path(), &lab, "roam");
+    save_pins(dir.path(), &lab, "roam", old);
+
+    std::fs::write(package.join("SKILL.md"), "# Outside two\n").unwrap();
+    let new = candidate(dir.path(), &lab, "roam");
+    let answer = catalog(dir.path(), &lab);
+    let row = skill(&answer, "roam");
+    assert_eq!(row.change, Some(wire::CatalogChange::Changed));
+    assert_eq!(row.current_document.as_deref(), Some("# Outside two\n"));
+    assert_eq!(row.pinned_document.as_deref(), Some("# Outside one\n"));
+
+    save_pins(dir.path(), &lab, "roam", old);
+    assert_eq!(catalog(dir.path(), &lab).skill_pins.get("roam"), Some(&old));
+
+    save_pins(dir.path(), &lab, "roam", new);
+    let answer = catalog(dir.path(), &lab);
+    assert_eq!(skill(&answer, "roam").change, None);
+    let cas = storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas()).unwrap();
+    assert_eq!(
+        city::skill_document(
+            &|digest| cas.get(digest).map_err(storage::StorageError::into_ax),
+            &new,
+            "roam",
+        )
+        .unwrap(),
+        "# Outside two\n"
+    );
+}

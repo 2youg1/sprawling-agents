@@ -186,6 +186,7 @@ pub fn write_mcp_references(
     building: &Address,
     references: &[McpReference],
 ) -> Result<(), AxError> {
+    super::check_mcp_references(city_root, building, references)?;
     change(
         city_root,
         building,

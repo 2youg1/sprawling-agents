@@ -28,7 +28,7 @@ pub struct CatalogAnswer {
     pub open_sessions: u32,                  // 冻结值不同于楼当前选择的会话数
     pub runs_seen: u32,                      // 最近 30 天使用证据覆盖的 run 数
     pub tools: Vec<CatalogTool>,             // 内建与 connector 工具，按名字；connector 由 namespace 分组
-    pub skills: Vec<CatalogSkill>,           // 同一目录的 skill 行
+    pub skill_rows: Vec<CatalogSkill>,       // 同一目录的 skill 行；`skills` 已是计数，不能重名
     pub references: Vec<McpReference>,       // 楼的引用与 pin，不携定义
     pub skill_pins: BTreeMap<String, B3Hash>,
     pub reading_room: Vec<String>,
@@ -66,7 +66,8 @@ pub struct CatalogSkill {
 ConfigureBuilding(BuildingSettings)          // 与 ConfigureCity(CitySettings) 同形；线上 JSON 与原来的结构体变体相同
 pub struct BuildingSettings { .., pub catalog: Option<ExposureTable>,
     pub mcp_references: Option<Vec<McpReference>>,
-    pub skill_pins: Option<BTreeMap<String, B3Hash>>, pub idem: IdemKey }
+    pub skill_pins: Option<BTreeMap<String, B3Hash>>,
+    pub reading_room: Option<Vec<String>>, pub idem: IdemKey }
 pub struct CitySettings { .., pub catalog: Option<ExposureTable>, pub idem: IdemKey }
 
 // §8-35 的答复多一格
@@ -74,6 +75,7 @@ pub struct PrefixAnswer { pub run: RunId, pub segments: Vec<PrefixSegment>,
                           pub tools: Option<kernel::event::record::PromptTools> }
 ```
 
+- **skill 行字段名为 `skill_rows`**：同一答复里的 `skills` 已是与 `status` 一致的 admitted skill 计数，Rust 与 JSON 都不能让两个不同事实共用一个键；这是对接口草案重复字段名的修正，不改变统一答复的范围。
 - **工具行取这栋楼最新 run 冻下的工具表，漂移行取 `digest_invalidated`，版本正文取 CAS**：答一问时不装配工作台，因为装配要与每台 MCP 服务器握手、可能起浏览器（accounting D55）。行的名字、命名空间、定义 digest 与字节来自那个 run 的 `prompt_assembled.tools`（runtime D111、D122），`Off` 的工具也有一行，所以关掉的能在这里开回来；Added／Changed／Removed 由当前 pin 与最新观察比较得出，Pinned 与 Current 的 description/schema 分别按 digest 完整读取 CAS。`exposure` 与 `from` 用此刻盘上的两张 `[catalog]` 表经 `runtime::catalog::exposure::exposure_of` 算出，与下一个新会话的目录调的是同一个函数。
 - **skill 行从当前书架索引与 `[skills.pins]` 合并**：当前候选与 pin 相同即未变，不同即 Changed；pin 的 `SKILL.md` 与候选正文都来自完整 CAS 读取，外部候选只在 Accept 时复制进城。审核判定仍按 digest 读 `skill_audited`，30 天使用证据与工具一样从 usage fold 得出。
 - **一次问答足以保存整楼选择**：`references`、`skill_pins`、`reading_room` 与两张 `[catalog]` 表给出草稿初值；保存经 `ConfigureBuilding` 更新引用、pin 与档位，并经已有 RULES 写门更新名字，绝不从另一栋楼复制服务器定义。`open_sessions` 由每个会话的 `CATALOG.toml` 与楼当前选择逐份比较，不能用最后活动时间代替（city D114）。
@@ -88,7 +90,7 @@ pub struct PrefixAnswer { pub run: RunId, pub segments: Vec<PrefixSegment>,
 
 /-! D112 `Query::Catalog` 是统一目录的唯一问答，版本正文按 digest 从 CAS 读，保存只写引用与 pin
 
-**决定**：工具与 skill 在同一 `CatalogAnswer`；Added／Changed／Removed 由 pin 与最新观察得出，版本正文由 digest 定位，不新增在线探测查询。`BuildingSettings` 增加整张 `mcp_references` 与 `skill_pins`，沿用 `ConfigureBuilding`；`[catalog]` 仍是三档的唯一写面。`open_sessions` 比较会话冻结目录与楼当前目录。
+**决定**：工具与 skill 在同一 `CatalogAnswer`；Added／Changed／Removed 由 pin 与最新观察得出，版本正文由 digest 定位，不新增在线探测查询。`BuildingSettings` 增加整张 `mcp_references`、`skill_pins` 与 `reading_room`，沿用 `ConfigureBuilding` 和城市的 RULES 求值门，客户端不另写一份 TOML；`[catalog]` 仍是三档的唯一写面。`open_sessions` 比较会话冻结目录与楼当前目录。`status` 与答复共读 `PromptTools` 的三项计数与三类字节；这批形状改动的 `WIRE_V` 从 73 进到 74。
 
 **理由**：统一面板若由客户端拼接 `Skills`、`McpHealth`、`Catalog` 与在线握手，会得到不同时刻的目录并产生页面副作用；直接携定义全文又会复制服务器主机事实。CAS digest 同时承担 pin 和版本定位，旧版与新版可以离线并排。
 

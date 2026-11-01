@@ -44,6 +44,7 @@ pub use install::{
     plan_install, skill_digest,
 };
 pub use projection::materialize;
+pub use reading::skill_document;
 pub use shelf::disclosure as skill_disclosure;
 pub use shelf::{Holding, Shelf};
 pub use shipped::{SHIPPED_SECTION, shelve_shipped};

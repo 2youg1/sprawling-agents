@@ -38,7 +38,7 @@ fn call() -> ToolCall {
 }
 
 #[test]
-fn the_thirteen_fields_report_in_the_frozen_order() {
+fn the_fourteen_fields_report_in_the_frozen_order() {
     let tool = StatusTool::new(snapshot()).unwrap();
     let outcome = tool.invoke(&call()).unwrap();
     let value = serde_json::to_value(&outcome.result).unwrap();
@@ -57,12 +57,13 @@ fn the_thirteen_fields_report_in_the_frozen_order() {
         "provider_mode",
         "neighbours",
         "backlog",
+        "catalog",
     ];
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(
         lines.len(),
-        13,
-        "the frozen list is thirteen fields: {text}"
+        14,
+        "the frozen list is fourteen fields: {text}"
     );
     for (line, field) in lines.iter().zip(order) {
         assert!(
@@ -70,6 +71,29 @@ fn the_thirteen_fields_report_in_the_frozen_order() {
             "expected {field}, got {line}"
         );
     }
+}
+
+#[test]
+fn the_catalog_line_reads_the_same_prompt_tools_as_the_page() {
+    let record = PromptTools {
+        hash: kernel::B3Hash::digest(b"tools"),
+        len: 1200,
+        index: 300,
+        reading: 400,
+        always: 4,
+        dormant: 18,
+        skills: 6,
+        rows: Vec::new(),
+    };
+    let tool = StatusTool::new(snapshot())
+        .unwrap()
+        .cataloging(Box::new(move || Some(record.clone())));
+    let value = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
+    assert!(
+        value["text"].as_str().unwrap().contains(
+            "catalog: 4 always, 18 dormant, 6 skills, 1200 core bytes, 300 index bytes, 400 reading bytes"
+        )
+    );
 }
 
 /// `children` was a hardcoded empty list, so a run that had just

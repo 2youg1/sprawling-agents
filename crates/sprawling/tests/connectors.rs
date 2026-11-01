@@ -491,6 +491,9 @@ fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
                 namespaces: [(NAMESPACE.to_owned(), Exposure::Off)].into(),
                 skills: std::collections::BTreeMap::new(),
             }),
+            mcp_references: None,
+            skill_pins: None,
+            reading_room: None,
             idem: idem(b"catalog"),
         }))
         .unwrap();
@@ -619,6 +622,13 @@ fn a_changed_tool_is_withheld_and_its_drift_is_recorded_only_once() {
             found: Some(_),
         } if name == OFFERED
     ));
+    let rows = apps_rows(dir.path());
+    let changed = rows.iter().find(|row| row.name == OFFERED).unwrap();
+    assert_eq!(changed.change, Some(wire::CatalogChange::Changed));
+    assert_eq!(changed.current.as_ref().unwrap().description, "new ping");
+    assert_eq!(changed.pinned.as_ref().unwrap().description, "old ping");
+    let unchanged = rows.iter().find(|row| row.name == "apps_pong").unwrap();
+    assert_eq!(unchanged.change, None);
 
     offered.lock().unwrap().clear();
     dispatch(&mut worker, "s3");
@@ -648,6 +658,35 @@ fn an_added_tool_is_withheld_until_it_is_admitted() {
             found: Some(_),
         } if name == "apps_new"
     ));
+    let rows = apps_rows(dir.path());
+    let added = rows.iter().find(|row| row.name == "apps_new").unwrap();
+    assert_eq!(added.change, Some(wire::CatalogChange::Added));
+    assert_eq!(added.current.as_ref().unwrap().description, "not admitted");
+    assert_eq!(added.pinned, None);
+
+    let mut reference = apps_reference(dir.path());
+    reference.tools.as_mut().unwrap().insert(
+        "apps_new".to_owned(),
+        added.current.as_ref().unwrap().digest,
+    );
+    worker
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+            addr: Address::parse(LAB).unwrap(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: Some(vec![reference]),
+            skill_pins: None,
+            reading_room: None,
+            idem: idem(b"accept-added-tool"),
+        }))
+        .unwrap();
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s3");
+    assert_only_namespace_count(&offered, 2);
+    assert!(apps_rows(dir.path()).iter().all(|row| row.change.is_none()));
 }
 
 #[test]
@@ -672,6 +711,14 @@ fn a_removed_tool_is_recorded_without_removing_its_pin() {
             found: None,
         } if name == "apps_pong"
     ));
+    let rows = apps_rows(dir.path());
+    let removed = rows.iter().find(|row| row.name == "apps_pong").unwrap();
+    assert_eq!(removed.change, Some(wire::CatalogChange::Removed));
+    assert_eq!(removed.current, None);
+    assert_eq!(
+        removed.pinned.as_ref().unwrap().description,
+        "unchanged pong"
+    );
 }
 
 #[test]
@@ -735,6 +782,46 @@ fn a_legacy_room_keeps_the_first_listing_it_adopted() {
         "the changed tool entered the already open room"
     );
     assert_eq!(catalog_drifts(dir.path()).len(), 1);
+}
+
+#[test]
+fn status_and_the_catalog_answer_read_one_frozen_count_table() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (dir, mut worker) = lab_city(
+        Box::new(Callers(Calling {
+            seen: Arc::clone(&seen),
+            tool: "status",
+            args: serde_json::json!({}),
+        })),
+        Box::new(Scripted(LISTING.to_owned())),
+    );
+    let dispatched = dispatch(&mut worker, "s1");
+    let wire::Answer::Catalog(catalog) = accounting::views::ask(
+        dir.path(),
+        &wire::Query::Catalog {
+            building: Address::parse(LAB).unwrap(),
+        },
+    )
+    .unwrap() else {
+        panic!("the catalog question did not answer Catalog")
+    };
+    let expected = format!(
+        "catalog: {} always, {} dormant, {} skills, {} core bytes, {} index bytes, {} reading bytes",
+        catalog.always,
+        catalog.dormant,
+        catalog.skills,
+        catalog.core_bytes,
+        catalog.index_bytes,
+        catalog.reading_bytes
+    );
+    let read = seen.lock().unwrap();
+    assert!(
+        read.read
+            .first()
+            .is_some_and(|text| text.contains(&expected)),
+        "status did not carry {expected:?}: {:?}; dispatch {dispatched}",
+        read.read
+    );
 }
 
 #[test]

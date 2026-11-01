@@ -101,6 +101,7 @@ impl Laying {
                 seen: &seen,
                 delegates: &delegates,
                 context: &context,
+                catalog: &catalog,
             },
         )?;
         let signal_tool = collab::SignalTool::new(Arc::clone(&desks.signals))?;
@@ -467,10 +468,20 @@ impl Laying {
                 )
             }),
         )?;
-        // The thirteenth line: what this run started and left running.
+        let catalog = Arc::clone(reach.catalog);
+        let read_catalog = move || match catalog.lock() {
+            Ok(catalog) => match catalog.tool_table() {
+                Ok(table) => Some(table.record),
+                Err(_unreadable) => None,
+            },
+            Err(_poisoned) => None,
+        };
+        // The last two lines: what this run started, and the one frozen
+        // `PromptTools` record the catalog page also answers from.
         Ok(tool
             .reporting(self.backlog.clone())
             .metering(reach.context.clone())
-            .clocked(site.clock.clone()))
+            .clocked(site.clock.clone())
+            .cataloging(Box::new(read_catalog)))
     }
 }

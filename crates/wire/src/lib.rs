@@ -50,7 +50,7 @@ pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use answer::{BYTES_WINDOW_MAX, BytesAnswer, DocumentVersion, ExportAnswer};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, FrozenNames, Note, Opening, Outcome, Output};
-pub use answer::{CatalogAnswer, CatalogTool};
+pub use answer::{CatalogAnswer, CatalogChange, CatalogSkill, CatalogTool, CatalogVersion};
 pub use answer::{CatalogSnapshot, LoginKind, LoginState, PinState};
 pub use answer::{CeilingLine, FigureFrom, FiguresAsked, FiguresLine};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};

@@ -316,6 +316,8 @@ pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     pub(super) context: &'a runtime::ContextReading,
+    /// The catalog whose frozen `PromptTools` status and the page share.
+    pub(super) catalog: &'a std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
 }
 
 /// Takes a desk, or says why it cannot be taken.

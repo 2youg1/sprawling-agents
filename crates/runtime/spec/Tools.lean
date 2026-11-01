@@ -84,7 +84,7 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 // 路径不存在而 old_string 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
 
-// crates/runtime/src/tools/status.rs —— 十三字段
+// crates/runtime/src/tools/status.rs —— 十四字段
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub policy: RunPolicy,
     pub ctx_limit: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree: PathBuf,
@@ -98,8 +98,9 @@ impl StatusTool {
     pub fn reporting(self, backlog: Backlog) -> StatusTool;   // §8-28-2：末行 `backlog:` 从表里现读，与 children 同一理由
     pub fn metering(self, context: ContextReading) -> StatusTool;   // `ctx:` 行的用量从运行的读数现读
     pub fn clocked(self, clock: ClockReading) -> StatusTool;        // `now:` 行从驱动最近的读数现读（§8-53）
+    pub fn cataloging(self, read: Box<dyn Fn() -> Option<PromptTools> + Send + Sync>) -> StatusTool; // `catalog:` 与 Query::Catalog 共读同一 ToolTable.record
 }
-impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
+impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾依次追加 backlog、catalog 两行 */ }
 
 // ToolBench 住 runtime::bench（§8-3）：按 Effect 过门是回合层的次序，工具本身以 Box<dyn Tool> 递入。
 
@@ -108,6 +109,7 @@ impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timest
 - **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，`crates/city/Spec.lean` §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
+- **`catalog` 是最后一个字段**：`always`、`dormant`、`skills`、`core_bytes`、`index_bytes` 与 `reading_bytes` 全部取装配时同一个 `Catalog::tool_table().record`，`Query::Catalog` 也读这份 `PromptTools`；页面与 status 不各算一张表。闭包在调用时读已冻好的记录，工具在冻结前构造时答 `catalog: not frozen`，不伪造零。
 - **`children` 是闭包而不是快照字段**：派活发生在 `status` 工具造好之后，一份开跑前拍的快照永远是空的。派生台住 `collab`，而 depmap 不允许 runtime 依赖 collab，故本模块只收一个答「现在派了哪些」的闭包，装配层把台接上去——与 `RunHooks` 四个闭包同一纪律：第二实现不存在时不引 trait。
 // runtime::compaction（形状 6 数据面＋形状 1 判定）
 pub enum Content { Prose, Code, Diff, Log, Structured, Table, Markup, Unknown }   // 八类，Unknown 与 Markup 各是其中之一

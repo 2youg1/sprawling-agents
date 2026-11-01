@@ -69,6 +69,25 @@ pub(super) fn shelve(
     Ok(())
 }
 
+/// Reads one admitted manifest and its SKILL.md through verified full
+/// reads, so the disclosure and document always come from one version.
+pub fn skill_document(
+    read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
+    digest: &B3Hash,
+    name: &str,
+) -> Result<String, AxError> {
+    let manifest = read_manifest(read, digest)?;
+    let document = manifest.document().ok_or_else(|| {
+        AxError::failure(
+            AxCode::CasCorrupt,
+            "read a skill from a shelf",
+            format!("{name} has no SKILL.md in its admitted manifest"),
+        )
+        .with_recovery("reinstall the skill through the city's install door")
+    })?;
+    read_text(read, document)
+}
+
 /// A full, verified manifest read, then the document it names. The index
 /// is trusted only as a locator, never as proof of the bytes.
 pub(super) fn read_manifest(

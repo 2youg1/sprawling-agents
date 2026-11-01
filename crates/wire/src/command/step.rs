@@ -148,6 +148,13 @@ pub struct BuildingSettings {
     /// building stated before; an empty table takes the key out, so the
     /// building follows the city's again (`crates/wire/spec/Answer/Catalog.lean` §8-99).
     pub catalog: Option<kernel::config::ExposureTable>,
+    /// The building's whole connector references and approved versions.
+    /// An empty list explicitly selects none rather than inheriting.
+    pub mcp_references: Option<Vec<kernel::McpReference>>,
+    /// The building's whole Reading Room pins; empty explicitly pins none.
+    pub skill_pins: Option<std::collections::BTreeMap<String, kernel::B3Hash>>,
+    /// The Reading Room's whole name list, written through the RULES door.
+    pub reading_room: Option<Vec<String>>,
     pub idem: IdemKey,
 }
 

@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 73,
+        WIRE_V, 74,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "4e33acd116e27ade6d257264340b4b20666133174a9d6c6ad3ac2f30595d04cd";
+const WIRE_SCHEMA_GOLDEN: &str = "aa2e307bd8b94906f470d0a2980832dc481260f94118862edba51bb878545726";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -481,6 +481,9 @@ title = \"a window\"
                 namespaces: [("apps".to_owned(), kernel::config::Exposure::Off)].into(),
                 skills: std::collections::BTreeMap::new(),
             }),
+            mcp_references: None,
+            skill_pins: None,
+            reading_room: None,
             idem,
         }),
         Command::ProbeEndpoint {

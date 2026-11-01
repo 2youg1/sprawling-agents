@@ -72,7 +72,7 @@ pub use agents::{
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine, TemplateAnswer};
-pub use catalog::{CatalogAnswer, CatalogTool};
+pub use catalog::{CatalogAnswer, CatalogChange, CatalogSkill, CatalogTool, CatalogVersion};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,

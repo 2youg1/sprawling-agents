@@ -7,7 +7,7 @@
 //! shelves read only to discover candidates and drift.
 
 use kernel::event::record::{CatalogDrift, CatalogSubject};
-use kernel::{Address, AxCode, AxError, B3Hash, SkillManifest};
+use kernel::{Address, AxCode, AxError, B3Hash};
 
 use super::held;
 use crate::worker::workbench::{Laying, Site};
@@ -89,7 +89,11 @@ impl Laying {
                     .with_recovery("start the run again to scan and admit one version"));
                 }
             }
-            let document = skill_document(&cas, &digest, name)?;
+            let document = city::skill_document(
+                &|digest| cas.get(digest).map_err(storage::StorageError::into_ax),
+                &digest,
+                name,
+            )?;
             held(catalog, "admit the reading room")?.admit_skill(runtime::CatalogEntry {
                 name: name.clone(),
                 disclosure: city::skill_disclosure(&document),
@@ -104,27 +108,4 @@ impl Laying {
         }
         Ok(())
     }
-}
-
-/// Reads SKILL.md through the same verified manifest as the run's other
-/// package files. The disclosure and full text therefore share one version.
-fn skill_document(cas: &storage::Cas, digest: &B3Hash, name: &str) -> Result<String, AxError> {
-    let manifest =
-        SkillManifest::decode(&cas.get(digest).map_err(storage::StorageError::into_ax)?)?;
-    let document = manifest.document().ok_or_else(|| {
-        AxError::failure(
-            AxCode::CasCorrupt,
-            "read a skill from a shelf",
-            format!("{name} has no SKILL.md in its admitted manifest"),
-        )
-        .with_recovery("reinstall the skill through the city's install door")
-    })?;
-    String::from_utf8(cas.get(document).map_err(storage::StorageError::into_ax)?).map_err(|_| {
-        AxError::failure(
-            AxCode::CasCorrupt,
-            "read a skill from a shelf",
-            format!("{name}'s SKILL.md is not UTF-8"),
-        )
-        .with_recovery("reinstall the skill as UTF-8 text through the install door")
-    })
 }

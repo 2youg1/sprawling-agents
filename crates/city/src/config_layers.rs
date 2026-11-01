@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use kernel::config::{SearchConfiguration, StatedConfig};
 use kernel::{
     Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, McpLayer,
-    SandboxLimits, SecondThreshold, ServerLabel,
+    McpReference, SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
 
@@ -331,6 +331,25 @@ impl ConfigLayer {
 /// Refuses an address with no building, an unreadable file, and a file
 /// that does not parse. A missing file is not an error: it is the
 /// ordinary case.
+/// Validates a replacement building reference table through the same
+/// ladder and connector resolver a later run will use.
+fn check_mcp_references(
+    city_root: &Path,
+    building: &Address,
+    references: &[McpReference],
+) -> Result<(), AxError> {
+    let ladder = Ladder::read(city_root, building)?;
+    let mut mcp = ladder.resolve(|layer| layer.mcp().cloned());
+    let mut layer = mcp.building.take().unwrap_or_default();
+    layer.references = Some(references.to_vec());
+    mcp.building = Some(layer);
+    kernel::config::freeze(&StatedConfig {
+        mcp,
+        ..StatedConfig::default()
+    })
+    .map(|_| ())
+}
+
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
     kernel::config::freeze(&StatedConfig {

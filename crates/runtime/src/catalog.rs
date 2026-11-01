@@ -35,6 +35,7 @@ mod fit;
 mod guide;
 mod namespace;
 
+pub use dormant::hint;
 pub use guide::{FIND_HITS, LIST_CEILING};
 pub use namespace::Namespace;
 
