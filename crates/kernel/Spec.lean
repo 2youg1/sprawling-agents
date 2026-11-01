@@ -41,6 +41,7 @@ import crates.kernel.spec.Retries
 import crates.kernel.spec.Schema
 import crates.kernel.spec.Secret
 import crates.kernel.spec.Share
+import crates.kernel.spec.Skill
 import crates.kernel.spec.Spine
 import crates.kernel.spec.Stall
 import crates.kernel.spec.Taint

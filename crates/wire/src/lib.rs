@@ -89,9 +89,8 @@ pub use answer::{PromptKind, PromptLayer, ShippedDefault};
 pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{RunSummary, Waiting};
-pub use answer::{
-    SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionRef, SessionStart, SessionsAnswer,
-};
+pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX};
+pub use answer::{SessionLine, SessionRef, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSearch, SettledSecond, SupplierAccounts};
 pub use answer::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use answer::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
