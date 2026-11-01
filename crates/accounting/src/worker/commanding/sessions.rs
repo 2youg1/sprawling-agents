@@ -37,7 +37,9 @@
 //! thing that can be done (`crates/sprawling/Spec.lean` §8-82).
 
 use kernel::event::Who;
-use kernel::event::record::{RunPolicyChanged, SessionNamed, SessionOpened};
+use kernel::event::record::{
+    ModelCalled, RunPolicyChanged, RunStarted, SessionNamed, SessionOpened,
+};
 use kernel::{Address, AxCode, AxError, EventKind, Payload, Seq};
 
 use super::super::RunWorker;
@@ -82,6 +84,14 @@ impl RunWorker {
             // dispatchable again, and a person who carries the summary
             // changed the model. Only the handoff slot is kept.
             wire::Carry::Handoff => city::forget_shape(&self.city_root, addr)?,
+        }
+        if let Some(origin) = from
+            && let Some(shape) = self.origin_shape(origin)?
+        {
+            city::write_session(&self.city_root, addr, &shape.model, shape.effort)?;
+            if let Some(naming) = shape.naming {
+                city::freeze_naming(&self.city_root, addr, naming)?;
+            }
         }
         // Read after the act rather than before it: `Nothing` has just
         // removed the file, and asking first would answer about a slot
@@ -153,7 +163,46 @@ impl RunWorker {
     }
 }
 
+struct SessionShape {
+    model: String,
+    effort: Option<kernel::Effort>,
+    naming: Option<kernel::B3Hash>,
+}
+
 impl RunWorker {
+    /// The shape the mother run froze, read from that run's own lines.
+    /// The branch point can precede the first model call, so the search
+    /// covers the whole run rather than only the prefix being inherited.
+    fn origin_shape(&mut self, origin: kernel::Origin) -> Result<Option<SessionShape>, AxError> {
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
+        let seqs: Vec<Seq> = self.index.run_seqs_before(origin.run, None).collect();
+        let mut model = None;
+        for at in seqs {
+            let bytes = self
+                .index
+                .reader(&dir)
+                .line_at(at)
+                .map_err(storage::StorageError::into_ax)?;
+            let line = storage::read_line(&bytes)
+                .map_err(|fault| fault.into_ax(at.value().saturating_add(1)))?;
+            if let storage::CheckedLine::Known(record) = line
+                && record.run() == origin.run
+            {
+                if record.kind() == EventKind::ModelCalled && model.is_none() {
+                    model = Some(record.data().read::<ModelCalled>()?.model);
+                } else if record.kind() == EventKind::RunStarted {
+                    let started = record.data().read::<RunStarted>()?;
+                    return Ok(model.map(|model| SessionShape {
+                        model,
+                        effort: started.effort,
+                        naming: started.naming,
+                    }));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     /// Refuses a branch that names a line this history does not have, or
     /// a line of another run.
     ///

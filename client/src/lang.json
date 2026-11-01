@@ -9907,6 +9907,34 @@
     "en": "sessions",
     "zh": "会话"
   },
+  "world_expand": {
+    "en": "expand child sessions",
+    "zh": "展开子会话"
+  },
+  "world_collapse": {
+    "en": "collapse child sessions",
+    "zh": "折叠子会话"
+  },
+  "world_read_session": {
+    "en": "read without branching",
+    "zh": "只读查看"
+  },
+  "world_session_switcher": {
+    "en": "switch session",
+    "zh": "切换会话"
+  },
+  "world_session_filter": {
+    "en": "filter sessions",
+    "zh": "筛选会话"
+  },
+  "world_session_branch": {
+    "en": "{title} · branch at line {at}",
+    "zh": "{title} · 分支自第 {at} 行"
+  },
+  "world_session_child": {
+    "en": "{title} · delegated child session",
+    "zh": "{title} · 委派子会话"
+  },
   "world_commits": {
     "en": "commits",
     "zh": "提交"

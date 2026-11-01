@@ -13,6 +13,7 @@ row's menu key shows on hover, on focus and on the row in main. Every
 link, role and `aria-*` value comes in the bags. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
+  import Button from "../parts/button.svelte";
   import Tip from "../parts/tip.svelte";
   import ContextBar from "./context_bar.svelte";
   import SessionMenu from "./session_menu.svelte";
@@ -37,86 +38,111 @@ link, role and `aria-*` value comes in the bags. -->
 chosen bar stand outside the text; the column that scrolls is widened
 by that step into the pane's own inset, so the pane clips neither. -->
 <div class="-mx-snug min-h-0 flex-1 overflow-y-auto px-snug">
-  {#each look.groups as group (group.key)}
-    <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">{group.heading}</h3>
-    <ul>
-      {#each group.rows as row (row.key)}
-        <li
+  <ul>
+    {#each look.rows as row (row.key)}
+      <li
+        class={[
+          "row group relative -mx-snug flex items-start rounded-card",
+          row.chosen ? "here wash-strong" : "hover:wash",
+        ]}
+      >
+        {#if row.disclosure !== undefined}
+          <button
+            {...row.disclosure}
+            class="mt-snug grid size-control-sm shrink-0 place-items-center rounded-control text-text-faint hover:wash hover:text-text"
+            style:margin-inline-start={`calc(${String(row.depth)} * var(--spacing-base))`}
+          >
+            <span class={row.disclosure["aria-expanded"] ? "rotate-90" : ""}>
+              <Glyph name="chevron" size="sm" />
+            </span>
+          </button>
+        {:else}
+          <span
+            class="w-control-sm shrink-0"
+            style:margin-inline-start={`calc(${String(row.depth)} * var(--spacing-base))`}
+          ></span>
+        {/if}
+        <a {...row.link} class="cells grid min-w-0 flex-1 gap-x-base rounded-card px-snug py-snug">
+          <span class="dot mt-snug size-dot rounded-pill" data-dot={row.dot} aria-hidden="true"
+          ></span>
+          <span class="flex min-w-0 items-center gap-tight">
+            <span
+              class={["truncate font-label", row.current ? "text-text" : "text-text-quiet"]}
+              title={row.room}>{row.title}</span
+            >
+            {#if row.pin !== undefined}
+              <Tip text={row.pin.hint}>
+                <span {...row.pin.wire} class="flex shrink-0 text-text-faint">
+                  <Glyph name="pin" size="sm" />
+                </span>
+              </Tip>
+            {/if}
+          </span>
+          {#if !look.narrow}
+            <span class="figure text-note text-text-faint">{row.when ?? ""}</span>
+            {#if row.phase !== undefined}
+              <span class="col-start-2 col-end-4 truncate text-note text-text-quiet"
+                >{row.phase}</span
+              >
+            {/if}
+            {#if row.delegated !== undefined}
+              <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
+                >{row.delegated}</span
+              >
+            {/if}
+            {#if row.about !== undefined}
+              <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet"
+                >{row.about}</span
+              >
+            {/if}
+            {#if row.ranOn !== undefined}
+              <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
+                >{row.ranOn}</span
+              >
+            {/if}
+            {#if row.tags.length > 0}
+              <span class="col-start-2 col-end-4 mt-tight flex flex-wrap gap-tight">
+                {#each row.tags as tag (tag)}
+                  <span
+                    class="rounded-pill border border-edge-panel px-tight text-note text-text-faint"
+                    >{tag}</span
+                  >
+                {/each}
+              </span>
+            {/if}
+            {#if row.context !== undefined}
+              <ContextBar room={row.context.room} run={row.context.run} />
+            {/if}
+          {/if}
+        </a>
+        <div
           class={[
-            "row group relative -mx-snug flex items-start rounded-card",
-            row.chosen ? "here wash-strong" : "hover:wash",
+            "shrink-0 pt-tight pr-tight",
+            row.chosen
+              ? ""
+              : "opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive",
           ]}
         >
-          <a
-            {...row.link}
-            class="cells grid min-w-0 flex-1 gap-x-base rounded-card px-snug py-snug"
-          >
-            <span class="dot mt-snug size-dot rounded-pill" data-dot={row.dot} aria-hidden="true"
-            ></span>
-            <span class="flex min-w-0 items-center gap-tight">
-              <span
-                class={["truncate font-label", row.current ? "text-text" : "text-text-quiet"]}
-                title={row.room}>{row.title}</span
-              >
-              {#if row.pin !== undefined}
-                <Tip text={row.pin.hint}>
-                  <span {...row.pin.wire} class="flex shrink-0 text-text-faint">
-                    <Glyph name="pin" size="sm" />
-                  </span>
-                </Tip>
-              {/if}
-            </span>
-            {#if !look.narrow}
-              <span class="figure text-note text-text-faint">{row.when ?? ""}</span>
-              {#if row.phase !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet"
-                  >{row.phase}</span
-                >
-              {/if}
-              {#if row.delegated !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
-                  >{row.delegated}</span
-                >
-              {/if}
-              {#if row.about !== undefined}
-                <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet"
-                  >{row.about}</span
-                >
-              {/if}
-              {#if row.ranOn !== undefined}
-                <span class="col-start-2 col-end-4 truncate text-note text-text-faint"
-                  >{row.ranOn}</span
-                >
-              {/if}
-              {#if row.tags.length > 0}
-                <span class="col-start-2 col-end-4 mt-tight flex flex-wrap gap-tight">
-                  {#each row.tags as tag (tag)}
-                    <span
-                      class="rounded-pill border border-edge-panel px-tight text-note text-text-faint"
-                      >{tag}</span
-                    >
-                  {/each}
-                </span>
-              {/if}
-              {#if row.context !== undefined}
-                <ContextBar room={row.context.room} run={row.context.run} />
-              {/if}
-            {/if}
-          </a>
+          <SessionMenu {...row.menu} />
+        </div>
+        {#if row.note !== null}
           <div
-            class={[
-              "shrink-0 pt-tight pr-tight",
-              row.chosen
-                ? ""
-                : "opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive",
-            ]}
+            class="flex w-full flex-wrap items-center gap-snug pb-snug pl-base text-note text-text-quiet"
+            aria-live="polite"
           >
-            <SessionMenu {...row.menu} />
+            <span>{row.note.said}</span>
+            {#if row.note.stop !== null}
+              <Button
+                label={row.note.stop.label}
+                name={row.note.stop.name}
+                onPress={row.note.stop.onPress}
+              />
+            {/if}
           </div>
-        </li>
-      {/each}
-    </ul>
-  {/each}
+        {/if}
+      </li>
+    {/each}
+  </ul>
 </div>
 
 <style>

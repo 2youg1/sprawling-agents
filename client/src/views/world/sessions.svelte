@@ -30,14 +30,18 @@
   import type { Snippet } from "svelte";
 
   import { say } from "../../core/lang";
-  import { grouped, pinningOf } from "../../core/stretches";
+  import { collapsedOf, sessionTree } from "../../core/session_tree";
+  import { pinningOf, tailOf } from "../../core/stretches";
   import type { Stretch } from "../../core/stretches";
   import { inUse, namedIn, tagsOf } from "../../core/tags";
+  import { newestWorking } from "../../core/belief/live";
+  import { cancel } from "../../core/commands";
   import type { Named } from "../../core/tags";
   import { ui } from "../../ui";
   import type { Address, Seq, Tag } from "../../wire";
   import { ticker } from "../talk/timing";
   import { filterOf, rowOf } from "./sessions";
+  import { branchFrom } from "../talk/branching";
   import type { SessionsLook } from "./sessions";
   import Look from "./sessions.look.svelte";
   import { askStretches } from "./stretches.svelte";
@@ -81,7 +85,13 @@
   let filter = $state<Tag | null>(null);
   const offered = $derived(city === null ? [] : inUse(stretches.all.map(tagsFor)));
   const by = $derived(filter !== null && offered.includes(filter) ? filter : null);
-  const groups = $derived(grouped(stretches.all, tagsFor, by));
+  const filtered = $derived(
+    by === null ? stretches.all : stretches.all.filter((stretch) => tagsFor(stretch).includes(by)),
+  );
+  const branching = u.branches.held;
+  let overrides = $state<Readonly<Record<string, boolean>>>({});
+  const collapsed = $derived(collapsedOf(filtered, overrides));
+  const rows = $derived(sessionTree(filtered, collapsed));
 
   function chosen(stretch: Stretch): boolean {
     return (
@@ -100,21 +110,36 @@
       },
     ),
     narrow,
-    groups: groups.map((group) => ({
-      key: group.kind === "pinned" ? "" : group.building,
-      heading: group.kind === "pinned" ? say($lang, "world_pinned") : group.building,
-      rows: group.rows.map((stretch) => {
-        const tags = tagsFor(stretch);
-        return rowOf(stretch, {
-          lang: $lang,
-          now: $tick,
-          chosen: chosen(stretch),
-          tags,
-          pinning: pinningOf(stretch, tags),
-          named: named(stretch),
-        });
-      }),
-    })),
+    rows: rows.map((node) => {
+      const stretch = node.stretch;
+      const tags = tagsFor(stretch);
+      const origin = tailOf(stretch);
+      const going = newestWorking($belief, stretch.room);
+      return rowOf(stretch, {
+        lang: $lang,
+        now: $tick,
+        chosen: chosen(stretch),
+        tags,
+        pinning: pinningOf(stretch, tags),
+        named: named(stretch),
+        depth: node.depth,
+        children: node.children,
+        collapsed: collapsed.has(node.key),
+        onToggle: () => {
+          overrides = { ...overrides, [node.key]: !collapsed.has(node.key) };
+        },
+        branch: origin === null ? { kind: "none" } : branchFrom($branching, stretch.room, origin),
+        open: (from) => {
+          u.branches.open(stretch.room, { kind: "branch", origin: from }, () => undefined);
+        },
+        stop:
+          going === undefined
+            ? null
+            : () => {
+                u.send(cancel(going.run));
+              },
+      });
+    }),
   });
 </script>
 

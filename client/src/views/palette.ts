@@ -13,9 +13,11 @@ import type { Lang } from "../core/lang";
 import { completed } from "../core/completion";
 import type { View } from "../core/route";
 import { buildingOf, readWorkspace, toFragment, workspaceDestination } from "../core/route";
+import { sessionTree } from "../core/session_tree";
+import { stretchesOf, tailOf } from "../core/stretches";
 import type { BuildingProgress } from "../wire";
 import { ago } from "../core/time";
-import type { Address, Seq, SessionLine } from "../wire";
+import type { Address, Origin, Seq, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
 import { rowId } from "./palette/rows";
 
@@ -102,6 +104,7 @@ export interface SessionPlace {
   readonly label: string;
   readonly hint: string;
   readonly to: View;
+  readonly origin: Origin | null;
 }
 
 // Where the palette stands: the room, and the earlier session main shows
@@ -126,21 +129,24 @@ export function sessionPlaces(
   lang: Lang,
   now: number,
 ): SessionPlace[] {
-  return lines.map((line, index) => {
+  const stretches = stretchesOf([{ room: at.room, sessions: lines, earlier: 0 }], () => []);
+  return sessionTree(stretches, new Set()).map((node) => {
+    const { stretch, depth } = node;
+    const line = stretch.line;
     const named = line.name ?? line.preview ?? "";
-    const kind =
-      index === 0
-        ? "palette_session_current"
-        : line.began === at.viewing
-          ? "palette_session_shown"
-          : "palette_session";
+    const kind = stretch.current
+      ? "palette_session_current"
+      : line.began === at.viewing
+        ? "palette_session_shown"
+        : "palette_session";
+    const label = named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`;
     return {
-      label: named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`,
-      hint: index === 0 ? say(lang, kind) : `${say(lang, kind)} · ${ago(lang, line.at, now)}`,
-      to:
-        index === 0
-          ? { kind: "talk", address: at.room }
-          : { kind: "talk", address: at.room, session: line.began },
+      label: `${"  ".repeat(depth)}${label}`,
+      hint: stretch.current ? say(lang, kind) : `${say(lang, kind)} · ${ago(lang, line.at, now)}`,
+      to: stretch.current
+        ? { kind: "talk", address: at.room }
+        : { kind: "talk", address: at.room, session: line.began },
+      origin: stretch.current ? null : tailOf(stretch),
     };
   });
 }

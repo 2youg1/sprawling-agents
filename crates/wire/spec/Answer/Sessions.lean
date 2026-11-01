@@ -79,6 +79,17 @@ pub struct SessionLine {
 **重开参数**：页面要一段里多个模型的历史时（会话中不换模型，今天只有一个），`model` 改成表。
 -/
 
+/-! D64 每段 session 带父会话、分支点与可直接分支的末尾
+
+**决定**：`SessionLine` 多三件可缺字段：`parent: Option<SessionRef>`（分支的母会话，或委派 run 的父会话）、`branched_from: Option<Origin>`（`session_opened.from` 原样）、`tail: Option<Origin>`（这一段最后一个 run 的最后一行）。`SessionRef { room, began }` 唯一指到另一段。视图在折叠时另按 run 记它所属的会话，所以父关系不依赖页面持有哪些 run。`WIRE_V` 进一位。
+
+**理由**：会话栏与 zen 切换器要同一棵跨楼树，任何过去的一段都要能从末尾直接分支。`last` 可能是 `session_named` 等城自己写的行，不能冒充 run 的 `Origin`；只有 `tail` 保证 `origin_is_real` 接受的 run 与 seq 配对。
+
+**被击败的备选**：页面从 belief 里的 run 反推父会话与 tail——重载或热窗口裁掉旧 run 后，同一座城会画出另一棵树，部分行只剩只读。
+
+**重开参数**：一个 session 可由多个父会话共同产生时，`parent` 改成表。
+-/
+
 /-! D40 一个被派出的 run 说出派它的 run；一段由派活打开的 session 说出是谁派的
 
 **决定**：`Opening` 多一件 `#[serde(default)] parent: Option<RunId>`，原样读自这个 run 的 `run_started.parent`；`SessionStart::Dispatched` 由单元臂改成 `Dispatched { by: Option<Who> }`，`by` 读自这一段第一个 `run_started` 的 `dispatched_by`。两处都只读账本已经写下的那一行，旧行没有这个键时为 `None`，页面不猜。改形，`WIRE_V` 进一位。

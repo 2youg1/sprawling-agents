@@ -122,7 +122,9 @@ pub use rounds::{
 };
 pub use run_summary::{RunSummary, Waiting};
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
-pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+pub use sessions::{
+    SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionRef, SessionStart, SessionsAnswer,
+};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use thinking::{EffortWord, OfferSource, Switch, ThinkingOffer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};

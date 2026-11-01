@@ -46,6 +46,13 @@ const at = (over: Partial<RowContext>): RowContext => ({
   tags: [],
   pinning: "none",
   named: null,
+  depth: 0,
+  children: false,
+  collapsed: false,
+  onToggle: () => undefined,
+  branch: { kind: "none" },
+  open: () => undefined,
+  stop: null,
   ...over,
 });
 

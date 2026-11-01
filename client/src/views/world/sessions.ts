@@ -14,11 +14,16 @@ import type { RunBelief } from "../../core/belief";
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import { roomOf, toFragment } from "../../core/route";
+import type { View } from "../../core/route";
 import type { Pinning, Stretch } from "../../core/stretches";
+import { tailOf } from "../../core/stretches";
 import { PIN } from "../../core/tags";
 import type { Named } from "../../core/tags";
 import { ago, lasted } from "../../core/time";
-import type { Address, RunId, Tag } from "../../wire";
+import type { Address, Origin, RunId, Tag } from "../../wire";
+import type { BranchHere } from "../talk/branching";
+import { noteOf } from "../talk/branch_note";
+import type { BranchNote } from "../talk/branch_note";
 import { phaseSaid } from "../runs/phase";
 import { called, dispatcherOf } from "../talk/naming";
 
@@ -66,6 +71,15 @@ export interface ToggleLook {
 export interface LinkWire {
   readonly href: string;
   readonly "aria-current": "page" | undefined;
+  readonly "aria-busy": boolean;
+  readonly onclick: (event: MouseEvent) => void;
+}
+
+export interface DisclosureWire {
+  readonly type: "button";
+  readonly "aria-label": string;
+  readonly "aria-expanded": boolean;
+  readonly onclick: () => void;
 }
 
 // The pin a pinned row carries: a mark with a name, and the hint that
@@ -82,6 +96,8 @@ export interface MenuProps {
   readonly tags: readonly Tag[];
   readonly pinning: Pinning;
   readonly session: { readonly name: string; readonly run: RunId | null };
+  // The read-only bypass; null for the room's current session.
+  readonly read: View | null;
 }
 
 // The row of the session in main names it and says nothing else about it
@@ -95,6 +111,8 @@ export interface MenuProps {
 // its title, its pin, its tags, and how long a running one has run.
 export interface RowLook {
   readonly key: string;
+  readonly depth: number;
+  readonly disclosure: DisclosureWire | undefined;
   readonly link: LinkWire;
   // Whether this row's session is the one in main.
   readonly chosen: boolean;
@@ -121,12 +139,8 @@ export interface RowLook {
   // for a current session that holds one and is not the chosen row.
   readonly context: { readonly room: Address; readonly run: RunId } | undefined;
   readonly menu: MenuProps;
-}
-
-export interface GroupLook {
-  readonly key: string;
-  readonly heading: string;
-  readonly rows: readonly RowLook[];
+  // Opening or refusal beside this row, never a toast that moves main.
+  readonly note: BranchNote | null;
 }
 
 export interface SessionsLook {
@@ -136,7 +150,7 @@ export interface SessionsLook {
   // Whether the pane is as narrow as the right pane leaves it, which
   // drops the second line and the time.
   readonly narrow: boolean;
-  readonly groups: readonly GroupLook[];
+  readonly rows: readonly RowLook[];
 }
 
 // What a row is read from beyond its session.
@@ -148,6 +162,13 @@ export interface RowContext {
   readonly tags: readonly Tag[];
   readonly pinning: Pinning;
   readonly named: Named | null;
+  readonly depth: number;
+  readonly children: boolean;
+  readonly collapsed: boolean;
+  readonly onToggle: () => void;
+  readonly branch: BranchHere;
+  readonly open: (origin: Origin) => void;
+  readonly stop: (() => void) | null;
 }
 
 export function rowOf(stretch: Stretch, at: RowContext): RowLook {
@@ -158,7 +179,26 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
   const told = at.chosen ? undefined : toldOf(stretch, dot, at);
   return {
     key: `${stretch.room}:${String(stretch.line.began)}`,
-    link: { href: hrefOf(stretch), "aria-current": at.chosen ? "page" : undefined },
+    depth: at.depth,
+    disclosure: at.children
+      ? {
+          type: "button",
+          "aria-label": say(lang, at.collapsed ? "world_expand" : "world_collapse"),
+          "aria-expanded": !at.collapsed,
+          onclick: at.onToggle,
+        }
+      : undefined,
+    link: {
+      href: hrefOf(stretch),
+      "aria-current": at.chosen ? "page" : undefined,
+      "aria-busy": at.branch.kind === "opening",
+      onclick: (event) => {
+        const origin = tailOf(stretch);
+        if (stretch.current || origin === null) return;
+        event.preventDefault();
+        at.open(origin);
+      },
+    },
     chosen: at.chosen,
     dot: at.chosen ? undefined : dot,
     title,
@@ -181,7 +221,11 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
       tags: at.tags,
       pinning: at.pinning,
       session: { name: stretch.line.name ?? "", run: stretch.current ? (last?.run ?? null) : null },
+      read: stretch.current
+        ? null
+        : { kind: "talk", address: stretch.room, session: stretch.line.began },
     },
+    note: noteOf(at.branch, stretch.room, lang, at.stop),
   };
 }
 

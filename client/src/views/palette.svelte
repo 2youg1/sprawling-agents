@@ -82,7 +82,7 @@
   import Rows from "./palette/rows.svelte";
   import Listening from "./talk/listening.svelte";
   import { noteOf, waitWhy } from "./talk/branch_note";
-  import { branchInto } from "./talk/branching";
+  import { branchFrom, branchInto } from "./talk/branching";
   import { askToSpeak } from "./talk/speak_asked";
   import { sessionHands } from "./talk/session_hands";
 
@@ -92,6 +92,7 @@
   const held = u.prefs.held;
   const effort = u.effort;
   const policy = u.policy;
+  const branching = u.branches.held;
 
   interface Props {
     readonly onClose: () => void;
@@ -109,6 +110,7 @@
 
   const { onClose, seat = "modal", here: named, arrival = "keys", initial = "" }: Props = $props();
 
+  // svelte-ignore state_referenced_locally (a fixture's initial text is captured once)
   let query = $state(initial);
   let cursor = $state(0);
   // Whether the list is the rooms this conversation can be carried to.
@@ -196,11 +198,27 @@
     // address line was pressed for (client/Spec.lean 4-10a).
     // While nothing is typed only the newest few are listed (`SESSIONS_AT_REST`).
     const viewing = viewed?.kind === "talk" ? viewed.session : undefined;
+    const room = here;
     const sessions = (
-      here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now())
+      room === null ? [] : sessionPlaces({ room, viewing }, sessionLines, $lang, u.now())
     )
       .filter((place, at) => at < SESSIONS_AT_REST || query.trim() !== "")
-      .map((place) => goTo(place.to, place.label, place.hint));
+      .map((place): Entry => {
+        const origin = place.origin;
+        const opening = origin === null ? null : branchFrom($branching, room ?? MAYOR, origin);
+        const note = opening === null ? null : noteOf(opening, room ?? MAYOR, $lang, null);
+        return {
+          label: place.label,
+          hint: note?.said ?? place.hint,
+          to: place.to,
+          why: opening === null ? undefined : waitWhy(opening),
+          keeps: origin === null ? undefined : true,
+          act: () => {
+            if (origin === null) u.go(place.to);
+            else u.branches.open(room ?? MAYOR, { kind: "branch", origin }, onClose);
+          },
+        };
+      });
     const carry: Entry[] =
       carryFrom === null
         ? []
@@ -379,7 +397,6 @@
   // The rooms this conversation can go to, while `carrying`. The box
   // stays open until the city opens the branch, so the row that sent it
   // can say it is opening, or why the city refused it (4-64b).
-  const branching = u.branches.held;
   const carried = $derived.by((): Entry[] => {
     const from = carryFrom;
     if (!carrying || here === null || from === null) return [];

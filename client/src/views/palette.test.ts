@@ -208,16 +208,23 @@ describe("the sessions of the room main stands in", () => {
       61_000,
     );
     expect(places).toEqual([
-      { label: "#40 · reconcile", hint: "current session", to: { kind: "talk", address: ROOM } },
+      {
+        label: "#40 · reconcile",
+        hint: "current session",
+        to: { kind: "talk", address: ROOM },
+        origin: null,
+      },
       {
         label: "#23 · the ledger is short",
         hint: "shown now · 1 min ago",
         to: { kind: "talk", address: ROOM, session: Seq.make(23) },
+        origin: null,
       },
       {
         label: "#9",
         hint: "session · 1 min ago",
         to: { kind: "talk", address: ROOM, session: Seq.make(9) },
+        origin: null,
       },
     ]);
   });

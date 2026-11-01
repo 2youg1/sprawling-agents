@@ -71,6 +71,25 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
     );
 }
 
+/// A branch restores the mother's frozen model, effort and identity
+/// rather than keeping the shape of the session it replaces.
+#[test]
+fn a_branch_restores_the_mothers_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut worker, started, _provider) = a_mother_ran(dir.path());
+    let room = addr("lab/room2");
+    city::write_session(dir.path(), &room, "m-other", Some(kernel::Effort::Low)).unwrap();
+
+    worker
+        .open_session(&room, wire::Carry::Nothing, Some(started))
+        .unwrap();
+
+    let own = city::own_layer(dir.path(), &room).unwrap();
+    assert_eq!(own.model(), Some("m-local"));
+    assert_eq!(own.effort(), None, "an unstated effort stays unstated");
+    assert!(own.naming().is_some());
+}
+
 /// A line at the origin that is no record at all is a damaged ledger,
 /// not a line of some other run, and the refusal says so with the code
 /// that sends the person to the ledger rather than to the branch.

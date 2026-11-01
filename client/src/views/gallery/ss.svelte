@@ -254,6 +254,7 @@
       tags={[]}
       pinning="none"
       session={{ name: "", run: null }}
+      read={null}
     />
   </div>
 </Case>

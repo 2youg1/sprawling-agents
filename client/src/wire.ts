@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 71 as const;
+export const WIRE_V = 72 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "8f3b5e976be5480948d7d16772e20267e66466b6ecb99ce33407a1f270e22389" as const;
+export const WIRE_HASH = "5b01613af1bb74f4bc51cf454c0517b8f0186a27ab3899a46bcd8708305da49e" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -4480,22 +4480,6 @@ export const RunCostsAnswer = Schema.Struct({
 export type RunCostsAnswer = typeof RunCostsAnswer.Type;
 
 /**
- * What a new session at an address keeps from the previous one.
- * 
- * An enum rather than a flag: the two states are named actions with
- * different results on disk, and `carry: true` at a call site says
- * neither of them. `Nothing` is the first variant and the default,
- * because that is what a person means by starting a new session — a
- * new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
- * handoff is the exception a person states.
- */
-export const Carry = Schema.Union([
-  Schema.Literal("nothing"),
-  Schema.Literal("handoff"),
-]).annotate({ identifier: "Carry" });
-export type Carry = typeof Carry.Type;
-
-/**
  * Where a session branched off: one run of this city, and the line in
  * it that the branch starts after.
  * 
@@ -4514,6 +4498,32 @@ export const Origin = Schema.Struct({
   run: RunId,
 }).annotate({ identifier: "Origin" });
 export type Origin = typeof Origin.Type;
+
+/**
+ * A session another line points at: the room and the line its stretch
+ * began at. The pair is stable across reloads and hot-view truncation.
+ */
+export const SessionRef = Schema.Struct({
+  began: Seq,
+  room: Address,
+}).annotate({ identifier: "SessionRef" });
+export type SessionRef = typeof SessionRef.Type;
+
+/**
+ * What a new session at an address keeps from the previous one.
+ * 
+ * An enum rather than a flag: the two states are named actions with
+ * different results on disk, and `carry: true` at a call site says
+ * neither of them. `Nothing` is the first variant and the default,
+ * because that is what a person means by starting a new session — a
+ * new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
+ * handoff is the exception a person states.
+ */
+export const Carry = Schema.Union([
+  Schema.Literal("nothing"),
+  Schema.Literal("handoff"),
+]).annotate({ identifier: "Carry" });
+export type Carry = typeof Carry.Type;
 
 /**
  * How a stretch began.
@@ -4540,13 +4550,16 @@ export type SessionStart = typeof SessionStart.Type;
 export const SessionLine = Schema.Struct({
   at: TimeMs,
   began: Seq,
+  branched_from: Schema.optional(Schema.NullOr(Origin)),
   effort: Schema.optional(Schema.NullOr(Effort)),
   last: Seq,
   model: Schema.optional(Schema.NullOr(Schema.String)),
   name: Schema.optional(Schema.NullOr(Schema.String)),
+  parent: Schema.optional(Schema.NullOr(SessionRef)),
   preview: Schema.optional(Schema.NullOr(Schema.String)),
   runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   start: SessionStart,
+  tail: Schema.optional(Schema.NullOr(Origin)),
   workspace: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "SessionLine" });
 export type SessionLine = typeof SessionLine.Type;

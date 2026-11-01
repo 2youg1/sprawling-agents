@@ -50,6 +50,8 @@ impl CityAsk { fn read(self) -> wire::Answer; }                     // 放下快
 /-!
 ## 8-37 每个问题的答案住在读面（`accounting::views`）
 
+**`Query::Sessions` 的父关系与分支末尾也从折叠答**：`RoomSessions` 除按房间折 `SessionLine` 外，按 run 记它所属的 `SessionRef { room, began }`。`session_opened.from` 给出 `branched_from`，并把母 run 所属会话写进 `parent`；`run_started.parent` 同样解析成父会话。每个 run 的最后一行写进 `tail`，`session_named` 等城级行不能覆盖它。整答（含父会话、分支点与 tail）由 `accounting::views::tests::sessions::a_room_s_sessions_are_answered_from_the_fold` 比较，线上形状见 wire D64。
+
 `Views` 折账本、答每一个 `Query`，删掉重折得到同样的字节——那是 `projection`（ARCHITECTURE.md §9 的形状 7），而 `bin::assembly` 是 `adapter`：装配点、唯一全知。一个模块里两个形状，就是它们分家的依据。`views` 是 `assembly` 的兄弟模块而不是 `assembly/` 下的子目录，因为 `Views` 是投影，不是 `RunWorker` 的一部分；两者之间的依赖方向见 §8-92。
 
 测试跟着被测的东西走：`views` 的断言住在 `views` 下，一份留在原处的断言会让下一个人以为那里还有代码。

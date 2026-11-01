@@ -13,6 +13,7 @@
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import type { RunBelief } from "../../core/belief";
+  import type { RoundsAnswer } from "../../wire";
   import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import { foldWire } from "./fold";
@@ -71,6 +72,22 @@
   // names whom it came from, and its room's sessions say which stretch
   // the way back opens.
   const mother = $derived(boundary?.kind === "forked" ? $belief.runs[boundary.mother] : undefined);
+  let motherRounds = $state<RoundsAnswer | undefined>(undefined);
+  $effect(() => {
+    if (boundary?.kind !== "forked" || boundary.turn !== null) return;
+    return conn.asking.ask({ rounds: { run: boundary.mother } }).subscribe((answer) => {
+      motherRounds = answer !== undefined && "rounds" in answer ? answer.rounds : undefined;
+    });
+  });
+  const turn = $derived.by(() => {
+    if (boundary?.kind !== "forked") return 0;
+    if (boundary.turn !== null) return boundary.turn;
+    return (
+      [...(motherRounds?.turns ?? [])]
+        .reverse()
+        .find((each) => each.opened <= boundary.origin.at_seq)?.number ?? 0
+    );
+  });
   const lines = $derived(
     mother?.addr === null || mother?.addr === undefined
       ? readable(undefined)
@@ -93,7 +110,7 @@
         {
           kind: "text",
           text: fill(say($lang, "session_forked_divider"), {
-            turn: String(boundary.turn),
+            turn: String(turn),
             at: (task === null ? null : motherName(task)) ?? say($lang, "fork_mother"),
           }),
         },

@@ -34,6 +34,7 @@
   import { drawsAddress, factsAt } from "./seat";
   import type { Seat } from "./seat";
   import Thread from "./thread.svelte";
+  import { draftPlace } from "./draft";
 
   interface Props {
     readonly address: Address;
@@ -85,7 +86,12 @@
           facts={factsAt(seat, at, run.run)}
           onFork={(plan: ForkPlan) => {
             u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
-              if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
+              if (plan.draft !== null) {
+                u.prefs.setDraft(
+                  draftPlace(address, $belief.sessions[address] ?? null),
+                  plan.draft,
+                );
+              }
             });
           }}
         />

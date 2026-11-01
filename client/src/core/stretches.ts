@@ -16,7 +16,7 @@
 // (`tailOf`).
 
 import type { RunBelief } from "./belief";
-import { MAYOR, buildingOf } from "./route";
+import { MAYOR } from "./route";
 import { PIN } from "./tags";
 import type { Address, Origin, Seq, SessionLine, SessionsAnswer, Tag } from "../wire";
 
@@ -74,36 +74,9 @@ export function pinningOf(stretch: Stretch, tags: readonly Tag[]): Pinning {
   return tags.includes(PIN) ? "tagged" : "none";
 }
 
-export type Group =
-  | { readonly kind: "pinned"; readonly rows: readonly Stretch[] }
-  | { readonly kind: "building"; readonly building: Address; readonly rows: readonly Stretch[] };
-
-// The pane's groups: the pinned first, then each building in the order of
-// its newest session, every group newest first. With a filter only the
-// rows carrying that tag stay, and a group left empty is not drawn.
-export function grouped(
-  stretches: readonly Stretch[],
-  tagsFor: (stretch: Stretch) => readonly Tag[],
-  filter: Tag | null,
-): Group[] {
-  const kept =
-    filter === null ? stretches : stretches.filter((stretch) => tagsFor(stretch).includes(filter));
-  const pinned = kept.filter((stretch) => pinningOf(stretch, tagsFor(stretch)) !== "none");
-  const rest = kept.filter((stretch) => !pinned.includes(stretch));
-  const buildings = [...new Set(rest.map((stretch) => buildingOf(stretch.room)))];
-  return [
-    ...(pinned.length === 0 ? [] : [{ kind: "pinned" as const, rows: pinned }]),
-    ...buildings.map((building) => ({
-      kind: "building" as const,
-      building,
-      rows: rest.filter((stretch) => buildingOf(stretch.room) === building),
-    })),
-  ];
-}
-
-// Where going on from a stretch branches: the last line of its last run.
-// `null` when this page holds none of its runs.
+// Where going on from a stretch branches. The sessions answer owns the
+// tail, so a hot-view truncation or reload cannot turn a past row into a
+// read-only one (wire D64).
 export function tailOf(stretch: Stretch): Origin | null {
-  const last = stretch.runs.at(-1);
-  return last === undefined ? null : { run: last.run, at_seq: last.lastSeq };
+  return stretch.line.tail ?? null;
 }
