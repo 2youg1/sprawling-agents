@@ -192,7 +192,7 @@ mod tests {
     fn upstream(name: &str) -> Upstream {
         Upstream {
             label: city(name),
-            address: format!("{name}.local:8787"),
+            address: format!("{name}.local:2501"),
             token_digest: None,
         }
     }
@@ -202,11 +202,11 @@ mod tests {
         let mut aggregate = Aggregate::new();
         aggregate.attach(upstream("studio"));
         let mut corrected = upstream("studio");
-        corrected.address = "192.168.1.9:8787".to_owned();
+        corrected.address = "192.168.1.9:2501".to_owned();
         aggregate.attach(corrected);
         assert_eq!(aggregate.cities().count(), 1);
         let only = aggregate.cities().next().unwrap();
-        assert_eq!(only.address, "192.168.1.9:8787");
+        assert_eq!(only.address, "192.168.1.9:2501");
     }
 
     #[test]

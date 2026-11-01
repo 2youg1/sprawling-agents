@@ -108,7 +108,7 @@ A building whose `RULES.toml` says `browser = true` gets the **browser** tool, s
 **Raise the two cities.** One port serves one city, so the second one gets another.
 
 ```bash
-sprawling up ~/cities/first                         # 127.0.0.1:8787, and opens its page
+sprawling up ~/cities/first                         # 127.0.0.1:2501, and opens its page
 sprawling up ~/cities/watcher 127.0.0.1:8788        # in a second shell
 ```
 
@@ -129,7 +129,7 @@ The template already wrote `confidential = false` above it. A browser opens what
 **Send it to look at the first city.**
 
 ```bash
-sprawling dispatch watchtower 'open http://127.0.0.1:8787/, take a snapshot, press the button that starts work, screenshot what happened, and write what you saw into Memo.md' --at 127.0.0.1:8788
+sprawling dispatch watchtower 'open http://127.0.0.1:2501/, take a snapshot, press the button that starts work, screenshot what happened, and write what you saw into Memo.md' --at 127.0.0.1:8788
 ```
 
 A city with no model chosen for `main` answers that in one frame, `E_MODEL_UNCHOSEN`, so choose one on the second city's settings page first. Otherwise the second city's own page shows the browser's actions going out one at a time.

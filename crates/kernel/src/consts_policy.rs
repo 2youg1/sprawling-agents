@@ -231,7 +231,7 @@ pub const DEFAULT_EFFORT: crate::model::Effort = crate::model::Effort::High;
 /// `up`, `serve`, the first screen, and every command that talks to a
 /// served city read this one value, and the installer script and README
 /// quote it, so the address a person is told is the address that binds.
-pub const DEFAULT_AT: &str = "127.0.0.1:8787";
+pub const DEFAULT_AT: &str = "127.0.0.1:2501";
 
 /// The building raised with every city, which holds the city's own plan
 /// and the two residents that serve every other building.

@@ -47,7 +47,7 @@ pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages
 pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
 pub const DEFAULT_EFFORT: Effort = Effort::High;                    // 没有人说过强度时内置的默认档（§8-24 D56）；用不用它由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按 offer 解出
-pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
+pub const DEFAULT_AT: &str = "127.0.0.1:2501";                       // 服务缺省监听地址；取 2501 避开 Wrangler 开发服务器的默认口 8787（裁定）
 ```
 
 `INTERVAL_CAP_BYTES` 是 `usize` 而不是 `u64`：它的读者只有 `runtime::tools::read` 与 `search`，两者都拿它比内存里一段文本的字节长度，换算因此不存在，也就没有一处可以把换算失败读成「无上限」。

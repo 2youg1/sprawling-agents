@@ -174,20 +174,20 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.
     let wire::BindVerdict::Serve(face) = wire::decide_bind(
-        &"127.0.0.1:8787".parse().unwrap(),
+        &"127.0.0.1:2501".parse().unwrap(),
         Some(kernel::B3Hash::digest(b"native-key")),
     ) else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let origins = wire::ListenerOrigins::of("127.0.0.1:8787".parse().unwrap());
+    let origins = wire::ListenerOrigins::of("127.0.0.1:2501".parse().unwrap());
     let app = wire::router(&config, face, &origins)
         .unwrap()
         .layer(MockConnectInfo(peer));
     let request = Request::builder()
         .method("POST")
         .uri("/enroll")
-        .header("host", "127.0.0.1:8787")
+        .header("host", "127.0.0.1:2501")
         .header("authorization", "Bearer native-key")
         .header("content-type", "application/json")
         .body(Body::from(body.to_owned()))

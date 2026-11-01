@@ -80,19 +80,19 @@ mod tests {
     #[test]
     fn the_four_cells_are_these_four() {
         assert_eq!(
-            Keying::decide(at("127.0.0.1:8787"), false),
+            Keying::decide(at("127.0.0.1:2501"), false),
             Keying::MintUnshown
         );
-        assert_eq!(Keying::decide(at("127.0.0.1:8787"), true), Keying::Adopt);
-        assert_eq!(Keying::decide(at("0.0.0.0:8787"), true), Keying::Adopt);
-        assert_eq!(Keying::decide(at("0.0.0.0:8787"), false), Keying::Mint);
+        assert_eq!(Keying::decide(at("127.0.0.1:2501"), true), Keying::Adopt);
+        assert_eq!(Keying::decide(at("0.0.0.0:2501"), true), Keying::Adopt);
+        assert_eq!(Keying::decide(at("0.0.0.0:2501"), false), Keying::Mint);
     }
 
     /// An address reachable from elsewhere with nothing configured grows
     /// a key that is shown, so a browser on another machine can present it.
     #[test]
     fn an_address_beyond_this_machine_never_ends_up_without_a_key() {
-        for raw in ["0.0.0.0:8787", "192.168.1.10:8787", "[::]:8787"] {
+        for raw in ["0.0.0.0:2501", "192.168.1.10:2501", "[::]:2501"] {
             assert_eq!(
                 Keying::decide(at(raw), false),
                 Keying::Mint,
@@ -106,6 +106,6 @@ mod tests {
     /// without a second branch.
     #[test]
     fn the_other_spelling_of_loopback_is_also_loopback() {
-        assert_eq!(Keying::decide(at("[::1]:8787"), false), Keying::MintUnshown);
+        assert_eq!(Keying::decide(at("[::1]:2501"), false), Keying::MintUnshown);
     }
 }

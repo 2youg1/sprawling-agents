@@ -438,23 +438,23 @@ mod tests {
     #[test]
     fn only_a_host_on_this_machine_is_answered_from_the_key_file() {
         for at in [
-            "127.0.0.1:8787",
-            "127.8.9.1:8787",
-            "[::1]:8787",
-            "localhost:8787",
-            "LocalHost:8787",
+            "127.0.0.1:2501",
+            "127.8.9.1:2501",
+            "[::1]:2501",
+            "localhost:2501",
+            "LocalHost:2501",
         ] {
-            assert_eq!(reach(at), Reach::ThisMachine(8787), "{at}");
+            assert_eq!(reach(at), Reach::ThisMachine(2501), "{at}");
         }
         for at in [
-            "other-host:8787",
-            "192.168.1.5:8787",
-            "10.0.0.2:8787",
-            "0.0.0.0:8787",
-            "example.com:8787",
-            "localhost.example.com:8787",
-            "127.0.0.1.example.com:8787",
-            "[2001:db8::1]:8787",
+            "other-host:2501",
+            "192.168.1.5:2501",
+            "10.0.0.2:2501",
+            "0.0.0.0:2501",
+            "example.com:2501",
+            "localhost.example.com:2501",
+            "127.0.0.1.example.com:2501",
+            "[2001:db8::1]:2501",
         ] {
             assert_eq!(reach(at), Reach::Elsewhere, "{at}");
         }

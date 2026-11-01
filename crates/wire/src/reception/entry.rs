@@ -379,7 +379,7 @@ mod tests {
     use super::*;
 
     fn loopback() -> ListenerOrigins {
-        ListenerOrigins::of("127.0.0.1:8787".parse().unwrap())
+        ListenerOrigins::of("127.0.0.1:2501".parse().unwrap())
     }
 
     const ARRIVALS: [Arrival; 8] = [
@@ -400,19 +400,19 @@ mod tests {
     fn every_entry_property_holds_over_every_input() {
         let origins = loopback();
         let hosts = [
-            (Some("127.0.0.1:8787"), true),
-            (Some("localhost:8787"), true),
-            (Some("evil.example:8787"), false),
-            (Some("0.0.0.0:8787"), false),
+            (Some("127.0.0.1:2501"), true),
+            (Some("localhost:2501"), true),
+            (Some("evil.example:2501"), false),
+            (Some("0.0.0.0:2501"), false),
             (None, false),
         ];
         let seen = [
             (None, "absent"),
-            (Some("http://127.0.0.1:8787"), "listed"),
-            (Some("http://localhost:8787"), "listed"),
+            (Some("http://127.0.0.1:2501"), "listed"),
+            (Some("http://localhost:2501"), "listed"),
             (Some("http://127.0.0.1:5173"), "foreign"),
             (Some("null"), "foreign"),
-            (Some("https://127.0.0.1:8787"), "foreign"),
+            (Some("https://127.0.0.1:2501"), "foreign"),
         ];
         let sites = [
             (None, false),
@@ -460,14 +460,14 @@ mod tests {
 
     #[test]
     fn a_listener_on_every_interface_is_opened_at_loopback_and_admits_its_own_host_only() {
-        let origins = ListenerOrigins::of("0.0.0.0:8787".parse().unwrap());
-        assert_eq!(origins.url(), "http://127.0.0.1:8787");
-        assert!(origins.admits_host("192.168.1.10:8787"));
-        assert!(!origins.admits_host("0.0.0.0:8787"));
-        assert!(!origins.admits_host("evil.example:8787"));
+        let origins = ListenerOrigins::of("0.0.0.0:2501".parse().unwrap());
+        assert_eq!(origins.url(), "http://127.0.0.1:2501");
+        assert!(origins.admits_host("192.168.1.10:2501"));
+        assert!(!origins.admits_host("0.0.0.0:2501"));
+        assert!(!origins.admits_host("evil.example:2501"));
         assert!(!origins.admits_host("192.168.1.10:9999"));
-        assert!(origins.admits_origin("http://192.168.1.10:8787", "192.168.1.10:8787"));
-        assert!(!origins.admits_origin("http://10.0.0.5:8787", "192.168.1.10:8787"));
+        assert!(origins.admits_origin("http://192.168.1.10:2501", "192.168.1.10:2501"));
+        assert!(!origins.admits_origin("http://10.0.0.5:2501", "192.168.1.10:2501"));
     }
 
     /// Wire D56: a route may pass the browser's `Host` on or rewrite it
