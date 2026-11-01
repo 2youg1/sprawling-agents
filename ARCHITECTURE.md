@@ -565,8 +565,9 @@ documents such as `Memo.md` in `city::spine_files`, `worktrees/` in
 └─ <building>/                 one building, one line of business
    ├─ .sprawling/              the building's reserved subtree: what governs it
    │  ├─ RULES.toml            what the building is and may do: one parsed file
-   │  ├─ CONFIG.toml           building layer, including its MCP servers
-   │  ├─ skills/               skills only this building admits
+   │  ├─ CONFIG.toml           building layer: local definitions when needed, references, positions and pins
+   │  ├─ CATALOG.toml           the selection this room's current session froze, when it has run
+   │  ├─ skills/               this building's skill index; package bytes stay in the city CAS
    │  └─ sessions/             the Ledger's projection of what ran here, disposable
    ├─ Roadmap.md               the plan tree, and the denominator of every progress reading
    ├─ Memo.md                  decisions and corrections
@@ -857,10 +858,19 @@ installing a different digest creates a candidate version without moving an
 existing pin. The read-only materialization under `.sprawling/library/.objects/`
 is rebuilt from those objects and is disposable, not another authority.
 
-MCP connections keep the tool list learned when they connect and reuse it
-while live; there is no comparison with a persistently approved server/tool
-definition. Issue #131 owns those remaining pins and their drift handling,
-and this section does not claim that they are implemented.
+A connector definition lives at one scope, normally the city's; a building
+stores label references, catalog positions and pins instead of copying the
+transport. A tool pin is the BLAKE3 of its canonical name, description and
+input-schema JSON, which is also that definition's CAS address. At run start,
+equal tools are offered and added, changed or removed tools are withheld;
+a server-definition drift alone does not withhold an unchanged tool. Skills
+continue to serve their pinned manifest. Each distinct drift is recorded once
+as `digest_invalidated`, so the catalog can compare pinned and found versions
+without connecting a server.
+
+A session's first run writes its catalog selection to
+`<addr>/.sprawling/CATALOG.toml`. Later runs in that session keep it;
+`/new` removes it and takes the building's current selection.
 
 ### CPU placement
 

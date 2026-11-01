@@ -21,11 +21,99 @@ use std::path::Path;
 
 use kernel::config::{SearchConfiguration, SecondThreshold};
 use kernel::{
-    Address, AxCode, AxError, B3Hash, Effort, KeepWarm, McpServer, McpTransport, SandboxLimits,
+    Address, AxCode, AxError, B3Hash, Effort, KeepWarm, McpDefinition, McpReference, McpServer,
+    McpTransport, SandboxLimits,
 };
 
 use super::{ConfigLayer, Layer, path};
 use crate::document;
+
+/// Converts equal building-local definitions into references and marks
+/// genuinely different local definitions as deliberate conflicts.
+///
+/// The whole edit is atomic and is read back through the ordinary parser.
+pub fn migrate_mcp(city_root: &Path, building: &Address) -> Result<bool, AxError> {
+    let file = path(city_root, building, Layer::Building)?;
+    if !file.exists() {
+        return Ok(false);
+    }
+    let city = super::ladder::stated(
+        &kernel::layout::CityLayout::new(city_root).city_config(),
+        Layer::City,
+    )?;
+    let mut migrated = false;
+    document::edit(&file, |held| {
+        let mut document = read_document(&file)?;
+        let original = toml::to_string_pretty(&document)
+            .map_err(|err| refuse_file(&file, &err.to_string()))?;
+        let layer =
+            ConfigLayer::parse(&original).map_err(|err| refuse_file(&file, err.subject()))?;
+        let mut references = layer
+            .mcp()
+            .and_then(|mcp| mcp.references.clone())
+            .unwrap_or_default();
+        let mut changed = false;
+        let mut definitions = Vec::new();
+        for definition in layer
+            .mcp()
+            .and_then(|mcp| mcp.definitions.clone())
+            .unwrap_or_default()
+        {
+            let farther = city.mcp().and_then(|mcp| {
+                mcp.definitions
+                    .as_ref()?
+                    .iter()
+                    .find(|candidate| candidate.server.label == definition.server.label)
+            });
+            match farther {
+                Some(candidate) if candidate.server == definition.server => {
+                    references.push(McpReference::legacy(definition.server.label));
+                    changed = true;
+                }
+                Some(_) if !definition.conflict => {
+                    definitions.push(McpDefinition {
+                        conflict: true,
+                        ..definition
+                    });
+                    changed = true;
+                }
+                Some(_) | None => definitions.push(definition),
+            }
+        }
+        if !changed {
+            return Ok(());
+        }
+        migrated = true;
+        references.sort_by(|left, right| left.label.as_str().cmp(right.label.as_str()));
+        references.dedup_by(|left, right| left.label == right.label);
+        document.insert(
+            "mcp_ref".to_owned(),
+            toml::Value::Array(reference_rows(&references)),
+        );
+        if definitions.is_empty() {
+            document.remove("mcp");
+        } else {
+            let servers = definitions
+                .iter()
+                .map(|definition| definition.server.clone())
+                .collect::<Vec<_>>();
+            let mut rows = rows(&servers);
+            for (row, definition) in rows.iter_mut().zip(definitions.iter()) {
+                if definition.conflict
+                    && let toml::Value::Table(row) = row
+                {
+                    row.insert("conflict".to_owned(), toml::Value::Boolean(true));
+                }
+            }
+            document.insert("mcp".to_owned(), toml::Value::Array(rows));
+        }
+        let rendered = toml::to_string_pretty(&document)
+            .map_err(|err| refuse_file(&file, &err.to_string()))?;
+        ConfigLayer::parse(&rendered).map_err(|err| refuse_file(&file, err.subject()))?;
+        held.replace(rendered.as_bytes())
+    })?;
+    Ok(migrated)
+}
 
 /// Writes the sandbox limits into one scope's own configuration.
 ///
@@ -92,6 +180,63 @@ pub fn write_mcp(
     change(city_root, addr, layer, Change::Mcp(servers))
 }
 
+/// Replaces a building's server references and their pins.
+pub fn write_mcp_references(
+    city_root: &Path,
+    building: &Address,
+    references: &[McpReference],
+) -> Result<(), AxError> {
+    change(
+        city_root,
+        building,
+        Layer::Building,
+        Change::McpReferences(references),
+    )
+}
+
+/// Replaces a building's Reading Room pins.
+pub fn write_skill_pins(
+    city_root: &Path,
+    building: &Address,
+    pins: &std::collections::BTreeMap<String, B3Hash>,
+) -> Result<(), AxError> {
+    change(
+        city_root,
+        building,
+        Layer::Building,
+        Change::SkillPins(pins),
+    )
+}
+
+/// Fills only the missing pins of a legacy reference discovered at run start.
+pub fn migrate_mcp_reference(
+    city_root: &Path,
+    building: &Address,
+    reference: &McpReference,
+) -> Result<(), AxError> {
+    change(
+        city_root,
+        building,
+        Layer::Building,
+        Change::MigrateMcpReference(reference),
+    )
+}
+
+/// Fills one missing Reading Room pin without moving an accepted version.
+pub fn migrate_skill_pin(
+    city_root: &Path,
+    building: &Address,
+    name: &str,
+    digest: B3Hash,
+) -> Result<(), AxError> {
+    change(
+        city_root,
+        building,
+        Layer::Building,
+        Change::MigrateSkillPin { name, digest },
+    )
+}
+
 /// What one edit states. Exhaustive, so the section a value is written
 /// under is decided in one match rather than once per write face.
 pub(super) enum Change<'a> {
@@ -105,6 +250,13 @@ pub(super) enum Change<'a> {
     Forget,
     Sandbox(&'a SandboxLimits),
     Mcp(&'a [McpServer]),
+    McpReferences(&'a [McpReference]),
+    SkillPins(&'a std::collections::BTreeMap<String, B3Hash>),
+    MigrateMcpReference(&'a McpReference),
+    MigrateSkillPin {
+        name: &'a str,
+        digest: B3Hash,
+    },
     /// The context reminder's second rung. Arrives already taken by
     /// `SecondThreshold`'s one construction point: a raw percent is
     /// refused where it is parsed, never where it is written.
@@ -189,6 +341,34 @@ impl Change<'_> {
             },
             Change::Mcp(servers) => {
                 document.insert("mcp".to_owned(), toml::Value::Array(rows(servers)));
+            }
+            Change::McpReferences(references) => {
+                document.insert(
+                    "mcp_ref".to_owned(),
+                    toml::Value::Array(reference_rows(references)),
+                );
+            }
+            Change::SkillPins(pins) => {
+                let spelled = pins
+                    .iter()
+                    .map(|(name, digest)| (name.clone(), toml::Value::String(digest.to_string())))
+                    .collect();
+                table(document, "skills", file)?
+                    .insert("pins".to_owned(), toml::Value::Table(spelled));
+            }
+            Change::MigrateMcpReference(reference) => {
+                migrate_reference(document, reference, file)?;
+            }
+            Change::MigrateSkillPin { name, digest } => {
+                let pins = table(document, "skills", file)?;
+                let toml::Value::Table(pins) = pins
+                    .entry("pins".to_owned())
+                    .or_insert_with(|| toml::Value::Table(toml::Table::new()))
+                else {
+                    return Err(refuse_file(file, "`[skills.pins]` is not a table"));
+                };
+                pins.entry((*name).to_owned())
+                    .or_insert_with(|| toml::Value::String(digest.to_string()));
             }
             Change::SecondThreshold(threshold) => {
                 let percent = i64::try_from(u64::from(*threshold))
@@ -334,6 +514,92 @@ fn rows(servers: &[McpServer]) -> Vec<toml::Value> {
         rows.push(toml::Value::Table(row));
     }
     rows
+}
+
+/// Reference rows in the file's grammar, with absent legacy pins omitted.
+fn reference_rows(references: &[McpReference]) -> Vec<toml::Value> {
+    references
+        .iter()
+        .map(|reference| {
+            let mut row = toml::Table::new();
+            row.insert(
+                "label".to_owned(),
+                toml::Value::String(reference.label.as_str().to_owned()),
+            );
+            if let Some(definition) = reference.definition {
+                row.insert(
+                    "definition".to_owned(),
+                    toml::Value::String(definition.to_string()),
+                );
+            }
+            if let Some(tools) = &reference.tools {
+                row.insert(
+                    "tools".to_owned(),
+                    toml::Value::Table(
+                        tools
+                            .iter()
+                            .map(|(name, digest)| {
+                                (name.clone(), toml::Value::String(digest.to_string()))
+                            })
+                            .collect(),
+                    ),
+                );
+            }
+            toml::Value::Table(row)
+        })
+        .collect()
+}
+
+/// Migrates one reference without overwriting pins a person saved meanwhile.
+fn migrate_reference(
+    document: &mut toml::Table,
+    reference: &McpReference,
+    file: &Path,
+) -> Result<(), AxError> {
+    let rows = document
+        .entry("mcp_ref".to_owned())
+        .or_insert_with(|| toml::Value::Array(Vec::new()));
+    let toml::Value::Array(rows) = rows else {
+        return Err(refuse_file(
+            file,
+            "`mcp_ref` is not a list of `[[mcp_ref]]` rows",
+        ));
+    };
+    let label = reference.label.as_str();
+    if let Some(row) = rows
+        .iter_mut()
+        .find(|row| row.get("label").and_then(toml::Value::as_str) == Some(label))
+    {
+        let toml::Value::Table(row) = row else {
+            return Err(refuse_file(file, "a `[[mcp_ref]]` row is not a table"));
+        };
+        if !row.contains_key("definition")
+            && let Some(definition) = reference.definition
+        {
+            row.insert(
+                "definition".to_owned(),
+                toml::Value::String(definition.to_string()),
+            );
+        }
+        if !row.contains_key("tools")
+            && let Some(tools) = &reference.tools
+        {
+            row.insert(
+                "tools".to_owned(),
+                toml::Value::Table(
+                    tools
+                        .iter()
+                        .map(|(name, digest)| {
+                            (name.clone(), toml::Value::String(digest.to_string()))
+                        })
+                        .collect(),
+                ),
+            );
+        }
+    } else {
+        rows.extend(reference_rows(std::slice::from_ref(reference)));
+    }
+    Ok(())
 }
 
 /// The reader's shape for a configured table: one name once, which is

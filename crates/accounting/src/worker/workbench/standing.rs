@@ -286,7 +286,8 @@ impl RunWorker {
         // City, building and resident layers, resolved once and frozen
         // for the whole run: re-reading them mid-run would let the two
         // halves of one session be shaped by two different settings.
-        let config = city::load_config(&self.city_root, addr)?;
+        let mut config = city::load_config(&self.city_root, addr)?;
+        let selection = city::catalog_for_session(&self.city_root, addr, &rules, &mut config)?;
         // Who runs this: the address's own URBANITE.md when it has one,
         // and an ephemeral worker when it does not. The identity supplies
         // the resident segment, so the same resident reads the same
@@ -305,6 +306,7 @@ impl RunWorker {
             building,
             rules,
             config,
+            reading_room: selection.reading_room,
             model,
             provider,
             adapter: Some(adapter),

@@ -9,6 +9,7 @@ import crates.kernel.spec.Approval
 import crates.kernel.spec.Backpressure
 import crates.kernel.spec.Blockage
 import crates.kernel.spec.Budget
+import crates.kernel.spec.CatalogDrift
 import crates.kernel.spec.Change
 import crates.kernel.spec.Completion
 import crates.kernel.spec.Config

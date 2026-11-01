@@ -132,6 +132,7 @@ fn a_refused_catalog_writes_nothing_beside_an_accepted_search() {
             catalog: Some(kernel::config::ExposureTable {
                 tools: [("Not A Tool".to_owned(), kernel::config::Exposure::Off)].into(),
                 namespaces: std::collections::BTreeMap::new(),
+                skills: std::collections::BTreeMap::new(),
             }),
             ..settings
         }))

@@ -22,6 +22,8 @@ impl<T> LayeredValue<T> { pub fn resolve(&self) -> Option<&T>; }  // resident→
 pub struct FrozenConfig {                                            // Run 起点冻结；字段逐条说明见下
     pub clock_stamp: ClockStampGranularity, pub clock_zones: Vec<ClockZone>,
     pub sandbox: SandboxLimits, pub mcp: Vec<McpServer>,
+    pub mcp_references: Vec<McpReference>,                            // 与 mcp 按 label 一一对应；缺 pin 是待迁移旧配置
+    pub skill_pins: BTreeMap<String, B3Hash>,                        // Reading Room 名字到 admitted manifest digest
     pub effort: Option<Effort>, pub second_threshold: Option<SecondThreshold>,
     #[serde(default)] pub search: SearchConfiguration,               // 缺省 Default
     #[serde(default)] pub catalog: CatalogExposure,                  // 城与楼两张 [catalog] 表；缺省两张空表
@@ -30,14 +32,16 @@ pub struct LiveConfig {}                                             // 热载�
 pub struct StatedConfig {                                            // 梯子上每个关切各一格，一起交给 freeze
     pub clock_stamp: LayeredValue<ClockStampGranularity>, pub clock_zones: LayeredValue<Vec<ClockZone>>,
     pub effort: LayeredValue<Effort>, pub sandbox: LayeredValue<SandboxLimits>,
-    pub mcp: LayeredValue<Vec<McpServer>>, pub second_threshold: LayeredValue<SecondThreshold>,
+    pub mcp: LayeredValue<McpLayer>, pub skill_pins: LayeredValue<BTreeMap<String, B3Hash>>,
+    pub second_threshold: LayeredValue<SecondThreshold>,
     pub search: LayeredValue<SearchConfiguration>, pub catalog: LayeredValue<ExposureTable>,
 }
-pub fn freeze(stated: &StatedConfig) -> FrozenConfig;
+pub fn freeze(stated: &StatedConfig) -> Result<FrozenConfig, AxError>; // 跨 scope 重名或引用无定义＝E_CONFIG_INVALID
 
 // kernel::config::exposure
 pub enum Exposure { Core, Dormant, Off }                              // 文件与线上写 "core" | "dormant" | "off"
-pub struct ExposureTable { pub tools: BTreeMap<String, Exposure>, pub namespaces: BTreeMap<String, Exposure> }
+pub struct ExposureTable { pub tools: BTreeMap<String, Exposure>, pub namespaces: BTreeMap<String, Exposure>,
+                           pub skills: BTreeMap<String, Exposure> }
 pub enum ExposureFrom { Fixed, Default, City, Building }
 pub struct CatalogExposure { pub city: ExposureTable, pub building: ExposureTable }
 impl CatalogExposure { pub fn stated(&self, tool: &str, namespace: &str) -> Option<(Exposure, ExposureFrom)>; }
@@ -57,7 +61,11 @@ impl CatalogExposure { pub fn stated(&self, tool: &str, namespace: &str) -> Opti
 
 **shell 臂的解释器（config）**：`pub enum Interpreter { System, Pwsh }`，`SandboxLimits.interpreter`，缺省 `System`，文件里写作 `[sandbox] interpreter = "system"` 或 `"pwsh"`（serde 小写，`#[serde(default)]`，所以没写这个键的层与线上旧帧读作 `System`）。配置文件里的值只经 `Interpreter::parse` 构造（`city::config_layers` 把这个键读成文本再交给它；serde 只读线上帧与冻结配置）：别的拼写以 `E_CONFIG_INVALID` 拒，主语是这个键与写下的值，恢复语给出两种拼法；不猜，也不当作缺省。它与 `shell` 是两件事：`shell` 决定 shell 臂给不给，`interpreter` 决定给的时候是哪一个；写的是名字而不是路径，理由同「主机事实不入城」。口径与 `mounts` 同形：整值上梯、Run 起点冻结、解析点拒。为什么要它、在主机上怎么解析、缺席时怎么拒，住 `crates/runtime/Spec.lean` §8-13-2 D30。
 
-**外部 MCP server（config）**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args, env }, Http { url, headers }, Sse { url, headers } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒（`ServerLabel` 住 §8-23）。**枚举是闭的**（无 `#[non_exhaustive]`）：读者全在这一个二进制里，通配臂只会把下一种 transport 从必须表态的模块面前藏起来。`env` 与 `headers` 皆为名在前、值在后的成对表，值可以是 `secret:realm/name` 引用——交给子进程的名字收不回来，故兑付发生在起进程／发请求的那一格，而恒不写进配置文件。`Sse` 自成一支而不是 `Http` 的一个开关：两者开法与败法都不同。`FrozenConfig.mcp: Vec<McpServer>` 缺省空表＝这栋楼不接任何外部 server。三条口径：①**整表覆盖**，与 zones／sandbox 同一条理由——一层说到 `[[mcp]]` 就说全部，欠说的层只会收窄而恒不会悄悄接上上层没提过的服务；②**冻结的理由就是工具表本身**——外部工具在 Run 起点入 catalog，而 provider 把工具数组哈希在 system prompt 之前，Run 内变宽的工具表既自毁缓存又没有人审过；③**命令与参数是主机事实**（一个可执行文件在运行中的机器上的位置），故它们住 `CONFIG.toml` 而恒不入 Ledger 载荷——一座城被搬到另一台机器时不该带着运行中的机器的路径。
+**外部 MCP server（config）**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args, env }, Http { url, headers }, Sse { url, headers } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒（`ServerLabel` 住 §8-23）。**枚举是闭的**（无 `#[non_exhaustive]`）：读者全在这一个二进制里，通配臂只会把下一种 transport 从必须表态的模块面前藏起来。`env` 与 `headers` 皆为名在前、值在后的成对表，值可以是 `secret:realm/name` 引用——交给子进程的名字收不回来，故兑付发生在起进程／发请求的那一格，而恒不写进配置文件。`Sse` 自成一支而不是 `Http` 的一个开关：两者开法与败法都不同。`FrozenConfig.mcp: Vec<McpServer>` 缺省空表＝这栋楼不接任何外部 server；`mcp_references` 按 label 给出每个已选服务器的 pin。
+
+D117 server 定义与选择分离：`McpLayer { definitions: Option<Vec<McpDefinition>>, references: Option<Vec<McpReference>> }` 把一级文件的两类行分开；`McpDefinition { server, conflict }` 只在同 label 的跨 scope 不同定义被明确保留时为 true。`McpReference { label, definition: Option<B3Hash>, tools: Option<BTreeMap<String, B3Hash>> }` 中，`definition` 是服务器定义的 digest，工具键是 catalog 全名、值是名称＋描述＋input schema 规范 JSON 的 digest；两个 `None` 只表示待迁移旧引用，`Some(empty)` 是明确不选任何工具。`freeze` 选最近一级写下的引用集合（空集合也覆盖），没有引用的层以本层定义集合作为旧式选择；同 label 的等值定义折叠成引用，不同定义仅在近层 `conflict = true` 时保留，否则 `E_CONFIG_INVALID`。被否：楼复制整份 `[[mcp]]`，会让修改命令变成逐楼编辑，且无法分辨“这一个服务器”与“这一栋楼的选择”。重开参数：需要房间级选择且愿意按房间拆分 provider cache 时，另议引用所在 rung，而不是恢复定义复制。
+
+**pin 与冻结**：服务器与工具 pin 在 Run 起点随 `FrozenConfig` 固定；定义 digest 只比较，不因自身变化而扣下 digest 仍相等的工具，工具 digest 变化或新工具则扣下。`skill_pins` 把 Reading Room 的名字固定到 canonical manifest；候选变化时 run 仍读 pin 的字节。命令与参数是主机事实，住 `CONFIG.toml`，Ledger 只记其 digest，不记原文。
 
 **网络搜索（config）**：子模块 `config::search` 定义两个值，`FrozenConfig.search` 持有后一个。
 

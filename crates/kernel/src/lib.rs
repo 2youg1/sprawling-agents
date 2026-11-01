@@ -76,7 +76,7 @@ pub use completion::{Completion, Evidence, PlannedProgress, Progress, UnplannedP
 pub use config::{ClockStampGranularity, ClockZone, FrozenConfig};
 pub use config::{ContainerImage, ContainerLimits};
 pub use config::{EnvVarName, Interpreter, LayeredValue, LiveConfig, SandboxArm, SandboxLimits};
-pub use config::{McpServer, McpTransport, SecondThreshold};
+pub use config::{McpDefinition, McpLayer, McpReference, McpServer, McpTransport, SecondThreshold};
 pub use delegation::{Delegate, DelegateKind, DelegationVerdict, Delegator, Depth};
 pub use discard::Restoration;
 pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardVerdict};

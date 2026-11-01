@@ -294,12 +294,13 @@ fn drive_failure_trace(initial: InitialLifetime, trace: &[(HttpFailure, bool)]) 
     let opening = ["initialize", "notifications/initialized", "tools/list"];
     let expected: Vec<_> = opening
         .into_iter()
+        .chain(std::iter::once("tools/list"))
         .chain(std::iter::repeat_n("tools/call", sent_calls))
-        .chain(
-            opening
-                .into_iter()
-                .take(if ending.is_some() { 3 } else { 0 }),
-        )
+        .chain(if ending.is_some() {
+            opening.into_iter().collect::<Vec<_>>()
+        } else {
+            vec!["tools/list"]
+        })
         .collect();
     assert_eq!(
         seen.iter()

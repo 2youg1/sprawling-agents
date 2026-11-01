@@ -76,7 +76,8 @@ pub fn clear_session(city_root: &Path, addr: &Address) -> Result<(), AxError> {
 /// Propagates a room configuration that exists and cannot be read or
 /// written.
 pub fn forget_shape(city_root: &Path, addr: &Address) -> Result<(), AxError> {
-    config_layers::forget_session(city_root, addr)
+    config_layers::forget_session(city_root, addr)?;
+    config_layers::forget_catalog_session(city_root, addr)
 }
 
 #[cfg(test)]

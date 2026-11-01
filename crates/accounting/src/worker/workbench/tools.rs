@@ -221,9 +221,10 @@ impl Laying {
         admitted.extend(self.filed_beyond_sprawling(site, addr, &bound)?);
         held(&catalog, "lay out the catalog")?.set_exposure(site.config.catalog.clone());
         register(&catalog, &mut bench, admitted, &keeper)?;
-        self.admit_reading_room(&catalog, &site.rules, &site.building, addr)?;
+        self.admit_reading_room(&catalog, site, addr)?;
         Ok(Workbench {
             catalog,
+            drift: self.take_drift()?,
             bench: Some(bench),
             policy: Some(policy),
             succession,

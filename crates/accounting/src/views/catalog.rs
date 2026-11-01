@@ -81,6 +81,10 @@ impl CatalogAsk {
             hash: kernel::B3Hash::digest(b""),
             len: 0,
             index: 0,
+            reading: 0,
+            always: 0,
+            dormant: 0,
+            skills: 0,
             rows: Vec::new(),
         });
         let tools = table

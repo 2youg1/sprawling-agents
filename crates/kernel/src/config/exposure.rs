@@ -44,13 +44,17 @@ pub struct ExposureTable {
     pub tools: BTreeMap<String, Exposure>,
     #[serde(default)]
     pub namespaces: BTreeMap<String, Exposure>,
+    /// Skill name to exposure: core injects the pinned SKILL.md, dormant
+    /// keeps its index line, and off admits nothing.
+    #[serde(default)]
+    pub skills: BTreeMap<String, Exposure>,
 }
 
 impl ExposureTable {
     /// Whether this table states nothing.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.tools.is_empty() && self.namespaces.is_empty()
+        self.tools.is_empty() && self.namespaces.is_empty() && self.skills.is_empty()
     }
 
     /// What this table says about `tool`, filed under `namespace`: the
@@ -108,6 +112,21 @@ impl CatalogExposure {
                 self.city
                     .said(tool, namespace)
                     .map(|exposure| (exposure, ExposureFrom::City))
+            })
+    }
+
+    /// What the two tables state for one skill, nearest layer first.
+    #[must_use]
+    pub fn stated_skill(&self, skill: &str) -> Option<(Exposure, ExposureFrom)> {
+        self.building
+            .skills
+            .get(skill)
+            .map(|exposure| (*exposure, ExposureFrom::Building))
+            .or_else(|| {
+                self.city
+                    .skills
+                    .get(skill)
+                    .map(|exposure| (*exposure, ExposureFrom::City))
             })
     }
 }

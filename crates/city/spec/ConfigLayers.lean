@@ -80,7 +80,24 @@ impl Ladder {
 - **`command`（非空）＋ `args`（缺省空表）＋ `env`（缺省空表，形如 `env = { API_KEY = "secret:mcp/apps" }`）**——城所在的机器上的一个程序。写成表而不是 `NAME=value` 行的列表：文件里一个名字只出现一次，也没有谁要去切一个人写的字符串。
 - **`url`（非空）＋ `headers`（缺省空表，写法同上）＋ `transport`（`"http"`｜`"sse"`，缺省 `"http"`）**——一个地址。`transport` 是闭集而不是自由文本，拼错在写它的地方就被拒，而不是变成一台没人够得到的服务器；缺省取 `http`，因为「发一条消息过去」正是一个 url 的本义。
 
-两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（`crates/sprawling/Spec.lean` §8-4／§8-15）。两条口径：①**同一层内标签不得重复**——两个同名 server 会让同一个工具名同时指向两个进程，而那是一个路由错误而不是一个偏好；②整表上梯（下层写即替换上层全表），语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（`crates/sprawling/Spec.lean` §8-4），本模块只回答「三份文件说了什么」。
+两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（`crates/sprawling/Spec.lean` §8-4／§8-15）。同一层内标签不得重复；跨 scope 的规则见下面的 `[[mcp_ref]]`。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（`crates/sprawling/Spec.lean` §8-4），本模块只回答「三份文件说了什么」。
+
+**`[[mcp_ref]]`：楼只引用，不复制定义**（kernel D117、city D112）：
+
+```toml
+[[mcp_ref]]
+label = "docs"
+definition = "<server-definition-b3>"       # 旧引用迁移前可缺席
+tools = { docs_search = "<tool-definition-b3>" }  # 旧引用迁移前可缺席；空表＝明确不选工具
+```
+
+- **定义恰好一个 scope**：`[[mcp]]` 是定义，通常只在城层；`[[mcp_ref]]` 只在楼层，按 label 选择并携 pin，不携 command、URL、args、env 或 headers。最近一级写下引用集合即决定选择，空 `mcp_ref = []` 明确一个也不用；没有引用的旧楼层以本层 `[[mcp]]` 作为旧式选择，没写任何选择的楼沿用城层定义。
+- **重名不遮蔽**：同 label 的跨 scope 等值定义在迁移时改成引用；不同定义只有在近层行写 `conflict = true` 时才作为这栋楼自己的定义保留，否则 `E_CONFIG_INVALID`。引用点名一个没有定义的 label 同样拒，恢复语让人先在城层定义或修正 label。
+- **迁移**：开城时把等值楼行改写为无 pin 的旧引用；真正不同的楼本地定义保留并显式写 `conflict = true`。第一次 run 把当时列出的服务器定义与工具填成初始 pin 后，引用不再是旧式。缺 pin 的旧配置是唯一的自动准入路径；已有 pin 后的新工具、改工具或消失工具都按 drift 处理，绝不自动接受。
+- **`[skills.pins]`**：Reading Room 的名字到 canonical manifest digest，只写楼层；`[skills] shelves` 仍只在城层，两者可同节而作用域分别判断。旧阅览室第一次 run 把当时解析到的候选填成 pin；之后安装同名新候选不移动 pin。保存目录时经既有 RULES 与 CONFIG 写门一起更新名字、档位和 pin。
+- **写面**：`write_mcp_references` 整张替换楼层引用，`write_skill_pins` 整张替换楼层 skill pin；迁移专用的 `migrate_mcp_reference` 与 `migrate_skill_pin` 只填补仍为 `None` 的旧 pin，不覆盖人已经保存的新值。所有写面仍走 `change`，落盘前由 `ConfigLayer::parse` 复读。
+
+D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在城层。理由：一栋楼想多用或少用一台服务器不该重述传输与凭据引用；城层修改命令后，所有引用它的楼应在下一次 run 使用新定义，同时工具自己的 digest 仍决定哪些内容已获批准。被否：整表上梯复制 `[[mcp]]`，改一处必须逐楼重复，且近层静默遮蔽远层。重开参数：出现独立于楼的第二个定义拥有者时，先扩展 scope 类型与重复判定，不在引用行里塞第二份定义。
 
 **`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。
 
@@ -199,11 +216,14 @@ exec = "dormant"
 
 [catalog.namespaces]
 github = "off"
+
+[catalog.skills]
+how = "core"
 ```
 
 - **值的形状与读法不在本模块**：`Exposure`、`ExposureTable` 与两张表的读法（楼的工具键、楼的命名空间键、城的工具键、城的命名空间键依次）住 `kernel::config`（`crates/kernel/Spec.lean` §8-22）；哪两件工具挪不动、表不说时取什么住 `runtime::catalog::exposure`（`crates/runtime/spec/Catalog.lean` §8-60，runtime D111）。本模块只回答文件说了什么、写在哪几级、怎么写回去。
-- **两张表各自冻结，不整值上梯**：楼的表没提到的工具仍落到城的表，所以 `load` 把城与楼两级各自那张交给 `freeze`，`FrozenConfig.catalog` 持两张（`CatalogExposure { city, building }`），不是 `LayeredValue::resolve` 取最近的一张。
-- **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：不认的键（`tools`、`namespaces` 之外）；值不是三种拼写之一；`tools` 的键不合工具名的文法（`kernel::ToolName::parse`）；`namespaces` 的键不合命名空间的文法（ASCII 小写与数字，`kernel::ServerLabel::parse`，预留命名空间也合这条文法）。今天没有哪件工具叫这个名字不拒：一台服务器的工具随服务器来去，写下的表不该因为它今天没连上就失效。
+- **两张表各自冻结，不整值上梯**：楼的表没提到的工具仍落到城的表，所以 `load` 把城与楼两级各自那张交给 `freeze`，`FrozenConfig.catalog` 持两张（`CatalogExposure { city, building }`），不是 `LayeredValue::resolve` 取最近的一张。`skills` 同理按 skill 名读楼再读城，缺省 `Dormant`；skill 的 `Core` 注入 pin 版本的完整 `SKILL.md`，`Dormant` 只占一行，`Off` 不进 run（city D113）。
+- **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：不认的键（`tools`、`namespaces`、`skills` 之外）；值不是三种拼写之一；`tools` 的键不合工具名的文法（`kernel::ToolName::parse`）；`namespaces` 的键不合命名空间的文法（ASCII 小写与数字，`kernel::ServerLabel::parse`，预留命名空间也合这条文法）；`skills` 的键用与书架索引相同的单段名。今天没有哪件工具或 skill 叫这个名字不拒：服务器与候选版本来去，写下的表不该因为它今天没连上就失效。
 - **只写在城与楼两级**：房间那一级写 `[catalog]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Catalog`），恢复语指向楼或城的 `CONFIG.toml`。理由见 D34。
 - **写面整张替换**：楼页的能力节一次保存整张表（`crates/wire/Spec.lean` §8-99）。`write_catalog` 写楼那一级，城那一级经 `CitySetting::Catalog`；两者都先过读面同一个 `check`（对外名 `check_catalog`，一帧同时写别的会被拒的项时，调用方在落任何一项之前先用它判），再进 `change`，`change` 落盘前复读整份文本（§8-4b）。空表把 `catalog` 键整个拿掉，这一级回到继承：写一份与上一级相同的值，上一级以后改了这一级也不跟。
 - **属于 format 1**：`[catalog]` 与认得 `format` 的第一版同一版发布，不另登记一级 `Rung`（`crates/city/spec/Format.lean` §8-42 的加键规则从下一版起适用）。
@@ -265,15 +285,33 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 **重开参数**：缺省那一家的 `tools/list` 不再列出 `web_search_exa` 或改了这几个参数，`web_search` 的映射校验会在调用前拒（§8-35），上面那条按名字运行的测试也会变红，那时改 `default_search_supplier` 一处；人要求在多家之间按顺序回落时，重开的是本决定的第一条。
 -/
 
-/-! D34 `[catalog]` 只写在城与楼两级，两级的表各自冻结
+/-! D34 `[catalog]` 的人设为城与楼两级，会话另有独立的冻结记录
 
-**决定**：`[catalog]` 只许城与楼两级写（`Confined::Catalog`），房间那一级写即拒；`load` 把两级各自的表都冻进 `FrozenConfig.catalog`，一件工具先看楼的表、再看城的表。
+**决定**：人在城与楼两级编辑 `[catalog]`；`load` 把两级各自的表都冻进 `FrozenConfig.catalog`，一件工具先看楼的表、再看城的表。每个会话第一次 run 另在 `<addr>/.sprawling/CATALOG.toml` 写下当时的两张表、Reading Room 名字、connector 引用与 skill pin；后续 run 读取这份会话记录，`/new` 删除后重新冻结。它不是楼配置梯子上的第三个编辑层，楼根会话也与楼设置分文件。
 
-**理由**：工具数组在 provider 的缓存里排在 system prompt 之前，同一栋楼的几个房间各有一张表，这栋楼的缓存就按房间裂开，而人在楼页上看不到哪个房间改了什么。两级各自冻结而不是取最近的一整张，是因为人在楼里只改一两件，其余仍该跟着城走；整值上梯会让楼写下一行就丢掉城的整张表。
+**理由**：两级各自冻结而不是取最近的一整张，是因为人在楼里只改一两件，其余仍该跟着城走；会话还要保住它开始时的工具列表，所以楼页保存不能改变已经打开的会话。独立的会话文件同时回答冻结与清理，避免把会话记录写进楼根 `CONFIG.toml` 后，`/new` 连楼设置一起删掉。
 
-**被否**：①三级都许写：见理由；②整值上梯（同 `[[mcp]]`）：楼想关一件就得抄一遍城的整张表，城以后改了这栋楼不跟。
+**被否**：①房间也作为人手编辑层：楼页看不到哪个房间改了什么；②每次 dispatch 都读楼的新表：旧会话会在保存后悄悄换工具；③把会话冻结写进房间 `CONFIG.toml`：楼根同文件会混淆设置与记录。
 
-**重开参数**：某家 provider 的缓存不再把工具数组排在 system 之前，或房间之间需要不同的工具表并愿意为此付缓存。
+**重开参数**：provider 能按楼共享不同会话的工具缓存且不需要会话冻结时，可重新评估独立文件的成本。
+-/
+
+/-! D114 会话目录由 `CATALOG.toml` 固定，楼保存只影响新会话
+
+**决定**：`catalog_for_session(city_root, addr, rules, config)` 在会话第一次 run 将当前 `CatalogExposure`、Reading Room 名字、`mcp_references` 与 `skill_pins` 写成 `<addr>/.sprawling/CATALOG.toml`，之后覆盖 `FrozenConfig` 的对应字段并回答会话的 Reading Room；文件已存在则不重写。`clear_session` 删除它。`Query::Catalog` 对每个当前会话比较这份冻结值与楼当前值的 digest，得到仍用旧选择的 open session 数。
+
+**理由**：这是“保存后旧会话不变、`/new` 得到新选择”的唯一持久边界；进程重启也不能让旧会话悄悄升级。比较整个冻结值而不是最后活动时间，避免旧会话在保存后继续活动时从旧选择计数中消失。
+
+**被否**：按 session 最后一条 Ledger 记录的时间判断——旧会话保存后活动就会被误算成新选择；在内存保留——重启失效；楼保存时改写所有会话——违反冻结。重开参数：需要提供“逐个会话接受新选择”时，在会话文件上增加明确的升级门，而不是由楼保存隐式移动。
+-/
+
+/-! D113 skill 复用 `[catalog]` 的三档而不另建 Reading Room 面板或位置字段
+
+**决定**：`[catalog.skills]` 以 skill 名为键，`Core` 把 pin 版本的完整 `SKILL.md` 注入 Resident 段，`Dormant` 在休眠索引占一行并经 `read` 取正文，`Off` 不准入。Reading Room 的名字仍由 `RULES.toml` 列出，pin 在 `[skills.pins]`，三处分别回答“选哪件、哪个版本、以什么位置提供”，目录保存经同一次用户动作更新它们。
+
+**理由**：工具已有三档与 provider cache 边界，skill 另建一套位置和面板会产生两个计量权威；`Off` 仍保留名字与 pin，是为了以后重新打开时不把旧批准变成新工具式的未知项。
+
+**被否**：把完整 skill 做成一件可直接调用的工具——skill 是指导文本与包文件，不是带 input schema 的远程调用；把 Always 只写成工具数组中的一行——无法交付 skill 正文。重开参数：skill 获得独立可执行接口时，另议其工具形状，不改变阅读文本的三档。
 -/
 
 /-! D26 MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判

@@ -52,6 +52,8 @@ pub const SHELF_INDEX: &str = "INDEX.toml";
 /// What one configuration layer declares. The same file name at every
 /// layer, because the layer is the scope it sits in rather than a name.
 pub const CONFIG_FILE: &str = "CONFIG.toml";
+/// The catalog selection one session froze at its own address.
+pub const SESSION_CATALOG_FILE: &str = "CATALOG.toml";
 /// What a scope keeps out of the transcript it sends to a model.
 pub const FILTERS_FILE: &str = "FILTERS.toml";
 /// Where a building files work it has finished with, by kind and day.
@@ -182,6 +184,11 @@ impl CityLayout {
     #[must_use]
     pub fn config(&self, addr: &Address) -> PathBuf {
         self.governed(addr).join(CONFIG_FILE)
+    }
+
+    /// The catalog selection frozen by the session at `addr`.
+    pub fn session_catalog(&self, addr: &Address) -> PathBuf {
+        self.governed(addr).join(SESSION_CATALOG_FILE)
     }
 
     /// The configuration layer the city itself declares.

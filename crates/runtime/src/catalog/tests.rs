@@ -75,6 +75,7 @@ fn skill(name: &str) -> CatalogEntry {
         disclosure: format!("{name}: the steps this building follows for it, with examples"),
         expansion: B3Hash::digest(name.as_bytes()).to_string(),
         hash: Some(B3Hash::digest(name.as_bytes())),
+        document: format!("# {name}\n\nUse this skill.\n"),
     }
 }
 
@@ -484,6 +485,7 @@ fn a_catalog_table_moves_tools_between_core_dormant_and_off() {
         city: ExposureTable {
             tools: [("plan".to_owned(), Exposure::Core)].into(),
             namespaces: [("apps".to_owned(), Exposure::Off)].into(),
+            skills: std::collections::BTreeMap::new(),
         },
         building: ExposureTable {
             tools: [
@@ -493,6 +495,7 @@ fn a_catalog_table_moves_tools_between_core_dormant_and_off() {
             ]
             .into(),
             namespaces: std::collections::BTreeMap::new(),
+            skills: std::collections::BTreeMap::new(),
         },
     });
     for name in ["read", "tool", "exec", "plan", "apps_mail", "apps_ping"] {

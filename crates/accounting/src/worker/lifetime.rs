@@ -265,6 +265,7 @@ impl RunWorker {
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels { monotonic }),
             connectors: std::sync::Arc::new(super::mcp::Residents::default()),
+            drift_book: super::workbench::DriftBook::from_history(city_root)?,
             machine,
             clock,
             monotonic,
@@ -277,6 +278,9 @@ impl RunWorker {
             exec_host,
         };
         worker.migrate_skills(now)?;
+        for building in city::buildings(city_root)? {
+            city::migrate_mcp(city_root, &building)?;
+        }
         worker.sweep_abandoned_trees();
         worker.bring_configuration_forward();
         worker.open_checkpoints();

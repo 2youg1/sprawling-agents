@@ -93,6 +93,15 @@ pub(super) struct WebSearch { /* supplier: SearchSupplier、meta、root、vault�
 **重开参数**：某个搜索供应方按账号缓存或按账号计配额，使得在不出错时留在同一账号有可度量的收益。
 -/
 
+/-! D116 lane 在注册前比较 pin，漂移经 `digest_invalidated` 去重入账，页面不主动握手
+
+**决定**：`Laying` 在 lane 连接服务器并取得 `tools/list` 后，先对定义与工具做 digest 比较，再把相等工具交给 `runtime::catalog`。首次迁移的旧引用把当时配置与列表写成初始 pin；已有 pin 的新工具、改工具与消失工具不注册。skill 从 pin 的 CAS manifest 读取，外部候选只在初次准入或 Accept 时复制。漂移先经共享 `DriftBook` 判重，再以 `digest_invalidated` 追加；book 在开城时从历史重建，追加成功才登记，失败不吞掉下一次记录机会。
+
+**理由**：握手只能在 lane 做，避免阻塞单写者；pin 持久化在配置而不是只在连接里，常驻连接复用旧列表时仍须与批准版本比较。页面继续读最新 `prompt_assembled`、漂移事件与 CAS 定义，不为回答 `Query::Catalog` 启动服务器或浏览器。
+
+**被否**：每次 run 都追加漂移——同一未处理变更会淹没 Ledger；只在内存去重——重启后重复；查询时主动刷新——只读页面会产生外部副作用。重开参数：需要表示“服务器已恢复、同一漂移重新出现”的完整状态机时，将活动漂移与历史漂移分列，而不是删除历史去重键。
+-/
+
 /-! D4 `Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `agent_protocols::Outbound`
 
 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `agent_protocols`，不归 worker。

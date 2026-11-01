@@ -15,7 +15,8 @@
 
 ```rust
 pub struct CatalogEntry { pub name: String, pub disclosure: String, pub expansion: String,
-                          pub hash: Option<B3Hash> }    // admitted canonical manifest 的 digest；自建条目为 None
+                          pub hash: Option<B3Hash>,     // admitted canonical manifest 的 digest；自建条目为 None
+                          pub document: String }        // pin 版本的 SKILL.md；mode/dev 为空
 pub struct SkillPin { pub name: String, pub hash: B3Hash }
 pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode: Option<Mode> —— 私有 */ }
 impl Catalog {
@@ -84,7 +85,9 @@ impl ToolTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<ToolTool, AxE
 - **一件工具的命名空间由准入它的装配层说**（`accounting::worker::workbench` 把每件工具连同一个 `Namespace` 交给 `admit_tool`）：只有那里知道一件工具是城自己的还是某台服务器的。城自己的工具归预留命名空间（`sprawling`：城与居民之间的协作与自身状态；`computer`：浏览器；`media`：识图与转写；`record`：回看与提案；`web`：联网搜索；`skill`：阅览室的 skill），外部服务器的工具归它的 label——它的每件工具拼作 `{label}_{tool}`，`ServerLabel` 不含 `_`，所以 `tool find` 去掉前缀得到的成员名唯一。预留名由 `kernel::ReservedNamespace` 一处列出，city 的配置层拒绝以它们为 label 的服务器（`crates/city/spec/ConfigLayers.lean` §8-4）：一台 MCP 服务器若叫 `sprawling`，`tool list sprawling` 会把外部工具当作城自己的能力列出。被否：按名字切第一个 `_` 推出命名空间——城自己的工具名（`web_search`）也含 `_`，推出的命名空间会是错的。
 - **索引的写法**：一行段头；然后先工具的命名空间、后 skill，各按名字的字节序，一件一行。命名空间写作 `- <名> (<件数>): <提示>`：预留命名空间的提示是表里那一句，其余是成员去掉 `<label>_` 前缀后的名字，以 `, ` 相连；skill 之前有一行组头 `- skill (<件数>): <提示>`，提示是预留命名空间 `skill` 的那一句，件数是已准入的 skill 加上归到 `skill` 命名空间的工具，有 skill 或这样的工具才写，`skill` 命名空间也就不再另占一行；没有组头时，那一句只在有工具归到 `skill` 时出现，而今天没有，模型就读不到 skill 是什么。每件 skill 写作 `- skill <名>: <提示>`，提示是披露的第一句（到第一个 `. ` 或行尾）。提示在 `HINT_MAX_BYTES` 处按字符边界截断。逐件贪心：带提示的那行放得下就放，放不下退到只有名字的那行，再放不下就停，剩下的件数写成末行 `+N more`。预算先扣掉 `+N more` 在 N 取全部件数时的长度，所以那一行恒放得下。没有休眠的件时整块不出现。
 - **一件工具的档位由 `catalog::exposure` 一处定**（D111）：`exposure_of` 先看它是不是 `FIXED` 里的两件（`tool` 是休眠索引唯一的门，`read` 是打开目录条目与 skill 的唯一的门，任何一件降档，索引列出的东西就没有调用够得到），是就恒为 `Core`；否则读这个 run 冻下的两张 `[catalog]` 表，次序是 `kernel::config::CatalogExposure::stated` 的（楼的工具键、楼的命名空间键、城的工具键、城的命名空间键，`crates/kernel/Spec.lean` §8-22）；两张表都不说时取 `fallback`：在某个 mode 的核心里（`mode::in_some_core`）的是 `Core`，其余 `Dormant`，也就是这张表出现之前的行为。`admit_tool` 把档位记在这一件上并答它：`Core` 进 `ChatRequest.tools`，`Dormant` 进休眠索引，`Off` 只留一行给 `tool_table`，不进工具表、索引、`tool` 的 `list`／`find`／`detail`／`run`。装配层拿到 `Off` 就不给它在 bench 上登记路由，所以模型按名字直调它也够不到（`accounting::worker::workbench`）。档位不改 `mode_admits`：`edit` 与 `exec` 被表降到 `Dormant` 后经 `tool` 的 `run` 到达，`chat` 下仍在它们自己的第一道门被拒（D25）。
-- **每个 run 记下它的工具表**：`tool_table` 把 `tool_defs` 的数组按 JSON 序列化一次，`array` 由装配层放进对象库，`record` 是 `PromptTools { hash, len, index, rows }`：数组的 BLAKE3 与字节、休眠索引的字节、每件一行（名字、命名空间、档位、来源、定义的字节、按 `dormant::hint` 截出的第一句），`Off` 的也有一行，按名字排。`FrozenPrefix::with_tools` 把它挂在冻结的前缀上，每一回合的 `prompt_assembled.tools` 都写同一份（`crates/kernel/Spec.lean` §8-22 的记录、`crates/wire/Spec.lean` §8-99 的读者）。字节是本城序列化的字节，不是哪一家 provider 线上的字节：各家兼容格式拼法不同，账要一把对所有兼容格式都一样的尺。
+- **skill 共用三档（D122）**：`exposure_of_skill` 读 `[catalog.skills]` 的楼键再城键，缺省 `Dormant`。`Core` 把 pin 版本的完整 `SKILL.md` 注入 Resident 段，`Dormant` 保留一件一行的索引并经 `read` 取包，`Off` 不进入 catalog、run pin 或任何请求字节。`CatalogEntry.document` 与 `hash` 必须出自同一个 admitted manifest，防止档位文本与版本脱节。
+- **connector pin 在注册之前判定**：装配层先计算服务器定义与每件工具定义的 digest。已有工具 pin 相等才注册；新工具、digest 改变、工具消失各形成 drift 并扣下该工具。服务器定义 digest 改变只标服务器 Changed，不扣下 digest 仍相等的工具。skill pin 不相等时仍注册 pin 的 CAS 版本。每次观察经 `CatalogDrift::between` 形成差异，`digest_invalidated` 对同一 `(building, subject, pinned, found)` 只记一次（kernel D118）。
+- **每个 run 记下它的工具表**：`tool_table` 把 `tool_defs` 的数组按 JSON 序列化一次，`array` 由装配层放进对象库，`record` 是 `PromptTools { hash, len, index, reading, always, dormant, skills, rows }`：数组的 BLAKE3 与字节、休眠索引的字节、Always skill 正文的字节、三类计数，以及每件工具一行（名字、命名空间、档位、来源、定义 digest 与字节、按 `dormant::hint` 截出的第一句），`Off` 的也有一行，按名字排。`ToolTable.definitions` 携带每件工具的规范 JSON，装配层逐件放入 CAS，digest 就是页面离线读取该版本的地址。`FrozenPrefix::with_tools` 把它挂在冻结的前缀上，每一回合的 `prompt_assembled.tools` 都写同一份；`status` 与目录问答读同一份计数（`crates/kernel/Spec.lean` §8-22 的记录、`crates/wire/Spec.lean` §8-99 的读者）。字节是本城序列化的字节，不是哪一家 provider 线上的字节：各家兼容格式拼法不同，账要一把对所有兼容格式都一样的尺。
 - **每个 mode 允许执行哪些常驻工具，由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`tool`；`work` 再加 `edit` 与 `exec`。`ChatRequest.tools` 的常驻核心是 `Mode::ALL` 各自 `core_tools` 的并集，在 session 开始时定下（D25），所以会话中换 mode 不改工具表，只改门（§8-62）。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。`status` 在派发时冻结的那几行进 Run 段之前留在常驻核心里，因为 `City.md` 让每个居民去调它。
 
 下面的模型是索引装填的长度账、命名空间的折叠与三档的可见性；Rust 的 `catalog::dormant` 按同一贪心拼出字节，`catalog::tests` 对拍上限、折叠与三档（§16）。
@@ -362,6 +365,15 @@ end Runtime.Catalog
 **被否**：①改 mode 时换工具表：违反 D21，每次改都整段缓存失效；②`chat` 里 `edit`／`exec` 只经 `tool` 的 `run` 走第三档：模型在 `work` 与 `chat` 之间看到同一件工具时有时直调、有时经 `run`，指南要说两套用法。
 
 **重开参数**：某个 mode 的核心多出一件定义很大的工具、使并集的字节在小模型的窗口里显著时，重议是否只对能改策略的 session 用并集。
+-/
+
+/-! D122 pin 比较先于注册，skill 的 Always 注入已批准正文，计量只有一个来源
+
+**决定**：connector 的工具 digest 不等、新增或消失时不注册该工具；server 定义 digest 不等只标 Changed，不连带扣下 digest 相等的工具。skill 永远注册 pin 的 manifest 版本，候选变化只形成 drift。`[catalog.skills]` 的 `Core` 将同一 manifest 的 `SKILL.md` 注入 Resident 段，`Dormant` 只列索引，`Off` 不进 run。`tool_table` 同时产出定义 CAS 对象与 Always/On call/skill/字节计数，`status` 和 `Query::Catalog` 不各自重算。
+
+**理由**：未批准文本不能进入 prompt；但服务器换命令不应把内容未变的工具全部停用，skill 又必须能继续提供旧字节，所以三类 drift 的运行后果不能一刀切。统一计量避免面板显示的选择与模型 `status` 自问得到的情况相反。
+
+**被否**：pin 整个服务器工具表——改一个工具会扣下全部，且无法表达新增工具；connector 变化时也提供旧描述——服务器行为已经可能改变，旧描述不再构成批准；Always 读取当前候选而不是 pin——接受前即静默换版。重开参数：MCP 提供可验证的旧工具行为版本时，可评估按版本调用，而不是仅按 digest 扣下。
 -/
 
 /-! D111 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结

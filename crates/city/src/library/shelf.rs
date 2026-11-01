@@ -194,7 +194,7 @@ impl Holding {
         Holding {
             name: source.name,
             section: source.section,
-            disclosure: first_line(source.text),
+            disclosure: disclosure(source.text),
             hash: source.hash,
             carried,
             shelf: source.shelf,
@@ -335,7 +335,7 @@ fn index_error(path: &Path, why: &str) -> AxError {
 /// The first non-empty line of a document, trimmed of its heading mark:
 /// what the author wrote to describe it, and the one line a catalog
 /// would show.
-fn first_line(text: &str) -> String {
+pub fn disclosure(text: &str) -> String {
     text.lines()
         .map(str::trim)
         .find(|line| !line.is_empty())

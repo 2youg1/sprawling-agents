@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::config::{SearchConfiguration, StatedConfig};
 use kernel::{
-    Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, McpServer,
+    Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, McpLayer,
     SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
@@ -35,6 +35,7 @@ use context::ContextSection;
 mod agents;
 mod cache;
 mod catalog;
+mod catalog_session;
 mod city_layer;
 mod clock;
 mod context;
@@ -52,6 +53,8 @@ mod write;
 pub use agents::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use cache::keep_warm;
 pub use catalog::{check as check_catalog, write_catalog};
+pub(crate) use catalog_session::forget as forget_catalog_session;
+pub use catalog_session::{SessionCatalog, catalog_for_session, previous_sessions};
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};
@@ -63,7 +66,9 @@ pub use session::{freeze_naming, own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
+pub use write::{migrate_mcp, migrate_mcp_reference, migrate_skill_pin};
 pub use write::{write_mcp, write_sandbox, write_second_threshold};
+pub use write::{write_mcp_references, write_skill_pins};
 
 use ladder::Ladder;
 // The refusal shapes every reader in this module answers with.
@@ -89,7 +94,7 @@ pub struct ConfigLayer {
     harness: Option<String>,
     effort: Option<Effort>,
     sandbox: Option<SandboxLimits>,
-    mcp: Option<Vec<McpServer>>,
+    mcp: Option<McpLayer>,
     /// Which supplier `web_search` reaches (§8-4c); refused on a room's rung.
     search: Option<SearchConfiguration>,
     /// The second context-reminder rung this layer states.
@@ -98,6 +103,8 @@ pub struct ConfigLayer {
     clock_stamp: Option<ClockStampGranularity>,
     keep_warm: Option<KeepWarm>,
     shelves: Option<Vec<String>>,
+    /// Reading Room names to admitted canonical manifests, building scope only.
+    skill_pins: std::collections::BTreeMap<String, B3Hash>,
     /// The identity version a session froze at this address
     /// (`crates/city/spec/Identity.lean` §8-33): read at the room's own layer only.
     naming: Option<B3Hash>,
@@ -172,7 +179,16 @@ impl ConfigLayer {
                 Some(limits)
             }
         };
-        let mcp = file.mcp.map(mcp::servers).transpose()?;
+        let definitions = file.mcp.map(mcp::servers).transpose()?;
+        let references = file.mcp_ref.map(mcp::references).transpose()?;
+        let mcp = if definitions.is_some() || references.is_some() {
+            Some(McpLayer {
+                definitions,
+                references,
+            })
+        } else {
+            None
+        };
         let search = file.search.map(search::stated).transpose()?;
         let model = resident::stated_name(file.model.name, resident::MODEL_NAME_KEY)?;
         let harness = file.resident.and_then(|section| section.harness);
@@ -196,7 +212,11 @@ impl ConfigLayer {
             // directory needs this person's home, which is not this
             // module's to read, and a value stored half-resolved would
             // be a second spelling of the same shelf.
-            shelves: file.skills.map(|section| section.shelves),
+            shelves: file
+                .skills
+                .as_ref()
+                .and_then(|section| section.shelves.clone()),
+            skill_pins: file.skills.map(|section| section.pins).unwrap_or_default(),
             naming: file.identity.map(|section| section.version),
             remote: file.remote.map(remote::stated).transpose()?,
             agents: file.agent.map(agents::rows).transpose()?,
@@ -240,8 +260,14 @@ impl ConfigLayer {
     }
 
     #[must_use]
-    pub fn mcp(&self) -> Option<&[McpServer]> {
-        self.mcp.as_deref()
+    pub fn mcp(&self) -> Option<&McpLayer> {
+        self.mcp.as_ref()
+    }
+
+    /// This layer's Reading Room pins, empty when it states none.
+    #[must_use]
+    pub fn skill_pins(&self) -> &std::collections::BTreeMap<String, B3Hash> {
+        &self.skill_pins
     }
 
     /// The identity version a session at this address froze, when it
@@ -275,6 +301,11 @@ impl ConfigLayer {
     fn confined(&self) -> Vec<Confined> {
         [
             self.shelves.as_ref().map(|_| Confined::Shelves),
+            self.mcp
+                .as_ref()
+                .and_then(|mcp| mcp.references.as_ref())
+                .map(|_| Confined::McpReferences),
+            (!self.skill_pins.is_empty()).then_some(Confined::SkillPins),
             self.remote.as_ref().map(|_| Confined::Remote),
             self.search.as_ref().map(|_| Confined::Search),
             self.agents.as_ref().map(|_| Confined::Agents),
@@ -299,18 +330,20 @@ impl ConfigLayer {
 /// ordinary case.
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
-    Ok(kernel::config::freeze(&StatedConfig {
+    kernel::config::freeze(&StatedConfig {
         clock_stamp: ladder.resolve(ConfigLayer::clock_stamp),
         // No layer states zones: a stamp is written in UTC, and the key
         // is refused where it is written (`crates/city/spec/ConfigLayers.lean` §8-31).
         clock_zones: kernel::LayeredValue::default(),
         effort: ladder.resolve(ConfigLayer::effort),
         sandbox: ladder.resolve(|layer| layer.sandbox().cloned()),
-        mcp: ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
+        mcp: ladder.resolve(|layer| layer.mcp().cloned()),
+        skill_pins: ladder
+            .resolve(|layer| (!layer.skill_pins().is_empty()).then(|| layer.skill_pins().clone())),
         second_threshold: ladder.resolve(|layer| layer.second_threshold),
         search: ladder.resolve(|layer| layer.search().cloned()),
         catalog: ladder.resolve(|layer| layer.catalog().cloned()),
-    }))
+    })
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -327,6 +360,8 @@ pub(crate) struct ConfigFile {
     sandbox: Option<SandboxSection>,
     #[serde(default)]
     mcp: Option<Vec<mcp::McpSection>>,
+    #[serde(default)]
+    mcp_ref: Option<Vec<mcp::McpReferenceSection>>,
     #[serde(default)]
     search: Option<search::SearchSection>,
     #[serde(default)]
@@ -363,7 +398,9 @@ struct IdentitySection {
 #[serde(deny_unknown_fields)]
 struct SkillsSection {
     #[serde(default)]
-    shelves: Vec<String>,
+    shelves: Option<Vec<String>>,
+    #[serde(default)]
+    pins: std::collections::BTreeMap<String, B3Hash>,
 }
 
 #[derive(Debug, Default, Deserialize)]

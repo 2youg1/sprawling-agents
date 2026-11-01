@@ -137,11 +137,17 @@ mod tests {
     use super::*;
 
     /// One skill the way a shelf inside the city files its own: a
-    /// section, then a document named after the skill.
-    fn shelved(root: &Path, section: &str, name: &str, text: &str) {
-        let dir = root.join(section);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join(format!("{name}.md")), text).unwrap();
+    /// One single-document skill installed through the production CAS door.
+    fn shelved(city_root: &Path, slot: &city::Slot, name: &str, text: &str) {
+        let source = city_root.join("fixtures").join(format!("{name}.md"));
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::write(&source, text).unwrap();
+        let store = kernel::layout::CityLayout::new(city_root).cas();
+        let mut cas = storage::Cas::open(&store).unwrap();
+        city::install_skill(city_root, slot, &source, &mut |bytes| {
+            cas.put(bytes).map_err(storage::StorageError::into_ax)
+        })
+        .unwrap();
     }
 
     /// One skill the way a shelf outside the city files it: a directory
@@ -159,30 +165,27 @@ mod tests {
     /// - which is the one thing the answer must not invent.
     #[test]
     fn every_shelf_reaches_the_page_with_the_place_it_sits_at() {
-        use kernel::layout::CityLayout;
-
         let dir = tempfile::tempdir().unwrap();
         crate::worker::fixture::init_city(dir.path()).unwrap();
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
-        let layout = CityLayout::new(dir.path());
         // The same name on both city shelves, so that the row also says
         // which of them won.
         shelved(
-            &layout.library(),
-            "utilities",
+            dir.path(),
+            &city::Slot::library("utilities").unwrap(),
             "diffing",
             "The city's rule\n",
         );
         shelved(
-            &layout.building_skills(&lab),
-            "utilities",
+            dir.path(),
+            &city::Slot::building(&lab, "utilities").unwrap(),
             "diffing",
             "This lab's own rule\n",
         );
         shelved(
-            &layout.library(),
-            "utilities",
+            dir.path(),
+            &city::Slot::library("utilities").unwrap(),
             "kiln-firing",
             "# Firing\n\nbody\n",
         );
@@ -217,15 +220,13 @@ mod tests {
 
         match &named("diffing").shelf {
             wire::SkillShelf::Building(at) => assert!(at.is_within(&lab), "{at}"),
-            wire::SkillShelf::Library(_) | wire::SkillShelf::External { .. } => {
+            wire::SkillShelf::Library | wire::SkillShelf::External { .. } => {
                 panic!("the building's own copy is the nearer shelf")
             }
         }
         assert_eq!(named("diffing").disclosure, "This lab's own rule");
         match &named("kiln-firing").shelf {
-            wire::SkillShelf::Library(at) => {
-                assert!(at.is_reserved(), "a resident may not restock it: {at}")
-            }
+            wire::SkillShelf::Library => {}
             wire::SkillShelf::Building(_) | wire::SkillShelf::External { .. } => {
                 panic!("the city's stock is the library shelf")
             }

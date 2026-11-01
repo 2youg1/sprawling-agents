@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use kernel::layout::CONFIG_FILE;
-use kernel::{AxCode, McpTransport, RESERVED_PREFIX};
+use kernel::{AxCode, McpServer, McpTransport, RESERVED_PREFIX};
 
 use super::*;
 
@@ -332,9 +332,12 @@ fn a_server_row_carries_its_environment_its_headers_and_which_way_a_url_answers(
          [[mcp]]\nlabel = \"streamed\"\nurl = \"https://example.test/sse\"\ntransport = \"sse\"\n",
     )
     .unwrap();
-    let servers = layer.mcp().unwrap();
+    let servers = layer.mcp().unwrap().definitions.as_ref().unwrap();
     assert_eq!(
-        servers.iter().map(|s| &s.transport).collect::<Vec<_>>(),
+        servers
+            .iter()
+            .map(|s| &s.server.transport)
+            .collect::<Vec<_>>(),
         vec![
             &McpTransport::Stdio {
                 command: "mcp-apps".to_owned(),
@@ -420,10 +423,12 @@ fn the_city_and_a_building_state_how_tools_reach_a_run_and_a_room_may_not() {
     let city_table = ExposureTable {
         tools: [("plan".to_owned(), Exposure::Core)].into(),
         namespaces: [("apps".to_owned(), Exposure::Off)].into(),
+        skills: std::collections::BTreeMap::new(),
     };
     let building_table = ExposureTable {
         tools: [("exec".to_owned(), Exposure::Dormant)].into(),
         namespaces: std::collections::BTreeMap::new(),
+        skills: std::collections::BTreeMap::new(),
     };
     write_city_setting(dir.path(), CitySetting::Catalog(&city_table)).unwrap();
     write_catalog(dir.path(), &building, &building_table).unwrap();
@@ -463,6 +468,7 @@ exec = \"off\"
     let misnamed = ExposureTable {
         tools: [("not a tool".to_owned(), Exposure::Off)].into(),
         namespaces: std::collections::BTreeMap::new(),
+        skills: std::collections::BTreeMap::new(),
     };
     assert_eq!(
         *write_catalog(dir.path(), &building, &misnamed)

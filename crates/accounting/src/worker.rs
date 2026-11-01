@@ -98,7 +98,7 @@ use recording::Stamping;
 pub use relay::Relay;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
-use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
+use workbench::{CITY_VERIFIER, Desks, DriftBook, Site, Workbench, held};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -247,6 +247,8 @@ pub struct RunWorker {
     /// for the same reason `models` is. Shared, because the lane that
     /// prepares a dispatch connects its servers (`crates/sprawling/Spec.lean` §8-113).
     connectors: Arc<dyn crate::Connectors + Send + Sync>,
+    /// Catalog differences already recorded, shared with each lane.
+    drift_book: DriftBook,
     /// Looks at the machine this city runs on and installs onto it
     /// (`doctor::ThisMachine`). Received for the same reason `models`
     /// is.

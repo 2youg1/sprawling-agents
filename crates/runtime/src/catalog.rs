@@ -53,6 +53,8 @@ pub struct CatalogEntry {
     /// read. `None` for an entry the catalog holds as text of its own,
     /// which has no document to change behind anybody's back.
     pub hash: Option<B3Hash>,
+    /// The pinned SKILL.md, used only at Core. Empty for mode and dev rows.
+    pub document: String,
 }
 
 /// What a second-level disclosure turns out to be.
@@ -79,6 +81,8 @@ pub struct Catalog {
     /// them, and they are kept only for the table this run records.
     withheld: BTreeMap<String, Filed>,
     skills: BTreeMap<String, Admitted>,
+    /// Skills turned off, retained only to reject a duplicate admission.
+    withheld_skills: BTreeMap<String, CatalogEntry>,
     mode: Option<Mode>,
     exposure: CatalogExposure,
 }
@@ -99,6 +103,8 @@ struct Filed {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolTable {
     pub array: Vec<u8>,
+    /// Every tool definition's canonical bytes, including Off rows.
+    pub definitions: Vec<Vec<u8>>,
     pub record: PromptTools,
 }
 
@@ -107,6 +113,7 @@ pub struct ToolTable {
 #[derive(Debug)]
 struct Admitted {
     entry: CatalogEntry,
+    exposure: Exposure,
 }
 
 impl Catalog {
@@ -177,12 +184,12 @@ impl Catalog {
     /// # Errors
     /// An empty name or disclosure, and a name already admitted, are
     /// `E_INVALID_ARGS`.
-    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError> {
+    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<Exposure, AxError> {
         self.admit(entry)
     }
 
     /// The hygiene check every admitted skill shares.
-    fn admit(&mut self, entry: CatalogEntry) -> Result<(), AxError> {
+    fn admit(&mut self, entry: CatalogEntry) -> Result<Exposure, AxError> {
         if entry.name.trim().is_empty() || entry.disclosure.trim().is_empty() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -194,7 +201,7 @@ impl Catalog {
                  shows both and a resident picks the skill by them",
             ));
         }
-        if self.skills.contains_key(&entry.name) {
+        if self.skills.contains_key(&entry.name) || self.withheld_skills.contains_key(&entry.name) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "admit skill to catalog",
@@ -206,8 +213,17 @@ impl Catalog {
                 entry.name
             )));
         }
-        self.skills.insert(entry.name.clone(), Admitted { entry });
-        Ok(())
+        let (exposure, _) = self
+            .exposure
+            .stated_skill(&entry.name)
+            .unwrap_or((Exposure::Dormant, ExposureFrom::Default));
+        if exposure == Exposure::Off {
+            self.withheld_skills.insert(entry.name.clone(), entry);
+        } else {
+            self.skills
+                .insert(entry.name.clone(), Admitted { entry, exposure });
+        }
+        Ok(exposure)
     }
 
     /// The run sits in exactly one mode; the catalog shows only it.
@@ -254,6 +270,19 @@ impl Catalog {
         out.push_str(&dev.disclosure);
         out.push('\n');
         out.push_str(&dormant::index(&self.dormant_entries()));
+        for (name, admitted) in self
+            .skills
+            .iter()
+            .filter(|(_, admitted)| admitted.exposure == Exposure::Core)
+        {
+            out.push_str("\n## skill ");
+            out.push_str(name);
+            out.push_str("\n\n");
+            out.push_str(&admitted.entry.document);
+            if !admitted.entry.document.ends_with('\n') {
+                out.push('\n');
+            }
+        }
         out
     }
 
@@ -270,7 +299,12 @@ impl Catalog {
         let filed_as_skill = namespaces
             .remove(&(skill.as_str(), &skill))
             .unwrap_or_default();
-        let skills = filed_as_skill.len().saturating_add(self.skills.len());
+        let dormant_skills = self
+            .skills
+            .values()
+            .filter(|admitted| admitted.exposure == Exposure::Dormant)
+            .count();
+        let skills = filed_as_skill.len().saturating_add(dormant_skills);
         let opening = (skills > 0).then(|| dormant::Entry {
             label: format!("{} ({skills})", skill.as_str()),
             about: skill.about(filed_as_skill.iter().copied()),
@@ -282,10 +316,15 @@ impl Catalog {
                 about: namespace.about(members.iter().copied()),
             })
             .chain(opening)
-            .chain(self.skills.iter().map(|(name, admitted)| dormant::Entry {
-                label: format!("skill {name}"),
-                about: admitted.entry.disclosure.clone(),
-            }))
+            .chain(
+                self.skills
+                    .iter()
+                    .filter(|(_, admitted)| admitted.exposure == Exposure::Dormant)
+                    .map(|(name, admitted)| dormant::Entry {
+                        label: format!("skill {name}"),
+                        about: admitted.entry.disclosure.clone(),
+                    }),
+            )
             .collect()
     }
 
@@ -349,25 +388,44 @@ impl Catalog {
     pub fn tool_table(&self) -> Result<ToolTable, AxError> {
         let array = serialised(&self.tool_defs())?;
         let mut rows = Vec::with_capacity(self.tools.len().saturating_add(self.withheld.len()));
+        let mut definitions = Vec::with_capacity(rows.capacity());
         for (name, filed) in self.tools.iter().chain(self.withheld.iter()) {
+            definitions.push(filed.def.pin_bytes()?);
             rows.push(PromptTool {
                 name: name.clone(),
                 namespace: filed.namespace.as_str().to_owned(),
                 exposure: filed.exposure,
                 from: filed.from,
+                digest: Some(filed.def.digest()?),
                 len: counted(serialised(&filed.def)?.len())?,
                 hint: dormant::hint(&filed.def.description).to_owned(),
             });
         }
         rows.sort_by(|left, right| left.name.cmp(&right.name));
+        let reading = self
+            .skills
+            .values()
+            .filter(|admitted| admitted.exposure == Exposure::Core)
+            .map(|admitted| admitted.entry.document.len())
+            .sum::<usize>();
         Ok(ToolTable {
             record: PromptTools {
                 hash: B3Hash::digest(&array),
                 len: counted(array.len())?,
                 index: counted(dormant::index(&self.dormant_entries()).len())?,
+                reading: counted(reading)?,
+                always: counted_u32(self.tool_defs().len())?,
+                dormant: counted_u32(
+                    self.tools
+                        .values()
+                        .filter(|filed| filed.exposure == Exposure::Dormant)
+                        .count(),
+                )?,
+                skills: counted_u32(self.skills.len())?,
                 rows,
             },
             array,
+            definitions,
         })
     }
 
@@ -398,7 +456,7 @@ impl Catalog {
     /// which it had by trying to parse it as an address, and a mode
     /// whose text happened to parse would have been opened as a file.
     pub fn expand(&self, name: &str) -> Option<Expansion> {
-        if let Some(Admitted { entry }) = self.skills.get(name) {
+        if let Some(Admitted { entry, .. }) = self.skills.get(name) {
             let manifest = entry.expansion.parse::<B3Hash>().ok()?;
             return Some(Expansion::Skill { manifest });
         }
@@ -428,6 +486,18 @@ fn serialised(value: &impl serde::Serialize) -> Result<Vec<u8>, AxError> {
             err.to_string(),
         )
         .with_recovery("give the tool a schema that serialises as JSON")
+    })
+}
+
+/// A capability count as the record holds it.
+fn counted_u32(len: usize) -> Result<u32, AxError> {
+    u32::try_from(len).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "record the tool table",
+            "a capability count past u32",
+        )
+        .with_recovery("admit fewer capabilities: this table cannot be recorded")
     })
 }
 

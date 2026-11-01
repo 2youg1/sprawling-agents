@@ -27,7 +27,10 @@ fn shipped_names() -> Vec<(String, String)> {
 
 fn shelved(city_root: &std::path::Path) -> Vec<(String, String)> {
     let home = city_root.join("no-home");
-    let mut found: Vec<(String, String)> = city::Library::scan(city_root, None, &home)
+    let store = kernel::layout::CityLayout::new(city_root).cas();
+    let cas = storage::Cas::open(&store).unwrap();
+    let read = |digest: &kernel::B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
+    let mut found: Vec<(String, String)> = city::Library::scan(city_root, None, &home, &read)
         .unwrap()
         .all()
         .into_iter()
@@ -73,16 +76,19 @@ fn a_formed_city_records_each_shipped_skill_it_shelved() {
         .filter(|record| record.kind() == kernel::EventKind::SkillShelved)
         .map(|record| record.data().read::<SkillShelved>().unwrap())
         .collect();
-    let slot = city::Slot::library(city::SHIPPED_SECTION).unwrap();
-    let shelf = kernel::layout::CityLayout::new(dir.path())
-        .library()
-        .join(city::SHIPPED_SECTION);
+    let store = kernel::layout::CityLayout::new(dir.path()).cas();
+    let cas = storage::Cas::open(&store).unwrap();
+    let read = |digest: &kernel::B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
+    let shelves =
+        city::Library::scan(dir.path(), None, &dir.path().join("no-home"), &read).unwrap();
     let expected: Vec<SkillShelved> = shipped_names()
         .into_iter()
         .map(|(_, name)| SkillShelved {
-            digest: *city::plan_skill_install(dir.path(), &slot, &shelf.join(&name))
+            digest: shelves
+                .reading_room(std::slice::from_ref(&name))
+                .first()
                 .unwrap()
-                .hash(),
+                .hash,
             skill: name,
             source: ShelvedFrom::Shipped,
         })

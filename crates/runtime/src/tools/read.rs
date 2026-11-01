@@ -450,6 +450,7 @@ impl Tool for ReadTool {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
-    reason = "test code"
+    clippy::permissions_set_readonly_false,
+    reason = "test code, including a deliberately corrupted writable CAS object"
 )]
 mod tests;

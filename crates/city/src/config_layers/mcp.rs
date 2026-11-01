@@ -8,7 +8,10 @@
 //!
 //! Specified by `crates/city/spec/ConfigLayers.lean` §8-4 and §8-4b.
 
-use kernel::{AxCode, AxError, McpServer, McpTransport, ReservedNamespace, SecretRef, ServerLabel};
+use kernel::{
+    AxCode, AxError, B3Hash, McpDefinition, McpReference, McpServer, McpTransport,
+    ReservedNamespace, SecretRef, ServerLabel,
+};
 use serde::Deserialize;
 
 use super::refuse::refuse;
@@ -16,6 +19,9 @@ use super::refuse::refuse;
 /// What a refusal of this judgement says it was doing: the same words
 /// whether the row came from a person's file or from the settings page.
 const ACTION: &str = "check the servers a layer reaches";
+
+/// The reference table's header, as a refusal names it.
+pub(crate) const MCP_REFERENCE_KEY: &str = "[[mcp_ref]]";
 
 /// Judges every server one layer reaches, for the reader and the writer
 /// alike: a value in `env` or `headers` that is a credential rather
@@ -188,8 +194,8 @@ pub(super) fn vaulted(
 /// Refuses a label `kernel` does not accept, a row that names both a
 /// command and a url or neither, a stream chosen for a command, two
 /// rows under one label, and every row [`validate`] refuses.
-pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpServer>, AxError> {
-    let mut servers: Vec<McpServer> = Vec::new();
+pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpDefinition>, AxError> {
+    let mut servers: Vec<McpDefinition> = Vec::new();
     for entry in entries {
         let label = ServerLabel::parse(&entry.label)
             .map_err(|err| refuse(format!("{}: {}", entry.label, err.recovery())))?;
@@ -242,16 +248,47 @@ pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpServer>, AxErro
         // Two servers under one label would put one tool name
         // in front of two processes, and that is a routing
         // mistake rather than a preference.
-        if servers.iter().any(|held| held.label == label) {
+        if servers.iter().any(|held| held.server.label == label) {
             return Err(refuse(format!(
                 "{}: two servers are named the same in one layer",
                 label.as_str()
             )));
         }
-        servers.push(McpServer { label, transport });
+        servers.push(McpDefinition {
+            server: McpServer { label, transport },
+            conflict: entry.conflict,
+        });
     }
-    validate(&servers)?;
+    validate(
+        &servers
+            .iter()
+            .map(|definition| definition.server.clone())
+            .collect::<Vec<_>>(),
+    )?;
     Ok(servers)
+}
+
+/// Reads building-scope references. Pins are already typed BLAKE3 values;
+/// the label grammar and duplicate rule are the same as for definitions.
+pub(super) fn references(entries: Vec<McpReferenceSection>) -> Result<Vec<McpReference>, AxError> {
+    let mut references: Vec<McpReference> = Vec::new();
+    for entry in entries {
+        let label = ServerLabel::parse(&entry.label)
+            .map_err(|err| refuse(format!("{}: {}", entry.label, err.recovery())))?;
+        unreserved(&label)?;
+        if references.iter().any(|held| held.label == label) {
+            return Err(refuse(format!(
+                "{}: two references are named the same in one layer",
+                label.as_str()
+            )));
+        }
+        references.push(McpReference {
+            label,
+            definition: entry.definition,
+            tools: entry.tools,
+        });
+    }
+    Ok(references)
 }
 
 /// A configured table as the wire carries it: name before value, in the
@@ -268,6 +305,10 @@ fn listed(table: std::collections::BTreeMap<String, String>) -> Vec<(String, Str
 #[serde(deny_unknown_fields)]
 pub(super) struct McpSection {
     label: String,
+    /// Whether this local definition deliberately conflicts with a
+    /// different definition of the same label at a farther scope.
+    #[serde(default)]
+    conflict: bool,
     #[serde(default)]
     command: Option<String>,
     #[serde(default)]
@@ -294,4 +335,16 @@ pub(super) struct McpSection {
 enum ReachedBy {
     Http,
     Sse,
+}
+
+/// One `[[mcp_ref]]` row: a label and its approved versions, never a
+/// command, URL, environment or header row.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct McpReferenceSection {
+    label: String,
+    #[serde(default)]
+    definition: Option<B3Hash>,
+    #[serde(default)]
+    tools: Option<std::collections::BTreeMap<String, B3Hash>>,
 }

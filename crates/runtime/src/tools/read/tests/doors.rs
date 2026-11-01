@@ -78,6 +78,7 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
             disclosure: "how this building reviews".to_owned(),
             expansion: manifest.to_string(),
             hash: Some(manifest),
+            document: "check the diff first\n".to_owned(),
         })
         .unwrap();
 
@@ -116,13 +117,14 @@ fn a_changed_cas_object_is_refused() {
             disclosure: "the kept skill".to_owned(),
             expansion: manifest.to_string(),
             hash: Some(manifest),
+            document: "on the shelf\n".to_owned(),
         })
         .unwrap();
     let hex = manifest.to_string();
     let path = kernel::layout::CityLayout::new(dir.path())
         .cas()
         .join("b3")
-        .join(&hex[..2])
+        .join(hex.get(..2).unwrap())
         .join(&hex);
     let mut permissions = std::fs::metadata(&path).unwrap().permissions();
     permissions.set_readonly(false);
@@ -244,6 +246,7 @@ fn a_document_named_like_a_package_opens_nothing_beside_it() {
             disclosure: "how ops works".to_owned(),
             expansion: manifest.to_string(),
             hash: Some(manifest),
+            document: "how ops works\n".to_owned(),
         })
         .unwrap();
 

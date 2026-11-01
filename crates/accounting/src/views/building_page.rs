@@ -100,7 +100,13 @@ pub(crate) fn read_building(
         sandbox: own.sandbox().cloned(),
         mcp: own
             .mcp()
-            .map(<[kernel::McpServer]>::to_vec)
+            .and_then(|mcp| mcp.definitions.as_ref())
+            .map(|definitions| {
+                definitions
+                    .iter()
+                    .map(|definition| definition.server.clone())
+                    .collect()
+            })
             .unwrap_or_default(),
     })
 }
