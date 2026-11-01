@@ -333,7 +333,7 @@ impl ConfigLayer {
 /// ordinary case.
 /// Validates a replacement building reference table through the same
 /// ladder and connector resolver a later run will use.
-fn check_mcp_references(
+pub fn check_mcp_references(
     city_root: &Path,
     building: &Address,
     references: &[McpReference],

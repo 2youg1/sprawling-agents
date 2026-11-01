@@ -62,6 +62,9 @@ impl RunWorker {
         let threshold = context_second_threshold
             .map(kernel::config::SecondThreshold::parse)
             .transpose()?;
+        if let Some(references) = mcp_references {
+            city::check_mcp_references(&self.city_root, building.addr(), references)?;
+        }
         if let Some(names) = reading_room {
             city::check_reading_room(&self.city_root, building.addr(), names)?;
         }

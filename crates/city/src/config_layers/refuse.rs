@@ -16,7 +16,7 @@ use kernel::{AxCode, AxError, RESERVED_PREFIX};
 use super::agents::AGENT_KEY;
 use super::catalog::CATALOG_KEY;
 use super::ladder::Layer;
-use super::mcp::MCP_REFERENCE_KEY;
+use super::mcp::MCP_REFERENCE_FIELD;
 use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
 use super::search::SEARCH_KEY;
@@ -109,15 +109,15 @@ impl Confined {
         rung <= self.nearest()
     }
 
-    fn key(self) -> &'static str {
+    fn key(self) -> String {
         match self {
-            Confined::Shelves => SHELVES_KEY,
-            Confined::Remote => REMOTE_KEY,
-            Confined::Search => SEARCH_KEY,
-            Confined::Agents => AGENT_KEY,
-            Confined::Catalog => CATALOG_KEY,
-            Confined::McpReferences => MCP_REFERENCE_KEY,
-            Confined::SkillPins => SKILL_PINS_KEY,
+            Confined::Shelves => SHELVES_KEY.to_owned(),
+            Confined::Remote => REMOTE_KEY.to_owned(),
+            Confined::Search => SEARCH_KEY.to_owned(),
+            Confined::Agents => AGENT_KEY.to_owned(),
+            Confined::Catalog => CATALOG_KEY.to_owned(),
+            Confined::McpReferences => format!("[[{MCP_REFERENCE_FIELD}]]"),
+            Confined::SkillPins => SKILL_PINS_KEY.to_owned(),
         }
     }
 

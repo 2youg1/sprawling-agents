@@ -133,7 +133,7 @@ fn validate(items: &[SkillItem]) -> Result<(), String> {
     let mut paths = BTreeSet::new();
     for item in items {
         let path = item.path();
-        if !plain(path) {
+        if !plain_package_path(path) {
             return Err(format!("`{path}` is not a plain relative package path"));
         }
         if !paths.insert(path) {
@@ -155,7 +155,10 @@ fn validate(items: &[SkillItem]) -> Result<(), String> {
     Ok(())
 }
 
-fn plain(path: &str) -> bool {
+/// Whether `path` is one canonical relative path inside a skill package.
+/// Manifest construction and package reads share this grammar.
+#[must_use]
+pub fn plain_package_path(path: &str) -> bool {
     !path.is_empty()
         && path.split('/').all(|segment| {
             !segment.is_empty()

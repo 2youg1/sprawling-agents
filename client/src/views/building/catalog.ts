@@ -117,7 +117,7 @@ export function skillRowsOf(answer: CatalogAnswer, scope: Scope): readonly Skill
   }));
 }
 
-function omit(record: Readonly<Record<string, Exposure>>, key: string): Record<string, Exposure> {
+function omit<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
   return Object.fromEntries(Object.entries(record).filter(([held]) => held !== key));
 }
 
@@ -187,27 +187,32 @@ export function pressSkill(
 }
 
 export function acceptTool(selection: Selection, tool: CatalogTool): Selection {
-  if (tool.current == null) return selection;
-  const digest = tool.current.digest;
   return {
     ...selection,
     references: selection.references.map((reference) => {
       if (reference.label !== tool.namespace) return reference;
-      return { ...reference, tools: { ...reference.tools, [tool.name]: digest } };
+      const tools = { ...reference.tools };
+      return {
+        ...reference,
+        tools:
+          tool.current == null
+            ? omit(tools, tool.name)
+            : { ...tools, [tool.name]: tool.current.digest },
+      };
     }),
   };
 }
 
 export function acceptSkill(selection: Selection, skill: CatalogSkill): Selection {
-  return skill.candidate == null
-    ? selection
-    : { ...selection, skillPins: { ...selection.skillPins, [skill.name]: skill.candidate } };
+  const skillPins =
+    skill.candidate == null
+      ? omit(selection.skillPins, skill.name)
+      : { ...selection.skillPins, [skill.name]: skill.candidate };
+  return { ...selection, skillPins };
 }
 
 export function keepSkill(selection: Selection, skill: CatalogSkill): Selection {
-  const skillPins = Object.fromEntries(
-    Object.entries(selection.skillPins).filter(([name]) => name !== skill.name),
-  );
+  const skillPins = omit(selection.skillPins, skill.name);
   if (skill.pinned != null) skillPins[skill.name] = skill.pinned;
   return { ...selection, skillPins };
 }
@@ -515,7 +520,7 @@ function toolLook(
   const tool = row.tool;
   const current = tool.current ?? tool.pinned;
   const actions =
-    seat.scope === "building" && tool.change != null && tool.current != null
+    seat.scope === "building" && tool.change != null
       ? [
           {
             key: "accept",
@@ -566,8 +571,8 @@ function skillLook(
   choices: (why: string | undefined) => readonly Choice<Exposure>[],
 ): RowLook {
   const skill = row.skill;
-  const accepted = skill.candidate != null && seat.draft.skillPins[skill.name] === skill.candidate;
-  const kept = seat.draft.skillPins[skill.name] === skill.pinned;
+  const accepted = selectionPinsSkill(seat.draft, skill);
+  const kept = skill.pinned != null && seat.draft.skillPins[skill.name] === skill.pinned;
   const actions =
     seat.scope === "building" && skill.change != null
       ? [
@@ -579,14 +584,18 @@ function skillLook(
               hands.edit(acceptSkill(seat.draft, skill));
             },
           },
-          {
-            key: "keep",
-            label: say(lang, "catalog_keep"),
-            why: kept ? say(lang, "catalog_kept") : undefined,
-            onPress: () => {
-              hands.edit(keepSkill(seat.draft, skill));
-            },
-          },
+          ...(skill.pinned == null
+            ? []
+            : [
+                {
+                  key: "keep",
+                  label: say(lang, "catalog_keep"),
+                  why: kept ? say(lang, "catalog_kept") : undefined,
+                  onPress: () => {
+                    hands.edit(keepSkill(seat.draft, skill));
+                  },
+                },
+              ]),
         ]
       : [];
   const audit =
@@ -667,11 +676,17 @@ function comparisonOf(
 }
 
 function selectionPinsTool(selection: Selection, tool: CatalogTool): boolean {
-  if (tool.current == null) return true;
-  return selection.references.some(
-    (reference) =>
-      reference.label === tool.namespace && reference.tools?.[tool.name] === tool.current?.digest,
-  );
+  const current = tool.current;
+  return selection.references.some((reference) => {
+    if (reference.label !== tool.namespace || reference.tools == null) return false;
+    const held = reference.tools[tool.name];
+    return current == null ? held === undefined : held === current.digest;
+  });
+}
+
+function selectionPinsSkill(selection: Selection, skill: CatalogSkill): boolean {
+  const held = selection.skillPins[skill.name];
+  return skill.candidate == null ? held === undefined : held === skill.candidate;
 }
 
 function bytesOf(tool: CatalogTool): number {

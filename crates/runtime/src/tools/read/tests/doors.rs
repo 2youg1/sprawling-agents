@@ -94,6 +94,11 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         let err = tool.invoke(&call(leaving)).unwrap_err();
         assert_eq!(err.code(), &code, "{leaving} was opened");
     }
+    let nul = tool.invoke(&call("review/bad\0path")).unwrap_err();
+    assert!(
+        nul.recovery().contains("plain segments"),
+        "a NUL path was judged as a missing file instead of an invalid package path: {nul:?}"
+    );
     let miss = tool.invoke(&call("review/scriptz/check.sh")).unwrap_err();
     assert_eq!(
         miss.nearby(),

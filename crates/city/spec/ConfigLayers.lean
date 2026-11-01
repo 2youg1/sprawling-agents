@@ -95,7 +95,7 @@ tools = { docs_search = "<tool-definition-b3>" }  # 旧引用迁移前可缺席�
 - **重名不遮蔽**：同 label 的跨 scope 等值定义在迁移时改成引用；不同定义只有在近层行写 `conflict = true` 时才作为这栋楼自己的定义保留，否则 `E_CONFIG_INVALID`。引用点名一个没有定义的 label 同样拒，恢复语让人先在城层定义或修正 label。
 - **迁移**：开城时把等值楼行改写为无 pin 的旧引用；真正不同的楼本地定义保留并显式写 `conflict = true`。第一次 run 把当时列出的服务器定义与工具填成初始 pin 后，引用不再是旧式。缺 pin 的旧配置是唯一的自动准入路径；已有 pin 后的新工具、改工具或消失工具都按 drift 处理，绝不自动接受。
 - **`[skills.pins]`**：Reading Room 的名字到 canonical manifest digest，只写楼层；`[skills] shelves` 仍只在城层，两者可同节而作用域分别判断。旧阅览室第一次 run 把当时解析到的候选填成 pin；之后安装同名新候选不移动 pin。保存目录时经既有 RULES 与 CONFIG 写门一起更新名字、档位和 pin。
-- **写面**：`write_mcp_references` 整张替换楼层引用，`write_skill_pins` 整张替换楼层 skill pin；迁移专用的 `migrate_mcp_reference` 与 `migrate_skill_pin` 只填补仍为 `None` 的旧 pin，不覆盖人已经保存的新值。所有写面仍走 `change`，落盘前由 `ConfigLayer::parse` 复读。
+- **写面**：`write_mcp_references` 整张替换楼层引用，`write_skill_pins` 整张替换楼层 skill pin；迁移专用的 `migrate_mcp_reference` 与 `migrate_skill_pin` 只填补仍为 `None` 的旧 pin，不覆盖人已经保存的新值。`mcp_ref` 的字段名由 `config_layers::mcp` 一处声明，写行、迁移与拒词都从那里取，不在写面重拼。所有写面仍走 `change`，落盘前由 `ConfigLayer::parse` 复读。
 
 D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在城层。理由：一栋楼想多用或少用一台服务器不该重述传输与凭据引用；城层修改命令后，所有引用它的楼应在下一次 run 使用新定义，同时工具自己的 digest 仍决定哪些内容已获批准。被否：整表上梯复制 `[[mcp]]`，改一处必须逐楼重复，且近层静默遮蔽远层。重开参数：出现独立于楼的第二个定义拥有者时，先扩展 scope 类型与重复判定，不在引用行里塞第二份定义。
 
@@ -446,6 +446,17 @@ settings-control ConfigFile.cache client/src/views/settings/city_layer.svelte
 settings-control ConfigFile.catalog client/src/views/building/catalog.svelte
 settings-control CatalogSection.tools client/src/views/building/catalog.svelte
 settings-control CatalogSection.namespaces client/src/views/building/catalog.svelte
+settings-control CatalogSection.skills client/src/views/building/catalog.svelte
+settings-control ConfigFile.mcp_ref client/src/views/building/catalog.svelte
+settings-control McpReferenceSection.label client/src/views/building/catalog.svelte
+settings-control McpReferenceSection.definition client/src/views/building/catalog.svelte
+settings-control McpReferenceSection.tools client/src/views/building/catalog.svelte
+settings-control SkillsSection.pins client/src/views/building/catalog.svelte
+settings-reason McpSection.conflict 楼本地定义与城层同名而不同，需要人在两份 CONFIG.toml 之间手工确认保留哪一个；目录面板只保存引用，不提供第二个定义编辑面。
+settings-reason SessionCatalog.catalog 会话第一次 run 冻结的目录记录，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
+settings-reason SessionCatalog.mcp_references 会话第一次 run 冻结的 connector 引用与 pin，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
+settings-reason SessionCatalog.reading_room 会话第一次 run 冻结的 Reading Room 名字，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
+settings-reason SessionCatalog.skill_pins 会话第一次 run 冻结的 skill pin，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
 settings-control CacheSection.keep_warm client/src/views/settings/city_layer.svelte
 settings-reason ConfigFile.clock 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
 settings-reason ClockSection.stamp 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。

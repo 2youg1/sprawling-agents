@@ -20,8 +20,8 @@ use super::refuse::refuse;
 /// whether the row came from a person's file or from the settings page.
 const ACTION: &str = "check the servers a layer reaches";
 
-/// The reference table's header, as a refusal names it.
-pub(crate) const MCP_REFERENCE_KEY: &str = "[[mcp_ref]]";
+/// The reference table's field, shared by the parser's writers and refusals.
+pub(crate) const MCP_REFERENCE_FIELD: &str = "mcp_ref";
 
 /// Judges every server one layer reaches, for the reader and the writer
 /// alike: a value in `env` or `headers` that is a credential rather

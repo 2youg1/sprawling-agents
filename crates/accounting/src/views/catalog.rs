@@ -219,6 +219,10 @@ fn tool_rows(table: &PromptTools, read: ToolRead<'_>) -> Result<Vec<wire::Catalo
     observed
         .into_iter()
         .map(|(name, observed)| tool_row(name, observed, &read))
+        .filter(|row| {
+            row.as_ref()
+                .is_ok_and(|row| row.current.is_some() || row.pinned.is_some())
+        })
         .collect()
 }
 
@@ -309,6 +313,10 @@ fn skill_rows(read: SkillRead<'_>) -> Result<Vec<wire::CatalogSkill>, AxError> {
         .map(|name| {
             let holding = holdings.get(&name).copied();
             skill_row(name, holding, &read)
+        })
+        .filter(|row| {
+            row.as_ref()
+                .is_ok_and(|row| row.candidate.is_some() || row.pinned.is_some())
         })
         .collect()
 }

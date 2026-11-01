@@ -53,6 +53,7 @@ pub use building::{Building, BuildingTemplate, Removed, create as create_buildin
 pub use building::{Founding, RulesText, has_rules, raise as raise_building, template_rules};
 pub use check::{Finding, Position, Report, check};
 pub use city_tool::CityTool;
+pub use config_layers::check_mcp_references;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};

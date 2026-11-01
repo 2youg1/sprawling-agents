@@ -8,6 +8,8 @@ use std::path::Path;
 
 use kernel::{Address, B3Hash, RunId, Seq};
 
+use super::{PromptTools, ToolRead, tool_rows};
+
 fn city_with_lab() -> (tempfile::TempDir, Address) {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -111,6 +113,50 @@ fn candidate(city_root: &Path, lab: &Address, name: &str) -> B3Hash {
 }
 
 #[test]
+fn an_accepted_tool_removal_leaves_no_historical_ghost_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let label = kernel::ServerLabel::parse("docs").unwrap();
+    let drift = kernel::event::record::CatalogDrift {
+        subject: kernel::event::record::CatalogSubject::Tool {
+            label: label.clone(),
+            name: "search".to_owned(),
+        },
+        pinned: Some(B3Hash::digest(b"old definition")),
+        found: None,
+    };
+    let references = vec![kernel::McpReference {
+        label,
+        definition: None,
+        tools: Some(BTreeMap::new()),
+    }];
+    let evidence = crate::views::usage::CatalogEvidence::default();
+    let drifts = vec![(Seq::FIRST, drift)];
+    let cas = storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas()).unwrap();
+    let rows = tool_rows(
+        &PromptTools {
+            hash: B3Hash::digest(b""),
+            len: 0,
+            index: 0,
+            reading: 0,
+            always: 0,
+            dormant: 0,
+            skills: 0,
+            rows: Vec::new(),
+        },
+        ToolRead {
+            stated: &kernel::config::CatalogExposure::default(),
+            references: &references,
+            evidence: &evidence,
+            drifts: &drifts,
+            cas: &cas,
+            newest: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(rows, Vec::new());
+}
+
+#[test]
 fn an_internal_skill_compares_two_cas_documents_and_accept_moves_the_pin() {
     let (dir, lab) = city_with_lab();
     let old = install(dir.path(), &lab, "guide", "# Old guide\n\nold body\n");
@@ -138,6 +184,45 @@ fn an_internal_skill_compares_two_cas_documents_and_accept_moves_the_pin() {
     let answer = catalog(dir.path(), &lab);
     assert_eq!(skill(&answer, "guide").change, None);
     assert_eq!(answer.changed, 0);
+}
+
+#[test]
+fn an_accepted_skill_removal_leaves_no_historical_ghost_row() {
+    let (dir, lab) = city_with_lab();
+    let old = install(dir.path(), &lab, "guide", "# Old guide\n");
+    admit(dir.path(), &lab, &["guide"]);
+    save_pins(dir.path(), &lab, "guide", old);
+    let index = kernel::layout::CityLayout::new(dir.path())
+        .building_skills(&lab)
+        .join(kernel::layout::SHELF_INDEX);
+    std::fs::write(&index, "version = 1\n").unwrap();
+    let mut worker = crate::worker::RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+            addr: lab.clone(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: None,
+            skill_pins: Some(BTreeMap::new()),
+            reading_room: Some(vec!["guide".to_owned()]),
+            idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, b"accept-skill-removal"),
+        }))
+        .unwrap();
+
+    let answer = catalog(dir.path(), &lab);
+    assert!(
+        !answer.skill_rows.iter().any(|row| row.name == "guide"),
+        "an accepted removal left a ghost row: {:?}",
+        answer.skill_rows
+    );
 }
 
 #[test]

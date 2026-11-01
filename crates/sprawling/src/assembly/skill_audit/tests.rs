@@ -132,15 +132,18 @@ fn local_report(request: &city::AuditRequest, verdict: AuditVerdict) -> city::Au
 #[test]
 fn background_unknown_digest_scans_locally_and_records_why() {
     let dir = tempfile::tempdir().unwrap();
-    let (path, old) = landed(
+    let (_, old) = landed(
         dir.path(),
         &city::Slot::library("tools").unwrap(),
         "# kiln\n",
     );
     let mut ledger = open(dir.path());
     shelving(&mut ledger, old, remote("a/repo/kiln"));
-    std::fs::write(&path, "# edited kiln\n").unwrap();
-    let current = city::skill_digest(&path).unwrap();
+    let (path, current) = landed(
+        dir.path(),
+        &city::Slot::library("tools").unwrap(),
+        "# edited kiln\n",
+    );
     let (send, receive) = mpsc::channel();
     drop(send);
     let mut scans = Vec::new();
@@ -177,11 +180,8 @@ fn background_unknown_digest_scans_locally_and_records_why() {
 #[test]
 fn background_startup_notification_and_duplicate_claims_use_one_attempt() {
     let dir = tempfile::tempdir().unwrap();
-    let (path, a) = landed(
-        dir.path(),
-        &city::Slot::library("tools").unwrap(),
-        "# kiln A\n",
-    );
+    let slot = city::Slot::library("tools").unwrap();
+    let (_, a) = landed(dir.path(), &slot, "# kiln A\n");
     let mut ledger = open(dir.path());
     shelving(&mut ledger, a, ShelvedFrom::Path);
     let (send, receive) = mpsc::channel();
@@ -197,8 +197,7 @@ fn background_startup_notification_and_duplicate_claims_use_one_attempt() {
         &mut |request: &city::AuditRequest| {
             calls.push(request.digest);
             if request.digest == a {
-                std::fs::write(&path, "# kiln B\n").unwrap();
-                let b = city::skill_digest(&path).unwrap();
+                let (_, b) = landed(dir.path(), &slot, "# kiln B\n");
                 let notice = EventRecord::from_draft(
                     draft(
                         EventKind::SkillShelved,
@@ -221,7 +220,7 @@ fn background_startup_notification_and_duplicate_claims_use_one_attempt() {
         },
     )
     .unwrap();
-    let b = city::skill_digest(&path).unwrap();
+    let (_, b) = landed(dir.path(), &slot, "# kiln B\n");
     assert_eq!(calls, vec![a, b]);
     assert_eq!(
         records(dir.path())

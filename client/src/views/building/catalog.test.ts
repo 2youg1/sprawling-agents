@@ -18,6 +18,7 @@ import { Address, B3Hash, ServerLabel } from "../../wire";
 import {
   acceptSkill,
   acceptTool,
+  catalogLook,
   draftOf,
   effectiveOf,
   keepSkill,
@@ -275,6 +276,115 @@ describe("the capabilities draft", () => {
     expect(digest).toBeDefined();
     if (digest === undefined) return;
     expect(acceptTool(selection, first.tool).references[0]?.tools).toEqual({ t0: digest });
+  });
+
+  test("Accept removes deleted pins, and Keep is absent when there is no old skill version", () => {
+    const old = B3Hash.make("1".padStart(64, "0"));
+    const candidate = B3Hash.make("2".padStart(64, "0"));
+    const version = {
+      bytes: 10,
+      hint: "old",
+      description: "old",
+      digest: old,
+      input_schema: {},
+    };
+    const removedTool = {
+      ...row(0, 0, 10, false, "dormant").tool,
+      current: null,
+      pinned: version,
+      change: "removed" as const,
+    };
+    const removedSkill: CatalogSkill = {
+      name: "how",
+      section: "engineering",
+      disclosure: "old",
+      current_document: null,
+      pinned_document: "# Old\n",
+      candidate: null,
+      pinned: old,
+      change: "removed",
+      exposure: "dormant",
+      from: "default",
+      audit: null,
+      audit_stale: false,
+      runs_used: 0,
+      last_used: null,
+    };
+    const addedSkill: CatalogSkill = {
+      ...removedSkill,
+      current_document: "# New\n",
+      candidate,
+      pinned: null,
+      change: "added",
+    };
+    const selection: Selection = {
+      catalog: EMPTY,
+      references: [{ label: ServerLabel.make("n0"), definition: old, tools: { t0: old } }],
+      skillPins: { how: old },
+      readingRoom: ["how"],
+    };
+    expect(acceptTool(selection, removedTool).references[0]?.tools).toEqual({});
+    expect(acceptSkill(selection, removedSkill).skillPins).toEqual({});
+
+    const answer: CatalogAnswer = {
+      building: Address.make("shop"),
+      run: null,
+      core_bytes: 0,
+      index_bytes: 0,
+      reading_bytes: 0,
+      always: 0,
+      dormant: 0,
+      skills: 0,
+      changed: 2,
+      open_sessions: 0,
+      runs_seen: 0,
+      tools: [removedTool],
+      skill_rows: [removedSkill],
+      references: selection.references,
+      skill_pins: selection.skillPins,
+      reading_room: selection.readingRoom,
+      city: {},
+      stated: {},
+    };
+    const hands = {
+      scope: () => undefined,
+      edit: () => undefined,
+      save: () => undefined,
+      unused: () => undefined,
+      copy: () => undefined,
+    };
+    const removedLook = catalogLook(
+      {
+        answer,
+        scope: "building",
+        draft: selection,
+        edited: true,
+        now: 0,
+        unusedOnly: false,
+        buildings: [],
+      },
+      "en",
+      hands,
+    );
+    expect(removedLook.groups[0]?.rows[0]?.actions.map((action) => action.key)).toEqual(["accept"]);
+    expect(removedLook.groups[1]?.rows[0]?.actions.map((action) => action.key)).toEqual([
+      "accept",
+      "keep",
+    ]);
+    const addedLook = catalogLook(
+      {
+        answer: { ...answer, skill_rows: [addedSkill], changed: 1 },
+        scope: "building",
+        draft: selection,
+        edited: true,
+        now: 0,
+        unusedOnly: false,
+        buildings: [],
+      },
+      "en",
+      hands,
+    );
+    expect(addedLook.groups[1]?.rows[0]?.actions.map((action) => action.key)).toEqual(["accept"]);
   });
 
   test("Accept counts the new version's bytes, not the old version's twice", () => {

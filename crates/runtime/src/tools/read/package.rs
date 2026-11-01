@@ -45,7 +45,7 @@ pub(super) fn open_in_package(
         return None;
     };
     Some((|| {
-        if !plain(inside) {
+        if !kernel::skill::plain_package_path(inside) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "read",
@@ -92,11 +92,4 @@ fn read_text(block_store: &Path, digest: &B3Hash, asked: &str) -> Result<String,
         )
         .with_recovery("read hands back text; these bytes are not UTF-8")
     })
-}
-
-fn plain(path: &str) -> bool {
-    !path.is_empty()
-        && path.split('/').all(|segment| {
-            !segment.is_empty() && !matches!(segment, "." | "..") && !segment.contains(['\\', ':'])
-        })
 }

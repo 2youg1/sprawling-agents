@@ -18,7 +18,7 @@ manifest 列出包内每一项的相对路径、种类（目录或文件）与�
 /-!
 ## 2 验收标准
 
-同一组项目生成的字节确定；相对路径为空、含 `.`／`..`、反斜杠或冒号即拒；重名即拒；`SKILL.md` 缺失或重复即拒。`file(path)` 只回答该路径的文件 digest，不回答目录或别的名字。Rust 的 roundtrip、边界测试与下面的查找性质共同验收。
+同一组项目生成的字节确定；相对路径为空、含 `.`／`..`、反斜杠、冒号或 NUL 即拒；重名即拒；`SKILL.md` 缺失或重复即拒。`file(path)` 只回答该路径的文件 digest，不回答目录或别的名字。`plain_package_path` 是构造 manifest 与 runtime 读取包内路径共用的唯一文法判定。Rust 的 roundtrip、边界测试与下面的查找性质共同验收。
 -/
 
 /-!
@@ -64,6 +64,7 @@ impl SkillManifest {
     pub fn file(&self, path: &str) -> Option<&B3Hash>;
     pub fn document(&self) -> Option<&B3Hash>;
 }
+pub fn plain_package_path(path: &str) -> bool;
 ```
 -/
 

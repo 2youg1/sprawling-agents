@@ -87,7 +87,7 @@ pub fn migrate_mcp(city_root: &Path, building: &Address) -> Result<bool, AxError
         references.sort_by(|left, right| left.label.as_str().cmp(right.label.as_str()));
         references.dedup_by(|left, right| left.label == right.label);
         document.insert(
-            "mcp_ref".to_owned(),
+            super::mcp::MCP_REFERENCE_FIELD.to_owned(),
             toml::Value::Array(reference_rows(&references)),
         );
         if definitions.is_empty() {
@@ -345,7 +345,7 @@ impl Change<'_> {
             }
             Change::McpReferences(references) => {
                 document.insert(
-                    "mcp_ref".to_owned(),
+                    super::mcp::MCP_REFERENCE_FIELD.to_owned(),
                     toml::Value::Array(reference_rows(references)),
                 );
             }
@@ -558,12 +558,15 @@ fn migrate_reference(
     file: &Path,
 ) -> Result<(), AxError> {
     let rows = document
-        .entry("mcp_ref".to_owned())
+        .entry(super::mcp::MCP_REFERENCE_FIELD.to_owned())
         .or_insert_with(|| toml::Value::Array(Vec::new()));
     let toml::Value::Array(rows) = rows else {
         return Err(refuse_file(
             file,
-            "`mcp_ref` is not a list of `[[mcp_ref]]` rows",
+            &format!(
+                "`{0}` is not a list of `[[{0}]]` rows",
+                super::mcp::MCP_REFERENCE_FIELD
+            ),
         ));
     };
     let label = reference.label.as_str();
@@ -572,7 +575,13 @@ fn migrate_reference(
         .find(|row| row.get("label").and_then(toml::Value::as_str) == Some(label))
     {
         let toml::Value::Table(row) = row else {
-            return Err(refuse_file(file, "a `[[mcp_ref]]` row is not a table"));
+            return Err(refuse_file(
+                file,
+                &format!(
+                    "a `[[{}]]` row is not a table",
+                    super::mcp::MCP_REFERENCE_FIELD
+                ),
+            ));
         };
         if !row.contains_key("definition")
             && let Some(definition) = reference.definition
