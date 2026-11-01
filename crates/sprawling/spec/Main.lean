@@ -16,7 +16,7 @@
 - **`fork <city> <run> <seq> [addr]`**＝世系记录形：验链 → `runtime::fork::prefix` 验界 → 节点归属验（seq 处的事件必属于母 Run，否则拒）→ `run_forked` 落账携新 RunId。**不自动发车**：驱动新 Run 是人的下一步 Dispatch；逐字节母前缀入窗属并发期的 must-read 网，不在本形。`Command::Fork` 同路。
 - **`adopt <city> <addr>`**＝收编已存在目录为楼（语义住 `crates/city/Spec.lean` §8-3）。
 - **`serve` 增 `--web-dir <dir>`**：开发回路逐请求读盘；发布形恒走嵌入表（`wire::ClientAssets`，语义住 `crates/wire/Spec.lean` §8-2）。
-- **默认地址住 `kernel::consts_policy::DEFAULT_AT`**（`"127.0.0.1:8787"`）。`up`／`serve`／首屏／`call` 与 `enrol` 的 `--at` 缺省，以及「不是 socket 地址」那条恢复语里的示例，全部读这一个值：一个人被告知的地址与真正绑上的地址不能是两处写法。安装脚本与 README 引用同一个值，改它即改这一处。
+- **默认地址住 `kernel::consts_policy::DEFAULT_AT`**（`"127.0.0.1:2501"`）。`up`／`serve`／首屏／`call` 与 `enrol` 的 `--at` 缺省，以及「不是 socket 地址」那条恢复语里的示例，全部读这一个值：一个人被告知的地址与真正绑上的地址不能是两处写法。安装脚本与 README 引用同一个值，改它即改这一处。
 -/
 
 /-!

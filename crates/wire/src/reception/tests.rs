@@ -27,7 +27,7 @@ fn keys() -> Keys<'static> {
 
 #[test]
 fn an_ipv6_loopback_is_also_loopback() {
-    let addr: SocketAddr = "[::1]:8787".parse().unwrap();
+    let addr: SocketAddr = "[::1]:2501".parse().unwrap();
     assert!(matches!(
         decide_bind(&addr, Some(B3Hash::digest(KEY.as_bytes()))),
         BindVerdict::Serve(BindFace::Loopback { .. })
@@ -65,7 +65,7 @@ fn an_ipv4_mapped_loopback_peer_may_enrol_and_a_mapped_stranger_may_not() {
 #[test]
 fn a_pairing_token_does_not_buy_the_right_to_enrol() {
     // An exposed bind is legal with a key; enrolment still is not.
-    let exposed: SocketAddr = "203.0.113.7:8787".parse().unwrap();
+    let exposed: SocketAddr = "203.0.113.7:2501".parse().unwrap();
     let digest = B3Hash::digest(b"pairing-code");
     let BindVerdict::Serve(face) = decide_bind(&exposed, Some(digest)) else {
         panic!("an exposed bind with a key is served");
@@ -80,7 +80,7 @@ fn a_pairing_token_does_not_buy_the_right_to_enrol() {
 #[test]
 fn no_face_is_served_without_a_key() {
     let digest = B3Hash::digest(b"pairing-code");
-    for raw in ["203.0.113.7:8787", "127.0.0.1:8787", "0.0.0.0:8787"] {
+    for raw in ["203.0.113.7:2501", "127.0.0.1:2501", "0.0.0.0:2501"] {
         let addr: SocketAddr = raw.parse().unwrap();
         let BindVerdict::Refuse(err) = decide_bind(&addr, None) else {
             panic!("{raw} with no key refuses to start");
@@ -308,7 +308,7 @@ fn a_session_that_has_not_been_welcomed_owes_no_range() {
 fn an_unspecified_address_is_not_loopback() {
     // 0.0.0.0 reaches every interface; treating it as local would be the
     // exact mistake this judgement exists to prevent.
-    let addr: SocketAddr = "0.0.0.0:8787".parse().unwrap();
+    let addr: SocketAddr = "0.0.0.0:2501".parse().unwrap();
     assert!(matches!(
         decide_bind(&addr, Some(B3Hash::digest(b"pairing-code"))),
         BindVerdict::Serve(BindFace::Exposed { .. })

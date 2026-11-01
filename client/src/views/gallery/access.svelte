@@ -212,7 +212,7 @@
 </Case>
 <Case label="quit · no run going">
   <QuitSheet
-    look={quitOf({ runs: 0, here: "http://127.0.0.1:8787" })}
+    look={quitOf({ runs: 0, here: "http://127.0.0.1:2501" })}
     seat="specimen"
     open
     onCancel={still}
@@ -221,7 +221,7 @@
 </Case>
 <Case label="quit · three runs going">
   <QuitSheet
-    look={quitOf({ runs: 3, here: "http://127.0.0.1:8787" })}
+    look={quitOf({ runs: 3, here: "http://127.0.0.1:2501" })}
     seat="specimen"
     open
     onCancel={still}

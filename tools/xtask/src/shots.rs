@@ -146,7 +146,7 @@ fn origin_in(args: &[String]) -> Result<Option<String>, XtaskError> {
             file: "cargo xtask shots".to_owned(),
             msg: format!(
                 "read the arguments `{}` (usage); run `cargo xtask shots`, or \
-                 `cargo xtask shots {ORIGIN} http://127.0.0.1:8787` for a served city",
+                 `cargo xtask shots {ORIGIN} http://127.0.0.1:2501` for a served city",
                 args.join(" ")
             ),
         }),

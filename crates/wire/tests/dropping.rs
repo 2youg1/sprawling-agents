@@ -91,18 +91,18 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
         .unwrap(),
     };
     let wire::BindVerdict::Serve(face) = wire::decide_bind(
-        &"127.0.0.1:8787".parse().unwrap(),
+        &"127.0.0.1:2501".parse().unwrap(),
         Some(kernel::B3Hash::digest(b"native-key")),
     ) else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let origins = wire::ListenerOrigins::of("127.0.0.1:8787".parse().unwrap());
+    let origins = wire::ListenerOrigins::of("127.0.0.1:2501".parse().unwrap());
     let app = wire::router(&config, face, &origins)
         .unwrap()
         .layer(MockConnectInfo(peer));
     let request = Request::builder()
-        .header("host", "127.0.0.1:8787")
+        .header("host", "127.0.0.1:2501")
         .header("authorization", "Bearer native-key")
         .method("POST")
         .uri(uri)

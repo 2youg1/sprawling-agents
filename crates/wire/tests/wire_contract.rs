@@ -32,12 +32,12 @@ use wire::{Hello, Welcome};
 
 #[cfg(feature = "server")]
 fn loopback() -> SocketAddr {
-    "127.0.0.1:8787".parse().unwrap()
+    "127.0.0.1:2501".parse().unwrap()
 }
 
 #[cfg(feature = "server")]
 fn exposed() -> SocketAddr {
-    "192.168.1.20:8787".parse().unwrap()
+    "192.168.1.20:2501".parse().unwrap()
 }
 
 // ---------------------------------------------------------------- wire counts

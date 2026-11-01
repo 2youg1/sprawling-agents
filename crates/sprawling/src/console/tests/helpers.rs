@@ -32,7 +32,7 @@ pub(super) fn room() -> Address {
 /// name a real machine's directories, which `xtask release` refuses.
 pub(super) fn terminal(bind: &str, token: Option<&str>) -> Terminal {
     Terminal {
-        url: "http://127.0.0.1:8787".to_owned(),
+        url: "http://127.0.0.1:2501".to_owned(),
         token: token.map(str::to_owned),
         city: "/tmp/a-city".to_owned(),
         client: "embedded, 3 file(s), 558419 gzipped byte(s)".to_owned(),

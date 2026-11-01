@@ -31,7 +31,7 @@ use axum::http::Request;
 use tower::ServiceExt;
 use wire::{Answer, Command, Reply, ServeConfig};
 
-const AT: &str = "127.0.0.1:8787";
+const AT: &str = "127.0.0.1:2501";
 
 fn config() -> ServeConfig {
     ServeConfig {
@@ -138,7 +138,7 @@ async fn a_cross_site_page_is_refused_before_the_socket_upgrades() {
 
 #[tokio::test]
 async fn a_foreign_host_is_refused_before_the_socket_upgrades_or_the_page_is_served() {
-    for host in ["evil.example:8787", "0.0.0.0:8787", "127.0.0.1:9999"] {
+    for host in ["evil.example:2501", "0.0.0.0:2501", "127.0.0.1:9999"] {
         let mut headers = UPGRADE.to_vec();
         headers.push(("host", host));
         assert_eq!(status("GET", "/ws", &headers).await, 403, "{host}");

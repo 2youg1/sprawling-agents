@@ -274,7 +274,7 @@ Stop the updated city. Restore the previous binary through its original channel,
 sprawling up ./cities/first
 ```
 
-This raises the city if the directory does not hold one, serves it on `127.0.0.1:8787`, and opens the page, already paired, in the browser your operating system opens links with. The terminal becomes the quiet host: two lines, the address and a pairing code, and nothing else however much the city does. Enter opens the page again. Closing the browser stops no work, because the city keeps the port open: open the address again, or press Enter in the quiet host.
+This raises the city if the directory does not hold one, serves it on `127.0.0.1:2501`, and opens the page, already paired, in the browser your operating system opens links with. The terminal becomes the quiet host: two lines, the address and a pairing code, and nothing else however much the city does. Enter opens the page again. Closing the browser stops no work, because the city keeps the port open: open the address again, or press Enter in the quiet host.
 
 ![The quiet host: the address and the pairing code in the middle of the terminal, and nothing else](images/console-quiet-host.png)
 
@@ -457,7 +457,7 @@ None of these takes a token on this machine: the served city writes a key file f
 ## Another machine on your network
 
 ```bash
-sprawling serve ./cities/first 0.0.0.0:8787
+sprawling serve ./cities/first 0.0.0.0:2501
 ```
 
 An address that reaches past this machine needs a pairing key, as the loopback address does. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and keeps it in the key file; a city served without a console also prints it once in its banner, on a line of its own, and the quiet host shows it on its second line after the pairing code. No address the city prints carries the key, because an address ends up in the browser's history. A browser on another computer pairs with the pairing code, as any second browser does. The next start replaces it. The programs the city starts never see `SPRAWLING_PAIRING_TOKEN`: it is removed from their environment, as every `SPRAWLING_SECRET_*` variable is. From outside your network, a device reaches the city through the remote door and a route you choose. Settings > Remote opens the door for a time you pick, closes it, and replaces the city key; opening and replacing the key print a code on the terminal that runs `sprawling serve`, as a third line in the quiet host, which you type into the page within two minutes, the same on Windows, macOS and Linux. Pairing a device stays at the console: [operating.md](operating.md), *Reaching the city from another device*, says how, and what the route is trusted with.
