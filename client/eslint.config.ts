@@ -17,7 +17,7 @@ import tseslint from "typescript-eslint";
 // and a Svelte component's script block and template alike.
 export default defineConfig([
   // ESLint's flat config does not skip dot directories: `.svelte-check/`
-  // (the transpiled project the `--tsgo` lane and editor tooling write)
+  // (the transpiled project editor tooling writes)
   // must be listed or its generated code is linted.
   { ignores: ["node_modules/", "dist/", ".svelte-check/"] },
   { linterOptions: { reportUnusedDisableDirectives: "error" } },

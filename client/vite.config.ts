@@ -11,7 +11,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
 
-import { thirdPartyNotices } from "./scripts/notices";
+import { thirdPartyNotices } from "./scripts/notices.ts";
 
 // The files the shipped faces are made of: Maple Mono's regular,
 // semibold and bold woff2, Libron's four static ones, and the licence each is given
