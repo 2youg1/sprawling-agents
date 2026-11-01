@@ -413,6 +413,7 @@ fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
             catalog: Some(ExposureTable {
                 tools: std::collections::BTreeMap::new(),
                 namespaces: [(NAMESPACE.to_owned(), Exposure::Off)].into(),
+                skills: std::collections::BTreeMap::new(),
             }),
             idem: idem(b"catalog"),
         }))

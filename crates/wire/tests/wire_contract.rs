@@ -479,6 +479,7 @@ title = \"a window\"
             catalog: Some(kernel::config::ExposureTable {
                 tools: [("exec".to_owned(), kernel::config::Exposure::Dormant)].into(),
                 namespaces: [("apps".to_owned(), kernel::config::Exposure::Off)].into(),
+                skills: std::collections::BTreeMap::new(),
             }),
             idem,
         }),

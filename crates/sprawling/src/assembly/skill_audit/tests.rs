@@ -47,10 +47,15 @@ fn landed(root: &Path, slot: &city::Slot, body: &str) -> (PathBuf, B3Hash) {
     let source = tempfile::tempdir().unwrap();
     let path = source.path().join("kiln.md");
     std::fs::write(&path, body).unwrap();
-    let installed =
-        city::install_skill(root, slot, &path, &mut |bytes| Ok(B3Hash::digest(bytes))).unwrap();
+    let store = kernel::layout::CityLayout::new(root).cas();
+    let mut cas = storage::Cas::open(&store).unwrap();
+    let installed = city::install_skill(root, slot, &path, &mut |bytes| {
+        cas.put(bytes).map_err(storage::StorageError::into_ax)
+    })
+    .unwrap();
+    let read = |digest: &B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
     (
-        root.join(installed.holding.shelf.address().unwrap().as_str()),
+        city::materialize(root, &installed.hash, &read).unwrap(),
         installed.hash,
     )
 }
