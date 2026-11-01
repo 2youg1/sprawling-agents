@@ -237,16 +237,22 @@ mod tests {
     fn text_block() -> impl Strategy<Value = ContentBlock> {
         "[a-z ]{1,20}".prop_map(|text| ContentBlock::Text { text })
     }
+    fn tool_use_block_with_id(id: String, name: String, arg: String) -> ContentBlock {
+        let mut args = Map::new();
+        args.insert("q".to_owned(), Value::String(arg));
+        ContentBlock::ToolUse {
+            id,
+            name: ToolName::parse(&name).unwrap(),
+            input: Payload::new(args).unwrap(),
+        }
+    }
     fn tool_use_block() -> impl Strategy<Value = ContentBlock> {
-        ("[a-z]{1,8}", "[a-z_]{1,10}", "[a-z]{0,12}").prop_map(|(id, name, arg)| {
-            let mut args = Map::new();
-            args.insert("q".to_owned(), Value::String(arg));
-            ContentBlock::ToolUse {
-                id,
-                name: ToolName::parse(&name).unwrap(),
-                input: Payload::new(args).unwrap(),
-            }
-        })
+        ("[a-z]{1,8}", "[a-z_]{1,10}", "[a-z]{0,12}")
+            .prop_map(|(id, name, arg)| tool_use_block_with_id(id, name, arg))
+    }
+    fn anthropic_tool_use_block() -> impl Strategy<Value = ContentBlock> {
+        ("[a-z]{1,8}", "[a-z_]{1,10}", "[a-z]{0,12}")
+            .prop_map(|(id, name, arg)| tool_use_block_with_id(format!("toolu_{id}"), name, arg))
     }
     /// A count a `dialect` wire can spell: the whole prompt is at least
     /// its cached parts, and only Anthropic's wire has a cache-write slot.
@@ -359,7 +365,7 @@ mod tests {
         /// Anthropic response round-trip is lossless: wire -> canonical -> wire.
         #[test]
         fn anthropic_response_roundtrip(
-            blocks in proptest::collection::vec(prop_oneof![text_block(), tool_use_block()], 0..4),
+            blocks in proptest::collection::vec(prop_oneof![text_block(), anthropic_tool_use_block()], 0..4),
             stop in stop_strategy(),
             usage in usage_strategy(DialectKind::Anthropic),
         ) {

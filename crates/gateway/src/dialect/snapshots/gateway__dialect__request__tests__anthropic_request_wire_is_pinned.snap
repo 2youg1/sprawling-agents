@@ -22,7 +22,7 @@ expression: "serde_json::to_string_pretty(&wire).unwrap()"
           "type": "text"
         },
         {
-          "id": "tu_1",
+          "id": "toolu_ace4a93ad60ceeba",
           "input": {
             "path": "notes.md"
           },
@@ -37,7 +37,7 @@ expression: "serde_json::to_string_pretty(&wire).unwrap()"
         {
           "content": "ok",
           "is_error": false,
-          "tool_use_id": "tu_1",
+          "tool_use_id": "toolu_ace4a93ad60ceeba",
           "type": "tool_result"
         }
       ],
