@@ -101,7 +101,7 @@ fn violation_for(location: String, violation: String, alternative: &str) -> Viol
     Violation {
         gate: "commits",
         location,
-        rule: format!("a subject starts `card-S<stage>.<index>: `; a ruling is `{RULING}`"),
+        rule: format!("a subject starts `CS<stage>.<index>: `; a ruling is `{RULING}`"),
         violation,
         alternative: alternative.to_owned(),
     }
@@ -111,9 +111,7 @@ fn violation_for(location: String, violation: String, alternative: &str) -> Viol
 fn findings(message: &str) -> Vec<String> {
     let subject = message.lines().next().unwrap_or_default();
     let carded = (!carded(subject)).then(|| {
-        format!(
-            "the subject `{subject}` does not start with `card-S<digits>.<digits or capitals>: `"
-        )
+        format!("the subject `{subject}` does not start with `CS<digits>.<digits or capitals>: `")
     });
     carded
         .into_iter()
@@ -133,17 +131,17 @@ fn title_findings(title: &str) -> Vec<String> {
     (!carded(title))
         .then(|| {
             format!(
-                "the pull request title `{title}` does not start with `card-S<digits>.<digits or capitals>: `"
+                "the pull request title `{title}` does not start with `CS<digits>.<digits or capitals>: `"
             )
         })
         .into_iter()
         .collect()
 }
 
-/// Whether a subject matches `^card-S\d+\.[0-9A-Z]+: `.
+/// Whether a subject matches `^CS\d+\.[0-9A-Z]+: `.
 fn carded(subject: &str) -> bool {
     subject
-        .strip_prefix("card-S")
+        .strip_prefix("CS")
         .and_then(|rest| rest.split_once(": "))
         .and_then(|(card, _)| card.split_once('.'))
         .is_some_and(|(stage, index)| {

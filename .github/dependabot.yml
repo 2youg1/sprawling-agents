@@ -54,7 +54,7 @@ updates:
       interval: daily
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "card-S0.DEPS"
+      prefix: "CS0.DEPS"
     groups:
       actions:
         patterns: ["*"]
@@ -75,7 +75,7 @@ updates:
       interval: daily
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "card-S0.DEPS"
+      prefix: "CS0.DEPS"
     ignore:
       # The workspace names tokio-tungstenite at axum's version so the
       # lockfile holds one WebSocket protocol (root Cargo.toml). The axum
