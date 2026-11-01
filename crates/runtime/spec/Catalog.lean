@@ -15,8 +15,7 @@
 
 ```rust
 pub struct CatalogEntry { pub name: String, pub disclosure: String, pub expansion: String,
-                          pub hash: Option<B3Hash>,    // 架上那份文档被读到时的哈希
-                          pub package: Option<String> } // 包目录，由 city 的扫描给出；单文档为 None
+                          pub hash: Option<B3Hash> }    // admitted canonical manifest 的 digest；自建条目为 None
 pub struct SkillPin { pub name: String, pub hash: B3Hash }
 pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode: Option<Mode> —— 私有 */ }
 impl Catalog {
@@ -24,8 +23,7 @@ impl Catalog {
     pub fn set_exposure(&mut self, stated: kernel::config::CatalogExposure); // 本 run 冻下的两张 `[catalog]` 表；先于第一件 admit_tool（§8-60、D111）
     pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<Exposure, AxError>; // disclosure 非空；重名＝E_INVALID_ARGS；命名空间由准入它的装配层说（§8-60）；答它得到的档位，Off 的不进工具表、索引与 run
     pub fn tool_table(&self) -> Result<ToolTable, AxError>;   // 本 run 的工具表：常驻数组的字节与每件一行（含 Off），`prompt_assembled.tools` 记它（D111）
-    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）；expansion 是城内地址
-    pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 城外书架上的一件：expansion 是扫描读到的那份文档正文（§8-29-6）
+    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者；expansion 与 hash 同为 admitted manifest digest，城外包已先复制进城 CAS（§8-29-6）
     pub fn set_mode(&mut self, mode: Mode);                                    // Resident 段的 mode 行：run 开始时的 mode；会话中换 mode 不改它（§8-62）
     pub fn render(&self) -> String;              // Resident 段的 catalog 部分：段头一行、mode 行、dev 行，然后休眠索引（§8-60）；BTreeMap 序恒定
     pub fn tool_defs(&self) -> Vec<ToolDef>;     // ChatRequest.tools 的唯一来源：各 mode 常驻核心的并集，session 开始时定下（§8-60、D25）
@@ -36,13 +34,13 @@ impl Catalog {
 
 - **`hash` 是 `Option`，而那个 `None` 不是「没算」**：目录里另有两类条目的正文由本构建自己握着（mode 的纪律、dev 那一条），它们背后没有一份能在无人看着时改掉的文档。
 - **pin 从 catalog 取，不重扫一遍书架**：catalog 已经是「本 Run 能够到什么」的权威，再扫一次就是在另一个时刻对同一个问题给第二个答案。
-- **一件 skill 怎么交给 run，由它进 catalog 的那扇门定**：`admit_skill` 收城内书架上的一件，`expand` 答 `Expansion::Skill`，`read` 到那个地址去开；`admit_carried_skill` 收城外书架上的一件，`expand` 答 `Expansion::Said`，正文就是 catalog 手里那份。两扇门而不是一个布尔参数：`expansion` 这一格在两扇门后是两种东西（地址与正文），门名把这件事说在调用处。两扇门共用同一套卫生检查（名字与一行披露非空、不重名），重名跨两扇门同样拒。
+- **一件 skill 只有一个交付形状**：`admit_skill` 收阅览室已经准入的一件，`expand` 答 `Expansion::Skill { manifest }`，`read` 对 manifest 与包内文件分别做完整 CAS 校验读取。城外持有在进 catalog 前已经逐文件复制进城 CAS，因而与城内持有共用同一扇门，不再有 catalog 携正文的第二来源。名字与一行披露非空、不重名仍是这扇门的卫生检查。
 
 **`render()` 与 `set_mode()` 的生产调用者是装配层的 prefix 组装**。常驻核心的工具走 `ChatRequest.tools` 到达模型，其余已准入的工具与 skill 走休眠索引；没有 `render()`，**阅览室准入的 SKILL 与本 Run 所处的 mode 就到不了任何模型**，`city::library` 的准入判定就是一道没有下游的门。
 
 接法：`Catalog::render()` 追在 `identity.segment_bytes()` 之后，合成 Resident 段。**不另开第五个槽**：一个居民能够伸手取到什么，与它是谁同属一类常住事实，且两者都随 Run 冻结，故前缀在整个 Run 的寿命里仍可缓存。装配层因此把 prefix 的组装移到目录建好之后。
 
-**第二级披露经 `read`**：SKILL 的 `expansion` 是 city 的 holding 地址 给的一个地址，坐在**保留前缀 `.sprawling/` 下**。`render()` 不印那个地址；模型按名字调 `read`，`read` 先查 catalog（§8-29），所以它不必知道、也读不到那个保留前缀下的路径。
+**第二级披露经 `read`**：SKILL 的 `expansion` 是 admitted canonical manifest 的 digest。`render()` 不印它；模型按名字调 `read`，`read` 先查 catalog（§8-29），再经完整 CAS 读取取得正文，不经过保留前缀下的文件路径。
 -/
 
 /-!
@@ -350,7 +348,7 @@ end Runtime.Catalog
 /-!
 ### runtime 决定 D22、D23（截断锁的另两半）
 
-- **D22（推断）：找是城里确定的等级匹配，指南是能力自己的文字、一字不删。** `find` 把问话在字母、数字与 `_` 以外的每个字符处切开，取非空的段、转成小写作词（名字以 `_` 连词，所以 `_` 留在词里；问号、引号之类不算词的一部分），每个词在每件已准入能力上取它够到的最高一级：名字（或去掉命名空间前缀的成员名）全等计 8、名字前缀计 4、名字子串计 2、正文子串计 1；正文是说明、入参名与入参说明。各词求和，按分降序、再按名字排，列出前 `FIND_HITS` 件，按命名空间分组。`detail` 按整名答那件的完整指南。所以索引可以很小，找回靠匹配而不靠读被截短的提示。skill 的正文仍只经 `read` 交出：`read` 是打开架上文件、核对读界与包目录的唯一一扇门（§8-29），`detail` 对一件 skill 答它的一行披露与「`read` 它的名字」。被否的备选：BM25（权重取决于语料统计，同一句问话在两栋楼排出两种次序）；`detail` 自己读 skill 正文（第二个读架子的地方）；嵌入向量检索（二进制里没有模型，且不确定）。重新打开它的参数：脚本化的 run 显示等级匹配找不回它要的能力，或问话常以 `/正则/` 写出。
+- **D22（推断）：找是城里确定的等级匹配，指南是能力自己的文字、一字不删。** `find` 把问话在字母、数字与 `_` 以外的每个字符处切开，取非空的段、转成小写作词（名字以 `_` 连词，所以 `_` 留在词里；问号、引号之类不算词的一部分），每个词在每件已准入能力上取它够到的最高一级：名字（或去掉命名空间前缀的成员名）全等计 8、名字前缀计 4、名字子串计 2、正文子串计 1；正文是说明、入参名与入参说明。各词求和，按分降序、再按名字排，列出前 `FIND_HITS` 件，按命名空间分组。`detail` 按整名答那件的完整指南。所以索引可以很小，找回靠匹配而不靠读被截短的提示。skill 的正文仍只经 `read` 交出：`read` 是按 admitted manifest 完整校验读取、核对包内路径的唯一一扇门（§8-29），`detail` 对一件 skill 答它的一行披露与「`read` 它的名字」。被否的备选：BM25（权重取决于语料统计，同一句问话在两栋楼排出两种次序）；`detail` 自己读 skill 正文（第二个读架子的地方）；嵌入向量检索（二进制里没有模型，且不确定）。重新打开它的参数：脚本化的 run 显示等级匹配找不回它要的能力，或问话常以 `/正则/` 写出。
 - **D23（推断）：命令行程序不另立第二份目录。** 楼对命令的准入就是楼已有的 exec 规则；prefix 里没有任何一处列出命令；命令行程序的第三档是 agent 经 `exec` 跑它自己的 `--help`，今天就成立。所以本节对 CLI 只确认零字节：没有要移进休眠索引的列表。重新打开它的参数：某处开始把可用命令写进 prefix。
 - **不在 v1 里（截断锁的现状）**：一件在一栋楼的多数 session 里都被用到的能力，升格为那栋楼的常驻工具——等账本里按能力计的调用次数量出来再定（`tool_called` 记的是换出来的那件，所以计数按能力而不是按 `tool`）；派活时点名子 agent 要用的能力，让它一开始就带着它们的指南——今天子 agent 是一次自己的 session，它自己 `find`。
 -/

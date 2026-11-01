@@ -65,7 +65,10 @@ pub(super) fn skills_answer(
     pins: &SkillPins,
 ) -> Option<wire::SkillsAnswer> {
     let home = crate::home::Home::detect().ok()?;
-    let shelves = city::Library::scan(city_root, Some(building), home.path()).ok()?;
+    let store = kernel::layout::CityLayout::new(city_root).cas();
+    let cas = storage::Cas::open(&store).ok()?;
+    let read = |digest: &B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
+    let shelves = city::Library::scan(city_root, Some(building), home.path(), &read).ok()?;
     // What this building's reading room admits, so a page can show
     // the stock and the choice in one list.
     let rules = city::load(city_root, building).ok()?;
@@ -111,7 +114,7 @@ fn pinned_by(pins: &SkillPins, name: &str, hash: &B3Hash) -> Vec<RunId> {
 /// sit in different places.
 pub(super) fn shelf_of(shelf: &city::Shelf) -> wire::SkillShelf {
     match shelf {
-        city::Shelf::Library(addr) => wire::SkillShelf::Library(addr.clone()),
+        city::Shelf::Library => wire::SkillShelf::Library,
         city::Shelf::Building(addr) => wire::SkillShelf::Building(addr.clone()),
         city::Shelf::External { index, path } => wire::SkillShelf::External {
             index: *index,

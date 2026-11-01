@@ -103,20 +103,38 @@ impl History {
                 return Ok(());
             }
         };
+        let store = kernel::layout::CityLayout::new(root).cas();
+        let cas = match storage::Cas::open(&store) {
+            Ok(cas) => cas,
+            Err(err) => {
+                eprintln!("skill audit store unavailable: {err}");
+                return Ok(());
+            }
+        };
         for building in std::iter::once(None).chain(buildings.iter().map(Some)) {
-            let library = match city::Library::scan(root, building, home.path()) {
-                Ok(library) => library,
-                Err(err) => {
-                    eprintln!("skill audit shelf unavailable: {err}");
-                    continue;
+            let library = {
+                let read = |digest: &kernel::B3Hash| {
+                    cas.get(digest).map_err(storage::StorageError::into_ax)
+                };
+                match city::Library::scan(root, building, home.path(), &read) {
+                    Ok(library) => library,
+                    Err(err) => {
+                        eprintln!("skill audit shelf unavailable: {err}");
+                        continue;
+                    }
                 }
             };
             for holding in library.all() {
-                let address = holding.package.as_ref().or_else(|| holding.shelf.address());
-                let Some(address) = address else {
-                    continue;
+                let read = |digest: &kernel::B3Hash| {
+                    cas.get(digest).map_err(storage::StorageError::into_ax)
                 };
-                let path = root.join(address.as_str());
+                let path = match city::materialize(root, &holding.hash, &read) {
+                    Ok(path) => path,
+                    Err(err) => {
+                        eprintln!("skill audit could not materialize {}: {err}", holding.name);
+                        continue;
+                    }
+                };
                 let digest = match city::skill_digest(&path) {
                     Ok(digest) => digest,
                     Err(err) => {

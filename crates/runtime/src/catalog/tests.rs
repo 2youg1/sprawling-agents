@@ -73,9 +73,8 @@ fn skill(name: &str) -> CatalogEntry {
     CatalogEntry {
         name: name.to_owned(),
         disclosure: format!("{name}: the steps this building follows for it, with examples"),
-        expansion: format!("lab/.sprawling/shelf/{name}.md"),
+        expansion: B3Hash::digest(name.as_bytes()).to_string(),
         hash: Some(B3Hash::digest(name.as_bytes())),
-        package: None,
     }
 }
 

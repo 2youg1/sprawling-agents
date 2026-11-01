@@ -21,6 +21,7 @@ pub const SNAPSHOT_DIR: &str = "snapshot";
 pub const LIBRARY_DIR: &str = "library";
 pub const BUILDING_SHELF: &str = "skills";
 pub const SKILL_FILE: &str = "SKILL.md";
+pub const SHELF_INDEX: &str = "INDEX.toml";   // 书架索引，正文与包文件全在 CAS
 pub const CONFIG_FILE: &str = "CONFIG.toml";
 pub const FILTERS_FILE: &str = "FILTERS.toml";
 pub const ARCHIVE_DIR: &str = "Archive";

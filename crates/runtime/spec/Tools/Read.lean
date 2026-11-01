@@ -56,19 +56,19 @@ const LINE_CAP: u16 = 512;
 
 `resolve` 里「`Address::parse` 后判 `is_reserved`」这一段移进 `runtime::tools::chosen_path`（§8-30-1），`read` 与新的 `search` 同调它。理由是一条硬约束：模型选的路径能不能到保留区，全城只允许有一个答案与一组测试。
 
-#### 8-29-3 一件藏品是一个目录：`<名>/<相对路径>`（`runtime::tools::read::package`）
+#### 8-29-3 一件藏品由 pin 的 manifest 描述：`<名>/<相对路径>`（`runtime::tools::read::package`）
 
 ```rust
 // read::package
-pub(super) fn open_in_package(catalog: &Catalog, city_root: &Path, asked: &str) -> Option<Result<Found, AxError>>;
-pub(super) fn open_document(city_root: &Path, shelved: &Address, asked: &str) -> Result<Found, AxError>;  // 单文档 skill
+pub(super) fn open_in_package(catalog: &Catalog, block_store: &Path, asked: &str) -> Option<Result<Found, AxError>>;
+pub(super) fn open_document(block_store: &Path, digest: &B3Hash, asked: &str) -> Result<Found, AxError>;
 ```
 
-- **阅览室准入的是整个包**：catalog 条目带着包目录（`CatalogEntry::package`，由 city 的扫描给出，`crates/city/Spec.lean` §8-8）时它是一个包，不从落点的写法去猜——一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包；`<名>/<相对路径>` 打开包目录下的那个文件。准入是人写阅览室时做的，所以包内文件与 `SKILL.md` 一样不经读界与保留区判定——它们住在同一个被准入的目录里。
-- **名字在前、路径在后，名字先查 catalog**：与整名命中同一条理由（§8-29 起首），一个恰好同名的城内目录遮不住它。首段不是 catalog 里的包（没有这个名字，或它是单份文档）即返回 `None`，交回普通路径那条路。
+- **阅览室准入的是整个 manifest**：catalog 的 `Expansion::Skill` 只携 admitted manifest digest；`read <名>` 完整读取并校验 manifest，再完整读取它列出的 `SKILL.md`，`<名>/<相对路径>` 则完整读取对应文件 digest。包与单文档走同一扇门，不再从文件路径或扩展名猜形状。
+- **名字在前、路径在后，名字先查 catalog**：与整名命中同一条理由（§8-29 起首），一个恰好同名的城内目录遮不住它。首段不是 catalog 里的 skill 即返回 `None`，交回普通路径那条路；是 skill 而包内文件不存在则在本次 catalog 条目内拒绝，不落回普通路径。
 - **相对路径逐段判形，不做规范化**：空段、`.`、`..`、带反斜杠或冒号的段一律 `E_INVALID_ARGS`，恢复语说出「包内相对路径，只用普通段」。规范化会把一条爬出包的路径「修」成另一条，而拒绝让写错的那一方看见自己写了什么。
-- **链接按落点判，不出包目录**：拼出的路径解开链接后的真实位置，必须落在「规范化的城根 + 书架上写的包路径」之下，否则 `E_GATE_DENIED`，恢复语说出「指包里的文件本身，而不是包里链接背后的东西」。以书架上的写法而非包目录的真实位置为准，所以包目录本身是链接时同样拒绝。免于读界的理由只覆盖被准入的那个目录；链接背后的文件没有被准入，而书架上的文件可以由人手或 `exec` 写进来，安装时的预检挡不住它们。文件不存在时同样按落点判：真实位置由 `chosen_path::real_location`（§8-30-1）求出，不存在的尾段不可能是链接，所以包里一条链接背后的缺失文件落在链接目标之下，出包即 `E_GATE_DENIED`，不交给读取去列链接背后的目录。
-- **单文档 skill 同样不走链接**：`open_document` 解开链接后的真实位置必须恰是「规范化的城根 + 书架上写的文档地址」，否则 `E_GATE_DENIED`，恢复语说出「请人把文档本身放上书架」。理由与包内文件相同：免于读界的是书架上写的那份文档，链接背后的东西没有被准入。
+- **CAS 完整读取是唯一的授权与完整性边界**：包内文件与 `SKILL.md` 一样不经普通路径读界与保留区判定，因为准入的是 manifest 列出的内容而不是一个可写目录。`Cas::get` 对 manifest 与文件各自重算 BLAKE3；对象被改即 `E_CAS_CORRUPT`，文本不交出。读取不经过文件系统链接，因而没有链接落点或 check-then-use 路径。
+- **缺失文件的 `nearby` 来自 manifest**：拒绝列出同一 admitted manifest 的项目，不列书架目录、其他版本或城内相邻目录。
 - **catalog 锁中毒＝`E_STORAGE_FATAL`，不落空到普通路径**：整名与包名同一个口径。落空会让一个与 skill 同名的城内文件或目录顶替它——正是「名字先查 catalog」要挡的那件事；恢复语说出「结束本 run 再续」，因为同一进程里这把锁再也拿不回来。
 
 #### 8-29-4 没命中时给出 `nearby`（`runtime::tools::read::miss`）
@@ -82,7 +82,7 @@ pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String,
 const NEARBY_CAP: usize = 16;
 ```
 
-- **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径的真实位置往上找第一个存在的目录，**不高于这次调用被准入的那一层（`Floor`）**：普通路径是它首段的真实位置，包是书架上写的包目录，catalog 里的单份文档没有目录可列（`Floor::Document`）。城根与书架上别的藏品因此不会出现在候选里——它们不是这次调用被准入的东西。条目按调用方够得着的写法拼出：普通路径是城内相对路径，包是 `<名>/<相对路径>`；保留区里的项不列，模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。
+- **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径的真实位置往上找第一个存在的目录，**不高于这次调用被准入的那一层（`Floor`）**：普通路径是它首段的真实位置，catalog 里的单份文档没有目录可列（`Floor::Document`）。城根与书架上别的藏品因此不会出现在候选里——它们不是这次调用被准入的东西。条目按调用方够得着的城内相对路径拼出；保留区里的项不列，模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。skill 包内缺失不走这条目录路径，§8-29-3 直接从 admitted manifest 给候选。
 - **路径是目录＝`E_INVALID_ARGS`，`nearby` 携这个目录自己的条目**：`text_at` 在打开之前问判过的真实位置是不是目录，是就不打开，答「这是目录」，候选按上一条的写法、同一个 `NEARBY_CAP` 列出目录里的条目（不按名字远近排，只按路径排）。模型读一个目录，是在问里面有什么；不先问的话，Windows 打开目录得到的是 os error 5（拒绝访问），Unix 读目录得到的是 EISDIR，两者都落进下一条的「在而打不开」，模型拿到 `retry: no` 和一句按操作系统区域设置写成的系统报错，却拿不到它要的条目。
 - **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
 - **打开之后再核一次，不符＝`E_GATE_DENIED`**：包与单文档的路径，以及 §8-29-4-1 退回的路径，经 `text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
@@ -123,28 +123,29 @@ fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
 - **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`accounting::worker::freezing`，记 run 所在的房间）、run 的任务书（`accounting::worker::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`accounting::worker::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
 
-#### 8-29-6 城外书架上的 skill：catalog 携着它的字节
+#### 8-29-6 城外书架上的 skill：准入时复制，读取时只认 CAS pin
 
 ```rust
-// runtime::catalog
-pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>;
-// entry.expansion＝扫描读到的 SKILL.md 正文；entry.hash＝同一份字节的哈希；entry.package＝None
+// city::library
+pub fn admit_external(package: &Path,
+    register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>) -> Result<Admitted, AxError>;
+// runtime::catalog：城内与城外准入后都只有一个 admit_skill，Expansion::Skill 携 manifest digest
 ```
 
-- **按名读到的是钉住的那份字节**：城外书架是别的程序的目录，城给不出地址（`crates/city/Spec.lean` §8-8），所以 catalog 不交地址而交正文。正文由 city 的扫描读一次、哈希一次（`Holding::carried` 与 `Holding::hash` 出自同一次读入），`read <名>` 经 `Expansion::Said` 交回它，走 §8-29-1 同一条切行路。于是这个 run 读到的字节恒等于 `run_started` 里那条 `SkillPin` 说的字节，哪怕那份文件在 run 进行中被它的主人改了。
-- **包里的其余文件读不到**：`package` 为 `None`，`<名>/<相对路径>` 不进 §8-29-3 那条路，落回普通路径并按城内路径判（多半是 `E_INVALID_ARGS` 的没命中）。城外的文件不在城根之下，`read` 不打开城外的路径；要整包可读，人把它装进城库（`crates/city/Spec.lean` §8-28），那条路把包里每个文件落在城内。
-- **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（`crates/city/Spec.lean` §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
+- **按名读到的是钉住的整包**：城外书架是别的程序的目录，扫描为候选构造完整 manifest；准入时经 `admit_external` 把每个文件与 canonical manifest 复制进城 CAS。之后 catalog 只携 manifest digest，`read <名>` 与 `<名>/<相对路径>` 都走 §8-29-3 的完整校验读取，城外路径不再被打开。
+- **外部变化是 drift，不是静默换版**：扫描的候选 digest 与准入时复制得到的 digest 不一致即 `E_VERSION_CONFLICT`；复制完成后外部再改，不影响本 run 或之后仍持旧 pin 的 run。新候选经接受动作更新 pin 后才进入新会话。
+- **一件 skill 在 catalog 里只有一个名字**：书架扫描按「近架盖远架」留下一个候选（`crates/city/Spec.lean` §8-8），catalog 的 `admit_skill` 对重名仍拒。所有来源共用同一个 manifest 读取与包内文件路径，不再有只能读 `SKILL.md` 的外部特例。
 -/
 
-/-! D9 城外书架上的 skill 由 catalog 携着正文交给 run
+/-! D9 城外 skill 在准入时复制进 CAS，run 只读 pin 的 manifest
 
-**决定**：阅览室准入的一件城外书架上的 skill 经 `Catalog::admit_carried_skill` 进 catalog，条目的 `expansion` 是扫描读到的 `SKILL.md` 正文，`read <名>` 交回这份正文（§8-29-6）。包里其余文件对它不可读。
+**决定**：阅览室准入的一件城外书架上的 skill 经 `city::admit_external` 把完整包复制进本城 CAS，再经 `Catalog::admit_skill` 以同一个 `Expansion::Skill` 进入 catalog。`read <名>` 与包内文件都按 admitted manifest digest 完整校验读取（§8-29-3、§8-29-6）。
 
-**理由**：`docs/getting-started.md` 告诉人，挂上 `[skills] shelves` 再在 `reading_room` 里写下名字，居民就用得上那件 skill；而城外的文件没有城内地址，`read` 只开城根下的路径。携正文让这句话成真，又不给 `read` 开一条去城外读文件的路：模型能选的仍只有城内路径，城外的字节只以「人准入过的那一份」的身份进来。正文与哈希出自同一次读入，所以 pin 说的字节就是 run 读到的字节。
+**理由**：城是可以整体复制的目录，run 不能依赖城外路径，也不能在外部文件变化后静默换版。逐文件加 manifest 的复制既保住整包边界，又让相同文件跨 skill 与版本去重；复制一次是每城最低存储量。
 
-**被否**：①给城外持有编一个城内地址或把城外目录映射进城根——那是一个指向并不在那儿的文件的地址，失败落在第一次 `read` 而不在写清单的时候（`crates/city/Spec.lean` §8-8）；②让 `read` 在调用时去城外路径读——读到的可能不是钉住的那份字节，且 `read` 多出一条不经读界判定的打开路径；③改文档，告诉人城外书架只能浏览不能用——书架挂了却用不上，人从 catalog 上看不出为什么。
+**被否**：①catalog 携扫描正文——只能覆盖 `SKILL.md`，包内文件没有同一 pin 的读取边界，正文还成为 CAS 之外的第二个权威；②让 `read` 在调用时读城外路径——读到的可能不是 pin 的版本，且城市复制后失效；③只复制 `SKILL.md`——包内脚本失去同一版本的读取与审核边界。
 
-**重开参数**：城外 skill 的包里附属文件也要按名读到（例如一件 skill 的 `SKILL.md` 指名它目录里的脚本）时，`Holding` 要带整包的字节或一份只读的城内镜像，本条与 city D9 一起重议。
+**重开参数**：城外书架由另一个独立账户提供不可变、可验证的 CAS 时，可以评估直接引用，但仍不得引用另一座城。
 -/
 
 /-! D113 模型选的路径按句柄判定，一次 open

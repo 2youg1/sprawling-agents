@@ -235,11 +235,9 @@ fn audit_uses_the_installed_package_digest_when_only_a_script_changes() {
         Ok(B3Hash::digest(bytes))
     })
     .unwrap();
-    let path = dir
-        .path()
-        .join(installed.holding.package.as_ref().unwrap().as_str());
+    let path = package;
     assert_eq!(crate::skill_digest(&path).unwrap(), installed.hash);
-    assert_ne!(installed.hash, installed.holding.hash);
+    assert_eq!(installed.hash, installed.holding.hash);
     let request = audit::AuditRequest {
         skill: "kiln".to_owned(),
         digest: installed.hash,
@@ -273,9 +271,10 @@ fn audit_uses_the_installed_package_digest_when_only_a_script_changes() {
     );
     let current = crate::skill_digest(&request.path).unwrap();
     assert_ne!(current, installed.hash);
-    assert_eq!(
+    assert_ne!(
         B3Hash::digest(&std::fs::read(request.path.join("SKILL.md")).unwrap()),
-        installed.holding.hash
+        installed.holding.hash,
+        "the manifest identifies the package, not only SKILL.md"
     );
 }
 

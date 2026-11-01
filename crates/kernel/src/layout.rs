@@ -46,6 +46,9 @@ pub const BUILDING_SHELF: &str = "skills";
 /// catalog lists this file's first line, and `read` opens the files
 /// beside it by `<name>/<path>`.
 pub const SKILL_FILE: &str = "SKILL.md";
+/// One shelf's index: `(section, name, manifest digest)` rows, with all
+/// skill bytes kept in the city's CAS rather than beside this file.
+pub const SHELF_INDEX: &str = "INDEX.toml";
 /// What one configuration layer declares. The same file name at every
 /// layer, because the layer is the scope it sits in rather than a name.
 pub const CONFIG_FILE: &str = "CONFIG.toml";

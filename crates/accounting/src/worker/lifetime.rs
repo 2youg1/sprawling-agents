@@ -24,7 +24,8 @@ use super::{
 };
 use std::path::Path;
 
-use kernel::AxError;
+use kernel::event::record::{ShelvedFrom, SkillAudited, SkillShelved};
+use kernel::{AxError, B3Hash, EventDraft, EventKind, EventRecord, Ledger, Payload, RunId, TimeMs};
 use storage::{Cas, JsonlLedger, OpenReport};
 
 /// What opening the ledger repaired before this worker read a line of
@@ -64,6 +65,31 @@ impl LedgerOpening {
             )),
         }
     }
+}
+
+fn old_skill_bindings(
+    city_root: &Path,
+) -> Result<std::collections::BTreeMap<String, (ShelvedFrom, Vec<SkillAudited>)>, AxError> {
+    let lines = storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
+        .map_err(storage::StorageError::into_ax)?;
+    let mut bindings = std::collections::BTreeMap::new();
+    for line in lines {
+        let record = EventRecord::parse_line(&line)?;
+        if record.kind() == EventKind::SkillShelved {
+            let shelved = record.data().read::<SkillShelved>()?;
+            let entry = bindings
+                .entry(shelved.skill)
+                .or_insert_with(|| (ShelvedFrom::Path, Vec::new()));
+            entry.0 = shelved.source;
+        } else if record.kind() == EventKind::SkillAudited {
+            let audit = record.data().read::<SkillAudited>()?;
+            let entry = bindings
+                .entry(audit.skill.clone())
+                .or_insert_with(|| (ShelvedFrom::Path, Vec::new()));
+            entry.1.push(audit);
+        }
+    }
+    Ok(bindings)
 }
 
 impl RunWorker {
@@ -250,10 +276,90 @@ impl RunWorker {
             recipe_for,
             exec_host,
         };
+        worker.migrate_skills(now)?;
         worker.sweep_abandoned_trees();
         worker.bring_configuration_forward();
         worker.open_checkpoints();
         Ok(worker)
+    }
+
+    /// Moves legacy skill shelves to CAS indexes and carries their old
+    /// source and audit bindings to the new manifest digest.
+    fn migrate_skills(&mut self, now: TimeMs) -> Result<(), AxError> {
+        let store = kernel::layout::CityLayout::new(&self.city_root).cas();
+        let mut cas = Cas::open(&store).map_err(storage::StorageError::into_ax)?;
+        let mut migrated = {
+            let reader = Cas::open(&store).map_err(storage::StorageError::into_ax)?;
+            let mut register =
+                |bytes: &[u8]| cas.put(bytes).map_err(storage::StorageError::into_ax);
+            let verify =
+                |digest: &B3Hash| reader.get(digest).map_err(storage::StorageError::into_ax);
+            city::Library::migrate(
+                &self.city_root,
+                None,
+                city::MigrationHooks {
+                    register: &mut register,
+                    verify: &verify,
+                },
+            )?
+        };
+        for building in city::buildings(&self.city_root)? {
+            migrated.extend({
+                let reader = Cas::open(&store).map_err(storage::StorageError::into_ax)?;
+                let mut register =
+                    |bytes: &[u8]| cas.put(bytes).map_err(storage::StorageError::into_ax);
+                let verify =
+                    |digest: &B3Hash| reader.get(digest).map_err(storage::StorageError::into_ax);
+                city::Library::migrate(
+                    &self.city_root,
+                    Some(&building),
+                    city::MigrationHooks {
+                        register: &mut register,
+                        verify: &verify,
+                    },
+                )?
+            });
+        }
+        if migrated.is_empty() {
+            return Ok(());
+        }
+        let mut bindings = old_skill_bindings(&self.city_root)?;
+        for installed in migrated {
+            let Some(previous) = installed.previous else {
+                continue;
+            };
+            let (source, audits) = bindings
+                .remove(&installed.holding.name)
+                .unwrap_or_else(|| (ShelvedFrom::Path, Vec::new()));
+            self.ledger.append(EventDraft {
+                run: RunId::CITY,
+                t: now,
+                who: "city".to_owned(),
+                addr: None,
+                kind: EventKind::SkillShelved,
+                data: Payload::of(&SkillShelved {
+                    skill: installed.holding.name.clone(),
+                    digest: installed.hash,
+                    source,
+                })?,
+                ig: false,
+            })?;
+            for audit in audits.into_iter().filter(|audit| audit.digest == previous) {
+                self.ledger.append(EventDraft {
+                    run: RunId::CITY,
+                    t: now,
+                    who: "city".to_owned(),
+                    addr: None,
+                    kind: EventKind::SkillAudited,
+                    data: Payload::of(&SkillAudited {
+                        digest: installed.hash,
+                        ..audit
+                    })?,
+                    ig: false,
+                })?;
+            }
+        }
+        Ok(())
     }
 
     /// Takes back the trees a crash left behind (`crates/sprawling/Spec.lean` §8-108).

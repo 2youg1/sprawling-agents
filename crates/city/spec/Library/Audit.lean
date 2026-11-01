@@ -8,7 +8,7 @@
 
 规定 `library::audit`（`crates/city/src/library/audit.rs`）：书架上一件 skill 的审核状态怎么从账本读出来。本文件是 `crates/city/Spec.lean` 的一个分部，标签 §8-28b，决定引作 `city D19`。
 
-模型放在 city 而不放在 accounting：「这件 skill 此刻的内容摘要是什么」是书架的事实（§8-8 的 `Holding::hash`、§8-28 的整包哈希），审核绑定的正是这个摘要；accounting 的折叠（wire D32）只读本模块给出的判定，不另写一份「过期」的规则。
+模型放在 city 而不放在 accounting：「这件 skill 此刻的候选版本是什么」是书架索引的事实（§8-8 的 `Holding::hash`、§8-28 的 canonical manifest digest），审核绑定的正是这个摘要；accounting 的折叠（wire D32）只读本模块给出的判定，不另写一份「过期」的规则。
 -/
 
 /-!
@@ -38,7 +38,7 @@ pub fn audit_state(content: &B3Hash, audits: &[(B3Hash, AuditVerdict, Seq)]) -> 
 
 **决定**：
 - **何时审**：一件 skill 每一次落位（`InstallSkill`，wire D32；`PutShelved` 落地之后同一条路）之后，以及城在扫架（`Library::scan`，开城与每次落位后）时看见一件持有的摘要在 `audit_state` 下是 `Unaudited` 或 `Stale` 时，各发起一次；同一 `(skill, digest)` 在一个城进程里只发起一次，于是一份取不到的内容不会在每次扫架时再写一行。发起点在城的后台任务（唯一的 spawn 点），run 的工具波从不等审核：`tool` 的 `detail` 读一件 `Stale` 的 skill 照常答。
-- **审什么**：被审的是书架上落下的那份字节——包审整包规范串的摘要（§8-28），文档审正文的摘要；`skill_audited.digest` 就是 `audit_state` 比对的那个值，即 §8-28 的 `Installed::hash`，而不是 `Holding::hash`：包的 `Holding::hash` 只是 `SKILL.md` 的摘要，改了包里一份脚本它不变，而注入正可以藏在脚本里。扫架不为此读包里每个文件（§8-8）：比对在后台的审核任务里做，它用 §8-28 预检的同一个读（`precheck`，上限 `PACKAGE_BYTES_LIMIT`）算出架上此刻的整包摘要。审的不是来源：来源在落位之后可能已经变了。
+- **审什么**：被审的是 admitted canonical manifest 列出的全部文件，`skill_audited.digest` 就是 manifest 的 digest，与 §8-28 的 `Installed::hash` 和 §8-8 的 `Holding::hash` 相同。任一脚本变化都会改变对应文件 digest，进而改变 manifest digest，所以注入无处藏在 `SKILL.md` 摘要之外。后台审核经 `city::materialize` 从 CAS 重建只读 projection，再对这一版本执行扫描；projection 是一次性派生物，不是第二份书架。审的不是外部来源：来源在复制或落位之后可能已经变了。
 - **来源关联**：后台以 `SkillShelved.digest` 为键登记来源，以被审内容的摘要查找，保留同一摘要首次登记的来源；同名不同摘要互不覆盖，因为 kernel D23 规定版本、上架与审核在 digest 上相遇。未登记摘要没有可追溯的远端来源，只调用适用的本地扫描器；本地审核载荷附 `local_only_reason`，说明当前内容摘要没有 SkillShelved 来源，因而跳过远端请求。没有本地扫描器时仍不产审核行，理由报告到 stderr。被否：按名字取最后来源，会把另一版本的远端结论绑到当前字节；把未知摘要声明为已登记的 Path，会丢掉无法追溯的原因。重开参数：来源记录提供可核对的内容绑定之外的追溯机制。
 - **谁来审，按序都试**：①skills.sh 的合作方审核（缺省，D89 第 3 条）：只在这件 skill 有一个 skills.sh 能认的来源时——来源是 skills.sh 名，或指向 `github.com/<owner>/<repo>` 的 git 地址——请求 `GET https://skills.sh/api/v1/skills/audit/<owner>/<repo>/<skill>`，不带令牌；每个合作方一行 `skill_audited`（`source = SkillsSh`，`scanner` 是合作方名，`verdict`／`risk`／`audited_at` 照录 `status`／`riskLevel`／`auditedAt`）；答 401、403、网络不通、超时（`SKILLS_SH_TIMEOUT`，5 s）或答复读不出时写一行 `verdict = Unreachable`，`link` 是 `https://skills.sh/<owner>/<repo>/<skill>` 这一页。②SkillSpector（可选）：doctor 在 PATH 上找到 `skillspector` 时，对落下的那份目录跑 `skillspector scan <path> --no-llm --format json`，退出码 0 读作 `Pass`、1 读作 `Fail`（它承诺稳定的只有这两个码与 JSON），其余退出码与读不出的输出读作 `Unreachable`；`scanner` 是它 `--version` 报出的串，`risk` 取 JSON 里的总风险等级原词。两者都不适用（本地路径或自带的 skill，且没有 SkillSpector）时不写行，状态就是 `Unaudited`：没人审过就不该有一行说审过。
 - **结论只显示，不判准入**：`Fail` 在书架页与 skill 页上标红并给出链接；进不进阅览室仍由 User 写在 `RULES.toml` 的 `reading_room` 里（§8-8）。

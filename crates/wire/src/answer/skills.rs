@@ -15,27 +15,16 @@
 use kernel::{Address, B3Hash, RunId};
 use serde::{Deserialize, Serialize};
 
-/// Which shelf a holding sits on, and where its document is.
-///
-/// One value rather than a shelf name beside a path, because a holding
-/// is on one shelf and at one place, and two fields would let them
-/// disagree: a row that says `library` and points outside the city is a
-/// state no shelf can be in.
-///
-/// Named rather than implied by which list it arrived in, so a page
-/// that shows three shelves in one list can still say where a skill
-/// came from - which is the question a person asks when two shelves
-/// hold the same name and the nearer one wins.
-///
-/// **The two city arms are `Query::Document`'s input; the external arm
-/// is not.** A skill on a shelf outside the city has no address, and one
-/// invented for it would send a reader to a file that is not there.
+/// Which shelf a holding sits on. City shelves are CAS indexes rather
+/// than document directories, so the city arms identify a scope, not a
+/// file to pass to `Query::Document`. A building arm names that building;
+/// an external arm names the mounted shelf and relative package path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SkillShelf {
     /// The city's central stock, under the reserved prefix.
-    Library(Address),
+    Library,
     /// This building's own shelf, inside the building.
     Building(Address),
     /// A directory outside the city that the city's configuration

@@ -28,7 +28,7 @@ use std::io::Read;
 use std::ops::Range;
 use std::path::Path;
 
-use kernel::{AxCode, AxError, B3Hash};
+use kernel::{AxCode, AxError, B3Hash, SkillItem, SkillManifest};
 
 use crate::library::reading;
 use crate::library::shelf::{HOLDING_EXT, holding_name};
@@ -41,19 +41,22 @@ const PACKAGE_HEADER: &[u8] = b"sprawling-skill-package/1\n";
 
 /// What a static precheck read: the name, the shape it lands in, the
 /// bytes the hash is taken over, and that hash.
-pub(super) struct Inspected {
-    pub(super) name: String,
-    pub(super) shape: Shape,
-    /// The document's bytes, or the package's canonical string: what
-    /// the store is handed and what [`Inspected::hash`] is taken over.
-    pub(super) stored: Vec<u8>,
-    pub(super) hash: B3Hash,
+pub(in crate::library) struct Inspected {
+    pub(in crate::library) name: String,
+    pub(in crate::library) shape: Shape,
+    /// The document's bytes, or the package's source canonical string,
+    /// used only for the source recheck and for the document's own CAS object.
+    pub(in crate::library) stored: Vec<u8>,
+    pub(in crate::library) source_hash: B3Hash,
+    pub(in crate::library) manifest: SkillManifest,
+    /// The package identity: the canonical manifest's digest.
+    pub(in crate::library) hash: B3Hash,
 }
 
 /// The two shapes a source arrives in, each landing as the shape the
 /// scan reads back.
 #[derive(Debug, Clone)]
-pub(super) enum Shape {
+pub(in crate::library) enum Shape {
     /// One document, landing as `<name>.md`; its bytes are `stored`.
     Document,
     /// A package, landing as `<name>/`: every item in canonical order,
@@ -64,7 +67,7 @@ pub(super) enum Shape {
 /// One item of a package, by its path relative to the package with
 /// segments joined by `/`.
 #[derive(Debug, Clone)]
-pub(super) enum Item {
+pub(in crate::library) enum Item {
     Directory(String),
     File(String, Range<usize>),
 }
@@ -75,7 +78,7 @@ pub(super) enum Item {
 /// Refuses a source that is not there (`E_PATH_NOT_FOUND`); a source
 /// that is not one skill document or package (`E_INVALID_ARGS`); and a
 /// link anywhere in it (`E_INVALID_ARGS`, whatever it points at).
-pub(super) fn inspect(path: &Path) -> Result<Inspected, AxError> {
+pub(in crate::library) fn inspect(path: &Path) -> Result<Inspected, AxError> {
     let meta = unlinked(path)?;
     if meta.is_dir() {
         inspect_package(path)
@@ -120,13 +123,48 @@ fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
         ));
     };
     require_text(&dir.join(reading::SKILL_FILE), stored.get(document))?;
-    let hash = B3Hash::digest(&stored);
+    let shape = Shape::Package(items);
+    let manifest = manifest_of(&shape, &stored)?;
+    let hash = B3Hash::digest(&manifest.encode()?);
+    let source_hash = B3Hash::digest(&stored);
     Ok(Inspected {
         name: reading::spelled(dir)?,
-        shape: Shape::Package(items),
+        shape,
         stored,
+        source_hash,
+        manifest,
         hash,
     })
+}
+
+/// Builds the package's one manifest authority from the same snapshot
+/// the source recheck hashes. Every skill, including one document, has
+/// this shape, so an index never has to guess how to decode it.
+pub(super) fn manifest_of(shape: &Shape, stored: &[u8]) -> Result<SkillManifest, AxError> {
+    let items = match shape {
+        Shape::Document => vec![SkillItem::File {
+            path: reading::SKILL_FILE.to_owned(),
+            digest: B3Hash::digest(stored),
+        }],
+        Shape::Package(items) => items
+            .iter()
+            .map(|item| match item {
+                Item::Directory(path) => Ok(SkillItem::Directory {
+                    path: path.trim_end_matches('/').to_owned(),
+                }),
+                Item::File(path, range) => {
+                    let bytes = stored.get(range.clone()).ok_or_else(|| {
+                        not_a_source(Path::new(path), "a file range left the source snapshot")
+                    })?;
+                    Ok(SkillItem::File {
+                        path: path.clone(),
+                        digest: B3Hash::digest(bytes),
+                    })
+                }
+            })
+            .collect::<Result<Vec<_>, AxError>>()?,
+    };
+    SkillManifest::new(items)
 }
 
 /// Appends one item to the canonical string: its kind, its
@@ -166,11 +204,16 @@ fn inspect_document(file: &Path) -> Result<Inspected, AxError> {
     };
     let stored = read_unlinked(file, &unlinked(file)?)?;
     require_text(file, Some(&stored))?;
-    let hash = B3Hash::digest(&stored);
+    let shape = Shape::Document;
+    let manifest = manifest_of(&shape, &stored)?;
+    let hash = B3Hash::digest(&manifest.encode()?);
+    let source_hash = B3Hash::digest(&stored);
     Ok(Inspected {
         name,
-        shape: Shape::Document,
+        shape,
         stored,
+        source_hash,
+        manifest,
         hash,
     })
 }

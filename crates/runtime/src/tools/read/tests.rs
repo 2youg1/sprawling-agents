@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::catalog::CatalogEntry;
+use kernel::{B3Hash, SkillItem, SkillManifest};
 
 mod doors;
 mod instruments;
@@ -19,10 +20,27 @@ fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
         root,
         Arc::clone(&catalog),
         everywhere,
-        Path::new("no-store"),
+        &kernel::layout::CityLayout::new(root).cas(),
     )
     .unwrap();
     (tool, catalog)
+}
+
+pub(super) fn skill_manifest(root: &Path, files: &[(&str, &[u8])]) -> B3Hash {
+    let store = kernel::layout::CityLayout::new(root).cas();
+    let mut cas = storage::Cas::open(&store).unwrap();
+    let items = files
+        .iter()
+        .map(|(path, bytes)| {
+            let digest = cas.put(bytes).unwrap();
+            SkillItem::File {
+                path: (*path).to_owned(),
+                digest,
+            }
+        })
+        .collect::<Vec<_>>();
+    let manifest = SkillManifest::new(items).unwrap();
+    cas.put(&manifest.encode().unwrap()).unwrap()
 }
 
 fn call(path: &str) -> ToolCall {
@@ -156,9 +174,7 @@ fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
 #[test]
 fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     let dir = tempfile::tempdir().unwrap();
-    let shelf = dir.path().join(".sprawling").join("library");
-    std::fs::create_dir_all(&shelf).unwrap();
-    std::fs::write(shelf.join("review.md"), "check the diff first\n").unwrap();
+    let manifest = skill_manifest(dir.path(), &[("SKILL.md", b"check the diff first\n")]);
     let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
@@ -166,9 +182,8 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
         .admit_skill(CatalogEntry {
             name: "review".to_owned(),
             disclosure: "how this building reviews".to_owned(),
-            expansion: ".sprawling/library/review.md".to_owned(),
-            hash: None,
-            package: None,
+            expansion: manifest.to_string(),
+            hash: Some(manifest),
         })
         .unwrap();
 

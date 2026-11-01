@@ -850,15 +850,17 @@ changes every name of the same file (runtime D10). The
 platform and filesystem optimizations, including copy-on-write; neither
 cloning nor zero new data blocks is guaranteed.
 
-Two admission boundaries still lack persistent accepted-content pins.
-The Reading Room records scan hashes, but a city skill is later opened by
-its shelf address; an external skill carries the text from that scan.
-Neither is the persistent accepted package version described in
-[#131](https://github.com/2youg1/sprawling-agents/issues/131). MCP connections
-keep the tool list learned when they connect and reuse it while live;
-there is no comparison with a persistently approved server/tool definition.
-Issue #131 owns those pins, their verified reads and their drift handling,
-and this section does not claim that any of it is implemented.
+A skill's shelf row is only a locator for its canonical manifest. Admission
+copies an external package into the city CAS once, and every later `read`
+resolves the admitted manifest and file through verified full CAS reads;
+installing a different digest creates a candidate version without moving an
+existing pin. The read-only materialization under `.sprawling/library/.objects/`
+is rebuilt from those objects and is disposable, not another authority.
+
+MCP connections keep the tool list learned when they connect and reuse it
+while live; there is no comparison with a persistently approved server/tool
+definition. Issue #131 owns those remaining pins and their drift handling,
+and this section does not claim that they are implemented.
 
 ### CPU placement
 

@@ -13,9 +13,10 @@
 //! Specified by `crates/city/spec/Library.lean` §8-8.
 
 use kernel::layout::CityLayout;
-use kernel::{Address, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash};
+use serde::{Deserialize, Serialize};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The extension a shelved document carries: one skill is one document,
 /// filed as `<name>.md`. Both directions of that spelling live here, so
@@ -64,7 +65,7 @@ pub(super) enum OwnShelf {
 }
 
 impl OwnShelf {
-    /// Where this shelf's root sits in the city.
+    /// Where this shelf's index sits in the city.
     pub(super) fn root(&self, layout: &CityLayout) -> PathBuf {
         match self {
             OwnShelf::Library => layout.library(),
@@ -72,11 +73,10 @@ impl OwnShelf {
         }
     }
 
-    /// Where a document read off this shelf sits.
-    pub(super) fn at(&self, item: Address) -> Shelf {
+    pub(super) fn as_shelf(&self) -> Shelf {
         match self {
-            OwnShelf::Library => Shelf::Library(item),
-            OwnShelf::Building(_) => Shelf::Building(item),
+            OwnShelf::Library => Shelf::Library,
+            OwnShelf::Building(building) => Shelf::Building(building.clone()),
         }
     }
 }
@@ -110,7 +110,7 @@ impl ShelfKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Shelf {
     /// The city's central stock, under the reserved prefix.
-    Library(Address),
+    Library,
     /// This building's own shelf, inside the building.
     Building(Address),
     /// A shelf outside the city that the city's configuration names,
@@ -124,17 +124,9 @@ pub enum Shelf {
 }
 
 impl Shelf {
-    /// The address a reader can open this holding by, where it has one.
-    ///
-    /// The question a catalog asks before it promises a skill to a run:
-    /// an entry is opened by an address, and a holding outside the city
-    /// has none.
     #[must_use]
-    pub fn address(&self) -> Option<&Address> {
-        match self {
-            Shelf::Library(addr) | Shelf::Building(addr) => Some(addr),
-            Shelf::External { .. } => None,
-        }
+    pub fn is_external(&self) -> bool {
+        matches!(self, Shelf::External { .. })
     }
 
     /// Where this shelf sits in the order a catalog lists shelves: the
@@ -148,7 +140,7 @@ impl Shelf {
     #[must_use]
     pub(super) fn catalog_position(&self) -> (u8, u32) {
         match self {
-            Shelf::Library(_) => (0, 0),
+            Shelf::Library => (0, 0),
             Shelf::Building(_) => (1, 0),
             Shelf::External { index, .. } => (2, *index),
         }
@@ -177,11 +169,6 @@ pub struct Holding {
     /// Which shelf, and where on it. One value, so a reader opening the
     /// document and a page naming the shelf read one fact.
     pub shelf: Shelf,
-    /// The package directory, when the holding is filed as one: the
-    /// scan says so here, so a reader never guesses it from a document
-    /// that happens to be called `SKILL.md`. `None` for a single
-    /// document, and for a shelf outside the city, which has no address.
-    pub package: Option<Address>,
     /// The document's text, for a holding no run can open by an address:
     /// one on a shelf outside the city. The scan read these bytes to take
     /// the disclosure line and the hash, so the text a reading room hands
@@ -191,23 +178,158 @@ pub struct Holding {
     pub carried: Option<String>,
 }
 
+pub(super) struct HoldingSource<'a> {
+    pub name: String,
+    pub section: String,
+    pub text: &'a str,
+    pub shelf: Shelf,
+    pub hash: B3Hash,
+}
+
 impl Holding {
-    /// One holding, derived from the document's bytes in exactly one
-    /// place. The disclosure line, the content hash and the text carried
-    /// for a shelf with no address are what every scan and every install
-    /// reports, and two derivations of them would be two answers to what
-    /// this document said.
-    pub(super) fn of(name: String, section: String, text: &str, shelf: Shelf) -> Holding {
+    /// One holding, derived from the document and manifest read in
+    /// exactly one place.
+    pub(super) fn of(source: HoldingSource<'_>) -> Holding {
+        let carried = source.shelf.is_external().then(|| source.text.to_owned());
         Holding {
-            name,
-            section,
-            disclosure: first_line(text),
-            hash: B3Hash::digest(text.as_bytes()),
-            carried: shelf.address().is_none().then(|| text.to_owned()),
-            shelf,
-            package: None,
+            name: source.name,
+            section: source.section,
+            disclosure: first_line(source.text),
+            hash: source.hash,
+            carried,
+            shelf: source.shelf,
         }
     }
+}
+
+/// One `(section, name, manifest digest)` row. No bytes or second path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShelfRow {
+    pub section: String,
+    pub name: String,
+    pub digest: B3Hash,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShelfDocument {
+    version: u16,
+    #[serde(default)]
+    skill: Vec<ShelfRow>,
+}
+
+const SHELF_VERSION: u16 = 1;
+
+/// Reads a shelf index. A missing index is empty; a present malformed one
+/// is not an empty shelf.
+pub(super) fn read_index(root: &Path) -> Result<Vec<ShelfRow>, AxError> {
+    let path = root.join(kernel::layout::SHELF_INDEX);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let text = std::fs::read_to_string(&path).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "read a skill shelf index",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("make the index readable, or restore it through the migration door")
+    })?;
+    let document: ShelfDocument = toml::from_str(&text).map_err(|err| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            "read a skill shelf index",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("restore the index from the shelf's verified CAS objects")
+    })?;
+    if document.version != SHELF_VERSION {
+        return Err(index_error(&path, "unsupported version"));
+    }
+    validate_rows(&document.skill).map_err(|why| index_error(&path, &why))?;
+    Ok(document.skill)
+}
+
+/// Adds or keeps one row and atomically replaces the index.
+pub(super) fn upsert_index(root: &Path, row: ShelfRow) -> Result<(), AxError> {
+    let mut rows = read_index(root)?;
+    if let Some(at) = rows.iter().position(|held| held.name == row.name) {
+        let existing = rows
+            .get(at)
+            .ok_or_else(|| index_error(&root.join(kernel::layout::SHELF_INDEX), "row vanished"))?;
+        if existing.section != row.section {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "install a skill",
+                format!(
+                    "`{}` is already shelved under {}",
+                    row.name, existing.section
+                ),
+            )
+            .with_recovery("use another name, or keep one name in one section"));
+        }
+        if existing == &row {
+            return Ok(());
+        }
+        let existing = rows
+            .get_mut(at)
+            .ok_or_else(|| index_error(&root.join(kernel::layout::SHELF_INDEX), "row vanished"))?;
+        *existing = row;
+    } else {
+        rows.push(row);
+    }
+    write_index(root, &rows)
+}
+
+pub(super) fn write_index(root: &Path, rows: &[ShelfRow]) -> Result<(), AxError> {
+    validate_rows(rows)
+        .map_err(|why| index_error(&root.join(kernel::layout::SHELF_INDEX), &why))?;
+    std::fs::create_dir_all(root).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "create a skill shelf",
+            format!("{}: {err}", root.display()),
+        )
+        .with_recovery("make the shelf directory writable, then install again")
+    })?;
+    let document = ShelfDocument {
+        version: SHELF_VERSION,
+        skill: rows.to_vec(),
+    };
+    let text = toml::to_string(&document).map_err(|err| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "write a skill shelf index",
+            err.to_string(),
+        )
+        .with_recovery("use only plain names and digest strings in the index")
+    })?;
+    crate::document::replace(&root.join(kernel::layout::SHELF_INDEX), text.as_bytes())
+}
+
+fn validate_rows(rows: &[ShelfRow]) -> Result<(), String> {
+    let mut names = std::collections::BTreeSet::new();
+    for row in rows {
+        if !plain_name(&row.section) || !plain_name(&row.name) {
+            return Err(format!(
+                "{}/{} is not a plain shelf name",
+                row.section, row.name
+            ));
+        }
+        if !names.insert(&row.name) {
+            return Err(format!("`{}` occurs more than once", row.name));
+        }
+    }
+    Ok(())
+}
+
+fn index_error(path: &Path, why: &str) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "read a skill shelf index",
+        format!("{}: {why}", path.display()),
+    )
+    .with_recovery("restore the index from verified CAS objects, then scan again")
 }
 
 /// The first non-empty line of a document, trimmed of its heading mark:
