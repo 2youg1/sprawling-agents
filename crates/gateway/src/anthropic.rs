@@ -47,16 +47,24 @@ fn role_str(role: Role) -> &'static str {
     }
 }
 
-/// Gives a redacted ledger tool id an Anthropic-safe spelling while
-/// leaving every other id unchanged.
+/// Keeps Anthropic tool ids and deterministically spells all others within
+/// the provider's accepted prefix and character set.
 fn tool_id_wire(id: &str) -> String {
-    let Some(fingerprint) = id.strip_prefix("secret:redacted/") else {
-        return id.to_owned();
-    };
-    if fingerprint.len() == 16 && fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        format!("toolu_{fingerprint}")
-    } else {
+    let is_anthropic_id = id.strip_prefix("toolu_").is_some_and(|suffix| {
+        !suffix.is_empty()
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    });
+    if is_anthropic_id {
         id.to_owned()
+    } else {
+        let fingerprint: String = kernel::B3Hash::digest(id.as_bytes())
+            .to_string()
+            .chars()
+            .take(16)
+            .collect();
+        format!("toolu_{fingerprint}")
     }
 }
 
