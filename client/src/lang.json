@@ -5375,6 +5375,18 @@
     "en": "building",
     "zh": "楼"
   },
+  "palette_go_address": {
+    "en": "go to {address}",
+    "zh": "前往 {address}"
+  },
+  "palette_address_expected": {
+    "en": "expected an address such as atlas or atlas/api",
+    "zh": "需要 atlas 或 atlas/api 这样的地址"
+  },
+  "palette_building_missing": {
+    "en": "that building is not in the city; use /raise to create it",
+    "zh": "城里没有这栋楼，用 /raise 建楼"
+  },
   "palette_placeholder": {
     "en": "go to…",
     "zh": "去…"

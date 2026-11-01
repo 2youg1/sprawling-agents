@@ -38,7 +38,7 @@ import { askQuit } from "./quitting";
 import { PAGE_VERBS } from "./slash_pages";
 import { given, stripped } from "./tags";
 import { CITY } from "./scope";
-import { buildingDestination, buildingOf } from "./route";
+import { readWorkspace, workspaceDestination } from "./route";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
 import { compact, fresh, retag } from "./slash_session";
 
@@ -291,9 +291,10 @@ export const SLASH: readonly Slash[] = [
     about: "slash_room",
     section: "navigation",
     run: (hands, call) => {
-      const address = addressed(call.words.at(0));
-      if (address === null) return;
-      hands.go({ kind: "talk", address });
+      if (call.rest.startsWith("-")) return;
+      const view = readWorkspace(call.rest);
+      if (view === null) return;
+      hands.go(view);
       hands.write("");
     },
   },
@@ -308,13 +309,12 @@ export const SLASH: readonly Slash[] = [
         hands.write("");
         return;
       }
-      // One top-level name only: a room or extra words are not a
-      // building destination, so the line stays for correction.
-      if (call.words.length !== 1) return;
-      const addr = addressed(call.words.at(0));
-      if (addr === null || buildingOf(addr) !== addr) return;
-      if (hands.buildings === undefined) return;
-      hands.go(buildingDestination(addr, hands.buildings).view);
+      if (call.rest.startsWith("-") || hands.buildings === undefined) return;
+      const view = readWorkspace(call.rest);
+      if (view === null) return;
+      const destination = workspaceDestination(view, hands.buildings);
+      if (destination === null) return;
+      hands.go(destination);
       hands.write("");
     },
   },

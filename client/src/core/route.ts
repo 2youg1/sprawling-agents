@@ -410,6 +410,41 @@ export function go(bar: AddressBar, view: View): void {
   bar.hash = toFragment(view);
 }
 
+export type WorkspaceView = Extract<View, { kind: "talk" }>;
+
+// The one reader for a workspace typed into `/room`, `/cd` or the
+// palette. Bare text is an address; a fragment or URL must name a talk
+// view, never another page that happens to share the address grammar.
+export function readWorkspace(raw: string): WorkspaceView | null {
+  const text = raw.trim();
+  if (text === "") return null;
+  const fragment = text.startsWith("#") ? text : URL.canParse(text) ? new URL(text).hash : null;
+  if (fragment !== null) {
+    const view = Option.getOrNull(fromFragment(fragment));
+    if (view?.kind !== "talk") return null;
+    return {
+      kind: "talk",
+      address: view.address,
+      ...(view.session === undefined ? {} : { session: view.session }),
+    };
+  }
+  return Option.getOrNull(
+    Option.map(readAddress(text), (address): WorkspaceView => ({ kind: "talk", address })),
+  );
+}
+
+// Where a parsed workspace goes against the buildings the city knows.
+// A top-level name follows the raise/building classification; a room is
+// direct only below an established building.
+export function workspaceDestination(
+  view: WorkspaceView,
+  buildings: readonly BuildingProgress[],
+): View | null {
+  const building = buildingOf(view.address);
+  if (building === view.address) return buildingDestination(building, buildings).view;
+  return buildings.some((held) => held.addr === building && !held.adoptable) ? view : null;
+}
+
 // The building an address belongs to: its first segment.
 export function buildingOf(address: Address): Address {
   const slash = address.indexOf("/");

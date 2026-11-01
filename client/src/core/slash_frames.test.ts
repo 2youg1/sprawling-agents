@@ -256,6 +256,11 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   ],
   "/room": [
     { line: "/room hall/mayor", done: going({ kind: "talk", address: MAYOR }) },
+    { line: "/room #/talk/hall/mayor", done: going({ kind: "talk", address: MAYOR }) },
+    {
+      line: "/room lab/a room",
+      done: going({ kind: "talk", address: Address.make("lab/a room") }),
+    },
     { line: "/room", done: NOTHING },
   ],
   "/cd": [
@@ -266,8 +271,9 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
       line: "/cd new-project",
       done: going({ kind: "raise", address: Address.make("new-project") }),
     },
-    { line: "/cd lab/room1", done: NOTHING },
-    { line: "/cd lab extra", done: NOTHING },
+    { line: "/cd lab/room1", done: going({ kind: "talk", address: Address.make("lab/room1") }) },
+    { line: "/cd lab extra", done: going({ kind: "raise", address: Address.make("lab extra") }) },
+    { line: "/cd unknown/room", done: NOTHING },
     { line: "/cd lab:", done: NOTHING },
     { line: "/cd /lab", done: NOTHING },
   ],

@@ -10,6 +10,7 @@
 import type { Action } from "../../core/keys";
 import type { Key } from "../../core/lang";
 import type { Section } from "../../core/slash_hands";
+import type { View } from "../../core/route";
 
 export interface Entry {
   readonly label: string;
@@ -18,6 +19,9 @@ export interface Entry {
   // where other rows show their hint.
   readonly action?: Action | undefined;
   readonly act: () => void;
+  // A navigation destination, used to keep a pasted address from
+  // drawing a second row for a place already listed.
+  readonly to?: View | undefined;
   // Present means the verb cannot run here, and names why.
   readonly why?: Key | undefined;
   // Present means pressing the row changes the list rather than going

@@ -154,6 +154,12 @@
   </Stand>
 </Case>
 
+<Case label="palette · a pasted address becomes one direct row" width={640}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
+    <Palette seat="specimen" here={HALL} initial="hall/new-room" onClose={ignore} />
+  </Stand>
+</Case>
+
 <Case label="palette · verbs, one this page cannot run greyed with its reason" width={640}>
   <Modal wire={specimen(say($lang, "nav_palette"))} seat="specimen">
     <PaletteLook

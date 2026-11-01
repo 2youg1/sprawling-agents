@@ -11,7 +11,14 @@ import { describe, expect, test } from "bun:test";
 
 import { completed } from "../core/completion";
 import type { BoxHands, BoxState } from "./palette";
-import { boxOf, carryPlaces, sessionPlaces, whyFor } from "./palette";
+import {
+  boxOf,
+  carryPlaces,
+  paletteWorkspace,
+  sessionPlaces,
+  whyFor,
+  workspaceProblem,
+} from "./palette";
 import { Address, Seq, TimeMs } from "../wire";
 import type { SessionLine } from "../wire";
 import type { Entry } from "./palette/entry";
@@ -213,6 +220,37 @@ describe("the sessions of the room main stands in", () => {
         to: { kind: "talk", address: ROOM, session: Seq.make(9) },
       },
     ]);
+  });
+});
+
+describe("a workspace pasted into the palette", () => {
+  const progress = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
+  const buildings = [
+    { addr: Address.make("lab"), adoptable: false, blocked: [], problems: [], progress, ready: 0 },
+  ];
+
+  test("a known room and a new room under a known building are direct destinations", () => {
+    expect([
+      paletteWorkspace("lab/parser", buildings),
+      paletteWorkspace("lab/new-room", buildings),
+      paletteWorkspace("lab", buildings),
+      paletteWorkspace("unknown/room", buildings),
+      paletteWorkspace("unknown", buildings),
+    ]).toEqual([
+      { kind: "talk", address: Address.make("lab/parser") },
+      { kind: "talk", address: Address.make("lab/new-room") },
+      { kind: "building", address: Address.make("lab") },
+      null,
+      null,
+    ]);
+  });
+
+  test("bad text and an unknown building have distinct empty-state reasons", () => {
+    expect([
+      workspaceProblem("a//b", buildings),
+      workspaceProblem("unknown/room", buildings),
+      workspaceProblem("lab/new-room", buildings),
+    ]).toEqual(["palette_address_expected", "palette_building_missing", null]);
   });
 });
 
