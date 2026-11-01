@@ -174,10 +174,11 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 状态迁移由 `kernel::PlanTree` 从计划自身判：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`、`block`、`release`、`split` 只作用于本次 drive 认领的那个节点（D6）；拒词报出此刻的状态并指向一个真能拿的节点。
 - 认领在调用时由 `Booking` 判定，桌子的副本先答：先让 `PlanTree::claim` 在副本上判，再问 `Booking`；`Booking` 拒绝时桌子不持有节点、不排效应、不改文本。`Booking` 记的是哪轮在飞的活持有哪个节点，只活到那轮活落地为止，所以它不是第二份登记表；它拿到整条 `ClaimEffect::Claimed`，因为那一行的种类与载荷只由 `ClaimEffect::kind` 与 `line` 定义。
 - 一次 drive 只持有一个节点。计划门禁就是那个 `Held` 值：它由 `PlanTree::claim` 铸出，只能花在 `finish` 或 `stop` 上，没有第三个出口；一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，「认领了却没交代」在冻结之后不可达。
-- `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
-- `add` 只在根下加顶层行，只有 `hall/mayor` 能调（D12）；它带 `parts`，每一份成为一个顶层行，编号接在最后一个顶层行之后；写进副本之前同 `split` 一样重新解析并 `PlanTree::build`，建不出合法树就一个字节都不写。回答带 `nodes`：新行的编号。
+- `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。每份 `parts` 可以带 `needs`：这个子行要等的行，写进新表的 `Needs` 列，于是「先等 3 做完再做这一行」是 `split` 一句话说得下来的事。依赖的存在、自指与成环由上面那一次 `PlanTree::build` 判，拒绝说出行与依赖的名字（`crates/kernel/spec/Spine.lean`）。新行的编号到插入时才定，所以 `needs` 只能点名表里已有的行。
+- `add` 只在根下加顶层行，只有 `hall/mayor` 能调（D12）；它带 `parts`，每一份成为一个顶层行，编号接在最后一个顶层行之后；同样带 `needs`。写进副本之前同 `split` 一样重新解析并 `PlanTree::build`，建不出合法树就一个字节都不写。回答带 `nodes`：新行的编号。
+- `list` 答的是这张桌子看到的计划：`ready`（叶子、无人认领、自己与每一层祖先的依赖都已 Done）、`in_progress`（叶子，正在做）、`blocked`（`Blocked` 与 `Awaiting approval`）、`done`（已完成的行，证据列解析得出的 Locator 随行，`evidence` 键缺席就是这一行没有可读的证据）、`nodes_total`。另有 `rendered`、`pending` 与 `note`：一次 drive 的 `claim`、`finish`、`block`、`release`、`split`、`add` 先只改桌子的副本，落地时才开始写 `Roadmap.md`，所以 `pending` 列出本 run 改过、还没写进文件的节点（按改动次序、去重），`rendered` 为真即这份副本与文件此刻一致。模型用自己的 `read` 去看文件时，它看到的是派活那一刻的计划；`note` 把这件事说成一句话，因为最容易被读成「我刚写的行丢了」的就是这个缺口。
 - `block` 与 `release` 必须带一句原因，原因随记录走（`roadmap_blocked` 的载荷），不随表格走。哪一种记录由出口决定（`ClaimEffect::kind`）：绿是 `roadmap_finished`，红是 `roadmap_blocked`，交回是 `roadmap_released`，拆是 `roadmap_split`。效应穷尽，新增一个变体应当是写入处的编译错误。
-- 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
+- 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight 与 needs。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
 - 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；`crates/accounting/Spec.lean` §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
 
 **`collab::archive_tool`**（形状 4 适配器）。`ARCHIVE_KINDS` 是封闭的四类（§14）。回忆是读，不是记：索引由 worker 在派活时从书架算出后交给桌子，盘上的文件才是真的。`record` 在调用时经装配层交来的 `Filer` 先写 `asset_archived`、再把条目落进这轮活写的树（kernel D24；审查楼的树在 lane 摆工作台时才放好，晚于开桌，故装配层在调用时读那棵树，而不是开桌时记下城根），`Filer` 答回落下的那一条，桌子把它并进自己读的那份书架，于是同一个 run 的 `recall` 读得到它；`searched` 是这次比对过的条目数。`Filer` 拒绝时它的拒词原样到模型，书架不多一条。落盘与记账归装配层，桌子只判定什么值得记。
@@ -261,7 +262,7 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 `ARCHIVE_KINDS` 是封闭的四类：`preference`、`decision`、`correction`、`fact`。第五类要有理由，而「它不属于前四类」正是让分类腐烂的那个理由，所以拒词点名四类并问这是哪一类。
 
-`plan` 条目的 581 B 上限：七个动作的 disclosure 加 schema 的紧凑 JSON，由一条断言钉住（`claim_tool::catalog_tests`）；四个动作时同一读法量得 548 B，`add` 复用 `parts` 只多 33 B（D12）。disclosure 里那句 *Must this be expanded?* 是 LLM First（ARCHITECTURE.md §9）的提醒，在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。多出的动词放得进来，省下的字节来自把 Locator 文法从 schema 移进拒词：一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节；schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
+`plan` 条目的 584 B 上限：七个动作的 disclosure 加 schema 的紧凑 JSON，由一条断言钉住（`claim_tool::catalog_tests`）；四个动作时同一读法量得 548 B，`add` 复用 `parts` 只多 33 B（D12），`needs` 骑在模型本来就要写的 `parts` 里、只在 `parts` 的说明里多 3 B，没有自己的 schema 键。disclosure 里那句 *Must this be expanded?* 是 LLM First（ARCHITECTURE.md §9）的提醒，在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。多出的动词放得进来，省下的字节来自把 Locator 文法从 schema 移进拒词：一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节；schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 -/
 
 /-! ## 15 影响面

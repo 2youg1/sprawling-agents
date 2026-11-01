@@ -149,6 +149,10 @@ impl RunWorker {
         // The conversation this run opens with is rebuilt here, where
         // the ledger's index is held and its lineage line is written.
         let inherited = self.inherited(&at, site.run_id)?;
+        // What the mother's reads already handed over, so the branch does
+        // not present the same rule twice as a note on its first read of
+        // that part of the tree.
+        let laying = self.laying(&site.who, inherited.delivered.clone())?;
         let carried_from = self.origins.carried_from(&at.addr);
         // The run begins the room's session: what a carried session was
         // owed is spent, and this run is the room's last.
@@ -167,8 +171,8 @@ impl RunWorker {
             given,
             job_locator: job_locator.clone(),
             desks: desks.for_bench(),
-            laying: self.laying(&site.who)?,
-            inherited,
+            laying,
+            inherited: inherited.messages,
             carried_from,
             member,
             command: self.doorstep.entrance.carrying(),

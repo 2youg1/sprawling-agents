@@ -19,7 +19,9 @@ use kernel::event::record::{
     ModelReturned, Rendering, RunStarted, SteerReceived, ToolAnswer, ToolResult,
 };
 use kernel::model::content_from_message;
-use kernel::{AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq};
+use kernel::{
+    Address, AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq,
+};
 
 use crate::compaction::Exchange;
 use crate::conversation::{Conversation, Opening};
@@ -71,6 +73,13 @@ pub struct Inherited {
     /// cut, because a provider refuses an assistant message whose tool
     /// uses nothing answers.
     pub at: Seq,
+    /// The project's rule files the mother's reads had already handed
+    /// her, read off the answers those reads recorded
+    /// (`crates/runtime/spec/Tools/Read.lean` §8-29-7). A branch has
+    /// read what its mother read, so a rule she was given does not
+    /// arrive a second time as a note on the branch's first read of a
+    /// file in that part of the tree.
+    pub delivered: std::collections::BTreeSet<Address>,
 }
 
 /// The refusal for a run whose opening line this history does not hold.
@@ -89,6 +98,7 @@ fn no_start(owner: RunId) -> AxError {
 fn fold_run<'a>(
     mut conversation: Conversation,
     records: impl Iterator<Item = &'a EventRecord>,
+    mut delivered: std::collections::BTreeSet<Address>,
 ) -> Result<Inherited, AxError> {
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
@@ -126,6 +136,7 @@ fn fold_run<'a>(
             }
             EventKind::ToolResult => {
                 let result = record.data().read::<ToolResult>()?;
+                delivered.extend(rules_delivered(&result));
                 if let Some(wave) = open.as_mut() {
                     wave.exchange.push_result(result_block(&result)?);
                     if wave.exchange.results().len() >= wave.expect {
@@ -266,7 +277,31 @@ fn fold_run<'a>(
     Ok(Inherited {
         messages: conversation.messages().to_vec(),
         at,
+        delivered,
     })
+}
+
+/// The rule files one recorded read answer says it carried.
+///
+/// A read that appended the project's rules names them under `rules` in
+/// its answer (`crates/runtime/spec/Tools/Read.lean` §8-29-7), and every
+/// older answer has no such key. A name the address grammar refuses is
+/// left out rather than failing the rebuild: the answer still draws, and
+/// one rule arriving twice costs a note.
+fn rules_delivered(result: &ToolResult) -> impl Iterator<Item = Address> + '_ {
+    let listed = match &result.answer {
+        ToolAnswer::Answered { result } => result
+            .as_map()
+            .get("rules")
+            .and_then(|rules| rules.get("delivered"))
+            .and_then(serde_json::Value::as_array),
+        ToolAnswer::Failed { .. } => None,
+    };
+    listed
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .filter_map(|at| Address::parse(at).ok())
 }
 
 /// Who handed the rebuilt run its work, in the words its opening was

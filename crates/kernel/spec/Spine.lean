@@ -24,7 +24,7 @@ pub struct RoadmapRow { pub id: NodeId, pub item: String, pub weight: u32,
                         pub needs: Vec<NodeId>, pub status: RoadmapStatus,
                         pub evidence: EvidenceCell }
 pub enum RoadmapShape { WellFormed { rows: Vec<RoadmapRow> }, Malformed { problems: Vec<String> } }
-pub struct NewChild { pub item: String, pub weight: u32 }
+pub struct NewChild { pub item: String, pub weight: u32, pub needs: Vec<NodeId> }
 pub fn check_roadmap_shape(text: &str) -> RoadmapShape;
 pub fn set_roadmap_status(text: &str, id: &NodeId, status: RoadmapStatus,
                           evidence: Option<&Locator>) -> Result<String, AxError>;
@@ -40,6 +40,7 @@ pub enum WriteMoment { BeforeReport, AfterFeedback, OnPlanChange }
 - **拼写单套且不区分大小写**：运行时文档是英文，中英两套拼写会成为「一个 Resident 允许写什么」的第二个权威；而大小写不入契约是因为 `done` 这类行表达的事实表装得下，把它判成 Malformed 等于拿一个读者不接受的理由把该行逐出分母。**线上拼写另有一套**（`snake_case` 标识符）：线帧是给程序读的，表格是给人读的，让客户端硬编码 `Awaiting approval` 正是短语表存在要防的事。
 - **写者与读者同住**：`set_roadmap_status`、`insert_children` 与 `append_top_level` 是这张表仅有的三个编辑入口，三者共用同一段「哪几行是这张表」的判定（`locate_table`／`body_row`）。三条契约不变：只改首个表；输出行规范化，故**同一次改写两次得到同一字节**；`Done` 缺证据恒拒（`E_EVIDENCE_MISSING`）。
 - **`append_top_level` 把一行接在表的最后一行之后**，是空计划写进第一行的那扇门（`Share.lean` D25）；它不自己算编号，而核对调用方给的编号是顶层、尚未被占，因为调用方之后认领这一行时用的就是这个编号。新行与子行同一个画法（`draw_child`），空白、带 `|`、权重为零的行一样被拒。
+- **新行自己写 `Needs` 列**：`NewChild.needs` 是这张新表要等的行，`draw_child` 按 `draw_row` 同一个写法把它接成 `, ` 分隔的一格，于是「先做这个再做那个」在 `add` 与 `split` 里都写得下来，而不是只能等人改文件。三个入口只写文法：一个名字在不在表里、是不是自己、会不会成环，由 `PlanTree::build` 在调用方写盘之前对长成的那张表判（`Plan.lean` §8-33），所以拒绝落在模型调用那一刻，且与读这份计划的判定是同一个。新行的编号在插入时才定，故一份 `needs` 只能点名表里已有的行；同一份 `parts` 里的兄弟行无法互相指着。
 - **`insert_children` 只往后编号，不补空位**：一个计划索引是一个名字，复用它等于悄悄搬走别人的证据。子节点落在父节点**最后一个后代之后**，于是阅读顺序不变、昨天看到的编号今天仍指同一件活。
 - **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`accounting::plan_view`）。
 -/

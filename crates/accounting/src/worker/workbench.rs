@@ -71,6 +71,10 @@ pub(in crate::worker) struct Laying {
     /// (`crates/sprawling/Spec.lean` §8-131, §8-142).
     book: gateway::EndpointBook,
     proposing: tools::proposal::Proposing,
+    /// The project's rule files this run's window already carries, read
+    /// off the history it inherited. `read` adds to the set as it hands
+    /// out more (`crates/runtime/spec/Tools/Read.lean` §8-29-7).
+    delivered: std::collections::BTreeSet<Address>,
 }
 
 impl Laying {
@@ -101,7 +105,11 @@ impl super::RunWorker {
     ///
     /// # Errors
     /// Propagates a city whose genesis line cannot be read.
-    pub(in crate::worker) fn laying(&self, who: &str) -> Result<Laying, AxError> {
+    pub(in crate::worker) fn laying(
+        &self,
+        who: &str,
+        delivered: std::collections::BTreeSet<Address>,
+    ) -> Result<Laying, AxError> {
         Ok(Laying {
             city_root: self.city_root.clone(),
             city: self.city_hash()?,
@@ -127,6 +135,7 @@ impl super::RunWorker {
                 .collect(),
             book: self.credentials.book.clone(),
             proposing: self.proposing(),
+            delivered,
         })
     }
 }

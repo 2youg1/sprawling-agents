@@ -25,10 +25,12 @@ fn the_plan_entry_costs_no_more_catalog_bytes_than_its_pin() {
     // a description repeating what a refusal already says is paid
     // for every turn and read once. The seventh verb, `add`, is the only
     // door into an empty plan and costs 33 B: it reuses
-    // `parts` instead of carrying a schema field of its own.
+    // `parts` instead of carrying a schema field of its own. `needs`
+    // costs 3 B in the `parts` description and no key of its own, since
+    // it rides inside a part the model already writes.
     assert!(meta.disclosure.contains("Must this be expanded?"));
     assert!(
-        bytes <= 581,
-        "the plan entry costs {bytes} B, and its pin is 581"
+        bytes <= 584,
+        "the plan entry costs {bytes} B, and its pin is 584"
     );
 }

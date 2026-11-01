@@ -129,10 +129,71 @@ fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
         1
     );
     assert_eq!(map.get("nodes_total").and_then(Value::as_u64), Some(3));
+    assert_eq!(
+        map.get("done").and_then(Value::as_array).map(Vec::len),
+        Some(0),
+        "a fresh plan has finished nothing"
+    );
+    assert_eq!(
+        (map.get("rendered"), map.get("pending")),
+        (Some(&Value::Bool(true)), Some(&Value::Array(Vec::new()))),
+        "nothing this run did is waiting to be written"
+    );
     assert!(
         shared.lock().unwrap().roadmap().is_none(),
         "reading the plan does not modify it"
     );
+}
+
+/// `list` answers the two questions a model asks after it has worked:
+/// what is finished and where is the proof, and why a row it just wrote
+/// is not in the file it would read. A run's edits live in the desk's
+/// copy until the run lands, and a `finish` that has not landed is not a
+/// row lost.
+#[test]
+fn list_reports_finished_rows_and_what_is_not_on_the_file_yet() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    tool.invoke(&call_evidence("1"))
+        .unwrap_or_else(|err| panic!("finish lands on the desk: {}", err.subject()));
+    let outcome = tool
+        .invoke(&call(serde_json::json!({ "action": "list" })))
+        .unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(
+        map.get("done"),
+        Some(&Value::Array(vec![serde_json::json!({
+            "node": "1",
+            "item": "wire the kiln",
+            "evidence": locator(),
+        })])),
+        "a finished row comes with the locator that proves it"
+    );
+    assert_eq!(
+        (map.get("rendered"), map.get("pending")),
+        (
+            Some(&Value::Bool(false)),
+            Some(&Value::Array(vec![serde_json::json!("1")]))
+        ),
+        "the row is in this run's copy, not yet in Roadmap.md"
+    );
+    assert!(
+        map.get("note")
+            .and_then(Value::as_str)
+            .is_some_and(|note| note.contains("lands")),
+        "the answer says why the file does not show it yet"
+    );
+}
+
+/// The `finish` call for one node, with the locator `locator` writes.
+fn call_evidence(node: &str) -> ToolCall {
+    call(serde_json::json!({
+        "action": "finish",
+        "node": node,
+        "evidence": locator(),
+    }))
 }
 
 #[test]

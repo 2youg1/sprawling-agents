@@ -54,7 +54,11 @@ impl ClaimTool {
             ("node", "string", "dotted index, such as `2.3`"),
             ("evidence", "string", "a path or locator"),
             ("reason", "string", "one line: why"),
-            ("parts", "array", "the children, each `{item, weight}`"),
+            (
+                "parts",
+                "array",
+                "the children, each `{item, weight, needs}`",
+            ),
         ] {
             let mut spec = Map::new();
             spec.insert("type".to_owned(), Value::String(kind.to_owned()));
@@ -238,6 +242,7 @@ impl ClaimDesk {
                 child: NewChild {
                     item: row.item.trim().to_owned(),
                     weight: row.weight,
+                    needs: row.needs.clone(),
                 },
             };
             grown = effect.apply(&grown)?;
@@ -322,6 +327,7 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
             Value::String(item) => NewChild {
                 item: item.clone(),
                 weight: 1,
+                needs: Vec::new(),
             },
             Value::Object(map) => {
                 let item = map
@@ -329,9 +335,15 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
                     .and_then(Value::as_str)
                     .ok_or_else(|| refuse("a part with no `item`"))?;
                 let weight = map.get("weight").and_then(Value::as_u64).unwrap_or(1);
+                let needs = map
+                    .get("needs")
+                    .map(needs_of)
+                    .transpose()?
+                    .unwrap_or_default();
                 NewChild {
                     item: item.to_owned(),
                     weight: u32::try_from(weight).unwrap_or(u32::MAX),
+                    needs,
                 }
             }
             Value::Null | Value::Bool(_) | Value::Number(_) | Value::Array(_) => {
@@ -341,4 +353,43 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
         children.push(child);
     }
     Ok(children)
+}
+
+/// The rows one part waits for, as the model wrote them: a list of
+/// indexes, or the same list as one comma-separated string.
+///
+/// A name that is not an index is refused here, where the part is still
+/// in hand; whether the row it names exists, is not the part itself and
+/// closes no circle is `PlanTree::build`'s judgement on the grown table.
+fn needs_of(value: &Value) -> Result<Vec<NodeId>, AxError> {
+    let refuse = |subject: String| {
+        AxError::failure(AxCode::InvalidArgs, "read the parts of a split", subject).with_recovery(
+            "pass `needs` as a list of the plan's indexes, such as `[\"2.1\", \"2.2\"]`, or as \
+             one comma-separated string",
+        )
+    };
+    let spelled: Vec<String> = match value {
+        Value::String(text) => text.split(',').map(str::to_owned).collect(),
+        Value::Array(listed) => listed
+            .iter()
+            .map(|entry| match entry {
+                Value::String(text) => Ok(text.clone()),
+                Value::Null
+                | Value::Bool(_)
+                | Value::Number(_)
+                | Value::Object(_)
+                | Value::Array(_) => Err(refuse("a `needs` entry that is not an index".to_owned())),
+            })
+            .collect::<Result<Vec<String>, AxError>>()?,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::Object(_) => {
+            return Err(refuse("`needs` that is neither a list nor text".to_owned()));
+        }
+    };
+    spelled
+        .iter()
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|index| !index.is_empty())
+        .map(|index| NodeId::parse(index).map_err(|err| refuse(err.subject().to_owned())))
+        .collect()
 }

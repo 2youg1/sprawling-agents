@@ -94,10 +94,13 @@ pub fn inherited_indexed(
     // The recursion ends because a branch point at or after its own
     // run_forked line is refused.
     let mut conversation = Conversation::new();
+    let mut delivered = std::collections::BTreeSet::new();
     if let Some(origin) = forked_from(owner, &records)? {
-        conversation.push_inherited(&inherited_indexed(index, dir, origin)?.messages);
+        let mother = inherited_indexed(index, dir, origin)?;
+        conversation.push_inherited(&mother.messages);
+        delivered.extend(mother.delivered);
     }
-    fold_run(conversation, records.iter().skip(start))
+    fold_run(conversation, records.iter().skip(start), delivered)
 }
 
 /// The refusal for a line the index does not hold, in the words a

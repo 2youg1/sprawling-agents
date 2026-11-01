@@ -169,7 +169,7 @@ fn worker_holding(city_root: &Path, ids: &[&str]) -> RunWorker {
 
 fn offered(worker: &RunWorker, root: &Path, configuration: &SearchConfiguration) -> WebSearch {
     worker
-        .laying("")
+        .laying("", std::collections::BTreeSet::new())
         .unwrap()
         .web_search(
             &kernel::BuildingPolicy::new(false),
@@ -255,7 +255,9 @@ fn web_search_defaults_to_exa_and_is_not_offered_when_confidential_or_off() {
         Some(&serde_json::json!(["query", "objective"]))
     );
 
-    let laying = worker.laying("").unwrap();
+    let laying = worker
+        .laying("", std::collections::BTreeSet::new())
+        .unwrap();
     for (confidential, configuration) in [
         (true, SearchConfiguration::Default),
         (false, SearchConfiguration::Off),

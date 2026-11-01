@@ -36,7 +36,6 @@ pub use tools::BoundReader;
 pub use tools::ChildStatus;
 pub use tools::ProviderMode;
 pub use tools::ReadBound;
-pub use tools::ReadTool;
 pub use tools::SearchTool;
 pub use tools::StatusSnapshot;
 pub use tools::StatusTool;
@@ -45,6 +44,7 @@ pub use tools::parse_arm;
 pub use tools::{EditDesk, EditTool, PathLocks, ReadStamps};
 pub use tools::{ExecSetup, ExecTool};
 pub use tools::{FailureClass, Shell, ShellCount, ShellTally};
+pub use tools::{Note, Notes, ReadTool};
 pub use tools::{SucceedTool, Succession, SuccessionDesk};
 
 pub mod bench;

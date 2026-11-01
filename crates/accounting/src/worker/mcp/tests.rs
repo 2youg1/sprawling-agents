@@ -170,7 +170,7 @@ fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
     let offered = worker
-        .laying("")
+        .laying("", std::collections::BTreeSet::new())
         .unwrap()
         .mcp_tools(&config.mcp, dir.path(), false);
     assert_eq!(offered.len(), 1);
@@ -179,7 +179,7 @@ fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
 
     assert!(
         worker
-            .laying("")
+            .laying("", std::collections::BTreeSet::new())
             .unwrap()
             .mcp_tools(&config.mcp, dir.path(), true)
             .is_empty(),
@@ -190,7 +190,7 @@ fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
     assert!(
         worker
-            .laying("")
+            .laying("", std::collections::BTreeSet::new())
             .unwrap()
             .mcp_tools(&config.mcp, dir.path(), false)
             .is_empty(),
@@ -287,12 +287,12 @@ fn a_second_dispatch_reaches_the_server_the_first_one_started() {
     let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
     let first = worker
-        .laying("")
+        .laying("", std::collections::BTreeSet::new())
         .unwrap()
         .mcp_tools(&config.mcp, dir.path(), false);
     drop(first);
     let second = worker
-        .laying("")
+        .laying("", std::collections::BTreeSet::new())
         .unwrap()
         .mcp_tools(&config.mcp, dir.path(), false);
 

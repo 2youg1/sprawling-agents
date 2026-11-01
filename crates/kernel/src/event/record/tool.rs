@@ -134,6 +134,10 @@ pub enum Rendering {
     /// V2 with its line numbers counted from 1, the way Claude Code and a
     /// compiler count them (`crates/runtime/spec/Rendering.lean` D119).
     V3,
+    /// V3, with the project's own rules for the part of the tree a `read`
+    /// opened drawn after the numbered body (`crates/runtime/spec/Rendering.lean`
+    /// §8-63, D126).
+    V4,
 }
 
 impl Rendering {

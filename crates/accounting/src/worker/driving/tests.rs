@@ -9,6 +9,7 @@ mod instruments;
 mod ledger;
 mod placing;
 mod rules_account;
+mod rules_note;
 mod sieving;
 mod throughput;
 mod turns;

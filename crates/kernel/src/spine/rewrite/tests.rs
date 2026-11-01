@@ -53,10 +53,12 @@ fn children_land_below_their_parent_and_number_on_from_the_last() {
             NewChild {
                 item: "design".to_owned(),
                 weight: 1,
+                needs: Vec::new(),
             },
             NewChild {
                 item: "code".to_owned(),
                 weight: 3,
+                needs: Vec::new(),
             },
         ],
     )
@@ -72,6 +74,7 @@ fn children_land_below_their_parent_and_number_on_from_the_last() {
         &[NewChild {
             item: "test".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -100,6 +103,7 @@ fn splitting_a_deep_branch_puts_the_children_after_the_whole_branch() {
         &[NewChild {
             item: "code".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -122,7 +126,8 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
             &node("1"),
             &[NewChild {
                 item: "  ".to_owned(),
-                weight: 1
+                weight: 1,
+                needs: Vec::new(),
             }]
         )
         .is_err()
@@ -133,6 +138,7 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
         &[NewChild {
             item: "x".to_owned(),
             weight: 0,
+            needs: Vec::new(),
         }],
     )
     .unwrap_err();
@@ -143,6 +149,7 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
         &[NewChild {
             item: "a | b".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap_err();
@@ -153,7 +160,8 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
             &node("9"),
             &[NewChild {
                 item: "x".to_owned(),
-                weight: 1
+                weight: 1,
+                needs: Vec::new(),
             }]
         )
         .is_err()
@@ -198,6 +206,7 @@ fn children_land_in_the_plan_s_table_after_its_last_line_of_the_branch() {
         &[NewChild {
             item: "code".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -223,6 +232,7 @@ fn a_top_level_row_is_added_last_under_the_index_the_caller_chose() {
     let child = NewChild {
         item: "ship".to_owned(),
         weight: 2,
+        needs: Vec::new(),
     };
     let added = append_top_level(text, &node("2"), &child).unwrap();
     let rows = rows_of(&added);

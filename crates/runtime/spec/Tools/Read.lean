@@ -136,6 +136,23 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 - **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（`crates/city/Spec.lean` §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
 -/
 
+/-! #### 8-29-7 更深的项目规则跟着那次 `read` 到达（`runtime::tools::read` 的 `Note`；reading 在 `accounting::prompt_chain::nested_rules`）
+
+```rust
+// runtime::tools::read —— 一次读可以带一条附注，附在这一次回答上
+pub struct Note { pub delivered: Vec<Address>, pub text: String }
+pub struct Notes(/* Arc<dyn Fn(&Address) -> Result<Option<Note>, AxError> + Send + Sync> */);   // 判定在装配层
+impl ReadTool { pub fn annotating(self, notes: Notes) -> ReadTool; }
+// 结果载荷：{path, offset?, total_lines?, next_offset?, bytes, text, rules?: {delivered: [addr], text}}
+```
+
+- **只有模型选的、真在城里的路径带附注**：`Found::Chosen` 打开成功之后才问 `Notes`；catalog 条目、包内文档与 Locator 没有可比的目录链，读失败（没命中、目录、非 UTF-8）也不带：一条规则说的是「你开始在这个目录里工作了」。附注不改变这次读的区间、行号与 `bytes`。
+- **判定在读界的那一侧**：`Notes` 只是一层壳，谁给附注、读哪些文件、扣不扣下一份都由装配层决定（`accounting::prompt_chain::nested_rules`），所以读界、链接判定与「哪些房间的规则已经在 resident 段里」这三件事各只有一个权威。`runtime` 只拥有「附注是什么、它落在哪一行的载荷里、由哪一版渲染器画出」。
+- **进账本、按版本重画**：附注进 `tool_result` 的载荷（`rules`），渲染器 V4 把它画在编号正文之后（§8-63 D126），分支与恢复从同一行重画同样的字节。`delivered` 记住这次给了哪些文件，`runtime::fork` 从母 run 的 `tool_result` 行把它们收进 `Inherited.delivered`，于是分支的第一个 `read` 不会重发母 run 已经给过的规则（§8-2）。
+- **不改系统块、不改工具表**：一次 run 里前缀与工具数组必须逐字节稳定，否则 provider 的缓存从那一块起失效，同一 session 里还会因工具数组变化被拒。附注只让对话尾部增长。
+- 验收：`runtime::rendering::tests` 的 `version_four_draws_the_rules_a_read_carried_and_older_versions_do_not`、`runtime::fork::tests` 的 `a_branch_inherits_the_rules_its_mother_was_already_given`、`accounting::worker::driving::tests::rules_note` 的 `a_rule_deeper_than_the_run_s_room_arrives_once_on_the_read_that_met_it`。
+-/
+
 /-! D9 城外书架上的 skill 由 catalog 携着正文交给 run
 
 **决定**：阅览室准入的一件城外书架上的 skill 经 `Catalog::admit_carried_skill` 进 catalog，条目的 `expansion` 是扫描读到的 `SKILL.md` 正文，`read <名>` 交回这份正文（§8-29-6）。包里其余文件对它不可读。

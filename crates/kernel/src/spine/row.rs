@@ -98,10 +98,17 @@ pub enum RoadmapShape {
     Malformed { problems: Vec<String> },
 }
 
-/// A child to hang under a node: what it is, and how big a slice of its
-/// parent it takes.
+/// A child to hang under a node: what it is, how big a slice of its
+/// parent it takes, and which rows it waits for.
+///
+/// `needs` names rows the plan already carries. `insert_children` and
+/// `append_top_level` write the column and nothing more: whether each
+/// name is there, is not the row itself, and does not close a circle is
+/// [`crate::plan::PlanTree::build`]'s judgement, made on the grown table
+/// before a caller writes it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewChild {
     pub item: String,
     pub weight: u32,
+    pub needs: Vec<NodeId>,
 }

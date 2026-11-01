@@ -60,6 +60,49 @@ use miss::Floor;
 /// `limit`. A `u16`, so widening it to `usize` cannot fail.
 const LINE_CAP: u16 = 512;
 
+/// A note a read appends to its answer: the project's own rules for the
+/// part of the tree the file sits in.
+///
+/// `delivered` names the rule files `text` carries, so a rebuild of the
+/// history can know what the model was already given; `text` is what the
+/// model reads, drawn after the numbered body by the renderer of
+/// `crates/runtime/spec/Rendering.lean` D126. The bytes are recorded in
+/// the answer rather than re-read at rebuild time, because the file may
+/// change between the two and a branch has to read what the mother read.
+pub struct Note {
+    pub delivered: Vec<kernel::Address>,
+    pub text: String,
+}
+
+/// What decides the note for one address a read opened, or `None` when
+/// this read carries none.
+///
+/// The reading lives where the read bound and the project's conventions
+/// live, because a note is a second way into the tree and has to be
+/// judged by the same door (`crates/accounting/src/prompt_chain.rs`).
+/// This module owns only what a note is and where it rides.
+pub struct Notes(Arc<NotesFor>);
+
+type NotesFor = dyn Fn(&kernel::Address) -> Result<Option<Note>, AxError> + Send + Sync;
+
+impl Notes {
+    #[must_use]
+    pub fn new(
+        note: impl Fn(&kernel::Address) -> Result<Option<Note>, AxError> + Send + Sync + 'static,
+    ) -> Notes {
+        Notes(Arc::new(note))
+    }
+
+    /// The note for a file this read opened, or `None`.
+    ///
+    /// # Errors
+    /// Whatever the reading refuses, which is a rule file that is there
+    /// and cannot be read.
+    fn of(&self, at: &kernel::Address) -> Result<Option<Note>, AxError> {
+        (self.0)(at)
+    }
+}
+
 /// Where the answer to one call comes from.
 enum Found {
     /// An admitted address the model chose, read by `engine`.
@@ -232,6 +275,10 @@ pub struct ReadTool {
     /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
     /// §8-64).
     seen: ReadStamps,
+    /// The project's rules a read appends once each, or `None` for a
+    /// tool built without them (`crates/runtime/spec/Tools/Read.lean`
+    /// §8-29-7).
+    notes: Option<Notes>,
     meta: ToolMeta,
 }
 
@@ -295,6 +342,7 @@ impl ReadTool {
             reader: BoundReader::new(city_root, bound, block_store),
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
+            notes: None,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Reads a file by its path, or a skill by the name the catalog \
@@ -378,6 +426,22 @@ impl ReadTool {
     pub fn noting(self, seen: ReadStamps) -> ReadTool {
         ReadTool { seen, ..self }
     }
+
+    /// This tool, appending the project's rules a read has not yet been
+    /// given.
+    ///
+    /// The note rides the answer rather than the frozen prefix: a rule
+    /// that arrives mid-run would move the system blocks or the tool
+    /// table, and every request after it would miss the provider's cache
+    /// and, inside one session, be refused by a provider that hashes the
+    /// tool array.
+    #[must_use]
+    pub fn annotating(self, notes: Notes) -> ReadTool {
+        ReadTool {
+            notes: Some(notes),
+            ..self
+        }
+    }
 }
 
 impl Tool for ReadTool {
@@ -417,16 +481,38 @@ impl Tool for ReadTool {
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
         let mut looked = None;
+        let mut opened = None;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
             Found::Chosen(addr) => {
                 let (text, before, after) =
                     engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?;
-                looked = Some((addr, before, after));
+                looked = Some((addr.clone(), before, after));
+                opened = Some(addr);
                 text
             }
             Found::File { at, floor } => miss::text_at(asked, at, &floor)?.0,
         };
+        // The rules this file's part of the tree carries, once per run.
+        // Read after the file itself opened: a path this tool refused is
+        // not a part of the tree the model has begun working in.
+        if let Some(at) = opened
+            && let Some(notes) = &self.notes
+            && let Some(note) = notes.of(&at)?
+        {
+            let mut rules = Map::new();
+            rules.insert(
+                "delivered".to_owned(),
+                Value::Array(
+                    note.delivered
+                        .iter()
+                        .map(|at| Value::String(at.as_str().to_owned()))
+                        .collect(),
+                ),
+            );
+            rules.insert("text".to_owned(), Value::String(note.text));
+            out.insert("rules".to_owned(), Value::Object(rules));
+        }
         let interval = Interval::asked_for(call)?;
         // Where the interval starts, as an index the drawn header and line
         // marks number from (`crate::rendering`); absent means index 0.

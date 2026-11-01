@@ -28,8 +28,8 @@
 use crate::claim_effect::ClaimEffect;
 use kernel::spine::check_roadmap_shape;
 use kernel::{
-    Address, AxCode, AxError, Held, Locator, NewChild, NodeId, Payload, PlanExit, PlanTree,
-    RoadmapShape, RoadmapStatus, StopCause,
+    Address, AxCode, AxError, EvidenceCell, Held, Locator, NewChild, NodeId, Payload, PlanExit,
+    PlanTree, RoadmapShape, RoadmapStatus, StopCause,
 };
 use serde_json::{Map, Value};
 
@@ -222,11 +222,22 @@ impl ClaimDesk {
         Ok(())
     }
 
+    /// The plan as this run sees it: what it may take, what is being
+    /// worked on, what is red, and what is finished.
+    ///
+    /// **Also where this run stands against the file.** A run's
+    /// `claim`, `finish`, `block`, `release`, `split` and `add` change
+    /// the desk's copy and are written to `Roadmap.md` when the run
+    /// lands, so a model that reads the file mid-run is looking at the
+    /// plan as it was dispatched. `rendered` and `pending` say so, and
+    /// `note` repeats it in a sentence, because a row missing from the
+    /// file is the one thing a model is most likely to read as lost.
     fn list(&self) -> Result<Payload, AxError> {
         let tree = self.tree()?;
         let mut ready = Vec::new();
         let mut working = Vec::new();
         let mut red = Vec::new();
+        let mut finished = Vec::new();
         for node in tree.nodes() {
             let mut entry = Map::new();
             entry.insert("node".to_owned(), Value::String(node.row.id.to_string()));
@@ -236,9 +247,15 @@ impl ClaimDesk {
                 RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval => {
                     red.push(Value::Object(entry));
                 }
+                RoadmapStatus::Done => {
+                    if let EvidenceCell::Present(evidence) = &node.row.evidence {
+                        entry.insert("evidence".to_owned(), Value::String(evidence.to_string()));
+                    }
+                    finished.push(Value::Object(entry));
+                }
                 // A branch in progress is its leaves' work, and a row
-                // nobody started or everybody finished asks nothing.
-                RoadmapStatus::InProgress | RoadmapStatus::NotStarted | RoadmapStatus::Done => {}
+                // nobody started asks nothing.
+                RoadmapStatus::InProgress | RoadmapStatus::NotStarted => {}
             }
         }
         for id in tree.ready() {
@@ -256,6 +273,30 @@ impl ClaimDesk {
         result.insert("ready".to_owned(), Value::Array(ready));
         result.insert("in_progress".to_owned(), Value::Array(working));
         result.insert("blocked".to_owned(), Value::Array(red));
+        result.insert("done".to_owned(), Value::Array(finished));
+        // The rows this run changed in its own copy, once each, in the
+        // order it changed them. Empty means the file and the copy agree.
+        let mut named = std::collections::BTreeSet::new();
+        let pending: Vec<Value> = self
+            .effects
+            .iter()
+            .filter(|effect| named.insert(effect.id().clone()))
+            .map(|effect| Value::String(effect.id().to_string()))
+            .collect();
+        let rendered = pending.is_empty();
+        result.insert("rendered".to_owned(), Value::Bool(rendered));
+        result.insert("pending".to_owned(), Value::Array(pending));
+        if !rendered {
+            result.insert(
+                "note".to_owned(),
+                Value::String(
+                    "this run's own changes are in its copy of the plan and are written to \
+                     Roadmap.md when it lands; reading the file now shows the plan as it was \
+                     dispatched"
+                        .to_owned(),
+                ),
+            );
+        }
         // The denominator is on screen for the person; it is here so the
         // model does not have to count the array to know where it stands.
         result.insert(
@@ -338,6 +379,7 @@ impl ClaimDesk {
                 .map(|child| NewChild {
                     item: child.item.trim().to_owned(),
                     weight: child.weight,
+                    needs: child.needs.clone(),
                 })
                 .collect(),
         };
@@ -452,5 +494,10 @@ mod booking_tests;
 mod catalog_tests;
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 mod split_tests;

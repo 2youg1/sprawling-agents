@@ -18,7 +18,7 @@
 //! earlier one, and a page showing the line the person asked for would
 //! be showing a cut the model was never given.
 
-use kernel::{AxError, ChatMessage, RunId};
+use kernel::{AxError, RunId};
 
 use super::super::{Assignment, RunWorker};
 
@@ -35,9 +35,13 @@ impl RunWorker {
         &mut self,
         at: &Assignment,
         run: RunId,
-    ) -> Result<Vec<ChatMessage>, AxError> {
+    ) -> Result<runtime::fork::Inherited, AxError> {
         let Some(origin) = at.origin else {
-            return Ok(Vec::new());
+            return Ok(runtime::fork::Inherited {
+                messages: Vec::new(),
+                at: kernel::Seq::FIRST,
+                delivered: std::collections::BTreeSet::new(),
+            });
         };
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
@@ -52,6 +56,6 @@ impl RunWorker {
                 at_seq: rebuilt.at,
             },
         )?;
-        Ok(rebuilt.messages)
+        Ok(rebuilt)
     }
 }
