@@ -24,5 +24,5 @@
 
 ## Notes
 
-- `deps:` is the bot's family and carries no card number (CONTRIBUTING §5); a person's change uses `card-<stage>.<index>: <what>`.
+- `deps:` is the bot's family and carries no card number (CONTRIBUTING §5); a person's change uses `CS<stage>.<index>: <what>`.
 - A change that widens a gate instead of fixing the cause is the one thing `guard` exists to refuse; if you believe a gate must move, say why here rather than in the code.
