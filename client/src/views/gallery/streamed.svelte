@@ -145,7 +145,13 @@
     <Stream
       shown={runs.slice(0, 3).reverse()}
       earlier={runs.slice(3)}
-      boundary={{ kind: "forked", at: null, turn: 4, mother: runOf(9) }}
+      boundary={{
+        kind: "forked",
+        at: null,
+        turn: 4,
+        mother: runOf(9),
+        origin: { run: runOf(9), at_seq: Seq.make(4) },
+      }}
     />
   </Stand>
 </Case>

@@ -21,7 +21,9 @@ pub const SNAPSHOT_DIR: &str = "snapshot";
 pub const LIBRARY_DIR: &str = "library";
 pub const BUILDING_SHELF: &str = "skills";
 pub const SKILL_FILE: &str = "SKILL.md";
+pub const SHELF_INDEX: &str = "INDEX.toml";   // 书架索引，正文与包文件全在 CAS
 pub const CONFIG_FILE: &str = "CONFIG.toml";
+pub const SESSION_CATALOG_FILE: &str = "CATALOG.toml";   // 一个会话冻下的目录，不是人手编辑层
 pub const FILTERS_FILE: &str = "FILTERS.toml";
 pub const ARCHIVE_DIR: &str = "Archive";
 pub const JOB_FILE: &str = "JOB.md";
@@ -47,6 +49,7 @@ impl CityLayout {
     pub fn cas(&self) -> PathBuf;                               // root/.sprawling/cas
     pub fn library(&self) -> PathBuf;                           // root/.sprawling/library
     pub fn config(&self, addr: &Address) -> PathBuf;            // <scope>/.sprawling/CONFIG.toml
+    pub fn session_catalog(&self, addr: &Address) -> PathBuf;     // <scope>/.sprawling/CATALOG.toml
     pub fn city_config(&self) -> PathBuf;                       // <root>/.sprawling/CONFIG.toml
     pub fn city_filters(&self) -> PathBuf;                      // <root>/.sprawling/FILTERS.toml
     pub fn building_skills(&self, addr: &Address) -> PathBuf;   // <scope>/.sprawling/skills

@@ -55,6 +55,8 @@ export function sameBinding(held: PopoverBinding | null, next: PopoverBinding): 
 
 // Everything the look is given.
 export interface SettingsRowLook {
+  // The building catalog chip, drawn by its own seat.
+  readonly catalog: Snippet | undefined;
   // The sandbox, drawn by its own seat.
   readonly facts: Snippet | undefined;
   // Said when a sentence the link did not take is kept in the box.

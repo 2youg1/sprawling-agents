@@ -15,13 +15,14 @@ import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
 import { InputKinds as InputKindsSchema } from "../../wire";
-import type { FigureFrom, FiguresLine, InputKinds } from "../../wire";
+import type { FigureFrom, FiguresLine, InputKinds, ModelTag } from "../../wire";
 import type { Min } from "../parts/table";
 import {
   ceilingOf,
   everyRow,
   isNamed,
   priceOf,
+  setTick,
   shownRows,
   tickedRows,
   windowOf,
@@ -132,6 +133,8 @@ export interface ModelRowLook {
   readonly said: string;
   readonly price: string;
   readonly role: ChoiceLook;
+  // Why unticking this row was refused, announced beside its id.
+  readonly refusal: string | undefined;
 }
 
 export type ColumnKey = "id" | "context" | "output" | "modalities" | "price" | "role";
@@ -150,6 +153,19 @@ export interface TickLook {
   readonly allLabel: string;
   readonly onPickAll: (on: boolean) => void;
   readonly allPicked: () => boolean;
+}
+
+export function roleKey(role: ModelTag): Key {
+  switch (role) {
+    case "main":
+      return "setup_main";
+    case "digest":
+      return "setup_digest";
+    case "transcribe":
+      return "setup_transcribe";
+    case "ocr":
+      return "setup_ocr";
+  }
 }
 
 export interface ModelTableLook {
@@ -260,11 +276,11 @@ export function lookOf(
             tick: {
               picked: (row) => state.ticked[row.id] === true,
               onPick: (row, on) => {
-                state.ticked[row.id] = on;
+                setTick(state, row.id, on);
               },
               allLabel: say(lang, "setup_select_all"),
               onPickAll: (on) => {
-                for (const row of shown) state.ticked[row.id] = on;
+                for (const row of shown) setTick(state, row.id, on);
               },
               allPicked: () =>
                 shown.length > 0 && shown.every((row) => state.ticked[row.id] === true),
@@ -321,6 +337,8 @@ function rowLook(state: TableState, { row, line, named }: Drawn, lang: Lang): Mo
     // as the role beside it, so one row offers one kind of choice.
     input: {
       ...choice(say(lang, "setup_model_modalities")),
+      placeholder:
+        line === undefined ? say(lang, "part_search") : say(lang, `setup_input_${line.input}`),
       choices: [
         { value: "", label: say(lang, "setup_input_unstated") },
         ...INPUTS.map((each) => ({ value: each, label: say(lang, `setup_input_${each}`) })),
@@ -343,8 +361,21 @@ function rowLook(state: TableState, { row, line, named }: Drawn, lang: Lang): Mo
       ],
       value: state.role[row.id] ?? null,
       pick: (value) => {
+        state.refusal = null;
+        if (value !== "") {
+          for (const id of Object.keys(state.role)) {
+            if (id !== row.id && state.role[id] === value) state.role[id] = "";
+          }
+        }
         state.role[row.id] = value;
       },
     },
+    refusal:
+      state.refusal?.id === row.id
+        ? fill(say(lang, "setup_model_role_taken"), {
+            id: row.id,
+            role: say(lang, roleKey(state.refusal.role)),
+          })
+        : undefined,
   };
 }

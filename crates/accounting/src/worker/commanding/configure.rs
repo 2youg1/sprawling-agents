@@ -49,6 +49,9 @@ impl RunWorker {
             desktop,
             context_second_threshold,
             catalog,
+            mcp_references,
+            skill_pins,
+            reading_room,
             idem: _,
         } = settings;
         let building = city::Building::of(addr)?;
@@ -59,6 +62,17 @@ impl RunWorker {
         let threshold = context_second_threshold
             .map(kernel::config::SecondThreshold::parse)
             .transpose()?;
+        if let Some(references) = mcp_references {
+            city::check_mcp_references(&self.city_root, building.addr(), references)?;
+        }
+        if let Some(names) = reading_room {
+            city::check_reading_room(&self.city_root, building.addr(), names)?;
+        }
+        // Accepting an external candidate copies that exact scanned version
+        // before its pin moves. Keeping an old pin never admits the candidate.
+        if let Some(pins) = skill_pins {
+            admit_external_pins(&self.city_root, building.addr(), pins)?;
+        }
         // Judged before any other face is written, so a table the city
         // refuses leaves the building as it was.
         if let Some(table) = catalog {
@@ -79,6 +93,15 @@ impl RunWorker {
                 city::Layer::Building,
                 servers,
             )?;
+        }
+        if let Some(references) = mcp_references {
+            city::write_mcp_references(&self.city_root, building.addr(), references)?;
+        }
+        if let Some(pins) = skill_pins {
+            city::write_skill_pins(&self.city_root, building.addr(), pins)?;
+        }
+        if let Some(names) = reading_room {
+            city::write_reading_room(&self.city_root, building.addr(), names)?;
         }
         if let Some(threshold) = threshold {
             city::write_second_threshold(
@@ -104,13 +127,120 @@ impl RunWorker {
             &building,
             city::Written {
                 sandbox: sandbox.is_some(),
-                mcp: mcp.is_some(),
+                mcp: mcp.is_some() || mcp_references.is_some(),
                 desktop: desktop.is_some(),
                 context: threshold.is_some(),
-                catalog: catalog.is_some(),
+                catalog: catalog.is_some()
+                    || mcp_references.is_some()
+                    || skill_pins.is_some()
+                    || reading_room.is_some(),
             },
         )?;
-        self.record(EventKind::BuildingConfigured, payload)
+        self.record(EventKind::BuildingConfigured, payload)?;
+        if reading_room.is_some() {
+            self.book_document(
+                Scope::Building(building.addr().clone()),
+                GoverningDocument::Rules,
+                &city::rules_path(&self.city_root, building.addr()),
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Copies only external candidates whose current digest the page accepted.
+/// Internal candidates are already in CAS; old pins kept across a candidate
+/// change do not copy or approve the new content.
+///
+/// A pin that no longer matches the shelf is honored only when an earlier
+/// save already admitted its bytes: keeping an admitted version changes
+/// nothing, while keeping a version nobody admitted leaves a pin whose
+/// manifest no read can answer — the catalog page and the building's runs
+/// both fail on the missing object (`crates/accounting/spec/Connectors.lean`
+/// D119). That save refuses instead of landing half of what the page asked.
+fn admit_external_pins(
+    city_root: &std::path::Path,
+    building: &kernel::Address,
+    pins: &std::collections::BTreeMap<String, kernel::B3Hash>,
+) -> Result<(), AxError> {
+    if pins.is_empty() {
+        return Ok(());
+    }
+    let home = crate::home::Home::detect()?;
+    let store = kernel::layout::CityLayout::new(city_root).cas();
+    let mut cas = storage::Cas::open(&store).map_err(storage::StorageError::into_ax)?;
+    let read = |digest: &kernel::B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
+    let shelves = city::Library::scan(city_root, Some(building), home.path(), &read)?;
+    let external = city::city_shelves(city_root, home.path())?;
+    let holdings = shelves.all();
+    for (name, pin) in pins {
+        let current = holdings
+            .iter()
+            .find(|holding| holding.name == *name)
+            .map(|holding| holding.hash);
+        if current == Some(*pin) {
+            continue;
+        }
+        held_pin_must_answer(&cas, name, pin)?;
+    }
+    for holding in holdings.into_iter().filter(|holding| {
+        holding.shelf.is_external() && pins.get(&holding.name) == Some(&holding.hash)
+    }) {
+        let city::Shelf::External { index, .. } = holding.shelf else {
+            continue;
+        };
+        let at = usize::try_from(index).map_err(|_| {
+            AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "accept an external skill",
+                format!("{}: shelf index {index} does not fit", holding.name),
+            )
+            .with_recovery("name fewer external shelves, then save again")
+        })?;
+        let root = external.get(at).ok_or_else(|| {
+            AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "accept an external skill",
+                format!("{}: shelf {index} is not configured", holding.name),
+            )
+            .with_recovery("restore the shelf, then save the catalog again")
+        })?;
+        let admitted = city::admit_external(&root.join(&holding.name), &mut |bytes| {
+            cas.put(bytes).map_err(storage::StorageError::into_ax)
+        })?;
+        if admitted.hash != holding.hash {
+            return Err(AxError::failure(
+                kernel::AxCode::VersionConflict,
+                "accept an external skill",
+                format!("{} changed between its scan and admission", holding.name),
+            )
+            .with_recovery("save the catalog again to accept one scanned version"));
+        }
+    }
+    Ok(())
+}
+
+/// Whether a pin kept across a change still names bytes the store has. An
+/// absent object means the page accepted a version the shelf no longer
+/// holds and no save ever admitted; keeping that pin would write a
+/// locator nothing can read. Corruption and other read failures are the
+/// storage layer's own story and propagate as they are.
+fn held_pin_must_answer(
+    cas: &storage::Cas,
+    name: &str,
+    pin: &kernel::B3Hash,
+) -> Result<(), AxError> {
+    match cas.get(pin) {
+        Ok(_) => Ok(()),
+        Err(storage::StorageError::CasMissing { .. }) => Err(AxError::failure(
+            kernel::AxCode::VersionConflict,
+            "save the building catalog",
+            format!(
+                "{name} changed after the page read it, and the pinned version was never admitted"
+            ),
+        )
+        .with_recovery("open the catalog again and accept or keep the version it shows now")),
+        Err(stopped) => Err(stopped.into_ax()),
     }
 }
 

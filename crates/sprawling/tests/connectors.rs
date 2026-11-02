@@ -142,6 +142,50 @@ impl accounting::ModelFactory for Listeners {
 /// anything.
 struct Scripted(String);
 
+/// A server listing a test can revise between runs, or make unavailable.
+type Listing = Arc<Mutex<Option<String>>>;
+struct Revisions(Listing);
+
+impl accounting::Connectors for Revisions {
+    fn connect(
+        &self,
+        server: &kernel::McpServer,
+        _write_root: &std::path::Path,
+        confidential: bool,
+        _resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<agent_protocols::McpTool>, accounting::Reached), AxError> {
+        let listing = self.0.lock().unwrap().clone().ok_or_else(|| {
+            AxError::failure(
+                kernel::AxCode::ToolUnavailable,
+                "list a scripted connector",
+                server.label.as_str(),
+            )
+            .with_recovery("restore the scripted listing")
+        })?;
+        let tools =
+            agent_protocols::tools_from(&server.label, &agent_protocols::Rpc::read(&listing)?)?
+                .into_iter()
+                .map(|entry| {
+                    agent_protocols::McpTool::new(
+                        entry.meta,
+                        entry.remote,
+                        Box::new(agent_protocols::ScriptedOutbound::new()),
+                        confidential,
+                    )
+                })
+                .collect::<Result<Vec<_>, AxError>>()?;
+        Ok((
+            tools,
+            accounting::Reached::Connected(agent_protocols::Handshake {
+                protocol_version: agent_protocols::PROTOCOL_VERSION.to_owned(),
+                server: "revisions".to_owned(),
+            }),
+        ))
+    }
+
+    fn invalidate(&self, _reference: &kernel::SecretRef) {}
+}
+
 impl accounting::Connectors for Scripted {
     fn connect(
         &self,
@@ -210,6 +254,38 @@ fn name_an_absent_server(city_root: &std::path::Path) {
 /// Forms a city with one building that names the server `apps`, and
 /// dispatches one run of `models` there with `connectors`; answers how
 /// the dispatch ended, for a failure message.
+fn listing(tools: &[(&str, &str)]) -> String {
+    let tools: Vec<serde_json::Value> = tools
+        .iter()
+        .map(|(name, description)| {
+            serde_json::json!({
+                "name": name,
+                "description": description,
+                "inputSchema": {"type": "object"},
+            })
+        })
+        .collect();
+    serde_json::json!({"jsonrpc": "2.0", "id": 1, "result": {"tools": tools}}).to_string()
+}
+
+/// A city whose scripted connector can change without changing its definition.
+fn revision_city(
+    initial: &str,
+) -> (
+    tempfile::TempDir,
+    accounting::worker::RunWorker,
+    Listing,
+    Arc<Mutex<Vec<String>>>,
+) {
+    let listing = Arc::new(Mutex::new(Some(initial.to_owned())));
+    let offered = Arc::new(Mutex::new(Vec::new()));
+    let (dir, worker) = lab_city(
+        Box::new(Listeners(Arc::clone(&offered))),
+        Box::new(Revisions(Arc::clone(&listing))),
+    );
+    (dir, worker, listing, offered)
+}
+
 fn dispatch_one_run(
     models: Box<dyn accounting::ModelFactory + Send>,
     connectors: Box<dyn accounting::Connectors + Send + Sync>,
@@ -413,7 +489,11 @@ fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
             catalog: Some(ExposureTable {
                 tools: std::collections::BTreeMap::new(),
                 namespaces: [(NAMESPACE.to_owned(), Exposure::Off)].into(),
+                skills: std::collections::BTreeMap::new(),
             }),
+            mcp_references: None,
+            skill_pins: None,
+            reading_room: None,
             idem: idem(b"catalog"),
         }))
         .unwrap();
@@ -431,6 +511,326 @@ fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
             .all(|row| row.exposure == Exposure::Off && row.from == ExposureFrom::Building),
         "{rows:?}"
     );
+}
+
+fn apps_reference(city_root: &std::path::Path) -> kernel::McpReference {
+    city::load_config(city_root, &Address::parse("lab/room1").unwrap())
+        .unwrap()
+        .mcp_references
+        .into_iter()
+        .find(|reference| reference.label.as_str() == NAMESPACE)
+        .unwrap()
+}
+
+fn catalog_drifts(city_root: &std::path::Path) -> Vec<kernel::event::record::CatalogDrift> {
+    storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
+        .unwrap()
+        .iter()
+        .map(|line| kernel::EventRecord::parse_line(line).unwrap())
+        .filter(|record| record.kind() == kernel::EventKind::DigestInvalidated)
+        .map(|record| {
+            record
+                .data()
+                .read::<kernel::event::record::CatalogDrift>()
+                .unwrap()
+        })
+        .collect()
+}
+
+fn assert_only_namespace_count(offered: &Arc<Mutex<Vec<String>>>, count: usize) {
+    let names = offered.lock().unwrap();
+    assert!(
+        names
+            .iter()
+            .any(|name| name == &format!("{NAMESPACE} ({count})")),
+        "expected {count} offered tools, saw {names:?}"
+    );
+}
+
+#[test]
+fn the_first_listing_migrates_legacy_pins_and_an_equal_listing_is_offered_again() {
+    let (dir, mut worker, _listing, offered) = revision_city(LISTING);
+    let first = dispatch(&mut worker, "s1");
+    let reference = apps_reference(dir.path());
+    let pinned = reference
+        .tools
+        .as_ref()
+        .unwrap()
+        .get(OFFERED)
+        .copied()
+        .unwrap();
+    let expected = kernel::ToolDef {
+        name: kernel::ToolName::parse(OFFERED).unwrap(),
+        description: "answer with pong".to_owned(),
+        input_schema: kernel::Payload::of(&serde_json::json!({"type": "object"})).unwrap(),
+    }
+    .digest()
+    .unwrap();
+    assert_eq!(pinned, expected, "the first dispatch answered {first}");
+    assert_eq!(reference.definition, Some(apps_definition(dir.path())));
+    let bytes = storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
+        .unwrap()
+        .get(&pinned)
+        .unwrap();
+    assert_eq!(
+        bytes,
+        kernel::ToolDef {
+            name: kernel::ToolName::parse(OFFERED).unwrap(),
+            description: "answer with pong".to_owned(),
+            input_schema: kernel::Payload::of(&serde_json::json!({"type": "object"})).unwrap(),
+        }
+        .pin_bytes()
+        .unwrap()
+    );
+
+    offered.lock().unwrap().clear();
+    let second = dispatch(&mut worker, "s2");
+    assert_only_namespace_count(&offered, 1);
+    assert!(catalog_drifts(dir.path()).is_empty(), "{first}; {second}");
+}
+
+fn apps_definition(city_root: &std::path::Path) -> kernel::B3Hash {
+    let config = city::load_config(city_root, &Address::parse("lab/room1").unwrap()).unwrap();
+    let server = config
+        .mcp
+        .iter()
+        .find(|server| server.label.as_str() == NAMESPACE)
+        .unwrap();
+    kernel::config::definition_digest(server).unwrap()
+}
+
+#[test]
+fn a_changed_tool_is_withheld_and_its_drift_is_recorded_only_once() {
+    let initial = listing(&[("ping", "old ping"), ("pong", "unchanged pong")]);
+    let (dir, mut worker, listing, offered) = revision_city(&initial);
+    dispatch(&mut worker, "s1");
+    *listing.lock().unwrap() = Some(self::listing(&[
+        ("ping", "new ping"),
+        ("pong", "unchanged pong"),
+    ]));
+
+    offered.lock().unwrap().clear();
+    let second = dispatch(&mut worker, "s2");
+    assert_only_namespace_count(&offered, 1);
+    let drifts = catalog_drifts(dir.path());
+    assert_eq!(drifts.len(), 1, "the second dispatch answered {second}");
+    assert!(matches!(
+        &drifts[0],
+        kernel::event::record::CatalogDrift {
+            subject: kernel::event::record::CatalogSubject::Tool { name, .. },
+            pinned: Some(_),
+            found: Some(_),
+        } if name == OFFERED
+    ));
+    let rows = apps_rows(dir.path());
+    let changed = rows.iter().find(|row| row.name == OFFERED).unwrap();
+    assert_eq!(changed.change, Some(wire::CatalogChange::Changed));
+    assert_eq!(changed.current.as_ref().unwrap().description, "new ping");
+    assert_eq!(changed.pinned.as_ref().unwrap().description, "old ping");
+    let unchanged = rows.iter().find(|row| row.name == "apps_pong").unwrap();
+    assert_eq!(unchanged.change, None);
+
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s3");
+    assert_only_namespace_count(&offered, 1);
+    assert_eq!(catalog_drifts(dir.path()), drifts);
+}
+
+#[test]
+fn an_added_tool_is_withheld_until_it_is_admitted() {
+    let (dir, mut worker, listing, offered) = revision_city(LISTING);
+    dispatch(&mut worker, "s1");
+    *listing.lock().unwrap() = Some(self::listing(&[
+        ("ping", "answer with pong"),
+        ("new", "not admitted"),
+    ]));
+
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s2");
+    assert_only_namespace_count(&offered, 1);
+    let drifts = catalog_drifts(dir.path());
+    assert_eq!(drifts.len(), 1);
+    assert!(matches!(
+        &drifts[0],
+        kernel::event::record::CatalogDrift {
+            subject: kernel::event::record::CatalogSubject::Tool { name, .. },
+            pinned: None,
+            found: Some(_),
+        } if name == "apps_new"
+    ));
+    let rows = apps_rows(dir.path());
+    let added = rows.iter().find(|row| row.name == "apps_new").unwrap();
+    assert_eq!(added.change, Some(wire::CatalogChange::Added));
+    assert_eq!(added.current.as_ref().unwrap().description, "not admitted");
+    assert_eq!(added.pinned, None);
+
+    let mut reference = apps_reference(dir.path());
+    reference.tools.as_mut().unwrap().insert(
+        "apps_new".to_owned(),
+        added.current.as_ref().unwrap().digest,
+    );
+    worker
+        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+            addr: Address::parse(LAB).unwrap(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: Some(vec![reference]),
+            skill_pins: None,
+            reading_room: None,
+            idem: idem(b"accept-added-tool"),
+        }))
+        .unwrap();
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s3");
+    assert_only_namespace_count(&offered, 2);
+    assert!(apps_rows(dir.path()).iter().all(|row| row.change.is_none()));
+}
+
+#[test]
+fn a_removed_tool_is_recorded_without_removing_its_pin() {
+    let initial = listing(&[("ping", "answer with pong"), ("pong", "unchanged pong")]);
+    let (dir, mut worker, listing, offered) = revision_city(&initial);
+    dispatch(&mut worker, "s1");
+    let pinned = apps_reference(dir.path()).tools.unwrap();
+    *listing.lock().unwrap() = Some(LISTING.to_owned());
+
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s2");
+    assert_only_namespace_count(&offered, 1);
+    assert_eq!(apps_reference(dir.path()).tools.unwrap(), pinned);
+    let drifts = catalog_drifts(dir.path());
+    assert_eq!(drifts.len(), 1);
+    assert!(matches!(
+        &drifts[0],
+        kernel::event::record::CatalogDrift {
+            subject: kernel::event::record::CatalogSubject::Tool { name, .. },
+            pinned: Some(_),
+            found: None,
+        } if name == "apps_pong"
+    ));
+    let rows = apps_rows(dir.path());
+    let removed = rows.iter().find(|row| row.name == "apps_pong").unwrap();
+    assert_eq!(removed.change, Some(wire::CatalogChange::Removed));
+    assert_eq!(removed.current, None);
+    assert_eq!(
+        removed.pinned.as_ref().unwrap().description,
+        "unchanged pong"
+    );
+}
+
+#[test]
+fn a_definition_only_change_records_server_drift_without_withholding_unchanged_tools() {
+    let (dir, mut worker, _listing, offered) = revision_city(LISTING);
+    dispatch(&mut worker, "s1");
+    let building = Address::parse(LAB).unwrap();
+    let mut server = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap())
+        .unwrap()
+        .mcp
+        .into_iter()
+        .find(|server| server.label.as_str() == NAMESPACE)
+        .unwrap();
+    server.transport = kernel::McpTransport::Stdio {
+        command: "another-absent-server".to_owned(),
+        args: Vec::new(),
+        env: Vec::new(),
+    };
+    city::write_mcp(dir.path(), &building, city::Layer::Building, &[server]).unwrap();
+
+    offered.lock().unwrap().clear();
+    dispatch(&mut worker, "s2");
+    assert_only_namespace_count(&offered, 1);
+    let drifts = catalog_drifts(dir.path());
+    assert_eq!(drifts.len(), 1);
+    assert!(matches!(
+        &drifts[0],
+        kernel::event::record::CatalogDrift {
+            subject: kernel::event::record::CatalogSubject::Server { .. },
+            pinned: Some(_),
+            found: Some(_),
+        }
+    ));
+}
+
+#[test]
+fn a_legacy_room_keeps_the_first_listing_it_adopted() {
+    let (dir, mut worker, listing, offered) = revision_city(LISTING);
+    dispatch(&mut worker, "s1");
+    *listing.lock().unwrap() = Some(self::listing(&[("ping", "changed after admission")]));
+
+    offered.lock().unwrap().clear();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/s1").unwrap(),
+            task: "Continue the same room.".to_owned(),
+            goal: "keep its frozen catalog".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: idem(b"continue-s1"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    assert!(
+        !offered
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|name| name.starts_with(NAMESPACE)),
+        "the changed tool entered the already open room"
+    );
+    assert_eq!(catalog_drifts(dir.path()).len(), 1);
+}
+
+#[test]
+fn status_and_the_catalog_answer_read_one_frozen_count_table() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (dir, mut worker) = lab_city(
+        Box::new(Callers(Calling {
+            seen: Arc::clone(&seen),
+            tool: "status",
+            args: serde_json::json!({}),
+        })),
+        Box::new(Scripted(LISTING.to_owned())),
+    );
+    let dispatched = dispatch(&mut worker, "s1");
+    let wire::Answer::Catalog(catalog) = accounting::views::ask(
+        dir.path(),
+        &wire::Query::Catalog {
+            building: Address::parse(LAB).unwrap(),
+        },
+    )
+    .unwrap() else {
+        panic!("the catalog question did not answer Catalog")
+    };
+    let expected = format!(
+        "catalog: {} always, {} dormant, {} skills, {} core bytes, {} index bytes, {} reading bytes",
+        catalog.always,
+        catalog.dormant,
+        catalog.skills,
+        catalog.core_bytes,
+        catalog.index_bytes,
+        catalog.reading_bytes
+    );
+    let read = seen.lock().unwrap();
+    assert!(
+        read.read
+            .first()
+            .is_some_and(|text| text.contains(&expected)),
+        "status did not carry {expected:?}: {:?}; dispatch {dispatched}",
+        read.read
+    );
+}
+
+#[test]
+fn a_failed_listing_is_not_a_removal() {
+    let (dir, mut worker, listing, _offered) = revision_city(LISTING);
+    dispatch(&mut worker, "s1");
+    *listing.lock().unwrap() = None;
+    dispatch(&mut worker, "s2");
+    assert!(catalog_drifts(dir.path()).is_empty());
 }
 
 const CALL: &str = "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\",\"arguments\":{}}}";

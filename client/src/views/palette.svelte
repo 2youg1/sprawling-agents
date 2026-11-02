@@ -66,7 +66,15 @@
   import type { Arrival } from "./palette_door.svelte";
   import type { Seat } from "./modal";
   import Modal from "./modal.look.svelte";
-  import { boxOf, carryPlaces, SESSIONS_AT_REST, sessionPlaces, whyFor } from "./palette";
+  import {
+    boxOf,
+    carryPlaces,
+    directEntry,
+    SESSIONS_AT_REST,
+    sessionPlaces,
+    whyFor,
+    workspaceProblem,
+  } from "./palette";
   import Look from "./palette.look.svelte";
   import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
@@ -74,7 +82,7 @@
   import Rows from "./palette/rows.svelte";
   import Listening from "./talk/listening.svelte";
   import { noteOf, waitWhy } from "./talk/branch_note";
-  import { branchInto } from "./talk/branching";
+  import { branchFrom, branchInto } from "./talk/branching";
   import { askToSpeak } from "./talk/speak_asked";
   import { sessionHands } from "./talk/session_hands";
 
@@ -84,6 +92,7 @@
   const held = u.prefs.held;
   const effort = u.effort;
   const policy = u.policy;
+  const branching = u.branches.held;
 
   interface Props {
     readonly onClose: () => void;
@@ -95,11 +104,14 @@
     // How the palette was opened (`palette_door.svelte.ts`); a touch
     // opening leaves the box unfocused, so no soft keyboard covers the list.
     readonly arrival?: Arrival | undefined;
+    // A gallery fixture may open with an address already pasted.
+    readonly initial?: string | undefined;
   }
 
-  const { onClose, seat = "modal", here: named, arrival = "keys" }: Props = $props();
+  const { onClose, seat = "modal", here: named, arrival = "keys", initial = "" }: Props = $props();
 
-  let query = $state("");
+  // svelte-ignore state_referenced_locally (a fixture's initial text is captured once)
+  let query = $state(initial);
   let cursor = $state(0);
   // Whether the list is the rooms this conversation can be carried to.
   let carrying = $state(false);
@@ -171,6 +183,7 @@
     const goTo = (to: View, label: string, hint = toFragment(to)): Entry => ({
       label,
       hint,
+      to,
       act: () => {
         u.go(to);
       },
@@ -185,11 +198,27 @@
     // address line was pressed for (client/Spec.lean 4-10a).
     // While nothing is typed only the newest few are listed (`SESSIONS_AT_REST`).
     const viewing = viewed?.kind === "talk" ? viewed.session : undefined;
+    const room = here;
     const sessions = (
-      here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now())
+      room === null ? [] : sessionPlaces({ room, viewing }, sessionLines, $lang, u.now())
     )
       .filter((place, at) => at < SESSIONS_AT_REST || query.trim() !== "")
-      .map((place) => goTo(place.to, place.label, place.hint));
+      .map((place): Entry => {
+        const origin = place.origin;
+        const opening = origin === null ? null : branchFrom($branching, room ?? MAYOR, origin);
+        const note = opening === null ? null : noteOf(opening, room ?? MAYOR, $lang, null);
+        return {
+          label: place.label,
+          hint: note?.said ?? place.hint,
+          to: place.to,
+          why: opening === null ? undefined : waitWhy(opening),
+          keeps: origin === null ? undefined : true,
+          act: () => {
+            if (origin === null) u.go(place.to);
+            else u.branches.open(room ?? MAYOR, { kind: "branch", origin }, onClose);
+          },
+        };
+      });
     const carry: Entry[] =
       carryFrom === null
         ? []
@@ -368,7 +397,6 @@
   // The rooms this conversation can go to, while `carrying`. The box
   // stays open until the city opens the branch, so the row that sent it
   // can say it is opening, or why the city refused it (4-64b).
-  const branching = u.branches.held;
   const carried = $derived.by((): Entry[] => {
     const from = carryFrom;
     if (!carrying || here === null || from === null) return [];
@@ -403,7 +431,23 @@
     if (needle.startsWith("/") && !carrying) {
       return commands;
     }
-    const all = carrying ? carried : entries;
+    const listed = carrying ? carried : entries;
+    const direct =
+      carrying || needle.startsWith("/") ? null : directEntry(query, buildings ?? [], $lang);
+    const all: Entry[] =
+      direct === null
+        ? listed
+        : [
+            {
+              ...direct,
+              act: () => {
+                u.go(direct.to);
+              },
+            },
+            ...listed.filter(
+              (entry) => entry.to === undefined || toFragment(entry.to) !== direct.hint,
+            ),
+          ];
     // A carry row's hint says how its opening goes, so the carry list is
     // searched by place alone: a row that matched on its hint would leave
     // the list the moment the hint changed, and take the city's refusal
@@ -458,7 +502,11 @@ pointer's extra way out, not the only one. -->
         },
       },
     )}
-    nothing={shown.length === 0 ? nothingFound(query) : undefined}
+    nothing={shown.length === 0
+      ? carrying || query.trim().startsWith("/")
+        ? nothingFound(query)
+        : (workspaceProblem(query, buildings ?? []) ?? nothingFound(query))
+      : undefined}
     foot={here !== null && query.trim() === "" && !carrying ? listening : undefined}
   >
     {#snippet list()}

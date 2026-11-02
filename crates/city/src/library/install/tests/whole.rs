@@ -67,7 +67,7 @@ fn a_whole_package_lands_whole_under_its_name() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let src = whole_package(stage.path(), "review");
-    let (seen, mut register) = counted();
+    let (seen, store, mut register) = counted();
 
     let installed = install(
         city_root.path(),
@@ -82,18 +82,31 @@ fn a_whole_package_lands_whole_under_its_name() {
     let installed = installed.unwrap();
 
     assert_eq!(installed.placed, Placed::Fresh);
+    let files = tree(&src)
+        .into_iter()
+        .filter_map(|(_, bytes)| bytes)
+        .collect::<Vec<_>>();
     assert_eq!(
-        tree(&shelved_package(city_root.path(), "utilities", "review")),
-        tree(&src),
-        "every item landed under its own path, byte for byte"
+        seen.borrow().len(),
+        files.len() + 1,
+        "every file and one manifest"
     );
-    assert_eq!(seen.borrow().len(), 1, "the package is registered once");
+    for bytes in files {
+        assert!(
+            seen.borrow().contains(&bytes),
+            "a source file did not reach CAS"
+        );
+    }
+    assert!(!shelved_package(city_root.path(), "utilities", "review").exists());
+    let manifest = seen.borrow().last().unwrap().clone();
     assert_eq!(
-        B3Hash::digest(&seen.borrow()[0]),
+        B3Hash::digest(&manifest),
         installed.hash,
-        "the one blob registered is the one the hash names"
+        "the package is identified by its manifest"
     );
-    let library = Library::scan(city_root.path(), None, Path::new("no-home")).unwrap();
+    let library = store
+        .borrow()
+        .scan(city_root.path(), None, Path::new("no-home"));
     assert_eq!(library.all(), vec![&installed.holding]);
 }
 
@@ -141,7 +154,7 @@ fn an_item_deep_inside_changed_before_the_landing_refuses_the_whole() {
 ",
     )
     .unwrap();
-    let (seen, mut register) = counted();
+    let (seen, _store, mut register) = counted();
     let err = planned.unwrap().apply(&mut register).unwrap_err();
     assert_eq!(*err.code(), AxCode::VersionConflict);
     assert!(
@@ -160,9 +173,11 @@ fn a_name_held_both_as_a_document_and_as_a_package_is_refused() {
     let stage = tempfile::tempdir().unwrap();
     let slot = Slot::library("utilities").unwrap();
     let src = package(stage.path(), "firing", BODY);
-    let (_seen, mut register) = counted();
+    let (_seen, _store, mut register) = counted();
     install(city_root.path(), &slot, &src, &mut register).unwrap();
-    std::fs::write(shelved(city_root.path(), "utilities", "firing"), BODY).unwrap();
+    let duplicate = shelved(city_root.path(), "utilities", "firing");
+    std::fs::create_dir_all(duplicate.parent().unwrap()).unwrap();
+    std::fs::write(duplicate, BODY).unwrap();
 
     let err = plan_install(city_root.path(), &slot, &src).err();
 

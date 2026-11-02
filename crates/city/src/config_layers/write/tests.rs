@@ -255,7 +255,17 @@ fn a_handwritten_plaintext_mcp_credential_is_refused_on_read_as_on_write() {
         ("X-Account".to_owned(), "acme".to_owned()),
     ]);
     let layer = ConfigLayer::parse(&handwritten(&referenced[0])).unwrap();
-    assert_eq!(layer.mcp(), Some(referenced.as_slice()));
+    assert_eq!(
+        layer.mcp().and_then(|mcp| {
+            mcp.definitions.as_ref().map(|definitions| {
+                definitions
+                    .iter()
+                    .map(|definition| definition.server.clone())
+                    .collect::<Vec<_>>()
+            })
+        }),
+        Some(referenced)
+    );
 }
 
 /// A url keeps the query and fragment a server needs, and is refused,

@@ -27,6 +27,8 @@ it is for. -->
 <div class="relative flex flex-wrap items-center justify-between gap-tight pt-tight">
   <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {#if look.catalog !== undefined}{@render look.catalog()}{/if}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {#if look.facts !== undefined}{@render look.facts()}{/if}
     {#if look.notLive !== undefined}<span class="px-snug text-note text-alert">{look.notLive}</span
       >{/if}

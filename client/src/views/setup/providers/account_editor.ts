@@ -31,6 +31,8 @@ import type {
   Command,
   ProviderAccount,
 } from "../../../wire";
+import { begin, end } from "./flight";
+import type { Flight, FlightState } from "./flight";
 
 export type Step = "up" | "down";
 
@@ -101,6 +103,7 @@ export interface Sent {
   readonly rows: readonly ProviderAccount[];
   readonly retries: AccountRetries | null;
   readonly against: string;
+  readonly flight: { readonly state: FlightState; readonly operation: Flight } | null;
 }
 
 // An account just removed whose key the vault still holds: the editor
@@ -142,6 +145,9 @@ export interface Hands {
   readonly follow: (id: string, step: Step) => void;
   // After a removal: the editor's heading.
   readonly focusHeading: () => void;
+  // Shared with the same endpoint row's model editor; search suppliers
+  // have no such row and leave it absent.
+  readonly flight?: FlightState;
 }
 
 const BLANK: AccountDraft = { id: "", reference: "", header: "", key: "" };
@@ -175,12 +181,19 @@ export function shownRetries(editor: Editor, roster: Roster): AccountRetries | n
 
 // A newer answer for this owner replaces what was sent.
 export function settle(editor: Editor, roster: Roster): void {
-  if (editor.sent !== null && editor.sent.against !== roster.stamp) editor.sent = null;
+  if (editor.sent === null || editor.sent.against === roster.stamp) return;
+  release(editor.sent);
+  editor.sent = null;
+}
+
+function release(sent: Sent): void {
+  if (sent.flight !== null) end(sent.flight.state, sent.flight.operation);
 }
 
 // The city refused the list: the editor draws the city's list again and
 // says why beside it.
 export function refuse(editor: Editor, error: AxError): void {
+  if (editor.sent !== null) release(editor.sent);
   editor.sent = null;
   editor.forgetting = false;
   editor.refused = error;
@@ -195,6 +208,8 @@ export function awaits(editor: Editor): boolean {
 // refusal that arrives later is no longer this editor's to show, since
 // the city answers a deletion that succeeds with nothing.
 export function leave(editor: Editor): void {
+  if (editor.sent !== null) release(editor.sent);
+  editor.sent = null;
   editor.pending = null;
   editor.forgetting = false;
 }
@@ -235,6 +250,7 @@ export function unsaveable(editor: Editor, rows: readonly ProviderAccount[]): Ke
 // one name the roster gives this owner and account, and the account
 // carries the reference the city answers with.
 export function save(editor: Editor, hands: Hands): void {
+  if (hands.flight?.current !== null && hands.flight?.current !== undefined) return;
   const roster = hands.roster();
   if (unsaveable(editor, shown(editor, roster)) !== null) return;
   const { draft } = editor;
@@ -366,7 +382,10 @@ function commit(
   retries: AccountRetries | null = shownRetries(editor, hands.roster()),
 ): boolean {
   const roster = hands.roster();
+  const operation = hands.flight === undefined ? null : begin(hands.flight, "accounts");
+  if (hands.flight !== undefined && operation === null) return false;
   if (!hands.send(roster.frame(rows, retries))) {
+    if (operation !== null && hands.flight !== undefined) end(hands.flight, operation);
     editor.note = say(hands.lang(), "setup_account_not_sent");
     return false;
   }
@@ -374,6 +393,12 @@ function commit(
   editor.refused = null;
   editor.removed = null;
   editor.forgetting = false;
-  editor.sent = { rows, retries, against: roster.stamp };
+  editor.sent = {
+    rows,
+    retries,
+    against: roster.stamp,
+    flight:
+      hands.flight === undefined || operation === null ? null : { state: hands.flight, operation },
+  };
   return true;
 }

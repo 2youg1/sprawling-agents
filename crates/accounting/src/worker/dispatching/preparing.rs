@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-use kernel::{AxCode, AxError, Ledger, Locator, RunId};
+use kernel::{AxCode, AxError, Ledger, Locator, Payload, RunId};
 
 use super::super::driving::Sieving;
 use super::super::driving::harness::{HarnessDriven, HarnessHalf, drive_harness};
@@ -290,6 +290,24 @@ impl LaneHalf {
             },
         )?;
         let mut workbench = laying.lay_out_workbench(site, &desks, at, &job_locator)?;
+        for next in &workbench.drift {
+            laying.drift_book.record(next, || {
+                Stamping {
+                    ledger: &mut *ledger,
+                    command,
+                    clock,
+                }
+                .record_for(
+                    site.run_id,
+                    crate::effect::Line {
+                        who: "city".to_owned(),
+                        addr: next.building.clone(),
+                        kind: kernel::EventKind::DigestInvalidated,
+                        data: Payload::of(&next.drift)?,
+                    },
+                )
+            })?;
+        }
         let (plan, handoff) = {
             let mut store = held(&laying.store, "take the lanes' store")?;
             super::super::freezing::Freezing {

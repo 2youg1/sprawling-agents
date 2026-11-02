@@ -103,9 +103,10 @@ fn mount(city_root: &std::path::Path) {
     std::fs::write(&config, text).unwrap();
 }
 
-/// What a skill's `SKILL.md` hashes to as it sits on the shelf: the
-/// bytes a run that reads it by name must be handed.
+/// The canonical manifest digest a run pins for a skill on the shelf.
 fn on_disk(skill: &Shipped) -> (String, B3Hash) {
-    let bytes = std::fs::read(skill.dir.join("SKILL.md")).unwrap();
-    (skill.name.clone(), B3Hash::digest(&bytes))
+    (
+        skill.name.clone(),
+        ::city::skill_digest(&skill.dir).unwrap(),
+    )
 }

@@ -47,9 +47,13 @@ fn replay_names_the_lines_it_verified_and_the_tail_seq() {
     let ledger_dir = layout.ledger();
     // Three lines of its own, and one `skill_shelved` per shipped skill
     // (kernel D23).
-    let shipped = std::fs::read_dir(layout.library().join(city::SHIPPED_SECTION))
-        .unwrap()
-        .count();
+    let cas = storage::Cas::open(&layout.cas()).unwrap();
+    let shipped = city::Library::scan(dir.path(), None, dir.path(), &|digest| {
+        cas.get(digest).map_err(storage::StorageError::into_ax)
+    })
+    .unwrap()
+    .all()
+    .len();
     let lines = 3 + shipped;
     assert_eq!(
         verified_chain(&ledger_dir),

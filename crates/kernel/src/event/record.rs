@@ -39,6 +39,7 @@
 //! bytes.
 
 mod adviser;
+mod catalog;
 mod checkpoint;
 mod collaboration;
 mod control;
@@ -65,6 +66,7 @@ mod turn;
 pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
+pub use catalog::{CatalogDrift, CatalogSubject};
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use collaboration::{
     ConflictLevel, GoalConflict, Landing, Lane, PursuitChanged, PursuitMove, SignalConsumed,

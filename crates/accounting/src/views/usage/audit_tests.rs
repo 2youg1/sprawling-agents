@@ -95,11 +95,13 @@ fn a_package_audit_uses_whole_content_and_a_script_edit_makes_it_stale() {
     std::fs::create_dir(&package).unwrap();
     std::fs::write(package.join("SKILL.md"), "# kiln\n").unwrap();
     std::fs::write(package.join("run.py"), "print(1)\n").unwrap();
+    let store = kernel::layout::CityLayout::new(dir.path()).cas();
+    let mut cas = storage::Cas::open(&store).unwrap();
     let installed = city::install_skill(
         dir.path(),
         &city::Slot::library("tools").unwrap(),
         &package,
-        &mut |bytes| Ok(kernel::B3Hash::digest(bytes)),
+        &mut |bytes| cas.put(bytes).map_err(storage::StorageError::into_ax),
     )
     .unwrap();
     let usage = Usage::fold([record(
@@ -125,9 +127,15 @@ fn a_package_audit_uses_whole_content_and_a_script_edit_makes_it_stale() {
                 verdict: kernel::event::record::AuditVerdict::Pass,
                 at: Seq::new(1)
             }));
-    let landed = dir.path().join(installed.holding.package.unwrap().as_str());
-    std::fs::write(landed.join("run.py"), "print(2)\n").unwrap();
-    let current = city::skill_digest(&landed).unwrap();
+    std::fs::write(package.join("run.py"), "print(2)\n").unwrap();
+    let current = city::install_skill(
+        dir.path(),
+        &city::Slot::library("tools").unwrap(),
+        &package,
+        &mut |bytes| cas.put(bytes).map_err(storage::StorageError::into_ax),
+    )
+    .unwrap()
+    .hash;
     assert!(read().iter().any(|copy| copy.digest == current
         && copy.audit
             == wire::SkillAudit::Stale {

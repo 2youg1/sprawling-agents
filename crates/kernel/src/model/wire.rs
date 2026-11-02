@@ -333,10 +333,37 @@ pub enum SharedPrefix {
 
 /// A tool as the provider sees it; sourced from catalog `tool_defs` only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ToolDef {
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub name: ToolName,
     pub description: String,
     pub input_schema: Payload,
+}
+
+impl ToolDef {
+    /// The canonical bytes a connector-tool pin covers and the CAS stores.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` if the schema cannot be serialised.
+    pub fn pin_bytes(&self) -> Result<Vec<u8>, crate::AxError> {
+        serde_json::to_vec(self).map_err(|err| {
+            crate::AxError::failure(
+                crate::AxCode::InvalidArgs,
+                "pin a tool definition",
+                self.name.as_str(),
+            )
+            .with_recovery(format!("make the input schema serialisable as JSON: {err}"))
+        })
+    }
+
+    /// The pin and CAS address of this definition.
+    ///
+    /// # Errors
+    /// Propagates [`ToolDef::pin_bytes`].
+    pub fn digest(&self) -> Result<crate::B3Hash, crate::AxError> {
+        self.pin_bytes().map(|bytes| crate::B3Hash::digest(&bytes))
+    }
 }
 
 /// The canonical request conversation (city dialect = Anthropic Messages). Both production dialects and the scripted model

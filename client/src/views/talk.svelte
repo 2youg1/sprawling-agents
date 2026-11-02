@@ -27,6 +27,7 @@
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
   import { MAYOR } from "../core/route";
+  import { lineIn } from "../core/stretches";
   import { QUERIES } from "../core/asking";
   import { forkAsked } from "../core/forking";
   import { untrack } from "svelte";
@@ -44,6 +45,7 @@
   import { noteOf } from "./talk/branch_note";
   import Landed from "./talk/landed.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
+  import { draftPlace } from "./talk/draft";
   import Thread from "./talk/thread.svelte";
   import { called } from "./talk/naming";
   import Showing from "./shared/showing.svelte";
@@ -115,7 +117,23 @@
   // nothing before a boundary is ever a run of this stretch because a
   // session cannot open underneath a run working in the room.
   const began = $derived($belief.sessions[address] ?? null);
-  const earlier = $derived(began === null ? [] : runs.filter((run) => run.lastSeq <= began));
+  const sessionAnswer = $derived(u.conn.asking.ask({ sessions: { room: address } }));
+  const currentLine = $derived(
+    lineIn(
+      $sessionAnswer !== undefined && "sessions" in $sessionAnswer
+        ? $sessionAnswer.sessions
+        : undefined,
+      undefined,
+    ),
+  );
+  const origin = $derived(currentLine?.branched_from ?? null);
+  const earlier = $derived(
+    origin !== null
+      ? runs.filter((run) => run.run === origin.run)
+      : began === null
+        ? []
+        : runs.filter((run) => run.lastSeq <= began),
+  );
   const shown = $derived(began === null ? runs : runs.filter((run) => run.lastSeq > began));
 
   // The room's newest run policy change inside the open session, drawn
@@ -171,6 +189,19 @@
   let ours = false;
   let watching = false;
   let seen: Seq | null = null;
+  const boundary = $derived.by((): Boundary | null => {
+    if (origin !== null) {
+      const local = story?.kind === "forked" && story.mother === origin.run ? story : null;
+      return {
+        kind: "forked",
+        at: local?.at ?? null,
+        turn: local?.turn ?? null,
+        mother: origin.run,
+        origin,
+      };
+    }
+    return story;
+  });
 
   $effect(() => {
     const opened = $belief.sessions[address] ?? null;
@@ -301,9 +332,17 @@
   function doFork(plan: ForkPlan): void {
     picking = false;
     u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
-      if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
+      if (plan.draft !== null) {
+        u.prefs.setDraft(draftPlace(address, $belief.sessions[address] ?? null), plan.draft);
+      }
       ours = true;
-      story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
+      story = {
+        kind: "forked",
+        at: u.now(),
+        turn: plan.turn,
+        mother: plan.mother,
+        origin: plan.origin,
+      };
       // The branch is where the person just went.
       rejoined += 1;
     });
@@ -382,7 +421,7 @@
     {placeholder}
     started={echo !== null}
     sending={sendingInto(live?.doing)}
-    draft={address}
+    draft={draftPlace(address, began)}
     hearing={u.hearing()}
     room={address}
     band={band ? lastSaid : undefined}
@@ -409,7 +448,7 @@ composition is rebuilt on the way. -->
       {#if runs.length > 0}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} shown={shown.length} boundary={story} onFork={doFork} onRetry={send} />
+          <Divider {earlier} shown={shown.length} {boundary} onFork={doFork} onRetry={send} />
           {#each shown as run, at (run.run)}
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
@@ -420,7 +459,7 @@ composition is rebuilt on the way. -->
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
           {/if}
         {:else}
-          <Stream {shown} {earlier} boundary={story} />
+          <Stream {shown} {earlier} {boundary} />
         {/if}
       {/if}
       {#if echo !== null}

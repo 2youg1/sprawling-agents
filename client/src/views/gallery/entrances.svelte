@@ -95,6 +95,9 @@
   import Button from "../parts/button.svelte";
   import Notice from "../parts/notice.svelte";
   import RefusalLook from "../refusal.look.svelte";
+  import SwitcherLook from "../world/switcher.look.svelte";
+  import { switcherLookOf } from "../world/switcher";
+  import type { SwitchItem } from "../world/switcher";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -124,6 +127,30 @@
     verb("/stop", say($lang, "slash_stop")),
   ]);
   const SESSIONS = $derived([verb("/model", say($lang, "slash_model"))]);
+  const SWITCH_ROWS: readonly SwitchItem[] = [
+    {
+      key: "hall/mayor:4182",
+      label: "hall/mayor · release notes",
+      hint: "current session",
+      depth: 0,
+      children: true,
+      origin: null,
+      to: { kind: "talk", address: HALL },
+      note: null,
+      refused: undefined,
+    },
+    {
+      key: "lab/worker:3990",
+      label: "lab/worker",
+      hint: "1 hour ago",
+      depth: 1,
+      children: false,
+      origin: null,
+      to: { kind: "talk", address: Address.make("lab/worker") },
+      note: null,
+      refused: undefined,
+    },
+  ];
   const VERBS = $derived([...ACTIONS, ...SESSIONS]);
   const BACK = $derived(backLookOf({ kind: "mcp" }, $lang));
 
@@ -152,6 +179,30 @@
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
     <Palette seat="specimen" here={HALL} onClose={ignore} />
   </Stand>
+</Case>
+
+<Case label="palette · a pasted address becomes one direct row" width={640}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
+    <Palette seat="specimen" here={HALL} initial="hall/new-room" onClose={ignore} />
+  </Stand>
+</Case>
+
+<Case label="session switcher · a tree with a delegated child" width={640}>
+  <Modal wire={specimen(say($lang, "world_session_switcher"))} seat="specimen">
+    <SwitcherLook
+      {...switcherLookOf(
+        {
+          query: "",
+          cursor: 0,
+          collapsed: new Set(),
+          rows: SWITCH_ROWS,
+          list: "entrances-switcher",
+          lang: $lang,
+        },
+        { write: ignore, move: ignore, fold: ignore, open: ignore, hover: ignore },
+      )}
+    />
+  </Modal>
 </Case>
 
 <Case label="palette · verbs, one this page cannot run greyed with its reason" width={640}>

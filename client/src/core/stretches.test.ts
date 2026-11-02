@@ -5,12 +5,12 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Address, RunId, Seq, Tag, TimeMs } from "../wire";
+import { Address, RunId, Seq, TimeMs } from "../wire";
 import type { SessionLine, SessionsAnswer } from "../wire";
 import type { RunBelief } from "./belief";
 import { unseen } from "./belief/fold";
 import { MAYOR } from "./route";
-import { grouped, lineIn, pinningOf, stretchesOf, tailOf } from "./stretches";
+import { lineIn, pinningOf, stretchesOf, tailOf } from "./stretches";
 import type { Stretch } from "./stretches";
 import { PIN } from "./tags";
 
@@ -80,29 +80,17 @@ describe("the sessions the pane lists", () => {
     ]).toEqual(["mayor", "tagged", "none"]);
   });
 
-  test("the pinned come first, then each building newest first, and a filter keeps only its tag", () => {
-    const bug = Tag.make("bug");
-    const tagsFor = (each: Stretch): Tag[] =>
-      each.line.began === Seq.make(1) ? [PIN, bug] : each.line.began === Seq.make(10) ? [bug] : [];
-    const shape = (filter: Tag | null): unknown =>
-      grouped(all, tagsFor, filter).map((group) => [
-        group.kind === "pinned" ? "pinned" : group.building,
-        group.rows.map((each) => each.line.began),
-      ]);
-    expect(shape(null)).toEqual([
-      ["pinned", [Seq.make(30), Seq.make(1)]],
-      [Address.make("lab"), [Seq.make(20), Seq.make(10)]],
-    ]);
-    expect(shape(bug)).toEqual([
-      ["pinned", [Seq.make(1)]],
-      [Address.make("lab"), [Seq.make(10)]],
-    ]);
-  });
-
-  test("going on from a stretch branches at its last run's last line", () => {
+  test("going on from a stretch uses the sessions answer's tail even with no run held", () => {
     const past = all.find((each) => each.line.began === Seq.make(10));
+    const withTail =
+      past === undefined
+        ? undefined
+        : {
+            ...past,
+            line: { ...past.line, tail: { run: second.run, at_seq: Seq.make(12) } },
+          };
     const lone: Stretch = { room: LAB, line: line(40, 400), current: true, runs: [] };
-    expect([past && tailOf(past), tailOf(lone)]).toEqual([
+    expect([withTail && tailOf(withTail), tailOf(lone)]).toEqual([
       { run: second.run, at_seq: Seq.make(12) },
       null,
     ]);

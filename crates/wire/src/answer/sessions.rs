@@ -32,6 +32,15 @@ pub struct SessionsAnswer {
     pub earlier: u64,
 }
 
+/// A session another line points at: the room and the line its stretch
+/// began at. The pair is stable across reloads and hot-view truncation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SessionRef {
+    pub room: Address,
+    pub began: Seq,
+}
+
 /// One stretch of a room, each field read off a line the Ledger files
 /// under the room's address.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,6 +74,17 @@ pub struct SessionLine {
     /// [`SESSION_PREVIEW_MAX`] characters.
     #[serde(default)]
     pub preview: Option<String>,
+    /// The session this one branched from, or the delegating run's
+    /// session; `None` for a session with no parent.
+    #[serde(default)]
+    pub parent: Option<SessionRef>,
+    /// The exact branch point; unlike `parent`, this also says where in
+    /// the mother's conversation the branch began.
+    #[serde(default)]
+    pub branched_from: Option<Origin>,
+    /// The last line of this stretch's last run, ready to branch from.
+    #[serde(default)]
+    pub tail: Option<Origin>,
 }
 
 /// How a stretch began.

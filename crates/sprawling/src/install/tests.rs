@@ -168,10 +168,29 @@ fn windows_uninstall_removes_its_running_executable() {
     assert_eq!((names(&dir), left), (Vec::new(), Vec::new()));
 }
 
+/// Whether this account may create links at all. The privilege is off
+/// for a default account, and the two tests below judge what uninstall
+/// does with a link, not the privilege; a machine without it skips
+/// rather than fails, so a suite never carries two permanent reds.
+#[cfg(target_os = "windows")]
+fn can_create_links(root: &Path) -> bool {
+    let real = root.join("privilege-probe.txt");
+    let link = root.join("privilege-probe.link");
+    if std::fs::write(&real, "probe").is_err() {
+        return false;
+    }
+    // The probe files stay: the caller's tempdir removes the tree.
+    std::os::windows::fs::symlink_file(&real, &link).is_ok()
+}
+
 #[cfg(target_os = "windows")]
 #[test]
 fn windows_uninstall_removes_only_the_link_to_an_external_running_executable() {
     let root = tempfile::tempdir().unwrap();
+    if !can_create_links(root.path()) {
+        eprintln!("skipping: this account lacks the privilege to create links");
+        return;
+    }
     let archive = root.path().join("archive.exe");
     let dir = root.path().join("installed");
     let scratch = root.path().join("scratch");
@@ -200,6 +219,10 @@ fn windows_uninstall_removes_only_the_link_to_an_external_running_executable() {
 #[test]
 fn windows_uninstall_removes_a_dangling_file_link() {
     let root = tempfile::tempdir().unwrap();
+    if !can_create_links(root.path()) {
+        eprintln!("skipping: this account lacks the privilege to create links");
+        return;
+    }
     let missing = root.path().join("missing.exe");
     let dir = root.path().join("installed");
     std::fs::create_dir(&dir).unwrap();

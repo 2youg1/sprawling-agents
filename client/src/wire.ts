@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 71 as const;
+export const WIRE_V = 74 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "8f3b5e976be5480948d7d16772e20267e66466b6ecb99ce33407a1f270e22389" as const;
+export const WIRE_HASH = "aa2e307bd8b94906f470d0a2980832dc481260f94118862edba51bb878545726" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -727,6 +727,18 @@ export const BytesAnswer = Schema.Struct({
 export type BytesAnswer = typeof BytesAnswer.Type;
 
 /**
+ * What the audit concluded.
+ */
+export const AuditVerdict = Schema.Union([
+  Schema.Literals(["pass", "warn", "fail"]),
+  Schema.Literal("unreachable"),
+]).annotate({ identifier: "AuditVerdict" });
+export type AuditVerdict = typeof AuditVerdict.Type;
+
+export const CatalogChange = Schema.Literals(["added", "changed", "removed"]).annotate({ identifier: "CatalogChange" });
+export type CatalogChange = typeof CatalogChange.Type;
+
+/**
  * How one admitted tool reaches a building's sessions.
  * 
  * Three values, the truncation lock's three tiers: `Core` travels in
@@ -750,17 +762,59 @@ export const ExposureFrom = Schema.Union([
 export type ExposureFrom = typeof ExposureFrom.Type;
 
 /**
- * One tool of a building.
+ * One skill candidate and, when it moved, the version the building pinned.
+ */
+export const CatalogSkill = Schema.Struct({
+  audit: Schema.optional(Schema.NullOr(AuditVerdict)),
+  audit_stale: Schema.Boolean,
+  candidate: Schema.optional(Schema.NullOr(B3Hash)),
+  change: Schema.optional(Schema.NullOr(CatalogChange)),
+  current_document: Schema.optional(Schema.NullOr(Schema.String)),
+  disclosure: Schema.String,
+  exposure: Exposure,
+  from: ExposureFrom,
+  last_used: Schema.optional(Schema.NullOr(TimeMs)),
+  name: Schema.String,
+  pinned: Schema.optional(Schema.NullOr(B3Hash)),
+  pinned_document: Schema.optional(Schema.NullOr(Schema.String)),
+  runs_used: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  section: Schema.String,
+}).annotate({ identifier: "CatalogSkill" });
+export type CatalogSkill = typeof CatalogSkill.Type;
+
+/**
+ * Ledger payload: a JSON object with every float refused, at construction
+ * and again on read (determinism rule 6). Keys serialize sorted
+ * (serde_json's default BTreeMap), which is part of the canonical bytes.
+ */
+export const Payload = Schema.Record(Schema.String, Schema.Unknown).annotate({ identifier: "Payload" });
+export type Payload = typeof Payload.Type;
+
+/**
+ * One definition in CAS, with the costs and text the panel compares.
+ */
+export const CatalogVersion = Schema.Struct({
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  description: Schema.String,
+  digest: B3Hash,
+  hint: Schema.String,
+  input_schema: Payload,
+}).annotate({ identifier: "CatalogVersion" });
+export type CatalogVersion = typeof CatalogVersion.Type;
+
+/**
+ * One built-in or connector tool. Connector rows are grouped by `namespace`.
  */
 export const CatalogTool = Schema.Struct({
-  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  change: Schema.optional(Schema.NullOr(CatalogChange)),
+  current: Schema.optional(Schema.NullOr(CatalogVersion)),
   exposure: Exposure,
   fallback: Exposure,
   from: ExposureFrom,
-  hint: Schema.String,
   last_used: Schema.optional(Schema.NullOr(TimeMs)),
   name: Schema.String,
   namespace: Schema.String,
+  pinned: Schema.optional(Schema.NullOr(CatalogVersion)),
   runs_used: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "CatalogTool" });
 export type CatalogTool = typeof CatalogTool.Type;
@@ -772,9 +826,20 @@ export type CatalogTool = typeof CatalogTool.Type;
  */
 export const ExposureTable = Schema.Struct({
   namespaces: Schema.optional(Schema.Record(Schema.String, Exposure)),
+  skills: Schema.optional(Schema.Record(Schema.String, Exposure)),
   tools: Schema.optional(Schema.Record(Schema.String, Exposure)),
 }).annotate({ identifier: "ExposureTable" });
 export type ExposureTable = typeof ExposureTable.Type;
+
+/**
+ * A building's reference to one server and the versions it approved.
+ */
+export const McpReference = Schema.Struct({
+  definition: Schema.optional(Schema.NullOr(Schema.String)),
+  label: ServerLabel,
+  tools: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, B3Hash))),
+}).annotate({ identifier: "McpReference" });
+export type McpReference = typeof McpReference.Type;
 
 /**
  * A run's identity in the one spelling the city writes it: a hyphenated uuid in lower case, as `kernel::RunId::parse` accepts it. Bare hex, braces, the `urn:uuid:` prefix and upper case are refused.
@@ -783,15 +848,25 @@ export const RunId = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{
 export type RunId = typeof RunId.Type;
 
 /**
- * The tools of one building, and the two tables a page edits.
+ * Everything one building's catalog page reads and saves.
  */
 export const CatalogAnswer = Schema.Struct({
+  always: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   building: Address,
+  changed: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   city: ExposureTable,
   core_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  dormant: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   index_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  open_sessions: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  reading_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  reading_room: Schema.Array(Schema.String),
+  references: Schema.Array(McpReference),
   run: Schema.optional(Schema.NullOr(RunId)),
   runs_seen: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  skill_pins: Schema.Record(Schema.String, B3Hash),
+  skill_rows: Schema.Array(CatalogSkill),
+  skills: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   stated: ExposureTable,
   tools: Schema.Array(CatalogTool),
 }).annotate({ identifier: "CatalogAnswer" });
@@ -2426,14 +2501,6 @@ export const GuideProgress = Schema.Struct({
 export type GuideProgress = typeof GuideProgress.Type;
 
 /**
- * Ledger payload: a JSON object with every float refused, at construction
- * and again on read (determinism rule 6). Keys serialize sorted
- * (serde_json's default BTreeMap), which is part of the canonical bytes.
- */
-export const Payload = Schema.Record(Schema.String, Schema.Unknown).annotate({ identifier: "Payload" });
-export type Payload = typeof Payload.Type;
-
-/**
  * One serialized history line. Fields private: the only paths to a
  * record are [`EventRecord::from_draft`] (append side) and
  * [`EventRecord::parse_line`] (read side).
@@ -3209,6 +3276,16 @@ export const CeilingLine = Schema.Union([
 export type CeilingLine = typeof CeilingLine.Type;
 
 /**
+ * What a model accepts as input: a closed judgement rather than a set of
+ * flags. Every row answers it,
+ * and the answer decides whether a picture may be sent at all. The
+ * default is the narrow one, because guessing narrow costs a refusal a
+ * person can act on and guessing wide costs a 400 from the provider.
+ */
+export const InputKinds = Schema.Literals(["text", "text_image"]).annotate({ identifier: "InputKinds" });
+export type InputKinds = typeof InputKinds.Type;
+
+/**
  * A window and the rung that stated it.
  */
 export const WindowLine = Schema.Struct({
@@ -3223,6 +3300,7 @@ export type WindowLine = typeof WindowLine.Type;
 export const FiguresLine = Schema.Struct({
   ceiling: Schema.optional(Schema.NullOr(CeilingLine)),
   id: Schema.String,
+  input: InputKinds,
   window: Schema.optional(Schema.NullOr(WindowLine)),
 }).annotate({ identifier: "FiguresLine" });
 export type FiguresLine = typeof FiguresLine.Type;
@@ -3491,6 +3569,7 @@ export type PrefixSegment = typeof PrefixSegment.Type;
  * One tool of a frozen table.
  */
 export const PromptTool = Schema.Struct({
+  digest: Schema.optional(Schema.NullOr(Schema.String)),
   exposure: Exposure,
   from: ExposureFrom,
   hint: Schema.String,
@@ -3510,10 +3589,14 @@ export type PromptTool = typeof PromptTool.Type;
  * is still one the building could admit.
  */
 export const PromptTools = Schema.Struct({
+  always: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  dormant: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   hash: Schema.String,
   index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   len: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  reading: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   rows: Schema.Array(PromptTool),
+  skills: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 }).annotate({ identifier: "PromptTools" });
 export type PromptTools = typeof PromptTools.Type;
 
@@ -4480,22 +4563,6 @@ export const RunCostsAnswer = Schema.Struct({
 export type RunCostsAnswer = typeof RunCostsAnswer.Type;
 
 /**
- * What a new session at an address keeps from the previous one.
- * 
- * An enum rather than a flag: the two states are named actions with
- * different results on disk, and `carry: true` at a call site says
- * neither of them. `Nothing` is the first variant and the default,
- * because that is what a person means by starting a new session — a
- * new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
- * handoff is the exception a person states.
- */
-export const Carry = Schema.Union([
-  Schema.Literal("nothing"),
-  Schema.Literal("handoff"),
-]).annotate({ identifier: "Carry" });
-export type Carry = typeof Carry.Type;
-
-/**
  * Where a session branched off: one run of this city, and the line in
  * it that the branch starts after.
  * 
@@ -4514,6 +4581,32 @@ export const Origin = Schema.Struct({
   run: RunId,
 }).annotate({ identifier: "Origin" });
 export type Origin = typeof Origin.Type;
+
+/**
+ * A session another line points at: the room and the line its stretch
+ * began at. The pair is stable across reloads and hot-view truncation.
+ */
+export const SessionRef = Schema.Struct({
+  began: Seq,
+  room: Address,
+}).annotate({ identifier: "SessionRef" });
+export type SessionRef = typeof SessionRef.Type;
+
+/**
+ * What a new session at an address keeps from the previous one.
+ * 
+ * An enum rather than a flag: the two states are named actions with
+ * different results on disk, and `carry: true` at a call site says
+ * neither of them. `Nothing` is the first variant and the default,
+ * because that is what a person means by starting a new session — a
+ * new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
+ * handoff is the exception a person states.
+ */
+export const Carry = Schema.Union([
+  Schema.Literal("nothing"),
+  Schema.Literal("handoff"),
+]).annotate({ identifier: "Carry" });
+export type Carry = typeof Carry.Type;
 
 /**
  * How a stretch began.
@@ -4540,13 +4633,16 @@ export type SessionStart = typeof SessionStart.Type;
 export const SessionLine = Schema.Struct({
   at: TimeMs,
   began: Seq,
+  branched_from: Schema.optional(Schema.NullOr(Origin)),
   effort: Schema.optional(Schema.NullOr(Effort)),
   last: Seq,
   model: Schema.optional(Schema.NullOr(Schema.String)),
   name: Schema.optional(Schema.NullOr(Schema.String)),
+  parent: Schema.optional(Schema.NullOr(SessionRef)),
   preview: Schema.optional(Schema.NullOr(Schema.String)),
   runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   start: SessionStart,
+  tail: Schema.optional(Schema.NullOr(Origin)),
   workspace: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "SessionLine" });
 export type SessionLine = typeof SessionLine.Type;
@@ -4584,15 +4680,6 @@ export const ShellsAnswer = Schema.Struct({
 export type ShellsAnswer = typeof ShellsAnswer.Type;
 
 /**
- * What the audit concluded.
- */
-export const AuditVerdict = Schema.Union([
-  Schema.Literals(["pass", "warn", "fail"]),
-  Schema.Literal("unreachable"),
-]).annotate({ identifier: "AuditVerdict" });
-export type AuditVerdict = typeof AuditVerdict.Type;
-
-/**
  * What the audits on the ledger say about the content a shelf holds now
  * (`city::library::audit_state`).
  */
@@ -4613,26 +4700,13 @@ export const SkillAudit = Schema.Union([
 export type SkillAudit = typeof SkillAudit.Type;
 
 /**
- * Which shelf a holding sits on, and where its document is.
- * 
- * One value rather than a shelf name beside a path, because a holding
- * is on one shelf and at one place, and two fields would let them
- * disagree: a row that says `library` and points outside the city is a
- * state no shelf can be in.
- * 
- * Named rather than implied by which list it arrived in, so a page
- * that shows three shelves in one list can still say where a skill
- * came from - which is the question a person asks when two shelves
- * hold the same name and the nearer one wins.
- * 
- * **The two city arms are `Query::Document`'s input; the external arm
- * is not.** A skill on a shelf outside the city has no address, and one
- * invented for it would send a reader to a file that is not there.
+ * Which shelf a holding sits on. City shelves are CAS indexes rather
+ * than document directories, so the city arms identify a scope, not a
+ * file to pass to `Query::Document`. A building arm names that building;
+ * an external arm names the mounted shelf and relative package path.
  */
 export const SkillShelf = Schema.Union([
-  Schema.Struct({
-    library: Address,
-  }),
+  Schema.Literal("library"),
   Schema.Struct({
     building: Address,
   }),
@@ -5479,7 +5553,10 @@ export const BuildingSettings = Schema.Struct({
   desktop: Schema.optional(Schema.NullOr(Schema.String)),
   idem: IdemKey,
   mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),
+  mcp_references: Schema.optional(Schema.NullOr(Schema.Array(McpReference))),
+  reading_room: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
   sandbox: Schema.optional(Schema.NullOr(SandboxLimits)),
+  skill_pins: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, B3Hash))),
 }).annotate({ identifier: "BuildingSettings" });
 export type BuildingSettings = typeof BuildingSettings.Type;
 
@@ -5587,17 +5664,6 @@ export const IdentityCard = Schema.Union([
   }),
 ]).annotate({ identifier: "IdentityCard" });
 export type IdentityCard = typeof IdentityCard.Type;
-
-/**
- * What a model accepts as input.
- * 
- * A closed judgement rather than a set of flags: every row answers it,
- * and the answer decides whether a picture may be sent at all. The
- * default is the narrow one, because guessing narrow costs a refusal a
- * person can act on and guessing wide costs a 400 from the provider.
- */
-export const InputKinds = Schema.Literals(["text", "text_image"]).annotate({ identifier: "InputKinds" });
-export type InputKinds = typeof InputKinds.Type;
 
 export const NoSecret = Schema.Never.annotate({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;

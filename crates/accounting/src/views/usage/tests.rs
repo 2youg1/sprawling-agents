@@ -111,7 +111,7 @@ fn used(at: At, part: &str, text: &str, outcome: wire::UseOutcome) -> wire::Skil
 pub(super) fn library(name: &str, text: &str) -> Shelved {
     Shelved {
         name: name.to_owned(),
-        shelf: wire::SkillShelf::Library(Address::parse(&format!("hall/{name}.md")).unwrap()),
+        shelf: wire::SkillShelf::Library,
         digest: hash(text),
     }
 }

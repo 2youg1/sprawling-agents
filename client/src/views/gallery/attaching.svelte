@@ -27,6 +27,8 @@
   import { freshDraft } from "../setup/providers/draft";
   import type { Draft } from "../setup/providers/draft";
   import EndpointList from "../setup/providers/endpoint_list.svelte";
+  import { freshFlight } from "../setup/providers/flight";
+  import ModelEditor from "../setup/providers/model_editor.svelte";
   import Previews from "../setup/providers/preview.svelte";
   import Case from "./case.svelte";
   import { ENDPOINTS, FIGURED, PROBED, TYPED } from "./served";
@@ -74,10 +76,15 @@
   const workedLook = $derived(lookOf(worked, PROBED, [], $lang));
   const typedLook = $derived(lookOf(typed, [], [], $lang));
   const answeredLook = $derived(lookOf(answered, PROBED, FIGURED, $lang));
+  const modelFlight = $state(freshFlight());
 </script>
 
 <Case label="provider · a long address, and a row with no model listed">
   <EndpointList answer={LISTED} />
+</Case>
+
+<Case label="provider · an attached row's model editor, open with A and B admitted">
+  <ModelEditor answer={LISTED} name="example" flight={modelFlight} open />
 </Case>
 
 <Case label="provider · the attach form's fold, closed">

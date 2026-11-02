@@ -216,6 +216,13 @@ impl Vfs for RealFs {
         std::fs::set_permissions(to, std::fs::metadata(from)?.permissions())
     }
 
+    fn make_readonly(&mut self, path: &Path) -> io::Result<()> {
+        self.release(path);
+        let mut permissions = std::fs::metadata(path)?.permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(path, permissions)
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.is_file()
     }

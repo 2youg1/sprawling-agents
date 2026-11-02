@@ -565,8 +565,9 @@ documents such as `Memo.md` in `city::spine_files`, `worktrees/` in
 └─ <building>/                 one building, one line of business
    ├─ .sprawling/              the building's reserved subtree: what governs it
    │  ├─ RULES.toml            what the building is and may do: one parsed file
-   │  ├─ CONFIG.toml           building layer, including its MCP servers
-   │  ├─ skills/               skills only this building admits
+   │  ├─ CONFIG.toml           building layer: local definitions when needed, references, positions and pins
+   │  ├─ CATALOG.toml           the selection this room's current session froze, when it has run
+   │  ├─ skills/               this building's skill index; package bytes stay in the city CAS
    │  └─ sessions/             the Ledger's projection of what ran here, disposable
    ├─ Roadmap.md               the plan tree, and the denominator of every progress reading
    ├─ Memo.md                  decisions and corrections
@@ -611,7 +612,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->71<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->74<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -850,15 +851,26 @@ changes every name of the same file (runtime D10). The
 platform and filesystem optimizations, including copy-on-write; neither
 cloning nor zero new data blocks is guaranteed.
 
-Two admission boundaries still lack persistent accepted-content pins.
-The Reading Room records scan hashes, but a city skill is later opened by
-its shelf address; an external skill carries the text from that scan.
-Neither is the persistent accepted package version described in
-[#131](https://github.com/2youg1/sprawling-agents/issues/131). MCP connections
-keep the tool list learned when they connect and reuse it while live;
-there is no comparison with a persistently approved server/tool definition.
-Issue #131 owns those pins, their verified reads and their drift handling,
-and this section does not claim that any of it is implemented.
+A skill's shelf row is only a locator for its canonical manifest. Admission
+copies an external package into the city CAS once, and every later `read`
+resolves the admitted manifest and file through verified full CAS reads;
+installing a different digest creates a candidate version without moving an
+existing pin. The read-only materialization under `.sprawling/library/.objects/`
+is rebuilt from those objects and is disposable, not another authority.
+
+A connector definition lives at one scope, normally the city's; a building
+stores label references, catalog positions and pins instead of copying the
+transport. A tool pin is the BLAKE3 of its canonical name, description and
+input-schema JSON, which is also that definition's CAS address. At run start,
+equal tools are offered and added, changed or removed tools are withheld;
+a server-definition drift alone does not withhold an unchanged tool. Skills
+continue to serve their pinned manifest. Each distinct drift is recorded once
+as `digest_invalidated`, so the catalog can compare pinned and found versions
+without connecting a server.
+
+A session's first run writes its catalog selection to
+`<addr>/.sprawling/CATALOG.toml`. Later runs in that session keep it;
+`/new` removes it and takes the building's current selection.
 
 ### CPU placement
 

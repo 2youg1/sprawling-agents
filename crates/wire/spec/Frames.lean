@@ -320,7 +320,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D61 能力：一问答一栋楼每件工具的档位、来源与使用证据，两张 `[catalog]` 表各走已有的配置帧
 
-**决定**：`Query::Catalog { building }` 答 `CatalogAnswer`：这栋楼最新 run 冻下的每件工具（含 `Off` 的），各带此刻盘上的表算出的档位与来源、两张表都不说时的档位、定义的字节与近 50 个 run 的使用证据，外加两张表照写下的样子。写门不新开：`ConfigureBuilding` 多一个面 `catalog`，`CitySettings` 多一项 `catalog`，各写自己那一级的整张表。`PrefixAnswer` 多一格 `tools`，透镜据此画工具块。`WIRE_V` 69 → 70。细节在 §8-99。
+**决定**：`Query::Catalog { building }` 答 `CatalogAnswer`：这栋楼最新 run 冻下的每件工具（含 `Off` 的）与漂移观察，各带此刻盘上的表算出的档位与来源、两张表都不说时的档位、定义的字节与 Ledger 最新时刻前 30 天的使用证据，外加两张表照写下的样子。写门不新开：`ConfigureBuilding` 多一个面 `catalog`，`CitySettings` 多一项 `catalog`，各写自己那一级的整张表。`PrefixAnswer` 多一格 `tools`，透镜据此画工具块。`WIRE_V` 69 → 70；统一目录的后续形状按 D112 共用 73 → 74。细节在 §8-99。
 
 **理由**：楼页要在保存之前就说清一件工具下一个 run 是常驻、按需还是关，谁定的，挪动它每次请求多付或少付多少字节。档位的算法已在 runtime（D111），答复用同一个函数算，页面不另写缺省表。写门沿用两条已有的配置帧，因为 `[catalog]` 与 `[search]`、`[[mcp]]` 一样是一级配置里的一节，楼写自己那一级、城写城那一级，新开一条命令就是同一件事的第二扇门。
 

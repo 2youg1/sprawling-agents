@@ -39,6 +39,8 @@ pub(crate) struct CatalogSection {
     tools: BTreeMap<String, Exposure>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     namespaces: BTreeMap<String, Exposure>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    skills: BTreeMap<String, Exposure>,
 }
 
 /// Reads one layer's `[catalog]` table into the value it states.
@@ -50,6 +52,7 @@ pub(super) fn stated(section: CatalogSection) -> Result<ExposureTable, AxError> 
     let table = ExposureTable {
         tools: section.tools,
         namespaces: section.namespaces,
+        skills: section.skills,
     };
     check(&table)?;
     Ok(table)
@@ -67,6 +70,7 @@ pub(super) fn spelled(table: &ExposureTable, file: &Path) -> Result<Option<toml:
     let section = CatalogSection {
         tools: table.tools.clone(),
         namespaces: table.namespaces.clone(),
+        skills: table.skills.clone(),
     };
     toml::Value::try_from(section)
         .map(Some)
@@ -126,6 +130,14 @@ pub fn check(table: &ExposureTable) -> Result<(), AxError> {
                 CHANGE_THE_KEY,
             )
         })?;
+    }
+    for skill in table.skills.keys() {
+        if skill.is_empty() || skill.starts_with('.') || skill.contains(['/', '\\', ':']) {
+            return Err(refuse_with(
+                format!("{CATALOG_KEY} skills: `{skill}` is not a shelf name"),
+                CHANGE_THE_KEY,
+            ));
+        }
     }
     Ok(())
 }

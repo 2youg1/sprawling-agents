@@ -308,6 +308,11 @@ impl Freezing<'_> {
         self.cas
             .put(&table.array)
             .map_err(storage::StorageError::into_ax)?;
+        for definition in &table.definitions {
+            self.cas
+                .put(definition)
+                .map_err(storage::StorageError::into_ax)?;
+        }
         let prefix = prefix.with_tools(table.record);
         self.intern_prefix(&prefix)?;
 

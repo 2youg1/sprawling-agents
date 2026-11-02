@@ -62,11 +62,13 @@ fn a_link_is_judged_by_where_it_lands() {
 #[test]
 fn a_package_the_reading_room_admits_opens_by_name_and_path() {
     let dir = tempfile::tempdir().unwrap();
-    let package = dir.path().join(".sprawling").join("library").join("review");
-    std::fs::create_dir_all(package.join("scripts")).unwrap();
-    std::fs::write(package.join("SKILL.md"), "check the diff first\n").unwrap();
-    std::fs::write(package.join("scripts").join("check.sh"), "git diff\n").unwrap();
-    std::fs::write(dir.path().join(".sprawling").join("CONFIG.toml"), "x\n").unwrap();
+    let manifest = skill_manifest(
+        dir.path(),
+        &[
+            ("SKILL.md", b"check the diff first\n"),
+            ("scripts/check.sh", b"git diff\n"),
+        ],
+    );
     let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
@@ -74,18 +76,17 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         .admit_skill(CatalogEntry {
             name: "review".to_owned(),
             disclosure: "how this building reviews".to_owned(),
-            expansion: ".sprawling/library/review/SKILL.md".to_owned(),
-            hash: None,
-            package: Some(".sprawling/library/review".to_owned()),
+            expansion: manifest.to_string(),
+            hash: Some(manifest),
+            document: "check the diff first\n".to_owned(),
         })
         .unwrap();
 
-    make_link(&package.join("out"), &dir.path().join(".sprawling"));
     let outcome = tool.invoke(&call("review/scripts/check.sh")).unwrap();
     assert_eq!(outcome.result.as_map()["text"], "git diff\n");
     for (leaving, code) in [
-        ("review/out/CONFIG.toml", AxCode::GateDenied),
-        ("review/out/absent.md", AxCode::GateDenied),
+        ("review/out/CONFIG.toml", AxCode::InvalidArgs),
+        ("review/out/absent.md", AxCode::InvalidArgs),
         ("review/../../CONFIG.toml", AxCode::InvalidArgs),
         ("review/./SKILL.md", AxCode::InvalidArgs),
         ("review/", AxCode::InvalidArgs),
@@ -93,47 +94,52 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         let err = tool.invoke(&call(leaving)).unwrap_err();
         assert_eq!(err.code(), &code, "{leaving} was opened");
     }
+    let nul = tool.invoke(&call("review/bad\0path")).unwrap_err();
+    assert!(
+        nul.recovery().contains("plain segments"),
+        "a NUL path was judged as a missing file instead of an invalid package path: {nul:?}"
+    );
     let miss = tool.invoke(&call("review/scriptz/check.sh")).unwrap_err();
     assert_eq!(
         miss.nearby(),
-        ["review/SKILL.md", "review/out", "review/scripts"],
+        ["review/SKILL.md", "review/scripts/check.sh"],
         "a miss in a package offers the package's entries as the caller names them"
     );
 }
 
-/// A single-document skill is read where the shelf spells it: a link on
-/// the way to its document leads the read nowhere, as a link inside a
-/// package does.
+/// A changed CAS object never reaches the model: the full read verifies
+/// its digest rather than trusting the shelf's index.
 #[test]
-fn a_shelved_document_behind_a_link_is_refused() {
+fn a_changed_cas_object_is_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let outside = tempfile::tempdir().unwrap();
-    std::fs::write(outside.path().join("SKILL.md"), "elsewhere\n").unwrap();
-    let library = dir.path().join(".sprawling").join("library");
-    std::fs::create_dir_all(library.join("kept")).unwrap();
-    std::fs::write(library.join("kept").join("SKILL.md"), "on the shelf\n").unwrap();
-    make_link(&library.join("notes"), outside.path());
+    let manifest = skill_manifest(dir.path(), &[("SKILL.md", b"on the shelf\n")]);
     let (tool, catalog) = tool(dir.path());
-    for name in ["kept", "notes"] {
-        catalog
-            .lock()
-            .unwrap()
-            .admit_skill(CatalogEntry {
-                name: name.to_owned(),
-                disclosure: format!("the {name} skill"),
-                expansion: format!(".sprawling/library/{name}/SKILL.md"),
-                hash: None,
-                package: None,
-            })
-            .unwrap();
-    }
+    catalog
+        .lock()
+        .unwrap()
+        .admit_skill(CatalogEntry {
+            name: "kept".to_owned(),
+            disclosure: "the kept skill".to_owned(),
+            expansion: manifest.to_string(),
+            hash: Some(manifest),
+            document: "on the shelf\n".to_owned(),
+        })
+        .unwrap();
+    let hex = manifest.to_string();
+    let path = kernel::layout::CityLayout::new(dir.path())
+        .cas()
+        .join("b3")
+        .join(hex.get(..2).unwrap())
+        .join(&hex);
+    let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+    permissions.set_readonly(false);
+    std::fs::set_permissions(&path, permissions).unwrap();
+    std::fs::write(&path, b"changed\n").unwrap();
 
-    let kept = tool.invoke(&call("kept")).unwrap();
-    assert_eq!(kept.result.as_map()["text"], "on the shelf\n");
-    let refused = tool.invoke(&call("notes"));
+    let refused = tool.invoke(&call("kept"));
     assert!(
-        matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
-        "a shelved document was read through a link: {refused:?}"
+        matches!(&refused, Err(err) if err.code() == &AxCode::CasCorrupt),
+        "changed bytes were served: {refused:?}"
     );
 }
 
@@ -235,10 +241,7 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
 #[test]
 fn a_document_named_like_a_package_opens_nothing_beside_it() {
     let dir = tempfile::tempdir().unwrap();
-    let section = dir.path().join(".sprawling").join("library").join("ops");
-    std::fs::create_dir_all(&section).unwrap();
-    std::fs::write(section.join("SKILL.md"), "how ops works\n").unwrap();
-    std::fs::write(section.join("deploy.md"), "not admitted\n").unwrap();
+    let manifest = skill_manifest(dir.path(), &[("SKILL.md", b"how ops works\n")]);
     let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
@@ -246,9 +249,9 @@ fn a_document_named_like_a_package_opens_nothing_beside_it() {
         .admit_skill(CatalogEntry {
             name: "SKILL".to_owned(),
             disclosure: "how ops works".to_owned(),
-            expansion: ".sprawling/library/ops/SKILL.md".to_owned(),
-            hash: None,
-            package: None,
+            expansion: manifest.to_string(),
+            hash: Some(manifest),
+            document: "how ops works\n".to_owned(),
         })
         .unwrap();
 

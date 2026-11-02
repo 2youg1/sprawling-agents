@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The status tool: the model's view of its own situation, in the
-//! thirteen lines, in that order.
+//! fourteen lines, in that order.
 //!
 //! The order is not cosmetic. A model reading its status reads the top
 //! first, so identity and mode come before the context reading, and that
@@ -37,6 +37,7 @@ use crate::backlog::{Backlog, Standing};
 use crate::clock::{ClockReading, iso};
 use crate::reminder::ContextReading;
 use kernel::RunPolicy;
+use kernel::event::record::PromptTools;
 use std::path::{Path, PathBuf};
 
 /// How the gateway is currently able to serve. Degraded and LocalOnly
@@ -115,6 +116,8 @@ pub struct StatusTool {
     /// The driver's latest clock reading. A tool built without one
     /// reports `not stamped`: nothing has told it what time it is.
     clock: ClockReading,
+    /// The same frozen `PromptTools` record the catalog page reads.
+    catalog: Box<dyn Fn() -> Option<PromptTools> + Send + Sync>,
     meta: ToolMeta,
 }
 
@@ -155,14 +158,15 @@ impl StatusTool {
             backlog: None,
             context: ContextReading::default(),
             clock: ClockReading::default(),
+            catalog: Box::new(|| None),
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure:
-                    "Report your current situation in thirteen lines: who you are, where you \
+                    "Report your current situation in fourteen lines: who you are, where you \
                      are, your mode and run policy, context used against the window, your trust, your write \
                      domain and its locks, the worktree and its size, the signals waiting, your \
-                     children, the clock, whether the provider is serving, your neighbours, and \
-                     your backlog. None of it is stated anywhere else."
+                     children, the clock, whether the provider is serving, your neighbours, your backlog, \
+                     and your catalog counts and bytes. None of it is stated anywhere else."
                         .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -190,6 +194,17 @@ impl StatusTool {
     #[must_use]
     pub fn clocked(mut self, clock: ClockReading) -> StatusTool {
         self.clock = clock;
+        self
+    }
+
+    /// Reads the frozen `PromptTools` behind the fourteenth line. The
+    /// accounting side returns the catalog's own `ToolTable.record`.
+    #[must_use]
+    pub fn cataloging(
+        mut self,
+        read: Box<dyn Fn() -> Option<PromptTools> + Send + Sync>,
+    ) -> StatusTool {
+        self.catalog = read;
         self
     }
 
@@ -228,6 +243,7 @@ impl StatusSnapshot {
             children,
             standing,
             disk,
+            catalog,
         } = live;
         let locks = if self.locks.is_empty() {
             "none".to_owned()
@@ -241,7 +257,7 @@ impl StatusSnapshot {
             Ok(bytes) => format!("{} bytes", bytes.get()),
             Err(err) => format!("size unreadable: {err}"),
         };
-        [
+        let mut lines = vec![
             format!("who: {}", self.who),
             format!("addr: {}", self.addr),
             format!(
@@ -261,8 +277,17 @@ impl StatusSnapshot {
             format!("provider_mode: {}", self.provider_mode.as_str()),
             format!("neighbours: {}", self.neighbours),
             format!("backlog: {backlog}"),
-        ]
-        .join("\n")
+        ];
+        lines.push(catalog.map_or_else(
+            || "catalog: not frozen".to_owned(),
+            |table| {
+                format!(
+                    "catalog: {} always, {} dormant, {} skills, {} core bytes, {} index bytes, {} reading bytes",
+                    table.always, table.dormant, table.skills, table.len, table.index, table.reading
+                )
+            },
+        ));
+        lines.join("\n")
     }
 }
 
@@ -274,6 +299,7 @@ struct Live<'a> {
     children: &'a [ChildStatus],
     standing: &'a [Standing],
     disk: std::io::Result<ByteLen>,
+    catalog: Option<&'a PromptTools>,
 }
 
 /// Every regular file under `root`, summed. The city's own state under
@@ -346,6 +372,7 @@ impl Tool for StatusTool {
                 self.meta.name.as_str()
             )));
         }
+        let catalog = (self.catalog)();
         let mut result = Map::new();
         result.insert(
             "text".to_owned(),
@@ -355,6 +382,7 @@ impl Tool for StatusTool {
                 children: &(self.children)(),
                 standing: &self.standing(),
                 disk: tree_bytes(&self.snapshot.worktree),
+                catalog: catalog.as_ref(),
             })),
         );
         Ok(ToolOutcome {

@@ -60,6 +60,16 @@ pub struct PromptTools {
     pub len: u64,
     /// Bytes of the dormant index in the resident segment.
     pub index: u64,
+    /// Bytes of Always skills' pinned SKILL.md text.
+    #[serde(default)]
+    pub reading: u64,
+    /// Tools at Core, tools at Dormant, and admitted skills at either position.
+    #[serde(default)]
+    pub always: u32,
+    #[serde(default)]
+    pub dormant: u32,
+    #[serde(default)]
+    pub skills: u32,
     /// One row per tool, in name order.
     pub rows: Vec<PromptTool>,
 }
@@ -73,6 +83,11 @@ pub struct PromptTool {
     pub namespace: String,
     pub exposure: crate::config::Exposure,
     pub from: crate::config::ExposureFrom,
+    /// The definition's canonical JSON digest and CAS address. Absent in a
+    /// record written before connector pins existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub digest: Option<crate::B3Hash>,
     /// Bytes of this tool's definition as the array spells it, counted
     /// whatever its exposure: what moving it into the core would add.
     pub len: u64,

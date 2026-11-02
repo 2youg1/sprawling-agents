@@ -108,6 +108,8 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
             clock_zones: Vec::new(),
             sandbox: kernel::SandboxLimits::default(),
             mcp: Vec::new(),
+            mcp_references: Vec::new(),
+            skill_pins: std::collections::BTreeMap::new(),
             effort: None,
             second_threshold: None,
             search: kernel::config::SearchConfiguration::Default,

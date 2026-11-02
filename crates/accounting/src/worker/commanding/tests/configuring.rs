@@ -14,6 +14,52 @@ use kernel::{Address, IdemKey, RunId, Seq};
 
 use crate::worker::*;
 
+/// A unified building save judges its references before changing the catalog beside them.
+#[test]
+fn a_refused_connector_reference_leaves_the_whole_building_selection_untouched() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut worker = opened(dir.path());
+    let lab = Address::parse("lab").unwrap();
+    city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
+    let file = kernel::layout::CityLayout::new(dir.path()).config(&lab);
+    city::write_catalog(
+        dir.path(),
+        &lab,
+        &kernel::config::ExposureTable {
+            tools: [("exec".to_owned(), kernel::config::Exposure::Core)].into(),
+            namespaces: std::collections::BTreeMap::new(),
+            skills: std::collections::BTreeMap::new(),
+        },
+    )
+    .unwrap();
+    let before = std::fs::read(&file).unwrap();
+    let settings = wire::BuildingSettings {
+        addr: lab,
+        sandbox: None,
+        mcp: None,
+        desktop: None,
+        context_second_threshold: None,
+        catalog: Some(kernel::config::ExposureTable {
+            tools: [("exec".to_owned(), kernel::config::Exposure::Off)].into(),
+            namespaces: std::collections::BTreeMap::new(),
+            skills: std::collections::BTreeMap::new(),
+        }),
+        mcp_references: Some(vec![kernel::McpReference::legacy(
+            kernel::ServerLabel::parse("absent").unwrap(),
+        )]),
+        skill_pins: None,
+        reading_room: None,
+        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"invalid-reference"),
+    };
+
+    let refused = worker
+        .handle(wire::Command::ConfigureBuilding(settings))
+        .unwrap_err();
+
+    assert_eq!(refused.code(), &kernel::AxCode::ConfigInvalid);
+    assert_eq!(std::fs::read(&file).unwrap(), before);
+}
+
 /// A city whose own file is still what the city was opened with.
 fn opened(root: &std::path::Path) -> RunWorker {
     crate::worker::fixture::init_city(root).unwrap();
@@ -132,6 +178,7 @@ fn a_refused_catalog_writes_nothing_beside_an_accepted_search() {
             catalog: Some(kernel::config::ExposureTable {
                 tools: [("Not A Tool".to_owned(), kernel::config::Exposure::Off)].into(),
                 namespaces: std::collections::BTreeMap::new(),
+                skills: std::collections::BTreeMap::new(),
             }),
             ..settings
         }))

@@ -60,7 +60,7 @@ pub fn dev_entry() -> CatalogEntry {
         // Text this build holds, not a document on a shelf: there is
         // nothing behind it that could change while nobody is looking.
         hash: None,
-        package: None,
+        document: String::new(),
     }
 }
 
@@ -86,7 +86,7 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
         disclosure: disclosure.to_owned(),
         expansion: expansion.to_owned(),
         hash: None,
-        package: None,
+        document: String::new(),
     }
 }
 

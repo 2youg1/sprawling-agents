@@ -28,6 +28,9 @@ use super::ladder;
 /// turns that test red.
 pub(crate) const SHELVES_KEY: &str = "[skills] shelves";
 
+/// The building's Reading Room pin table, as a refusal names it.
+pub(crate) const SKILL_PINS_KEY: &str = "[skills.pins]";
+
 /// The directories this city's own configuration mounts read-only beside
 /// its own shelves, in the order it lists them.
 ///

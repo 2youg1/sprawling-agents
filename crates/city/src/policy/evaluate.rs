@@ -59,6 +59,58 @@ pub fn write_rules_against(
     Ok(rules)
 }
 
+/// Validates a Reading Room replacement without writing it.
+pub fn check_reading_room(
+    city_root: &Path,
+    addr: &Address,
+    names: &[String],
+) -> Result<(), AxError> {
+    reading_room_document(&rules_path(city_root, addr), addr, names).map(|_| ())
+}
+
+/// Replaces only the Reading Room's name list, preserving the other RULES
+/// keys. The complete result is evaluated before it lands.
+pub fn write_reading_room(
+    city_root: &Path,
+    addr: &Address,
+    names: &[String],
+) -> Result<BuildingRules, AxError> {
+    let path = rules_path(city_root, addr);
+    crate::document::edit(&path, |held| {
+        let (rendered, rules) = reading_room_document(&path, addr, names)?;
+        held.replace(rendered.as_bytes())?;
+        Ok(rules)
+    })
+}
+
+fn reading_room_document(
+    path: &Path,
+    addr: &Address,
+    names: &[String],
+) -> Result<(String, BuildingRules), AxError> {
+    let text = std::fs::read_to_string(path).map_err(|err| {
+        AxError::failure(
+            kernel::AxCode::StorageFatal,
+            "read a building's rules",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("make RULES.toml readable, then save the catalog again")
+    })?;
+    let mut document: toml::Table = toml::from_str(&text).map_err(|err| refuse(err.to_string()))?;
+    document.insert(
+        "reading_room".to_owned(),
+        toml::Value::Array(
+            names
+                .iter()
+                .map(|name| toml::Value::String(name.clone()))
+                .collect(),
+        ),
+    );
+    let rendered = toml::to_string_pretty(&document).map_err(|err| refuse(err.to_string()))?;
+    let rules = evaluate(addr, &rendered)?;
+    Ok((rendered, rules))
+}
+
 /// The file as a person wrote it, before any rule is judged.
 ///
 /// One struct, so the set of keys this version reads is a thing the

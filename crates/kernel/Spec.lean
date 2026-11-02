@@ -9,6 +9,7 @@ import crates.kernel.spec.Approval
 import crates.kernel.spec.Backpressure
 import crates.kernel.spec.Blockage
 import crates.kernel.spec.Budget
+import crates.kernel.spec.CatalogDrift
 import crates.kernel.spec.Change
 import crates.kernel.spec.Completion
 import crates.kernel.spec.Config
@@ -41,6 +42,7 @@ import crates.kernel.spec.Retries
 import crates.kernel.spec.Schema
 import crates.kernel.spec.Secret
 import crates.kernel.spec.Share
+import crates.kernel.spec.Skill
 import crates.kernel.spec.Spine
 import crates.kernel.spec.Stall
 import crates.kernel.spec.Taint

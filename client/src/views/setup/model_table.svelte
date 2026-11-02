@@ -29,26 +29,32 @@
 
   const u = ui();
   const lang = u.lang;
-  const { served, about, onChosen }: ModelTableProps = $props();
+  const { served, about, onChosen, state: lent }: ModelTableProps = $props();
 
   // Mutated through its properties only, so the binding itself is never
-  // reassigned.
-  const state = $state<TableState>(freshTable());
+  // reassigned. An endpoint row lends its draft; the attach form uses
+  // this owned one.
+  const owned = $state<TableState>(freshTable());
+  const tableState = $derived(lent ?? owned);
 
   $effect(() => {
-    onChosen(chosenRows(state, served));
+    onChosen(chosenRows(tableState, served));
   });
 
   // The city's answer for every row (client D103). A table about no
   // endpoint asks nothing, and its boxes stay blank.
   const asked = $derived(
-    about === null ? readable(undefined) : u.conn.asking.ask(figuresQuery(about, state, served)),
+    about === null
+      ? readable(undefined)
+      : u.conn.asking.ask(figuresQuery(about, tableState, served)),
   );
   const figures = $derived(
     readAnswer($asked, (held) => ("model_figures" in held ? held.model_figures.models : undefined)),
   );
 
-  const look = $derived(lookOf(state, served, figures.kind === "held" ? figures.value : [], $lang));
+  const look = $derived(
+    lookOf(tableState, served, figures.kind === "held" ? figures.value : [], $lang),
+  );
 </script>
 
 <Look {...look} />

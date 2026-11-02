@@ -139,6 +139,46 @@ export function attachEndpoint(
 // tuning and models, and writes the list without asking the endpoint
 // anything. The legacy key and header are not sent, because an explicit
 // list leaves them no account to belong to (gateway Router D29).
+// The model ids an attached endpoint admits: those its newest probe
+// listed, and those the person named whether or not the list carries them.
+export interface Admission {
+  readonly listed: readonly string[];
+  readonly named: readonly string[];
+}
+
+// Probe an attached endpoint without asking for its key or accounts again.
+export function probeAttached(summary: EndpointSummary): Command {
+  return {
+    probe_endpoint: {
+      name: providerName(summary.name),
+      base_url: summary.base_url,
+      dialect: summary.dialect,
+      secret: null,
+      auth_header: null,
+      tuning: { ...summary.tuning, accounts: null },
+      idem: mintIdem(),
+    },
+  };
+}
+
+// Replace only an attached endpoint's admitted models and role-independent
+// tuning; its archived credentials and account order stay where they are.
+export function saveModels(summary: EndpointSummary, admit: Admission): Command {
+  return {
+    attach_endpoint: {
+      name: providerName(summary.name),
+      base_url: summary.base_url,
+      dialect: summary.dialect,
+      secret: null,
+      auth_header: null,
+      admit: [...admit.listed],
+      named: [...admit.named],
+      tuning: { ...summary.tuning, accounts: null },
+      idem: mintIdem(),
+    },
+  };
+}
+
 export function reattachEndpoint(
   summary: EndpointSummary,
   accounts: readonly ProviderAccount[],

@@ -48,6 +48,7 @@
   import Quit from "./views/quit.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
+  import SessionSwitcher from "./views/world/switcher.svelte";
   import SettingsPanel from "./views/settings/panel.svelte";
   import {
     closePanel,
@@ -93,6 +94,7 @@
 
   let view = $state.raw<View>(DEFAULT_VIEW);
   let sheetOpen = $state(false);
+  let sessionSwitcherOpen = $state(false);
   // How many times the stop key found no run in front; each is answered.
   let stopsWithoutRun = $state(0);
   // What opened the sheet, which takes the focus back when it closes.
@@ -289,6 +291,9 @@
       case "palette":
         togglePalette();
         return;
+      case "session.switch":
+        if (tier === "zen") sessionSwitcherOpen = !sessionSwitcherOpen;
+        return;
       case "tier.cycle":
         holdTier();
         return;
@@ -336,7 +341,8 @@
       (event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat,
     );
     if (event.key === "Escape") {
-      if (paletteShown()) closePalette();
+      if (sessionSwitcherOpen) sessionSwitcherOpen = false;
+      else if (paletteShown()) closePalette();
       else if (sheetOpen) closeSheet();
       return;
     }
@@ -419,6 +425,9 @@
   <Quit />
   {#if paletteShown()}
     <Palette onClose={closePalette} arrival={paletteArrival()} />
+  {/if}
+  {#if sessionSwitcherOpen && tier === "zen"}
+    <SessionSwitcher onClose={() => (sessionSwitcherOpen = false)} />
   {/if}
   {#if sheetOpen}
     <Cheatsheet seat="modal" onClose={closeSheet} />

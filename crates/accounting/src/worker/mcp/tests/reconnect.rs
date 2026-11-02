@@ -41,6 +41,12 @@ fn session_ending_server() -> (kernel::McpServer, std::thread::JoinHandle<Vec<St
                 serde_json::json!({"tools": [{"name": "pong"}]}),
             ),
             ("tools/call", 200, "", serde_json::json!({})),
+            (
+                "tools/list",
+                200,
+                "",
+                serde_json::json!({"tools": [{"name": "pong"}]}),
+            ),
         ] {
             let (stream, _) = listener.accept().unwrap();
             let (mut reader, headers, request) = read_http_request(stream);

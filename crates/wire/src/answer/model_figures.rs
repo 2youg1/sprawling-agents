@@ -47,6 +47,8 @@ pub struct FiguresLine {
     /// Absent only when the policy default itself is zero, a state the
     /// policy module's own test forbids.
     pub ceiling: Option<CeilingLine>,
+    /// What this pick would register as the model's accepted input.
+    pub input: kernel::InputKinds,
 }
 
 /// A window and the rung that stated it.

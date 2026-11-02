@@ -251,6 +251,26 @@ export class DevTools {
     });
   }
 
+  // A press whose browser default matters, such as Tab moving the focus
+  // or a key activating a button. Chrome performs those only for a raw
+  // key down, so a walk that drives a form needs this beside `key`.
+  async raw(key: string, code: string, virtual: number, modifiers = 0): Promise<void> {
+    await this.send("Input.dispatchKeyEvent", {
+      type: "rawKeyDown",
+      key,
+      code,
+      modifiers,
+      windowsVirtualKeyCode: virtual,
+    });
+    await this.send("Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key,
+      code,
+      modifiers,
+      windowsVirtualKeyCode: virtual,
+    });
+  }
+
   async keep(path: string): Promise<Outcome<string>> {
     const shot = await this.send("Page.captureScreenshot", { format: "png" });
     if (!shot.ok) return shot;

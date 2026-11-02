@@ -5,12 +5,11 @@
 
 use kernel::layout::LIBRARY_DIR;
 
-use super::super::Library;
+use super::super::test_store::Store;
 use super::*;
 
-/// A package is a directory on a section shelf: its `SKILL.md` is the
-/// holding the catalog lists, and the files beside it stay on the shelf
-/// for `read` to open by `<name>/<path>` rather than becoming holdings.
+/// A package on a section shelf is one holding: its manifest identifies
+/// every file, while the catalog reads only SKILL.md's disclosure.
 #[test]
 fn a_package_on_a_section_shelf_is_one_holding_at_its_skill_file() {
     let dir = tempfile::tempdir().unwrap();
@@ -24,28 +23,14 @@ fn a_package_on_a_section_shelf_is_one_holding_at_its_skill_file() {
     std::fs::write(package.join(SKILL_FILE), "# Review a diff\n\nbody\n").unwrap();
     std::fs::write(package.join("scripts").join("check.sh"), "echo\n").unwrap();
 
-    let library = Library::scan(dir.path(), None, Path::new("no-home")).unwrap();
+    let mut store = Store::new();
+    let installed = store.migrate(dir.path(), None).into_iter().next().unwrap();
+    let library = store.scan(dir.path(), None, Path::new("no-home"));
 
-    let skill = format!(
-        "{}/{LIBRARY_DIR}/utilities/review/{SKILL_FILE}",
-        kernel::RESERVED_PREFIX
-    );
-    assert_eq!(
-        library.all(),
-        vec![&Holding {
-            package: Some(
-                Address::parse(&format!(
-                    "{}/{LIBRARY_DIR}/utilities/review",
-                    kernel::RESERVED_PREFIX
-                ))
-                .unwrap()
-            ),
-            ..Holding::of(
-                "review".to_owned(),
-                "utilities".to_owned(),
-                "# Review a diff\n\nbody\n",
-                Shelf::Library(Address::parse(&skill).unwrap()),
-            )
-        }]
+    assert_eq!(library.all(), vec![&installed.holding]);
+    assert!(installed.previous.is_some());
+    assert!(
+        !package.exists(),
+        "the index replaced the old package directory"
     );
 }

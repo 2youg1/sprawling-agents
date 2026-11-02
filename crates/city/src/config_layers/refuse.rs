@@ -16,10 +16,11 @@ use kernel::{AxCode, AxError, RESERVED_PREFIX};
 use super::agents::AGENT_KEY;
 use super::catalog::CATALOG_KEY;
 use super::ladder::Layer;
+use super::mcp::MCP_REFERENCE_FIELD;
 use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
 use super::search::SEARCH_KEY;
-use super::shelves::SHELVES_KEY;
+use super::shelves::{SHELVES_KEY, SKILL_PINS_KEY};
 
 /// What a person does when a key or a value is not one this build reads.
 /// The message names the key, so the sentence does not.
@@ -83,6 +84,11 @@ pub(super) enum Confined {
     /// cache, so rooms of one building that exposed different tools would
     /// split that building's cache (`crates/city/spec/ConfigLayers.lean` §8-4g).
     Catalog,
+    /// A building references a definition instead of copying it; rooms
+    /// receive their selection through their frozen CATALOG.toml.
+    McpReferences,
+    /// Reading Room pins belong to a building, not one of its rooms.
+    SkillPins,
 }
 
 impl Confined {
@@ -90,7 +96,10 @@ impl Confined {
     pub(super) fn nearest(self) -> Layer {
         match self {
             Confined::Shelves | Confined::Remote | Confined::Agents => Layer::City,
-            Confined::Search | Confined::Catalog => Layer::Building,
+            Confined::Search
+            | Confined::Catalog
+            | Confined::McpReferences
+            | Confined::SkillPins => Layer::Building,
         }
     }
 
@@ -100,13 +109,15 @@ impl Confined {
         rung <= self.nearest()
     }
 
-    fn key(self) -> &'static str {
+    fn key(self) -> String {
         match self {
-            Confined::Shelves => SHELVES_KEY,
-            Confined::Remote => REMOTE_KEY,
-            Confined::Search => SEARCH_KEY,
-            Confined::Agents => AGENT_KEY,
-            Confined::Catalog => CATALOG_KEY,
+            Confined::Shelves => SHELVES_KEY.to_owned(),
+            Confined::Remote => REMOTE_KEY.to_owned(),
+            Confined::Search => SEARCH_KEY.to_owned(),
+            Confined::Agents => AGENT_KEY.to_owned(),
+            Confined::Catalog => CATALOG_KEY.to_owned(),
+            Confined::McpReferences => format!("[[{MCP_REFERENCE_FIELD}]]"),
+            Confined::SkillPins => SKILL_PINS_KEY.to_owned(),
         }
     }
 
@@ -122,6 +133,13 @@ impl Confined {
             Confined::Search => {
                 "the settings page shows the city's and each building's choice, and a room's \
                 would govern runs it never shows"
+            }
+            Confined::McpReferences => {
+                "a building references a server definition, and a room keeps its selection in \
+                its own CATALOG.toml"
+            }
+            Confined::SkillPins => {
+                "a building pins its Reading Room, and a room keeps those pins in CATALOG.toml"
             }
         }
     }

@@ -26,6 +26,9 @@
   import Accounts from "./accounts.svelte";
   import { lookOf } from "./endpoint_list";
   import Look from "./endpoint_list.look.svelte";
+  import { freshFlight } from "./flight";
+  import type { FlightState } from "./flight";
+  import ModelEditor from "./model_editor.svelte";
   import { endpointRoster } from "./rosters";
 
   const { answer }: EndpointListProps = $props();
@@ -40,13 +43,25 @@
   });
 
   const look = $derived(lookOf(answer, $lang));
+  const flights: Record<string, FlightState> = {};
+  function flightFor(name: string): FlightState {
+    const held = flights[name];
+    if (held !== undefined) return held;
+    const made = $state(freshFlight());
+    flights[name] = made;
+    return made;
+  }
 </script>
 
 {#snippet accounts(name: string)}
   {@const endpoint = answer.endpoints.find((each) => each.name === name)}
   {#if endpoint !== undefined}
-    <Accounts roster={endpointRoster(endpoint, fallback)} />
+    <Accounts roster={endpointRoster(endpoint, fallback)} flight={flightFor(name)} />
   {/if}
 {/snippet}
 
-<Look {...look} {accounts} />
+{#snippet models(name: string)}
+  <ModelEditor {answer} {name} flight={flightFor(name)} />
+{/snippet}
+
+<Look {...look} {accounts} {models} />

@@ -8,6 +8,7 @@
 //! for another (`crates/accounting/spec/Connectors.lean` §8-2).
 
 use crate::Reached;
+use agent_protocols::Outbound as _;
 use kernel::{Address, AxError};
 
 use super::RunWorker;
@@ -37,6 +38,7 @@ struct Keyed {
 
 /// One connected server and what it offered when it connected.
 struct Resident {
+    label: kernel::ServerLabel,
     link: agent_protocols::McpLink,
     /// Each tool under both its names, in the order the server listed
     /// them.
@@ -116,11 +118,11 @@ impl Residents {
     ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError> {
         let keyed = self.keyed(server, write_root)?;
         let mut connected = super::workbench::held(&keyed.connected, "reach an mcp server")?;
-        if let Some(resident) = connected
+        if let Some(mut resident) = connected
             .take()
             .filter(|resident| !resident.link.has_ended())
         {
-            let tools = resident.tools(confidential);
+            let tools = resident.refresh(confidential);
             *connected = Some(resident);
             return Ok((tools?, Reached::Resident));
         }
@@ -187,8 +189,6 @@ impl Resident {
         write_root: &std::path::Path,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Resident, agent_protocols::Handshake), AxError> {
-        use agent_protocols::Outbound as _;
-
         // The run's own root, which exists whether or not this building
         // lends its runs a worktree.
         let mut link = agent_protocols::McpLink::open(&server.transport, write_root, resolve)?;
@@ -204,7 +204,30 @@ impl Resident {
                 .into_iter()
                 .map(|entry| (entry.meta, entry.remote))
                 .collect();
-        Ok((Resident { link, listed }, opened))
+        Ok((
+            Resident {
+                label: server.label.clone(),
+                link,
+                listed,
+            },
+            opened,
+        ))
+    }
+
+    /// Lists tools again at a run boundary while keeping the connection.
+    /// A server's description or schema may change after initialize; the
+    /// caller's pin comparison cannot see that from a cached list.
+    fn refresh(&mut self, confidential: bool) -> Result<Vec<agent_protocols::McpTool>, AxError> {
+        let mut rpc = agent_protocols::Rpc::new();
+        let listing = self
+            .link
+            .call(&rpc.list_tools(), agent_protocols::EXTERNAL_CALL_PATIENCE)?;
+        self.listed =
+            agent_protocols::tools_from(&self.label, &agent_protocols::Rpc::read(&listing)?)?
+                .into_iter()
+                .map(|entry| (entry.meta, entry.remote))
+                .collect();
+        self.tools(confidential)
     }
 
     /// One handle per tool on the one connection: two connections would

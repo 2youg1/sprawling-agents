@@ -16,9 +16,11 @@ import {
   fromFragment,
   go,
   roomIn,
+  readWorkspace,
   SETUP_GROUPS,
   toFragment,
   unresolved,
+  workspaceDestination,
   type View,
 } from "./route";
 
@@ -47,6 +49,7 @@ const EVERY_VIEW: readonly View[] = [
   { kind: "setup" },
   ...SETUP_GROUPS.map((group): View => ({ kind: "setup", group })),
   { kind: "building", address: lab },
+  { kind: "building", address: lab, section: "catalog" },
   { kind: "raise" },
   { kind: "raise", address: Address.make("notes") },
   { kind: "monitor" },
@@ -265,6 +268,44 @@ describe("building destinations", () => {
       { kind: "adopt", view: { kind: "raise", address: notes } },
       { kind: "build", view: { kind: "raise", address: unknown } },
     ]);
+  });
+});
+
+describe("reading a workspace once", () => {
+  test("a bare address, a talk fragment and a full URL resolve alike, including spaces and a session", () => {
+    const spaced = Address.make("lab/a room");
+    expect([
+      readWorkspace("  hall/mayor  "),
+      readWorkspace("#/talk/lab/parser"),
+      readWorkspace("https://city.example.test/#/talk/lab/parser:12"),
+      readWorkspace("lab/a room"),
+    ]).toEqual([
+      { kind: "talk", address: MAYOR },
+      { kind: "talk", address: parser },
+      { kind: "talk", address: parser, session: Seq.make(12) },
+      { kind: "talk", address: spaced },
+    ]);
+  });
+
+  test("a non-talk fragment or malformed address names no workspace", () => {
+    for (const raw of ["#/city", "a//b", "a\\b", "https://city.example.test/#/cost", ""]) {
+      expect(readWorkspace(raw), raw).toBeNull();
+    }
+  });
+
+  test("a destination keeps an established room, raises an unknown building and refuses a room below one", () => {
+    const progress: BuildingProgress["progress"] = {
+      planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 },
+    };
+    const buildings: readonly BuildingProgress[] = [
+      { addr: lab, adoptable: false, blocked: [], problems: [], progress, ready: 0 },
+    ];
+    const unknown = Address.make("unknown");
+    expect([
+      workspaceDestination({ kind: "talk", address: parser }, buildings),
+      workspaceDestination({ kind: "talk", address: unknown }, buildings),
+      workspaceDestination({ kind: "talk", address: Address.make("unknown/room") }, buildings),
+    ]).toEqual([{ kind: "talk", address: parser }, { kind: "raise", address: unknown }, null]);
   });
 });
 

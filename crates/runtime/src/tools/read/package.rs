@@ -3,135 +3,93 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A file inside a package the reading room admits, asked for as
-//! `<name>/<path>`.
-//!
-//! A person admitted the package when they wrote the reading room, so
-//! the files beside its `SKILL.md` open the way that document does:
-//! past the read bound and the reserved subtree, but never out of the
-//! package directory, whether by a segment or through a link.
+//! A skill and its package files, read only through a pinned manifest
+//! (`crates/kernel/spec/Skill.lean`). Both the manifest and every file
+//! are full, verified CAS reads; no filesystem path is followed.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use kernel::{Address, AxCode, AxError};
+use kernel::{AxCode, AxError, B3Hash, SkillManifest};
 
 use super::Found;
-use super::miss::Floor;
 use crate::catalog::{Catalog, Expansion};
-use crate::tools::chosen_path::real_location;
 
-/// Where `<name>/<path>` lands when `name` is a package in the catalog.
-///
-/// `None` when the first segment is not a package the catalog holds -
-/// no such name, a single-document skill however its file is named, or
-/// an entry the catalog speaks itself - so the caller goes on to the
-/// ordinary path. Which entries are packages is the shelf scan's to
-/// say, and it says so in `CatalogEntry::package`.
-///
-/// # Errors
-/// Refuses a path inside the package with an empty, `.` or `..`
-/// segment, or one spelled with `\` or `:`, rather than normalising it:
-/// a normalised path is a different path from the one the caller wrote.
-/// Refuses with `E_GATE_DENIED` a file whose real location, links
-/// resolved, lies outside the package directory as the shelf spells it,
-/// which also refuses a package directory that is itself a link.
+/// Opens a skill's `SKILL.md` through its admitted manifest.
+pub(super) fn open_document(
+    block_store: &Path,
+    digest: &B3Hash,
+    asked: &str,
+) -> Result<Found, AxError> {
+    let manifest = manifest(block_store, digest)?;
+    let document = manifest.document().ok_or_else(|| {
+        AxError::failure(
+            AxCode::CasCorrupt,
+            "read a skill",
+            format!("{asked} has no SKILL.md in its manifest"),
+        )
+        .with_recovery("reinstall the skill through the city's install door")
+    })?;
+    Ok(Found::Text(read_text(block_store, document, asked)?))
+}
+
+/// Opens `<name>/<path>` when `name` is an admitted skill. A missing
+/// file is a refusal inside this catalog entry, never a fallback to an
+/// ordinary path.
 pub(super) fn open_in_package(
     catalog: &Catalog,
-    city_root: &Path,
+    block_store: &Path,
     asked: &str,
 ) -> Option<Result<Found, AxError>> {
     let (name, inside) = asked.split_once('/')?;
-    let Some(Expansion::Skill {
-        package: Some(package),
-        ..
-    }) = catalog.expand(name)
-    else {
+    let Some(Expansion::Skill { manifest: digest }) = catalog.expand(name) else {
         return None;
     };
-    let package = package.as_str();
-    Some(within(package, inside, asked).and_then(|target| {
-        let shelf = under(
-            &real_location(city_root, "read", asked)?.into_path(),
-            package,
-        );
-        let at = real_location(&under(city_root, target.as_str()), "read", asked)?;
-        stays_inside(&at, &shelf, asked)?;
-        Ok(Found::File {
-            at,
-            floor: Floor::Directory {
-                dir: shelf,
-                named: name.to_owned(),
-            },
-        })
-    }))
+    Some((|| {
+        if !kernel::skill::plain_package_path(inside) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read",
+                format!("{asked} does not name a file inside the package"),
+            )
+            .with_recovery(
+                "write the path inside the package as plain segments joined by `/`, with no empty, `.` or `..` segment",
+            ));
+        }
+        let manifest = manifest(block_store, &digest)?;
+        let file = manifest.file(inside).ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read",
+                format!("{asked} is not a file in the admitted manifest"),
+            )
+            .with_nearby(
+                manifest
+                    .items()
+                    .iter()
+                    .map(|item| format!("{name}/{}", item.path()))
+                    .collect(),
+            )
+            .with_recovery("name a file the manifest lists, or read the skill's SKILL.md")
+        })?;
+        Ok(Found::Text(read_text(block_store, file, asked)?))
+    })())
 }
 
-/// Opens a single-document skill where the shelf spells it.
-///
-/// # Errors
-/// Refuses with `E_GATE_DENIED` a document whose real location, links
-/// resolved, is not the shelved address under the canonical city root:
-/// the reading room admitted that document, not what a link on its way
-/// leads to.
-pub(super) fn open_document(
-    city_root: &Path,
-    shelved: &Address,
-    asked: &str,
-) -> Result<Found, AxError> {
-    let spelled = under(
-        &real_location(city_root, "read", asked)?.into_path(),
-        shelved.as_str(),
-    );
-    let at = real_location(&under(city_root, shelved.as_str()), "read", asked)?;
-    if at.path() != spelled.as_path() {
-        return Err(AxError::failure(
-            AxCode::GateDenied,
-            "read",
-            format!("{asked} is shelved behind a link"),
-        )
-        .with_recovery(
-            "the User has to put the skill's document itself on the shelf, not a link to it",
-        ));
-    }
-    Ok(Found::File {
-        at,
-        floor: Floor::Document,
-    })
+fn manifest(block_store: &Path, digest: &B3Hash) -> Result<SkillManifest, AxError> {
+    let cas = storage::Cas::open(block_store).map_err(storage::StorageError::into_ax)?;
+    let bytes = cas.get(digest).map_err(storage::StorageError::into_ax)?;
+    SkillManifest::decode(&bytes)
 }
 
-/// Refuses a file whose real location, present or absent, is not in
-/// the package directory as the shelf spells it.
-fn stays_inside(at: &super::Located, shelf: &Path, asked: &str) -> Result<(), AxError> {
-    if at.path().starts_with(shelf) {
-        return Ok(());
-    }
-    Err(AxError::failure(
-        AxCode::GateDenied,
-        "read",
-        format!("{asked} leads out of the package through a link"),
-    )
-    .with_recovery("name a file that lies inside the package itself, not behind a link in it"))
-}
-
-fn under(root: &Path, addr: &str) -> PathBuf {
-    addr.split('/')
-        .fold(root.to_path_buf(), |path, segment| path.join(segment))
-}
-
-fn within(package: &str, inside: &str, asked: &str) -> Result<Address, AxError> {
-    let plain = inside
-        .split('/')
-        .all(|segment| !matches!(segment, "" | "." | "..") && !segment.contains(['\\', ':']));
-    if !plain {
-        return Err(AxError::failure(
+fn read_text(block_store: &Path, digest: &B3Hash, asked: &str) -> Result<String, AxError> {
+    let cas = storage::Cas::open(block_store).map_err(storage::StorageError::into_ax)?;
+    let bytes = cas.get(digest).map_err(storage::StorageError::into_ax)?;
+    String::from_utf8(bytes).map_err(|_| {
+        AxError::failure(
             AxCode::InvalidArgs,
             "read",
-            format!("{asked} does not name a file inside the package"),
+            format!("{asked} is not UTF-8 text"),
         )
-        .with_recovery(
-            "write the path inside the package as plain segments joined by `/`, \
-             with no empty, `.` or `..` segment",
-        ));
-    }
-    Address::parse(&format!("{package}/{inside}"))
+        .with_recovery("read hands back text; these bytes are not UTF-8")
+    })
 }

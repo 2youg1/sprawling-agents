@@ -27,6 +27,7 @@
   import { readAnswer } from "../../core/answered";
   import { MODES, WRITE_LIMITS, changeRunPolicy, nameSession } from "../../core/commands";
   import { fill, say } from "../../core/lang";
+  import type { View } from "../../core/route";
   import type { Pinning } from "../../core/stretches";
   import { PIN, given, kept, readTag, stripped } from "../../core/tags";
   import type { Named } from "../../core/tags";
@@ -49,9 +50,10 @@
     // policy a change starts from: the room's current run, or null for
     // a session the city no longer goes on with.
     readonly session: { readonly name: string; readonly run: RunId | null };
+    readonly read: View | null;
   }
 
-  const { named, label, tags, pinning, session }: Props = $props();
+  const { named, label, tags, pinning, session, read }: Props = $props();
 
   // The longest display name the field takes: a row shows a line of it.
   const NAME_MAX = 80;
@@ -120,6 +122,18 @@
   }
 
   const items = $derived.by((): Item[] => [
+    ...(read === null
+      ? []
+      : [
+          {
+            id: "read",
+            word: say($lang, "world_read_session"),
+            act: () => {
+              u.go(read);
+              close();
+            },
+          },
+        ]),
     ...(pinning === "mayor"
       ? []
       : [

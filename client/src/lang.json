@@ -235,6 +235,78 @@
     "en": "the newest run carried {core} bytes of core tools and a {index}-byte dormant index",
     "zh": "最新的 run 带了 {core} 字节常驻工具与 {index} 字节休眠索引"
   },
+  "catalog_meter_unified": {
+    "en": "{always} Always · {dormant} On call · {skills} skills · {core} core B · {index} index B · {reading} reading B",
+    "zh": "{always} 常驻 · {dormant} 按需 · {skills} 个 skill · 常驻 {core} B · 索引 {index} B · 正文 {reading} B"
+  },
+  "catalog_added": {
+    "en": "Added",
+    "zh": "新增"
+  },
+  "catalog_changed": {
+    "en": "Changed",
+    "zh": "已变更"
+  },
+  "catalog_removed": {
+    "en": "Removed",
+    "zh": "已移除"
+  },
+  "catalog_accept": {
+    "en": "Accept",
+    "zh": "接受"
+  },
+  "catalog_accepted": {
+    "en": "The current version is in the draft.",
+    "zh": "草稿已是当前版本。"
+  },
+  "catalog_keep": {
+    "en": "Keep",
+    "zh": "保留"
+  },
+  "catalog_kept": {
+    "en": "The old pin is kept.",
+    "zh": "仍保留旧 pin。"
+  },
+  "catalog_audit": {
+    "en": "audit: {verdict}",
+    "zh": "审核：{verdict}"
+  },
+  "catalog_audit_stale": {
+    "en": "stale audit: {verdict}",
+    "zh": "过期审核：{verdict}"
+  },
+  "catalog_costs": {
+    "en": "Always {core} B · On call {dormant} B",
+    "zh": "常驻 {core} B · 按需 {dormant} B"
+  },
+  "catalog_unused_filter": {
+    "en": "admitted, unused for 30 days",
+    "zh": "已准入、30 天未使用"
+  },
+  "catalog_turn_off_unused": {
+    "en": "turn these off",
+    "zh": "将这些设为关"
+  },
+  "catalog_no_unused": {
+    "en": "No admitted item is unused for 30 days.",
+    "zh": "没有已准入且 30 天未使用的项目。"
+  },
+  "catalog_copy_selection": {
+    "en": "use the selection of building…",
+    "zh": "沿用另一栋楼的选择…"
+  },
+  "catalog_open_sessions": {
+    "en": "{n} open sessions use the previous selection; start a new one with ",
+    "zh": "{n} 个打开的会话仍用之前的选择；用 "
+  },
+  "catalog_nav_changed": {
+    "en": "capabilities · {n} changed",
+    "zh": "能力 · {n} 已变更"
+  },
+  "catalog_chip": {
+    "en": "{always} Always · {dormant} On call · {skills} skills · {changed} Changed",
+    "zh": "{always} 常驻 · {dormant} 按需 · {skills} 个 skill · {changed} 已变更"
+  },
   "catalog_more": {
     "en": "{n} bytes more in every request",
     "zh": "每次请求多 {n} 字节"
@@ -5375,6 +5447,18 @@
     "en": "building",
     "zh": "楼"
   },
+  "palette_go_address": {
+    "en": "go to {address}",
+    "zh": "前往 {address}"
+  },
+  "palette_address_expected": {
+    "en": "expected an address such as atlas or atlas/api",
+    "zh": "需要 atlas 或 atlas/api 这样的地址"
+  },
+  "palette_building_missing": {
+    "en": "that building is not in the city; use /raise to create it",
+    "zh": "城里没有这栋楼，用 /raise 建楼"
+  },
   "palette_placeholder": {
     "en": "go to…",
     "zh": "去…"
@@ -7351,6 +7435,10 @@
     "en": "role",
     "zh": "角色"
   },
+  "setup_model_role_taken": {
+    "en": "{id} is {role}; choose another {role} first",
+    "zh": "{id} 是 {role}；先另选 {role}"
+  },
   "setup_model_search": {
     "en": "search the models",
     "zh": "搜索模型"
@@ -7358,6 +7446,54 @@
   "setup_models": {
     "en": "which model thinks",
     "zh": "哪个模型来想"
+  },
+  "setup_models_empty": {
+    "en": "choose at least one model",
+    "zh": "至少选择一个模型"
+  },
+  "setup_models_not_sent": {
+    "en": "the model change could not be sent; check the connection",
+    "zh": "模型改动未能发出，请检查连接"
+  },
+  "setup_models_probe_busy": {
+    "en": "refreshing the model list…",
+    "zh": "正在刷新模型列表…"
+  },
+  "setup_models_refresh": {
+    "en": "refresh the model list",
+    "zh": "刷新模型列表"
+  },
+  "setup_models_role_required": {
+    "en": "choose another {role} before saving",
+    "zh": "保存前先另选 {role}"
+  },
+  "setup_models_save": {
+    "en": "save models",
+    "zh": "保存模型"
+  },
+  "setup_models_save_busy": {
+    "en": "saving the model selection…",
+    "zh": "正在保存模型选择…"
+  },
+  "setup_models_saved": {
+    "en": "saved models: {models}",
+    "zh": "已保存模型：{models}"
+  },
+  "setup_models_toggle": {
+    "en": "models · {n}",
+    "zh": "模型 · {n}"
+  },
+  "setup_models_unchanged": {
+    "en": "no model changes to save",
+    "zh": "模型没有改动"
+  },
+  "setup_models_will_remove": {
+    "en": "will remove: {models}",
+    "zh": "将移除：{models}"
+  },
+  "setup_endpoint_busy": {
+    "en": "another change to this endpoint is still being saved",
+    "zh": "这个端点的另一项改动仍在保存"
   },
   "setup_network_default": {
     "en": "the rule a new endpoint starts with",
@@ -9894,6 +10030,34 @@
   "world_sessions": {
     "en": "sessions",
     "zh": "会话"
+  },
+  "world_expand": {
+    "en": "expand child sessions",
+    "zh": "展开子会话"
+  },
+  "world_collapse": {
+    "en": "collapse child sessions",
+    "zh": "折叠子会话"
+  },
+  "world_read_session": {
+    "en": "read without branching",
+    "zh": "只读查看"
+  },
+  "world_session_switcher": {
+    "en": "switch session",
+    "zh": "切换会话"
+  },
+  "world_session_filter": {
+    "en": "filter sessions",
+    "zh": "筛选会话"
+  },
+  "world_session_branch": {
+    "en": "{title} · branch at line {at}",
+    "zh": "{title} · 分支自第 {at} 行"
+  },
+  "world_session_child": {
+    "en": "{title} · delegated child session",
+    "zh": "{title} · 委派子会话"
   },
   "world_commits": {
     "en": "commits",

@@ -101,7 +101,7 @@ export type View =
       readonly session?: Seq;
     }
   | { readonly kind: "city" }
-  | { readonly kind: "building"; readonly address: Address }
+  | { readonly kind: "building"; readonly address: Address; readonly section?: "catalog" }
   // The page a building is raised on; with an address, that address is
   // filled in, which is how a folder waiting to be adopted is opened.
   | { readonly kind: "raise"; readonly address?: Address }
@@ -143,7 +143,7 @@ export function toFragment(view: View): string {
     case "city":
       return "#/city";
     case "building":
-      return `#/building/${escaped(view.address)}`;
+      return `#/building/${escaped(view.address)}${view.section === "catalog" ? "/catalog" : ""}`;
     case "raise":
       return view.address === undefined ? "#/raise" : `#/raise/${escaped(view.address)}`;
     case "run":
@@ -337,11 +337,21 @@ export function fromFragment(raw: string): Option.Option<View> {
     case "s":
       return talkIn(tail);
     case "building":
-    case "b":
-      return Option.map(readEscapedAddress(tail), (address) => ({
+    case "b": {
+      const catalog = tail.endsWith("/catalog");
+      const address = catalog ? tail.slice(0, -"/catalog".length) : tail;
+      if (catalog) {
+        return Option.map(readEscapedAddress(address), (building) => ({
+          kind: "building",
+          address: building,
+          section: "catalog",
+        }));
+      }
+      return Option.map(readEscapedAddress(address), (building) => ({
         kind: "building",
-        address,
+        address: building,
       }));
+    }
     case "raise":
       return Option.map(readEscapedAddress(tail), (address) => ({ kind: "raise", address }));
     case "setup":
@@ -408,6 +418,41 @@ export function current(bar: Readonly<AddressBar>): Option.Option<View> {
 // signal: a click, an `<a href>` and the back button take one path.
 export function go(bar: AddressBar, view: View): void {
   bar.hash = toFragment(view);
+}
+
+export type WorkspaceView = Extract<View, { kind: "talk" }>;
+
+// The one reader for a workspace typed into `/room`, `/cd` or the
+// palette. Bare text is an address; a fragment or URL must name a talk
+// view, never another page that happens to share the address grammar.
+export function readWorkspace(raw: string): WorkspaceView | null {
+  const text = raw.trim();
+  if (text === "") return null;
+  const fragment = text.startsWith("#") ? text : URL.canParse(text) ? new URL(text).hash : null;
+  if (fragment !== null) {
+    const view = Option.getOrNull(fromFragment(fragment));
+    if (view?.kind !== "talk") return null;
+    return {
+      kind: "talk",
+      address: view.address,
+      ...(view.session === undefined ? {} : { session: view.session }),
+    };
+  }
+  return Option.getOrNull(
+    Option.map(readAddress(text), (address): WorkspaceView => ({ kind: "talk", address })),
+  );
+}
+
+// Where a parsed workspace goes against the buildings the city knows.
+// A top-level name follows the raise/building classification; a room is
+// direct only below an established building.
+export function workspaceDestination(
+  view: WorkspaceView,
+  buildings: readonly BuildingProgress[],
+): View | null {
+  const building = buildingOf(view.address);
+  if (building === view.address) return buildingDestination(building, buildings).view;
+  return buildings.some((held) => held.addr === building && !held.adoptable) ? view : null;
 }
 
 // The building an address belongs to: its first segment.

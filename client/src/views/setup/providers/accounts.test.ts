@@ -20,6 +20,8 @@ import * as wiring from "./account_editor";
 import { freshEditor, refuse, save, settle, shown } from "./account_editor";
 import type { Editor, Hands, Step } from "./account_editor";
 import { lookOf } from "./accounts";
+import { begin, end, freshFlight } from "./flight";
+import type { FlightState } from "./flight";
 import { endpointRoster } from "./rosters";
 
 const account = (
@@ -61,7 +63,7 @@ const ENDPOINT: EndpointSummary = {
 };
 
 // One editor and everything around it, recorded.
-function rig(endpoint: EndpointSummary = ENDPOINT) {
+function rig(endpoint: EndpointSummary = ENDPOINT, flight?: FlightState) {
   const sent: Command[] = [];
   const requests: { url: string; body: unknown }[] = [];
   const focus: string[] = [];
@@ -96,6 +98,7 @@ function rig(endpoint: EndpointSummary = ENDPOINT) {
     enrol,
     follow: (id: string, step: Step) => focus.push(`${id}:${step}`),
     focusHeading: () => focus.push("heading"),
+    ...(flight === undefined ? {} : { flight }),
   };
   const lists = () =>
     sent.map((command) =>
@@ -334,6 +337,25 @@ describe("the order of the accounts", () => {
       account("b"),
       account("a"),
     ]);
+  });
+
+  test("the shared row ticket excludes a model save and releases on the city's newer answer", () => {
+    const flight = freshFlight();
+    const { editor, hands, world, sent } = rig(ENDPOINT, flight);
+    const operation = begin(flight, "models");
+    wiring.move(editor, hands, "spare", "up");
+    expect(sent).toEqual([]);
+
+    // Start from a free row: the account command holds the ticket until
+    // the endpoint answer moves, and only then can another edit leave.
+    if (operation !== null) end(flight, operation);
+    wiring.move(editor, hands, "spare", "up");
+    expect(sent.length).toBe(1);
+    wiring.move(editor, hands, "main", "down");
+    expect(sent.length).toBe(1);
+    world.endpoint = { ...world.endpoint, label: "House, reordered" };
+    settle(editor, endpointRoster(world.endpoint, "two"));
+    expect(flight.current).toBeNull();
   });
 
   test("a refusal draws the city's list again", () => {

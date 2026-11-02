@@ -10,14 +10,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::consts_policy::CLOCK_STAMP_DEFAULT;
 use crate::error::{AxCode, AxError};
+use crate::locator::B3Hash;
 use crate::model::Effort;
 use crate::tool::ServerLabel;
 
+mod connectors;
 mod container;
 mod exposure;
 mod interpreter;
 mod sandbox;
 mod search;
+pub use connectors::{McpDefinition, McpLayer, McpReference, definition_digest};
 pub use container::{ContainerImage, ContainerLimits};
 pub use exposure::{CatalogExposure, Exposure, ExposureFrom, ExposureTable};
 pub use interpreter::Interpreter;
@@ -293,6 +296,12 @@ pub struct FrozenConfig {
     /// table that widened mid-run would both discard the cache and
     /// hand the model a capability nobody reviewed.
     pub mcp: Vec<McpServer>,
+    /// The references and approved versions for `mcp`, one per selected label.
+    #[serde(default)]
+    pub mcp_references: Vec<McpReference>,
+    /// Reading Room names pinned to canonical skill manifests.
+    #[serde(default)]
+    pub skill_pins: std::collections::BTreeMap<String, B3Hash>,
     /// How hard the model may think. Frozen rather than live because the
     /// provider renders it into the cached prompt prefix: changing the
     /// effort value mid-run invalidates the message cache breakpoints,
@@ -331,7 +340,8 @@ pub struct StatedConfig {
     pub clock_zones: LayeredValue<Vec<ClockZone>>,
     pub effort: LayeredValue<Effort>,
     pub sandbox: LayeredValue<SandboxLimits>,
-    pub mcp: LayeredValue<Vec<McpServer>>,
+    pub mcp: LayeredValue<McpLayer>,
+    pub skill_pins: LayeredValue<std::collections::BTreeMap<String, B3Hash>>,
     pub second_threshold: LayeredValue<SecondThreshold>,
     pub search: LayeredValue<SearchConfiguration>,
     pub catalog: LayeredValue<ExposureTable>,
@@ -345,16 +355,16 @@ pub struct LiveConfig {}
 /// Resolves the ladder into the Run-start snapshot. Absence everywhere
 /// falls back to the policy default; the zones ladder overrides as a
 /// whole list (a building that writes zones replaces the city list).
-pub fn freeze(stated: &StatedConfig) -> FrozenConfig {
-    FrozenConfig {
+pub fn freeze(stated: &StatedConfig) -> Result<FrozenConfig, AxError> {
+    let (mcp, mcp_references) = connectors::resolve(&stated.mcp)?;
+    Ok(FrozenConfig {
         clock_stamp: *stated.clock_stamp.resolve().unwrap_or(&CLOCK_STAMP_DEFAULT),
         clock_zones: stated.clock_zones.resolve().cloned().unwrap_or_default(),
         sandbox: stated.sandbox.resolve().cloned().unwrap_or_default(),
         effort: stated.effort.resolve().copied(),
-        // A layer that speaks about servers speaks about all of them:
-        // an unstated layer reaches nothing rather than inheriting a
-        // reach nobody at that layer wrote down.
-        mcp: stated.mcp.resolve().cloned().unwrap_or_default(),
+        mcp,
+        mcp_references,
+        skill_pins: stated.skill_pins.resolve().cloned().unwrap_or_default(),
         second_threshold: stated.second_threshold.resolve().copied(),
         // Silence on every rung is the default supplier, which is what
         // a city written before `[search]` existed meant.
@@ -367,7 +377,7 @@ pub fn freeze(stated: &StatedConfig) -> FrozenConfig {
             city: stated.catalog.city.clone().unwrap_or_default(),
             building: stated.catalog.building.clone().unwrap_or_default(),
         },
-    }
+    })
 }
 
 #[cfg(test)]

@@ -16,12 +16,15 @@ use std::collections::BTreeMap;
 
 use kernel::event::record::{ModelCalled, RunStarted, SessionNamed, WorktreeOpened};
 use kernel::{Address, AxError, EventKind, EventRecord};
-use wire::{Carry, SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+use wire::{
+    Carry, SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionRef, SessionStart, SessionsAnswer,
+};
 
 /// Every address's stretches, oldest first.
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct RoomSessions {
     by_room: BTreeMap<Address, Vec<SessionLine>>,
+    by_run: BTreeMap<kernel::RunId, SessionRef>,
 }
 
 impl RoomSessions {
@@ -51,6 +54,10 @@ impl RoomSessions {
             } else {
                 Carry::Nothing
             };
+            let parent = opened
+                .from
+                .as_ref()
+                .and_then(|origin| self.by_run.get(&origin.run).cloned());
             self.by_room
                 .entry(room.clone())
                 .or_default()
@@ -68,6 +75,9 @@ impl RoomSessions {
                     effort: None,
                     workspace: None,
                     preview: None,
+                    parent,
+                    branched_from: opened.from,
+                    tail: None,
                 });
             return Ok(());
         }
@@ -81,10 +91,44 @@ impl RoomSessions {
                 stretch.name = (!named.name.is_empty()).then_some(named.name);
             }
         }
-        let runs = u64::from(kind == EventKind::RunStarted);
+        let started = if kind == EventKind::RunStarted {
+            Some(record.data().read::<RunStarted>()?)
+        } else {
+            None
+        };
+        let parent = started
+            .as_ref()
+            .and_then(|line| line.parent)
+            .and_then(|run| self.by_run.get(&run).cloned());
+        let runs = u64::from(started.is_some());
+        let mut opened_run = None;
         match self.by_room.get_mut(room).and_then(|held| held.last_mut()) {
             Some(current) => {
+                let first = current.runs == 0;
                 current.runs = current.runs.saturating_add(runs);
+                if first
+                    && matches!(&current.start, SessionStart::Dispatched { .. })
+                    && current.parent.is_none()
+                {
+                    current.parent = parent;
+                }
+                if started.is_some()
+                    || current
+                        .tail
+                        .as_ref()
+                        .is_some_and(|tail| tail.run == record.run())
+                {
+                    current.tail = Some(kernel::Origin {
+                        run: record.run(),
+                        at_seq: seq,
+                    });
+                }
+                if started.is_some() {
+                    opened_run = Some(SessionRef {
+                        room: room.clone(),
+                        began: current.began,
+                    });
+                }
                 current.last = seq;
                 current.at = at;
                 describe(current, record)?;
@@ -103,11 +147,24 @@ impl RoomSessions {
                     effort: None,
                     workspace: None,
                     preview: None,
+                    parent,
+                    branched_from: None,
+                    tail: Some(kernel::Origin {
+                        run: record.run(),
+                        at_seq: seq,
+                    }),
                 };
                 describe(&mut opened, record)?;
+                opened_run = Some(SessionRef {
+                    room: room.clone(),
+                    began: opened.began,
+                });
                 self.by_room.insert(room.clone(), vec![opened]);
             }
             None => {}
+        }
+        if let Some(opened) = opened_run {
+            self.by_run.insert(record.run(), opened);
         }
         Ok(())
     }

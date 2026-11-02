@@ -11,7 +11,7 @@ use std::rc::Rc;
 use kernel::layout::LIBRARY_DIR;
 use kernel::{AxCode, B3Hash};
 
-use crate::library::Library;
+use crate::library::test_store::Store;
 
 mod whole;
 
@@ -48,15 +48,18 @@ fn shelved_package(city_root: &Path, section: &str, name: &str) -> PathBuf {
 /// the content hash, standing in for the assembly layer's CAS binding.
 fn counted() -> (
     Rc<RefCell<Vec<Vec<u8>>>>,
+    Rc<RefCell<Store>>,
     impl FnMut(&[u8]) -> Result<B3Hash, AxError>,
 ) {
     let seen = Rc::new(RefCell::new(Vec::new()));
     let mine = Rc::clone(&seen);
+    let store = Rc::new(RefCell::new(Store::new()));
+    let kept = Rc::clone(&store);
     let register = move |bytes: &[u8]| {
         mine.borrow_mut().push(bytes.to_vec());
-        Ok(B3Hash::digest(bytes))
+        Ok(kept.borrow_mut().put(bytes))
     };
-    (seen, register)
+    (seen, store, register)
 }
 
 /// Places `target` at `link` as a link, on a machine that has no symlink
@@ -91,7 +94,7 @@ fn an_installed_skill_is_shelved_and_read_back_whole() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let src = package(stage.path(), "firing", BODY);
-    let (seen, mut register) = counted();
+    let (seen, store, mut register) = counted();
 
     let installed = install(
         city_root.path(),
@@ -103,16 +106,19 @@ fn an_installed_skill_is_shelved_and_read_back_whole() {
 
     assert_eq!(installed.placed, Placed::Fresh);
     assert_eq!(
-        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
-            .unwrap(),
-        BODY.as_bytes(),
-        "what landed is what arrived, byte for byte"
+        seen.borrow().len(),
+        2,
+        "the document and its manifest were registered"
     );
-    assert_eq!(seen.borrow().len(), 1, "the bytes were registered once");
-    assert_eq!(B3Hash::digest(&seen.borrow()[0]), installed.hash);
+    assert_eq!(seen.borrow()[0], BODY.as_bytes());
+    assert!(!shelved_package(city_root.path(), "utilities", "firing").exists());
+    let manifest = seen.borrow().last().unwrap().clone();
+    assert_eq!(B3Hash::digest(&manifest), installed.hash);
     // The scan reads back exactly the holding install reported: one name
     // is one holding, and the two derivations cannot disagree.
-    let library = Library::scan(city_root.path(), None, Path::new("no-home")).unwrap();
+    let library = store
+        .borrow()
+        .scan(city_root.path(), None, Path::new("no-home"));
     assert_eq!(library.all(), vec![&installed.holding]);
 }
 
@@ -124,7 +130,7 @@ fn a_residents_own_document_is_shelved_the_same_way() {
     let stage = tempfile::tempdir().unwrap();
     let document = stage.path().join("hand-written.md");
     std::fs::write(&document, "# Hand written\n").unwrap();
-    let (seen, mut register) = counted();
+    let (seen, _store, mut register) = counted();
 
     let installed = install(
         city_root.path(),
@@ -135,11 +141,9 @@ fn a_residents_own_document_is_shelved_the_same_way() {
     .unwrap();
 
     assert_eq!(installed.holding.name, "hand-written");
-    assert_eq!(
-        std::fs::read(shelved(city_root.path(), "notes", "hand-written")).unwrap(),
-        b"# Hand written\n"
-    );
-    assert_eq!(seen.borrow().len(), 1);
+    assert_eq!(seen.borrow()[0], b"# Hand written\n");
+    assert!(!shelved(city_root.path(), "notes", "hand-written").exists());
+    assert_eq!(seen.borrow().len(), 2);
 }
 
 #[test]
@@ -148,7 +152,7 @@ fn reinstalling_the_same_bytes_is_idempotent() {
     let stage = tempfile::tempdir().unwrap();
     let src = package(stage.path(), "firing", BODY);
     let slot = Slot::library("utilities").unwrap();
-    let (_seen, mut register) = counted();
+    let (seen, _store, mut register) = counted();
 
     let first = install(city_root.path(), &slot, &src, &mut register).unwrap();
     let second = install(city_root.path(), &slot, &src, &mut register).unwrap();
@@ -156,12 +160,8 @@ fn reinstalling_the_same_bytes_is_idempotent() {
     assert_eq!(first.placed, Placed::Fresh);
     assert_eq!(second.placed, Placed::AlreadyShelved);
     assert_eq!(second.holding, first.holding, "one name holds one holding");
-    assert_eq!(
-        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
-            .unwrap(),
-        BODY.as_bytes(),
-        "a reinstall writes no byte"
-    );
+    assert!(!shelved_package(city_root.path(), "utilities", "firing").exists());
+    assert_eq!(seen.borrow().len(), 2, "a reinstall writes no byte");
 }
 
 /// The recheck is the whole point of the gap between deciding and
@@ -177,7 +177,7 @@ fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
     let swapped = package(stage.path(), "swapped", BODY);
     let planned = plan_install(city_root.path(), &slot, &swapped).unwrap();
     std::fs::write(swapped.join("SKILL.md"), "# Something else\n").unwrap();
-    let (seen, mut register) = counted();
+    let (seen, _store, mut register) = counted();
     let err = planned.apply(&mut register).unwrap_err();
     assert_eq!(*err.code(), AxCode::VersionConflict);
     assert!(
@@ -234,37 +234,43 @@ fn a_package_reached_through_a_link_is_always_refused() {
     );
 }
 
-/// One name holds one holding, so a name taken on the shelf refuses a
-/// different skill under it - and refuses it in another section too,
-/// where the scan's by-name key would let the two silently shadow.
+/// A new version replaces only the index; the old manifest and its
+/// bytes remain addressable for buildings that still pin them.
 #[test]
-fn a_taken_name_refuses_a_different_skill() {
+fn a_new_version_replaces_the_index_without_overwriting_the_old_cas() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let slot = Slot::library("utilities").unwrap();
-    let (seen, mut register) = counted();
+    let (seen, store, mut register) = counted();
 
     let src = package(stage.path(), "firing", BODY);
-    install(city_root.path(), &slot, &src, &mut register).unwrap();
-
-    // Same name, different bytes: the shelf keeps what it had.
+    let first = install(city_root.path(), &slot, &src, &mut register).unwrap();
     std::fs::write(src.join("SKILL.md"), "# Another firing rule\n").unwrap();
-    let err = plan_install(city_root.path(), &slot, &src).unwrap_err();
-    assert_eq!(*err.code(), AxCode::InvalidArgs);
+    let second = plan_install(city_root.path(), &slot, &src)
+        .unwrap()
+        .apply(&mut register)
+        .unwrap();
+    assert_ne!(first.hash, second.hash);
+    assert!(
+        store.borrow().read(&first.hash).is_ok(),
+        "the old manifest remains readable"
+    );
     assert_eq!(
-        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
-            .unwrap(),
-        BODY.as_bytes(),
-        "the shelved skill is the one that was there"
+        store
+            .borrow()
+            .scan(city_root.path(), None, Path::new("no-home"))
+            .all()[0]
+            .hash,
+        second.hash
     );
 
-    // Same name under another section of the same shelf.
+    // The same name under another section is still a duplicate authority.
     let err = plan_install(city_root.path(), &Slot::library("domain").unwrap(), &src).unwrap_err();
     assert_eq!(*err.code(), AxCode::InvalidArgs);
     assert_eq!(
         seen.borrow().len(),
-        1,
-        "a refused install registers nothing"
+        4,
+        "a refused install registers nothing more"
     );
 }
 
@@ -276,7 +282,7 @@ fn a_refusal_names_the_section_that_holds_the_taken_name() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let src = package(stage.path(), "firing", BODY);
-    let (_seen, mut register) = counted();
+    let (_seen, _store, mut register) = counted();
 
     install(
         city_root.path(),

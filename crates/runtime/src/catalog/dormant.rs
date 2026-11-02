@@ -63,7 +63,7 @@ fn more(left: usize) -> String {
 /// The first sentence of `about`, on its first line, cut to
 /// [`HINT_MAX_BYTES`] on a character boundary. `tool find` reads the
 /// whole text, so what is cut here is still found.
-pub(super) fn hint(about: &str) -> &str {
+pub fn hint(about: &str) -> &str {
     let line = about.split_once('\n').map_or(about, |(first, _)| first);
     let sentence = line
         .split_once(". ")

@@ -149,7 +149,12 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
   const roster = hands.roster();
   const lang = hands.lang();
   const rows = shown(editor, roster);
-  const busy = editor.pending === null ? undefined : say(lang, "setup_account_busy");
+  const busy =
+    editor.pending !== null
+      ? say(lang, "setup_account_busy")
+      : hands.flight?.current !== null && hands.flight?.current !== undefined
+        ? say(lang, "setup_endpoint_busy")
+        : undefined;
   const control = (
     key: Control,
     why: Key | null,
@@ -171,7 +176,7 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
     value: editor.draft[name],
     secret: false,
     mono: true,
-    disabled: editor.pending !== null,
+    disabled: busy !== undefined,
     help: undefined,
     folded: false,
     input: (value) => {
@@ -253,11 +258,11 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
         : fill(say(lang, "setup_account_editing"), { id: editor.editing }),
     fields: [
       field("id", "setup_account_id", {
-        disabled: editor.pending !== null || editor.editing !== null,
+        disabled: busy !== undefined || editor.editing !== null,
       }),
       field("key", "setup_key", {
         secret: true,
-        disabled: editor.pending !== null || environmental,
+        disabled: busy !== undefined || environmental,
         help: keyHelp === null ? undefined : say(lang, keyHelp),
       }),
       field("reference", "setup_account_reference", { folded: true }),
@@ -269,8 +274,10 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
     route: say(lang, "setup_account_key_route"),
     save: {
       label: say(lang, "setup_account_save"),
-      why: unsaved === null || unsaved === "setup_account_busy" ? undefined : say(lang, unsaved),
-      loading: editor.pending !== null,
+      why:
+        busy ??
+        (unsaved === null || unsaved === "setup_account_busy" ? undefined : say(lang, unsaved)),
+      loading: editor.pending !== null || hands.flight?.current?.kind === "accounts",
       press: () => {
         save(editor, hands);
       },

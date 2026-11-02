@@ -71,5 +71,11 @@ pub(crate) trait Vfs: Send {
     /// Gives `to` the permissions `from` carries, so a file written
     /// anew keeps what the file it stands for allowed.
     fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()>;
+    /// Makes a content-addressed object read-only after it lands. The
+    /// default is for scripted adapters without permission bits; RealFs
+    /// and the power-loss model implement the operation.
+    fn make_readonly(&mut self, _path: &Path) -> io::Result<()> {
+        Ok(())
+    }
     fn exists(&self, path: &Path) -> bool;
 }

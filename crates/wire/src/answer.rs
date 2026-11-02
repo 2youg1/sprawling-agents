@@ -72,7 +72,7 @@ pub use agents::{
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine, TemplateAnswer};
-pub use catalog::{CatalogAnswer, CatalogTool};
+pub use catalog::{CatalogAnswer, CatalogChange, CatalogSkill, CatalogTool, CatalogVersion};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,
@@ -122,7 +122,9 @@ pub use rounds::{
 };
 pub use run_summary::{RunSummary, Waiting};
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
-pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+pub use sessions::{
+    SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionRef, SessionStart, SessionsAnswer,
+};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use thinking::{EffortWord, OfferSource, Switch, ThinkingOffer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};

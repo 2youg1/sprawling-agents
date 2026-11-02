@@ -8,8 +8,14 @@
 // its own idempotency key.
 
 import { mintIdem } from "./idem";
-export type { Endpoint, Pair, Tuning } from "./commands/endpoint";
-export { attachEndpoint, probeEndpoint, reattachEndpoint } from "./commands/endpoint";
+export type { Admission, Endpoint, Pair, Tuning } from "./commands/endpoint";
+export {
+  attachEndpoint,
+  probeAttached,
+  probeEndpoint,
+  reattachEndpoint,
+  saveModels,
+} from "./commands/endpoint";
 import { providerName } from "./commands/endpoint";
 export { providerName };
 import type {

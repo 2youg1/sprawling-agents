@@ -6,6 +6,10 @@
 use super::*;
 use std::collections::BTreeSet;
 
+fn thaw(stated: StatedConfig) -> FrozenConfig {
+    freeze(&stated).unwrap()
+}
+
 #[test]
 fn lower_layer_overrides_upper() {
     let ladder = LayeredValue {
@@ -14,7 +18,7 @@ fn lower_layer_overrides_upper() {
         resident: None,
     };
     assert_eq!(
-        freeze(&StatedConfig {
+        thaw(StatedConfig {
             clock_stamp: ladder,
             ..StatedConfig::default()
         })
@@ -27,7 +31,7 @@ fn lower_layer_overrides_upper() {
         resident: Some(ClockStampGranularity::FiveMinute),
     };
     assert_eq!(
-        freeze(&StatedConfig {
+        thaw(StatedConfig {
             clock_stamp: ladder,
             ..StatedConfig::default()
         })
@@ -39,7 +43,7 @@ fn lower_layer_overrides_upper() {
 #[test]
 fn absence_everywhere_takes_the_policy_default() {
     let ladder: LayeredValue<ClockStampGranularity> = LayeredValue::default();
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         clock_stamp: ladder,
         ..StatedConfig::default()
     });
@@ -59,7 +63,7 @@ fn effort_resolves_down_the_same_ladder() {
         building: Some(Effort::Max),
         resident: None,
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         effort,
         ..StatedConfig::default()
     });
@@ -87,7 +91,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         building: Some(terse),
         resident: None,
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         sandbox: ladder,
         ..StatedConfig::default()
     });
@@ -102,7 +106,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
 
 #[test]
 fn an_unstated_sandbox_is_closed_with_the_default_fuel() {
-    let frozen = freeze(&StatedConfig::default());
+    let frozen = thaw(StatedConfig::default());
     assert!(!frozen.sandbox.shell);
     assert_eq!(
         frozen.sandbox.fuel,
@@ -130,7 +134,7 @@ fn zones_override_as_a_whole_list() {
         }]),
         resident: None,
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         clock_zones: zones,
         ..StatedConfig::default()
     });
@@ -148,19 +152,31 @@ fn servers_override_as_a_whole_table_and_silence_reaches_nothing() {
             env: Vec::new(),
         },
     };
+    let layer = |servers: Vec<McpServer>| McpLayer {
+        definitions: Some(
+            servers
+                .into_iter()
+                .map(|server| McpDefinition {
+                    server,
+                    conflict: false,
+                })
+                .collect(),
+        ),
+        references: None,
+    };
     let ladder = LayeredValue {
-        city: Some(vec![server("apps"), server("mail")]),
-        building: Some(vec![server("apps")]),
+        city: Some(layer(vec![server("apps"), server("mail")])),
+        building: Some(layer(vec![server("apps")])),
         resident: None,
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         mcp: ladder,
         ..StatedConfig::default()
     });
     assert_eq!(frozen.mcp.len(), 1);
     assert_eq!(frozen.mcp[0].label.as_str(), "apps");
 
-    let silent = freeze(&StatedConfig::default());
+    let silent = thaw(StatedConfig::default());
     assert!(
         silent.mcp.is_empty(),
         "a building nobody granted a server reaches none of them"
@@ -175,6 +191,8 @@ fn frozen_and_live_share_no_field() {
         sandbox: SandboxLimits::default(),
         effort: None,
         mcp: Vec::new(),
+        mcp_references: Vec::new(),
+        skill_pins: std::collections::BTreeMap::new(),
         second_threshold: None,
         search: SearchConfiguration::Default,
         catalog: crate::config::CatalogExposure::default(),
@@ -241,13 +259,13 @@ fn the_second_rung_resolves_down_the_same_ladder() {
         building: None,
         resident: Some(stated),
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         second_threshold: ladder,
         ..StatedConfig::default()
     });
     assert_eq!(frozen.second_threshold, Some(stated));
 
-    let silent = freeze(&StatedConfig::default());
+    let silent = thaw(StatedConfig::default());
     assert_eq!(
         silent.second_threshold, None,
         "no layer speaking is a fact, not a default: the rung falls back where it is read"
@@ -282,7 +300,7 @@ fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
         building: Some(SandboxLimits::default()),
         resident: None,
     };
-    let frozen = freeze(&StatedConfig {
+    let frozen = thaw(StatedConfig {
         sandbox: ladder,
         ..StatedConfig::default()
     });

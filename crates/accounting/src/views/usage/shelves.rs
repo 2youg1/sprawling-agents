@@ -30,34 +30,31 @@ pub(crate) struct Shelved {
 /// package's digest is the whole install precheck hash (city D19).
 pub(crate) fn shelved(city_root: &Path) -> Result<Vec<Shelved>, AxError> {
     let home = crate::home::Home::detect()?;
-    let copy = |holding: &city::Holding| {
-        let digest = match &holding.package {
-            Some(package) => city::skill_digest(&city_root.join(package.as_str()))?,
-            None => holding.hash,
-        };
-        Ok(Shelved {
-            name: holding.name.clone(),
-            shelf: shelf_of(&holding.shelf),
-            digest,
-        })
+    let store = kernel::layout::CityLayout::new(city_root).cas();
+    let cas = storage::Cas::open(&store).map_err(storage::StorageError::into_ax)?;
+    let read = |digest: &B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
+    let copy = |holding: &city::Holding| Shelved {
+        name: holding.name.clone(),
+        shelf: shelf_of(&holding.shelf),
+        digest: holding.hash,
     };
-    let mut found = city::Library::scan(city_root, None, home.path())?
+    let mut found = city::Library::scan(city_root, None, home.path(), &read)?
         .all()
         .into_iter()
         .map(copy)
-        .collect::<Result<Vec<_>, AxError>>()?;
+        .collect::<Vec<_>>();
     for building in buildings_of(city_root)? {
-        let library = city::Library::scan(city_root, Some(&building), home.path())?;
+        let library = city::Library::scan(city_root, Some(&building), home.path(), &read)?;
         found.extend(
             library
                 .all()
                 .into_iter()
                 .filter(|holding| match holding.shelf {
                     city::Shelf::Building(_) => true,
-                    city::Shelf::Library(_) | city::Shelf::External { .. } => false,
+                    city::Shelf::Library | city::Shelf::External { .. } => false,
                 })
                 .map(copy)
-                .collect::<Result<Vec<_>, AxError>>()?,
+                .collect::<Vec<_>>(),
         );
     }
     Ok(found)

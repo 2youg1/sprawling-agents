@@ -186,9 +186,8 @@ fn readable_pairs<'de, D: Deserializer<'de>>(held: D) -> Result<Vec<(String, Str
         .collect())
 }
 
-/// What a model accepts as input.
-///
-/// A closed judgement rather than a set of flags: every row answers it,
+/// What a model accepts as input: a closed judgement rather than a set of
+/// flags. Every row answers it,
 /// and the answer decides whether a picture may be sent at all. The
 /// default is the narrow one, because guessing narrow costs a refusal a
 /// person can act on and guessing wide costs a 400 from the provider.

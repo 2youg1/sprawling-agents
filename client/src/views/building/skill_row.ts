@@ -5,8 +5,8 @@
 
 // What one skill of a building is given (client D95: `skills.svelte` is
 // the seat, `skill_row.look.svelte` draws the row). Every line is already
-// in the person's language. A skill on an external shelf has no address
-// in this city, so its row opens nothing and says so by being disabled.
+// in the person's language. A CAS-indexed skill has no document address,
+// so its row opens nothing and says so by being disabled.
 
 export interface SkillRowWire {
   readonly type: "button";
@@ -19,7 +19,7 @@ export interface SkillRowLook {
   // The summary its SKILL.md opens with.
   readonly summary: string;
   readonly shelf: string;
-  // The address the row opens, empty for an external shelf.
+  // The address the row opens, empty for a CAS-indexed shelf.
   readonly at: string;
   readonly admitted: string;
   readonly used: string;

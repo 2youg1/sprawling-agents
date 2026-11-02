@@ -37,6 +37,76 @@ pub(super) use standing::{Lending, Placing, lend_tree};
 /// holds which goal, how far the city trusts its residents - arrive as
 /// the values they had when the dispatch was staged, which is the moment
 /// the worker read them before the bench moved into the lane.
+/// One drift and the building its event envelope names.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct LocatedDrift {
+    pub(super) building: Address,
+    pub(super) drift: kernel::event::record::CatalogDrift,
+}
+
+/// The drift lines already written, shared with every lane so one observed
+/// difference reaches the Ledger once across runs and across a restart.
+#[derive(Clone, Default)]
+pub(super) struct DriftBook {
+    seen: std::sync::Arc<std::sync::Mutex<std::collections::BTreeSet<LocatedDrift>>>,
+}
+
+impl DriftBook {
+    /// Rebuilds the book from the same Ledger the views read.
+    pub(super) fn from_history(city_root: &Path) -> Result<DriftBook, AxError> {
+        let book = DriftBook::default();
+        for line in storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
+            .map_err(storage::StorageError::into_ax)?
+        {
+            let record = kernel::EventRecord::parse_line(&line)?;
+            if record.kind() != kernel::EventKind::DigestInvalidated {
+                continue;
+            }
+            let drift = record
+                .data()
+                .read::<kernel::event::record::CatalogDrift>()?;
+            if let Some(building) = record.addr() {
+                book.seen
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(LocatedDrift {
+                        building: building.clone(),
+                        drift,
+                    });
+            }
+        }
+        Ok(book)
+    }
+
+    /// Writes a difference once. The key is inserted only after the append
+    /// succeeds, so a failed append does not hide it from the next run.
+    pub(super) fn record(
+        &self,
+        next: &LocatedDrift,
+        write: impl FnOnce() -> Result<(), AxError>,
+    ) -> Result<(), AxError> {
+        let mut seen = held(&self.seen, "record catalog drift")?;
+        if seen.contains(next) {
+            return Ok(());
+        }
+        write()?;
+        seen.insert(next.clone());
+        Ok(())
+    }
+}
+
+/// One connector admission job: the selected definitions, their matching
+/// references and the building whose pins decide what may be offered.
+pub(in crate::worker) struct ConnectorJob<'a> {
+    pub(in crate::worker) servers: &'a [kernel::McpServer],
+    pub(in crate::worker) references: &'a [kernel::McpReference],
+    pub(in crate::worker) building: &'a Address,
+    /// The room whose frozen legacy reference adopts this first listing too.
+    pub(in crate::worker) session: &'a Address,
+    pub(in crate::worker) write_root: &'a Path,
+    pub(in crate::worker) confidential: bool,
+}
+
 pub(in crate::worker) struct Laying {
     pub(in crate::worker) city_root: PathBuf,
     /// The city's genesis line, which signs every checkpoint.
@@ -71,9 +141,34 @@ pub(in crate::worker) struct Laying {
     /// (`crates/sprawling/Spec.lean` §8-131, §8-142).
     book: gateway::EndpointBook,
     proposing: tools::proposal::Proposing,
+    /// Differences found while this run's catalog is assembled.
+    drift: std::sync::Mutex<Vec<LocatedDrift>>,
+    /// The history's already-written differences.
+    pub(super) drift_book: DriftBook,
 }
 
 impl Laying {
+    /// Records one difference without deciding when it reaches the Ledger.
+    pub(super) fn note_drift(
+        &self,
+        building: &Address,
+        drift: kernel::event::record::CatalogDrift,
+    ) -> Result<(), AxError> {
+        held(&self.drift, "collect catalog drift")?.push(LocatedDrift {
+            building: building.clone(),
+            drift,
+        });
+        Ok(())
+    }
+
+    /// Takes the differences found by this one assembly.
+    pub(super) fn take_drift(&self) -> Result<Vec<LocatedDrift>, AxError> {
+        Ok(std::mem::take(&mut *held(
+            &self.drift,
+            "collect catalog drift",
+        )?))
+    }
+
     /// Writes one diagnostic line, anchored where the dispatch was staged.
     fn note(&self, level: runtime::diagnostics::Level, module: &str, message: &str) {
         self.notes.write(level, self.staged_at, module, message);
@@ -127,6 +222,8 @@ impl super::RunWorker {
                 .collect(),
             book: self.credentials.book.clone(),
             proposing: self.proposing(),
+            drift: std::sync::Mutex::new(Vec::new()),
+            drift_book: self.drift_book.clone(),
         })
     }
 }
@@ -151,6 +248,8 @@ pub(super) struct Site {
     /// City, building and resident layers, resolved once and frozen for
     /// the whole run.
     pub(super) config: kernel::FrozenConfig,
+    /// The Reading Room names this session froze, independent of later edits.
+    pub(super) reading_room: Vec<String>,
     pub(super) model: gateway::ModelEntry,
     /// The endpoint the model is reached through (`crates/sprawling/Spec.lean` §8-85).
     pub(super) provider: String,
@@ -189,6 +288,8 @@ pub(super) struct Site {
 /// to what this run admits rather than a list and a copy of it.
 pub(super) struct Workbench {
     pub(super) catalog: std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
+    /// Drift found before any tool was registered.
+    pub(super) drift: Vec<LocatedDrift>,
     /// The bench, until the drive takes it. `Option` is the vehicle of
     /// that move and not a second state - the same handling `Site`
     /// gives its adapter - because a drive owns everything it runs on
@@ -215,6 +316,8 @@ pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     pub(super) context: &'a runtime::ContextReading,
+    /// The catalog whose frozen `PromptTools` status and the page share.
+    pub(super) catalog: &'a std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
 }
 
 /// Takes a desk, or says why it cannot be taken.

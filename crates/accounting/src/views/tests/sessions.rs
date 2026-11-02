@@ -49,7 +49,7 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
             runs[1],
             EventKind::RunStarted,
             &there,
-            serde_json::json!({ "dispatched_by": "person" })
+            serde_json::json!({ "dispatched_by": "person", "parent": runs[0] })
                 .as_object()
                 .unwrap()
                 .clone(),
@@ -99,6 +99,9 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
         effort: None,
         workspace: None,
         preview: None,
+        parent: None,
+        branched_from: None,
+        tail: None,
     };
     let asked = |room: &Address| wire::Query::Sessions { room: room.clone() };
 
@@ -112,38 +115,67 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
             wire::Answer::Sessions(wire::SessionsAnswer {
                 room: here.clone(),
                 sessions: vec![
-                    stretch(
-                        6,
-                        wire::SessionStart::Opened {
-                            carry: wire::Carry::Nothing,
-                            from: Some(branch),
-                        },
-                        0,
-                        6,
-                    ),
-                    stretch(
-                        4,
-                        wire::SessionStart::Opened {
-                            carry: wire::Carry::Handoff,
-                            from: None,
-                        },
-                        1,
-                        5,
-                    ),
-                    stretch(1, wire::SessionStart::Dispatched { by: None }, 1, 2),
+                    wire::SessionLine {
+                        parent: Some(wire::SessionRef {
+                            room: here.clone(),
+                            began: kernel::Seq::new(4)
+                        }),
+                        branched_from: Some(branch),
+                        ..stretch(
+                            6,
+                            wire::SessionStart::Opened {
+                                carry: wire::Carry::Nothing,
+                                from: Some(branch),
+                            },
+                            0,
+                            6,
+                        )
+                    },
+                    wire::SessionLine {
+                        tail: Some(kernel::Origin {
+                            run: runs[2],
+                            at_seq: kernel::Seq::new(5)
+                        }),
+                        ..stretch(
+                            4,
+                            wire::SessionStart::Opened {
+                                carry: wire::Carry::Handoff,
+                                from: None,
+                            },
+                            1,
+                            5,
+                        )
+                    },
+                    wire::SessionLine {
+                        tail: Some(kernel::Origin {
+                            run: runs[0],
+                            at_seq: kernel::Seq::new(2)
+                        }),
+                        ..stretch(1, wire::SessionStart::Dispatched { by: None }, 1, 2)
+                    },
                 ],
                 earlier: 0,
             }),
             wire::Answer::Sessions(wire::SessionsAnswer {
                 room: there.clone(),
-                sessions: vec![stretch(
-                    3,
-                    wire::SessionStart::Dispatched {
-                        by: Some(kernel::event::Who::Person),
-                    },
-                    1,
-                    7,
-                )],
+                sessions: vec![wire::SessionLine {
+                    parent: Some(wire::SessionRef {
+                        room: here.clone(),
+                        began: kernel::Seq::new(1)
+                    }),
+                    tail: Some(kernel::Origin {
+                        run: runs[1],
+                        at_seq: kernel::Seq::new(7)
+                    }),
+                    ..stretch(
+                        3,
+                        wire::SessionStart::Dispatched {
+                            by: Some(kernel::event::Who::Person),
+                        },
+                        1,
+                        7,
+                    )
+                }],
                 earlier: 0,
             }),
         ]

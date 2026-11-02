@@ -19,7 +19,7 @@
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
-use kernel::event::record::{AuditVerdict, RunStarted, SkillAudited, SkillShelved};
+use kernel::event::record::{AuditVerdict, CatalogDrift, RunStarted, SkillAudited, SkillShelved};
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{Address, B3Hash, Effect, EventKind, EventRecord, RunId, Seq, TimeMs};
 
@@ -140,21 +140,27 @@ pub(crate) struct Usage {
     outcomes: BTreeMap<(RunId, String), wire::UseOutcome>,
     shells: runtime::ShellTally,
     /// Every run that started at an address, in ledger order.
-    started: Vec<(RunId, Address)>,
+    started: Vec<(RunId, Address, TimeMs)>,
+    /// The newest record time, which dates the 30-day evidence window.
+    latest: Option<TimeMs>,
+    /// Catalog drift in ledger order, with the building its envelope names.
+    drifts: Vec<(Address, Seq, CatalogDrift)>,
     /// The tools each run called, each with the moment of its last call.
     /// A `tool` `run` line records the tool it stood for, so this counts
     /// capabilities rather than the door they were reached through.
     tool_calls: BTreeMap<RunId, BTreeMap<String, TimeMs>>,
 }
 
-/// How a building's newest runs used its tools.
+/// How a building's runs used its tools and skills in the last 30 days.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct ToolEvidence {
-    /// How many runs the counts were taken over.
+pub(crate) struct CatalogEvidence {
     pub(crate) runs_seen: u32,
-    /// Per tool: in how many of those runs it was called, and when last.
     pub(crate) by_tool: BTreeMap<String, (u32, TimeMs)>,
+    pub(crate) by_skill: BTreeMap<String, (u32, TimeMs)>,
 }
+
+/// Thirty days in milliseconds; the window ends at the Ledger's latest record.
+const EVIDENCE_WINDOW_MS: u64 = 2_592_000_000;
 
 impl UsageAsk {
     /// Folds the whole ledger, reads the shelves and the configuration,
@@ -251,6 +257,7 @@ impl Usage {
     /// what it meant would be a use nobody made. Five kinds move it, so
     /// the test is by kind rather than a match over every kind there is.
     fn apply(&mut self, record: &EventRecord) {
+        self.latest = Some(self.latest.map_or(record.t(), |at| at.max(record.t())));
         let kind = record.kind();
         if kind == EventKind::ToolResult
             && let Some(result) = record
@@ -265,7 +272,7 @@ impl Usage {
             && let Ok(started) = record.data().read::<RunStarted>()
         {
             if let Some(addr) = record.addr() {
-                self.started.push((record.run(), addr.clone()));
+                self.started.push((record.run(), addr.clone(), record.t()));
             }
             self.pinned(record, started);
         } else if kind == EventKind::ToolCalled
@@ -293,6 +300,11 @@ impl Usage {
             && let Ok(shelved) = record.data().read::<SkillShelved>()
         {
             self.shelving(record, shelved);
+        } else if kind == EventKind::DigestInvalidated
+            && let Ok(drift) = record.data().read::<CatalogDrift>()
+            && let Some(building) = record.addr()
+        {
+            self.drifts.push((building.clone(), record.seq(), drift));
         }
     }
 
@@ -350,32 +362,87 @@ impl Usage {
         }
     }
 
-    /// How `building`'s newest `window` runs used each tool: the runs
-    /// that started in it or in one of its rooms, newest last in the
-    /// ledger, and for each tool the runs among them that called it and
-    /// the moment of its last call there.
-    pub(crate) fn tool_evidence(&self, building: &Address, window: usize) -> ToolEvidence {
+    /// Run counts and last use inside the 30 days before the Ledger's
+    /// newest record. Skills use their recorded reads; tools use calls.
+    pub(crate) fn catalog_evidence(&self, building: &Address) -> CatalogEvidence {
         let within =
             |addr: &Address| city::Building::of(addr).is_ok_and(|held| held.addr() == building);
+        let recent = |at: TimeMs| {
+            self.latest.is_some_and(|latest| {
+                latest.value().saturating_sub(at.value()) <= EVIDENCE_WINDOW_MS
+            })
+        };
         let runs: Vec<RunId> = self
             .started
             .iter()
-            .rev()
-            .filter(|(_, addr)| within(addr))
-            .map(|(run, _)| *run)
-            .take(window)
+            .filter(|(_, addr, at)| within(addr) && recent(*at))
+            .map(|(run, _, _)| *run)
             .collect();
         let mut by_tool: BTreeMap<String, (u32, TimeMs)> = BTreeMap::new();
         for calls in runs.iter().filter_map(|run| self.tool_calls.get(run)) {
-            for (tool, at) in calls {
+            for (tool, at) in calls.iter().filter(|(_, at)| recent(**at)) {
                 let seen = by_tool.entry(tool.clone()).or_insert((0, *at));
                 seen.0 = seen.0.saturating_add(1);
                 seen.1 = seen.1.max(*at);
             }
         }
-        ToolEvidence {
+        let mut skill_runs: BTreeMap<String, BTreeSet<RunId>> = BTreeMap::new();
+        let mut skill_last: BTreeMap<String, TimeMs> = BTreeMap::new();
+        for read in self
+            .reads
+            .iter()
+            .filter(|read| recent(read.used.at) && read.used.resident.as_ref().is_some_and(within))
+        {
+            skill_runs
+                .entry(read.name.clone())
+                .or_default()
+                .insert(read.used.run);
+            skill_last
+                .entry(read.name.clone())
+                .and_modify(|at| *at = (*at).max(read.used.at))
+                .or_insert(read.used.at);
+        }
+        let by_skill = skill_last
+            .into_iter()
+            .map(|(name, at)| {
+                let count = skill_runs
+                    .get(&name)
+                    .map_or(0, |runs| u32::try_from(runs.len()).unwrap_or(u32::MAX));
+                (name, (count, at))
+            })
+            .collect();
+        CatalogEvidence {
             runs_seen: u32::try_from(runs.len()).unwrap_or(u32::MAX),
             by_tool,
+            by_skill,
+        }
+    }
+
+    /// Every catalog difference recorded for one building, oldest first.
+    pub(crate) fn catalog_drifts(&self, building: &Address) -> Vec<(Seq, CatalogDrift)> {
+        self.drifts
+            .iter()
+            .filter(|(addr, _, _)| addr == building)
+            .map(|(_, seq, drift)| (*seq, drift.clone()))
+            .collect()
+    }
+
+    /// The verdict of the current skill content and whether it is stale.
+    pub(crate) fn skill_audit(&self, name: &str, content: &B3Hash) -> (Option<AuditVerdict>, bool) {
+        let audits = self.audits.get(name).map_or(&[][..], Vec::as_slice);
+        match city::audit_state(content, audits) {
+            city::AuditState::Audited { verdict, .. } => (Some(verdict), false),
+            city::AuditState::Unaudited => (None, false),
+            city::AuditState::Stale { audited } => {
+                let verdict = audits
+                    .iter()
+                    .filter(|(digest, verdict, _)| {
+                        digest == &audited && *verdict != AuditVerdict::Unreachable
+                    })
+                    .max_by_key(|(_, _, seq)| *seq)
+                    .map(|(_, verdict, _)| *verdict);
+                (verdict, true)
+            }
         }
     }
 

@@ -139,7 +139,7 @@
 
   import { newestWorking } from "../core/belief/live";
   import { heldIn } from "../core/belief/rooms";
-  import { say } from "../core/lang";
+  import { fill, say } from "../core/lang";
   import { MAYOR, buildingOf, roomOf, type ItemLink } from "../core/route";
   import { stretchesOf } from "../core/stretches";
   import { ui } from "../ui";
@@ -300,8 +300,18 @@
     session: say($lang, "world_session"),
     commits: address === MAYOR ? ($belief.city ?? say($lang, "world_city")) : buildingOf(address),
   });
-  const title = $derived(address === MAYOR ? say($lang, "talk_empty_mayor") : roomOf(address));
-  const chosenTitle = $derived(chosenStretch === undefined ? title : titleOf(chosenStretch));
+  const baseTitle = $derived(address === MAYOR ? say($lang, "talk_empty_mayor") : roomOf(address));
+  const title = $derived.by(() => {
+    const line = chosenStretch?.line;
+    if (line?.parent === undefined || line.parent === null) return baseTitle;
+    return line.branched_from === undefined || line.branched_from === null
+      ? fill(say($lang, "world_session_child"), { title: baseTitle })
+      : fill(say($lang, "world_session_branch"), {
+          title: baseTitle,
+          at: String(line.branched_from.at_seq),
+        });
+  });
+  const chosenTitle = $derived(chosenStretch === undefined ? baseTitle : titleOf(chosenStretch));
 </script>
 
 {#snippet sessionsHead()}

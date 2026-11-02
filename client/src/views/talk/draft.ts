@@ -8,6 +8,14 @@
 // arrives at a place and writes them back as they change.
 
 import type { PreferenceDoor } from "../../core/prefs";
+import type { Address, Seq } from "../../wire";
+
+// One draft per session. A room with no session yet keeps its old bare
+// key; once the city says where the stretch began, another branch can
+// never read the words of the stretch it replaced (client D107).
+export function draftPlace(room: Address, began: Seq | null): string {
+  return began === null ? room : `${room}:${String(began)}`;
+}
 
 // How long a keystroke waits before the draft is written.
 const DRAFT_MS = 500;

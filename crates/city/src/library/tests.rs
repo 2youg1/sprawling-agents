@@ -5,12 +5,16 @@
 
 use kernel::layout::{BUILDING_SHELF, LIBRARY_DIR};
 
+use super::test_store::Store;
 use super::*;
 
 /// A scan of a city whose own configuration names no external shelf, so
 /// the home directory the scan takes is never joined to anything.
 fn scan(city_root: &Path, building: Option<&Address>) -> Result<Library, AxError> {
-    Library::scan(city_root, building, Path::new("no-home"))
+    let mut store = Store::new();
+    store.migrate(city_root, None);
+    store.migrate(city_root, building);
+    store.try_scan(city_root, building, Path::new("no-home"))
 }
 
 fn stocked(root: &Path) {
@@ -83,12 +87,8 @@ fn a_holding_lives_where_no_run_may_write() {
     stocked(dir.path());
     let library = scan(dir.path(), None).unwrap();
     let holding = library.all()[0];
-    let at = holding
-        .shelf
-        .address()
-        .expect("a city shelf is addressable");
     assert!(
-        at.is_reserved(),
+        matches!(holding.shelf, Shelf::Library),
         "a resident may read the stock and may not restock it"
     );
 }
@@ -110,7 +110,10 @@ fn a_building_keeps_its_own_shelf_and_the_nearer_shelf_wins() {
     std::fs::write(own.join("kiln.md"), "Firing a kiln in this lab\n").unwrap();
     std::fs::write(own.join("unit-tests.md"), "This lab's own rule for tests\n").unwrap();
 
-    let library = scan(dir.path(), Some(&lab)).unwrap();
+    let mut store = Store::new();
+    store.migrate(dir.path(), None);
+    store.migrate(dir.path(), Some(&lab));
+    let library = store.scan(dir.path(), Some(&lab), Path::new("no-home"));
     let names: Vec<&str> = library.all().iter().map(|h| h.name.as_str()).collect();
     assert!(names.contains(&"kiln"), "{names:?}");
     assert!(names.contains(&"diffing"), "the city's shelf is still read");
@@ -124,17 +127,19 @@ fn a_building_keeps_its_own_shelf_and_the_nearer_shelf_wins() {
         mine.disclosure, "This lab's own rule for tests",
         "the nearer shelf wins, as the configuration ladder already does"
     );
+    assert!(matches!(&mine.shelf, Shelf::Building(at) if at == &lab));
     assert!(
-        mine.shelf
-            .address()
-            .expect("a building shelf is addressable")
-            .is_reserved(),
-        "a building's own shelf is still outside its write domain: {:?}",
-        mine.shelf
+        Address::parse("lab/.sprawling/skills")
+            .unwrap()
+            .is_reserved()
     );
 
     // Another building sees only the city's shelf.
-    let other = scan(dir.path(), Some(&Address::parse("vault").unwrap())).unwrap();
+    let other = store.scan(
+        dir.path(),
+        Some(&Address::parse("vault").unwrap()),
+        Path::new("no-home"),
+    );
     assert!(!other.all().iter().any(|h| h.name == "kiln"));
 }
 
@@ -209,7 +214,7 @@ fn an_external_shelf_is_mounted_and_its_holdings_have_no_address() {
     external_skill(&shelf, "diagnosing-bugs", "# Diagnose first\n\nbody\n");
     configured(dir.path(), &["~/agents/skills"]);
 
-    let library = Library::scan(dir.path(), None, &home).unwrap();
+    let library = Store::new().scan(dir.path(), None, &home);
     let held = library
         .all()
         .into_iter()
@@ -224,7 +229,7 @@ fn an_external_shelf_is_mounted_and_its_holdings_have_no_address() {
         }
     );
     assert!(
-        held.shelf.address().is_none(),
+        held.shelf.is_external(),
         "a file outside the city has no address, and a made-up one would send a reader to \
          a file that is not there"
     );
@@ -246,7 +251,9 @@ fn the_citys_own_stock_beats_an_external_shelf_of_the_same_name() {
     external_skill(&shelf, "unit-tests", "Another program's rule for tests\n");
     configured(dir.path(), &["~/agents/skills"]);
 
-    let library = Library::scan(dir.path(), None, &home).unwrap();
+    let mut store = Store::new();
+    store.migrate(dir.path(), None);
+    let library = store.scan(dir.path(), None, &home);
     assert_eq!(
         library.all().len(),
         3,
@@ -258,7 +265,10 @@ fn the_citys_own_stock_beats_an_external_shelf_of_the_same_name() {
         .find(|h| h.name == "unit-tests")
         .unwrap();
     assert_eq!(held.disclosure, "Writing a test that earns its place");
-    assert!(held.shelf.address().is_some(), "the city's own copy won");
+    assert!(
+        matches!(held.shelf, Shelf::Library),
+        "the city's own copy won"
+    );
 }
 
 /// The catalog groups by shelf before it looks at a section, so the
@@ -282,7 +292,9 @@ fn the_catalog_lists_the_citys_stock_before_a_buildings_own_and_an_external_shel
     std::fs::create_dir_all(&own).unwrap();
     std::fs::write(own.join("zz-building.md"), "The building's own\n").unwrap();
 
-    let library = Library::scan(dir.path(), Some(&lab), &home).unwrap();
+    let mut store = Store::new();
+    store.migrate(dir.path(), Some(&lab));
+    let library = store.scan(dir.path(), Some(&lab), &home);
     let named: Vec<&str> = library
         .all()
         .into_iter()
@@ -311,7 +323,7 @@ fn the_second_shelf_is_the_second_index() {
     external_skill(&home.join("two"), "second", "From the second shelf\n");
     configured(dir.path(), &["~/one", "~/two"]);
 
-    let library = Library::scan(dir.path(), None, &home).unwrap();
+    let library = Store::new().scan(dir.path(), None, &home);
     let named: Vec<(&str, Shelf)> = library
         .all()
         .into_iter()
@@ -345,16 +357,11 @@ fn a_missing_external_shelf_is_empty_and_a_file_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let home = dir.path().join("home");
     configured(dir.path(), &["~/not-here"]);
-    assert!(
-        Library::scan(dir.path(), None, &home)
-            .unwrap()
-            .all()
-            .is_empty()
-    );
+    assert!(Store::new().scan(dir.path(), None, &home).all().is_empty());
 
     std::fs::create_dir_all(&home).unwrap();
     std::fs::write(home.join("not-here"), "a file, not a shelf\n").unwrap();
-    let err = Library::scan(dir.path(), None, &home).unwrap_err();
+    let err = Store::new().try_scan(dir.path(), None, &home).unwrap_err();
     assert_eq!(*err.code(), AxCode::ConfigInvalid);
     assert!(err.subject().contains("not-here"), "{}", err.subject());
 }
@@ -365,7 +372,9 @@ fn a_missing_external_shelf_is_empty_and_a_file_is_refused() {
 fn a_relative_shelf_path_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     configured(dir.path(), &["../elsewhere"]);
-    let err = Library::scan(dir.path(), None, dir.path()).unwrap_err();
+    let err = Store::new()
+        .try_scan(dir.path(), None, dir.path())
+        .unwrap_err();
     assert_eq!(*err.code(), AxCode::ConfigInvalid);
     assert!(
         err.recovery().contains("absolute"),

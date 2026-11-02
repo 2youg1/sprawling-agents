@@ -3,44 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Installing one skill onto a shelf the city keeps itself: the static
-//! precheck, the atomic landing, and the content hash registered before
-//! it lands (`crates/city/spec/Library/Install.lean` §8-28).
-//!
-//! Four things happen behind [`install`], and nothing else does:
-//! - **A static precheck.** The package is read and judged by shape;
-//!   nothing in it is executed, compiled or interpreted. A package
-//!   reached through a link is refused whatever the link points at: its
-//!   bytes are not the package's to file, and where it points can change
-//!   between a check and a landing.
-//! - **A name check.** One name holds one holding, so a name taken on
-//!   the shelf refuses a different skill under it - in this section or
-//!   any other, because the scan keys holdings by name alone.
-//! - **An atomic landing.** A document is swapped in whole through
-//!   `city::document::replace`, and a package is placed whole through
-//!   `city::document::place_tree`: the write paths live in one module.
-//! - **A recheck before the landing.** The decision is separated from
-//!   the landing ([`plan_install`] then [`PlannedInstall::apply`]) so
-//!   that "the package moved underneath while it was being installed" is
-//!   a refusal rather than a race; see section 8-28 for the rejected
-//!   single-door alternative.
-//!
-//! The bytes are registered before they land, so a store remembers what
-//! was about to arrive even if the arrival fails. The registrar is a
-//! parameter because the CAS belongs to `storage` and this crate depends
-//! on `kernel` alone - the assembly layer binds `storage::Cas::put`,
-//! exactly as `Neighbourhood::scan` receives its inbox counts.
+//! Installing one skill into the city's CAS and a shelf's index
+//! (`crates/city/spec/Library/Install.lean` §8-28). The source precheck,
+//! recheck and refusal paths are unchanged; the landed form is now one
+//! CAS object per file, a canonical manifest, and an index row rather
+//! than a second directory of bytes.
 
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
-use kernel::{Address, AxCode, AxError, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash, SkillManifest};
 
 use super::reading;
-use super::shelf::{Holding, OwnShelf, holding_file_name, plain_name};
-use crate::document::TreeEntry;
+use super::shelf::{Holding, HoldingSource, OwnShelf, ShelfRow, holding_file_name, plain_name};
 
-mod precheck;
+pub(super) mod precheck;
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -54,14 +31,8 @@ mod tests;
 
 use precheck::{Item, Shape, inspect};
 
-/// Where one skill is filed: which of the shelves the city keeps itself,
-/// and which section of it.
-///
-/// These two always travel together - a skill is filed on one shelf,
-/// under one section - so they are one value rather than two parameters
-/// that can disagree. There is no third constructor: a shelf outside the
-/// city is another program's directory mounted read-only (`crates/city/spec/Library.lean`
-/// §8-8), so filing a skill on it cannot be asked for.
+/// Where one skill is indexed: which shelf and which section. There is
+/// no constructor for an external shelf, which remains read-only.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slot {
     shelf: OwnShelf,
@@ -69,21 +40,10 @@ pub struct Slot {
 }
 
 impl Slot {
-    /// A slot on the city's own stock.
-    ///
-    /// # Errors
-    /// Refuses a section that is not one plain directory name: empty,
-    /// leading with a dot, or carrying a path separator. The scan skips
-    /// dot-prefixed items, so a skill filed under one is a skill no
-    /// catalog will ever show.
     pub fn library(section: &str) -> Result<Slot, AxError> {
         Slot::of(OwnShelf::Library, section)
     }
 
-    /// A slot on one building's own shelf.
-    ///
-    /// # Errors
-    /// The same section refusal as [`Slot::library`].
     pub fn building(building: &Address, section: &str) -> Result<Slot, AxError> {
         Slot::of(OwnShelf::Building(building.clone()), section)
     }
@@ -95,47 +55,39 @@ impl Slot {
             section: section.to_owned(),
         })
     }
-
-    /// Where a holding of `name` in `shape` lands in this slot: the
-    /// layout the scan reads back, a document as `<name>.md` and a
-    /// package as `<name>/`.
-    fn target(&self, layout: &CityLayout, name: &str, shape: &Shape) -> PathBuf {
-        let section = self.shelf.root(layout).join(&self.section);
-        match shape {
-            Shape::Document => section.join(holding_file_name(name)),
-            Shape::Package(_) => section.join(name),
-        }
-    }
 }
 
-/// Whether this install had to write anything.
+/// Whether this install had to write a new version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Placed {
-    /// The bytes were not on the shelf and were landed.
     Fresh,
-    /// The same bytes were already shelved under this name: a reinstall
-    /// is a no-op rather than a second write.
     AlreadyShelved,
 }
 
-/// What an install put on the shelf, and whether it had to.
-///
-/// The holding is the value a scan of the same shelf reads back, whole:
-/// it is read back off the shelf by the scan's own function, so the two
-/// cannot disagree. `hash` is what the store files the install under:
-/// the document's hash, or the whole package's (`crates/city/spec/Library/Install.lean` §8-28).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Installed {
     pub holding: Holding,
     pub hash: B3Hash,
     pub placed: Placed,
+    /// The pre-manifest digest, present only for a migrated legacy shelf.
+    pub previous: Option<B3Hash>,
 }
 
-/// One install decided but not yet landed.
-///
-/// Every refusal that can be answered without changing anything on disk
-/// is answered in [`plan_install`]; the action can only be taken from a
-/// decision, so a landing no one decided cannot be spelled.
+/// The CAS result of an admission that needs no shelf index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Admitted {
+    pub hash: B3Hash,
+    pub manifest: SkillManifest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Shelved {
+    Empty,
+    Current(B3Hash),
+    Legacy(B3Hash),
+}
+
+/// One install decided but not yet written.
 #[derive(Debug, Clone)]
 pub struct PlannedInstall {
     city_root: PathBuf,
@@ -143,121 +95,207 @@ pub struct PlannedInstall {
     slot: Slot,
     name: String,
     shape: Shape,
-    /// Every byte the decision was made on, which is what lands.
     stored: Vec<u8>,
+    source_hash: B3Hash,
+    manifest: SkillManifest,
     hash: B3Hash,
-    /// What the shelf held under the name when the decision was made.
-    shelved: Option<B3Hash>,
+    shelved: Shelved,
 }
 
 impl PlannedInstall {
-    /// The name this skill will be admitted by.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// The content hash of the document that will land, which is what a
-    /// person approves before it does.
     #[must_use]
     pub fn hash(&self) -> &B3Hash {
         &self.hash
     }
 
-    /// Lands the document, registering its bytes first.
-    ///
-    /// # Errors
-    /// Refuses the whole install when the package or the shelf moved
-    /// after the decision (`E_VERSION_CONFLICT`) - nothing on disk is
-    /// touched and the registrar is not called. Refuses when the
-    /// registrar answers with a hash that is not the content's
-    /// (`E_CAS_CORRUPT`), and propagates the registrar's own refusal and
-    /// the landing's `E_STORAGE_FATAL`.
+    /// Writes the decided snapshot, then its index. A current index with
+    /// the same digest is already settled; a different digest is a new
+    /// candidate version, not an overwrite of any building's pin.
     pub fn apply(
         self,
         register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>,
     ) -> Result<Installed, AxError> {
-        // The recheck reads the world again and requires the reading to
-        // be the decision's basis. A source that will not even read the
-        // same way now is a source that moved: the whole install is
-        // refused, whatever shape the difference took, and what the
-        // second reading met travels with the refusal.
+        self.recheck()?;
+        if self.shelved == Shelved::Current(self.hash) {
+            return Ok(Installed {
+                holding: self.holding()?,
+                hash: self.hash,
+                placed: Placed::AlreadyShelved,
+                previous: None,
+            });
+        }
+        let admitted = self.store(register)?;
+        let root = self.slot.shelf.root(&CityLayout::new(&self.city_root));
+        super::shelf::upsert_index(
+            &root,
+            ShelfRow {
+                section: self.slot.section.clone(),
+                name: self.name.clone(),
+                digest: admitted.hash,
+            },
+        )?;
+        if let Shelved::Legacy(previous) = self.shelved {
+            self.remove_legacy(previous)?;
+        }
+        let placed = Placed::Fresh;
+        Ok(Installed {
+            holding: self.holding()?,
+            hash: admitted.hash,
+            placed,
+            previous: match self.shelved {
+                Shelved::Legacy(previous) => Some(previous),
+                Shelved::Empty | Shelved::Current(_) => None,
+            },
+        })
+    }
+
+    fn recheck(&self) -> Result<(), AxError> {
         let again =
             inspect(&self.source).map_err(|why| moved_underneath(&self.source, why.subject()))?;
-        let layout = CityLayout::new(&self.city_root);
-        let target = self.slot.target(&layout, &self.name, &self.shape);
-        let shelf_again = shelf_state(&self.slot, &self.city_root, &self.name)
-            .map_err(|why| moved_underneath(&target, why.subject()))?;
-        if again.hash != self.hash {
+        if again.source_hash != self.source_hash {
             return Err(moved_underneath(
                 &self.source,
                 "what is there now is not what the decision was made against",
             ));
         }
-        if shelf_again != self.shelved {
+        let state = shelf_state(&self.slot, &self.city_root, &self.name)
+            .map_err(|why| moved_underneath(&self.source, why.subject()))?;
+        if state != self.shelved {
             return Err(moved_underneath(
-                &target,
-                "what is there now is not what the decision was made against",
+                &self.source,
+                "the shelf changed while this skill was being installed",
             ));
         }
-        let placed = match self.shelved {
-            Some(_) => Placed::AlreadyShelved,
-            None => Placed::Fresh,
-        };
-        // Registration lands before the swap: the store is the history
-        // of what was installed, and a landing that fails after it leaves
-        // the store remembering rather than the shelves lying.
-        let stored = register(&self.stored)?;
-        if stored != self.hash {
-            return Err(store_disagrees(&self.hash, &stored));
-        }
-        if placed == Placed::Fresh {
-            self.land(&target)?;
-        }
-        let holding = reading::holding_at(
-            &self.city_root,
-            &self.slot.shelf,
-            &self.slot.section,
-            &target,
-        )?
-        .ok_or_else(|| not_read_back(&target))?;
-        Ok(Installed {
-            holding,
-            hash: self.hash,
-            placed,
-        })
+        Ok(())
     }
 
-    /// Writes the snapshot the decision was made on, never the source
-    /// again: bytes swapped in after the recheck cannot reach the shelf.
-    fn land(&self, target: &Path) -> Result<(), AxError> {
-        let Shape::Package(items) = &self.shape else {
-            return crate::document::replace(target, &self.stored);
-        };
-        let entries = items
-            .iter()
-            .map(|item| match item {
-                Item::Directory(path) => Ok(TreeEntry::Directory(path)),
-                Item::File(path, bytes) => self
-                    .stored
-                    .get(bytes.clone())
-                    .map(|body| TreeEntry::File(path, body))
-                    .ok_or_else(|| not_read_back(target)),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        crate::document::place_tree(target, &entries)
+    fn store(
+        &self,
+        register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>,
+    ) -> Result<Admitted, AxError> {
+        store_snapshot(
+            Snapshot {
+                shape: &self.shape,
+                stored: &self.stored,
+                manifest: &self.manifest,
+                hash: self.hash,
+            },
+            register,
+        )
+    }
+
+    fn holding(&self) -> Result<Holding, AxError> {
+        let text = document_text(&self.shape, &self.stored)?;
+        Ok(Holding::of(HoldingSource {
+            name: self.name.clone(),
+            section: self.slot.section.clone(),
+            text: &text,
+            shelf: self.slot.shelf.as_shelf(),
+            hash: self.hash,
+        }))
+    }
+
+    fn remove_legacy(&self, previous: B3Hash) -> Result<(), AxError> {
+        let root = self.slot.shelf.root(&CityLayout::new(&self.city_root));
+        let section = root.join(&self.slot.section);
+        let targets = [
+            section.join(holding_file_name(&self.name)),
+            section.join(&self.name),
+        ];
+        for target in targets {
+            if !target.exists() {
+                continue;
+            }
+            if inspect(&target)?.source_hash != previous {
+                // The index row has already landed, so every later
+                // install of this name refuses "both an index row and a
+                // legacy directory" until the directory is gone: a
+                // retry cannot recover, and the recovery says what
+                // actually unblocks the name.
+                return Err(AxError::failure(
+                    AxCode::VersionConflict,
+                    "remove a migrated skill directory",
+                    format!("{} changed before its index landed", target.display()),
+                )
+                .with_recovery(
+                    "the index row already names the new version; remove the old directory by \
+                     hand, then install again",
+                ));
+            }
+            if target.is_dir() {
+                std::fs::remove_dir_all(&target).map_err(|err| legacy_io(&target, err))?;
+            } else {
+                std::fs::remove_file(&target).map_err(|err| legacy_io(&target, err))?;
+            }
+        }
+        Ok(())
     }
 }
 
-/// Decides one install without touching anything: the precheck, the name
-/// check, and the state of the world the decision stands on.
-///
-/// # Errors
-/// Refuses a source that is not there (`E_PATH_NOT_FOUND`); a source
-/// that is not one skill document (`E_INVALID_ARGS`); a package reached
-/// through a link (`E_INVALID_ARGS`, whatever the link points at); a
-/// name or section this city cannot file (`E_INVALID_ARGS`); and a name
-/// already holding a different skill (`E_INVALID_ARGS`).
+/// CAS hooks a legacy migration needs: the ordinary write path, and a
+/// full verified read of the old whole-package object.
+pub struct MigrationHooks<'a> {
+    pub register: &'a mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>,
+    pub verify: &'a dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
+}
+
+/// Migrates one legacy shelf. The old object must still contain exactly
+/// the source bytes before an index can replace its directory.
+pub(super) fn migrate_slot(
+    city_root: &Path,
+    slot: &Slot,
+    hooks: &mut MigrationHooks<'_>,
+) -> Result<Vec<Installed>, AxError> {
+    let root = slot.shelf.root(&CityLayout::new(city_root));
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut migrated = Vec::new();
+    for section in reading::read_dir(&root)? {
+        if !section.is_dir() {
+            continue;
+        }
+        let section_name = reading::spelled(&section)?;
+        if !plain_name(&section_name) {
+            continue;
+        }
+        let slot = Slot::of(slot.shelf.clone(), &section_name)?;
+        for item in reading::read_dir(&section)? {
+            let item_name = reading::spelled(&item)?;
+            if !plain_name(&item_name) || item_name == kernel::layout::SHELF_INDEX {
+                continue;
+            }
+            let planned = plan_install(city_root, &slot, &item)?;
+            let previous = match &planned.shelved {
+                Shelved::Legacy(previous) => *previous,
+                Shelved::Empty | Shelved::Current(_) => continue,
+            };
+            let old = (hooks.verify)(&previous)?;
+            if old != planned.stored {
+                return Err(AxError::failure(
+                    AxCode::CasCorrupt,
+                    "migrate a skill shelf",
+                    format!(
+                        "{} does not match the CAS object installed with it",
+                        item.display()
+                    ),
+                )
+                .with_recovery(
+                    "restore the old CAS object or the shelf bytes, then open the city again",
+                ));
+            }
+            migrated.push(planned.apply(&mut *hooks.register)?);
+        }
+    }
+    Ok(migrated)
+}
+
+/// Decides one install without changing anything.
 pub fn plan_install(
     city_root: &Path,
     slot: &Slot,
@@ -266,9 +304,6 @@ pub fn plan_install(
     let inspected = inspect(package)?;
     require_plain(&inspected.name, "the name this skill is admitted by")?;
     let shelved = shelf_state(slot, city_root, &inspected.name)?;
-    if shelved.is_some_and(|existing| existing != inspected.hash) {
-        return Err(name_taken(&inspected.name, &slot.section));
-    }
     Ok(PlannedInstall {
         city_root: city_root.to_path_buf(),
         source: package.to_path_buf(),
@@ -276,23 +311,14 @@ pub fn plan_install(
         name: inspected.name,
         shape: inspected.shape,
         stored: inspected.stored,
+        source_hash: inspected.source_hash,
+        manifest: inspected.manifest,
         hash: inspected.hash,
         shelved,
     })
 }
 
-/// Reads the whole shelved content using the install precheck's canonical hash.
-///
-/// # Errors
-/// Propagates the precheck's unreadable, oversized or linked content refusal.
-pub fn skill_digest(path: &Path) -> Result<B3Hash, AxError> {
-    Ok(inspect(path)?.hash)
-}
-
-/// The one entry point: decides, then lands.
-///
-/// # Errors
-/// Everything [`plan_install`] and [`PlannedInstall::apply`] refuse.
+/// The one entry point: decides, then writes CAS and the index.
 pub fn install(
     city_root: &Path,
     slot: &Slot,
@@ -302,19 +328,140 @@ pub fn install(
     plan_install(city_root, slot, package)?.apply(register)
 }
 
-/// What the shelf holds under `name`, and the refusal when the name is
-/// taken under another section - where the scan's by-name key would let
-/// two filings silently shadow each other. `<name>.md` and `<name>/` are
-/// one name - both at once is refused, since the scan would keep either -
-/// and whatever sits there is read by the same precheck as the source,
-/// so the two hashes compare like for like.
-fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Hash>, AxError> {
+/// Copies an external skill into CAS on admission, without adding it to
+/// any shelf. Its candidate manifest already carries every file digest.
+pub fn admit_external(
+    package: &Path,
+    register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>,
+) -> Result<Admitted, AxError> {
+    let inspected = inspect(package)?;
+    let again = inspect(package)?;
+    if again.source_hash != inspected.source_hash {
+        return Err(moved_underneath(
+            package,
+            "the external skill changed while it was being admitted",
+        ));
+    }
+    store_snapshot(
+        Snapshot {
+            shape: &inspected.shape,
+            stored: &inspected.stored,
+            manifest: &inspected.manifest,
+            hash: inspected.hash,
+        },
+        register,
+    )
+}
+
+/// The manifest digest of a source, without landing it.
+pub fn skill_digest(path: &Path) -> Result<B3Hash, AxError> {
+    Ok(inspect(path)?.hash)
+}
+
+struct Snapshot<'a> {
+    shape: &'a Shape,
+    stored: &'a [u8],
+    manifest: &'a SkillManifest,
+    hash: B3Hash,
+}
+
+fn store_snapshot(
+    snapshot: Snapshot<'_>,
+    register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>,
+) -> Result<Admitted, AxError> {
+    match snapshot.shape {
+        Shape::Document => {
+            let expected = snapshot.manifest.document().ok_or_else(|| {
+                store_disagrees(&snapshot.hash, &B3Hash::digest(b"missing document"))
+            })?;
+            let stored = register(snapshot.stored)?;
+            if &stored != expected {
+                return Err(store_disagrees(expected, &stored));
+            }
+        }
+        Shape::Package(items) => {
+            for item in items {
+                let Item::File(path, range) = item else {
+                    continue;
+                };
+                let expected = snapshot.manifest.file(path).ok_or_else(|| {
+                    store_disagrees(&snapshot.hash, &B3Hash::digest(path.as_bytes()))
+                })?;
+                let bytes = snapshot
+                    .stored
+                    .get(range.clone())
+                    .ok_or_else(|| store_disagrees(expected, &B3Hash::digest(path.as_bytes())))?;
+                let stored = register(bytes)?;
+                if &stored != expected {
+                    return Err(store_disagrees(expected, &stored));
+                }
+            }
+        }
+    }
+    let manifest = snapshot.manifest.encode()?;
+    let stored = register(&manifest)?;
+    if stored != snapshot.hash {
+        return Err(store_disagrees(&snapshot.hash, &stored));
+    }
+    Ok(Admitted {
+        hash: stored,
+        manifest: snapshot.manifest.clone(),
+    })
+}
+
+fn document_text(shape: &Shape, stored: &[u8]) -> Result<String, AxError> {
+    let bytes = match shape {
+        Shape::Document => Some(stored),
+        Shape::Package(items) => items.iter().find_map(|item| match item {
+            Item::File(path, range) if path == reading::SKILL_FILE => stored.get(range.clone()),
+            Item::File(..) | Item::Directory(_) => None,
+        }),
+    };
+    let bytes = bytes.ok_or_else(|| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "read an installed skill",
+            "the manifest has no SKILL.md",
+        )
+        .with_recovery("reinstall the skill with a UTF-8 SKILL.md")
+    })?;
+    String::from_utf8(bytes.to_vec()).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "read an installed skill",
+            "SKILL.md is not UTF-8",
+        )
+        .with_recovery("reinstall the skill with a UTF-8 SKILL.md")
+    })
+}
+
+/// What the shelf holds under `name`, distinguishing the current index
+/// from the legacy directory that migration may replace.
+fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Shelved, AxError> {
     let root = slot.shelf.root(&CityLayout::new(city_root));
+    if let Some(row) = super::shelf::read_index(&root)?
+        .into_iter()
+        .find(|row| row.name == name)
+    {
+        if row.section != slot.section {
+            return Err(name_taken(name, &row.section));
+        }
+        if legacy_shelf_state(slot, &root, name)?.is_some() {
+            return Err(name_taken(name, "both an index row and a legacy directory"));
+        }
+        return Ok(Shelved::Current(row.digest));
+    }
+    let Some(legacy) = legacy_shelf_state(slot, &root, name)? else {
+        return Ok(Shelved::Empty);
+    };
+    Ok(Shelved::Legacy(legacy))
+}
+
+fn legacy_shelf_state(slot: &Slot, root: &Path, name: &str) -> Result<Option<B3Hash>, AxError> {
     if !root.exists() {
         return Ok(None);
     }
-    let mut found = None;
-    for section in reading::read_dir(&root)? {
+    for section in reading::read_dir(root)? {
         if !section.is_dir() {
             continue;
         }
@@ -324,10 +471,7 @@ fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Has
         }
         let held: Vec<_> = [section.join(holding_file_name(name)), section.join(name)]
             .into_iter()
-            .filter(|named| {
-                !matches!(std::fs::symlink_metadata(named),
-                    Err(err) if err.kind() == std::io::ErrorKind::NotFound)
-            })
+            .filter(|named| named.exists())
             .collect();
         match held.as_slice() {
             [] => {}
@@ -337,14 +481,12 @@ fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Has
                 return Err(name_taken(name, &twice));
             }
             [_] if held_under != slot.section => return Err(name_taken(name, &held_under)),
-            [one] => found = Some(inspect(one)?.hash),
+            [one] => return Ok(Some(inspect(one)?.source_hash)),
         }
     }
-    Ok(found)
+    Ok(None)
 }
 
-/// A name or section this city cannot file a skill under: the rule is
-/// `shelf::plain_name`, and this is the refusal that states it.
 fn require_plain(what: &str, role: &str) -> Result<(), AxError> {
     if plain_name(what) {
         return Ok(());
@@ -355,8 +497,7 @@ fn require_plain(what: &str, role: &str) -> Result<(), AxError> {
         format!("{role} is `{what}`"),
     )
     .with_recovery(
-        "name it with letters, digits and dashes: one plain name, no leading dot, \
-         no path separators",
+        "name it with letters, digits and dashes: one plain name, no leading dot, no path separators",
     ))
 }
 
@@ -367,8 +508,7 @@ fn name_taken(name: &str, held_under: &str) -> AxError {
         format!("`{name}` is already shelved under {held_under}"),
     )
     .with_recovery(format!(
-        "install it under another name, or take the shelved `{name}` off the shelf first: \
-         one name holds one holding"
+        "install it under another name, or take the shelved `{name}` off the shelf first: one name holds one holding"
     ))
 }
 
@@ -384,18 +524,6 @@ fn moved_underneath(path: &Path, why: &str) -> AxError {
     .with_recovery("start the install again from what is there now")
 }
 
-fn not_read_back(target: &Path) -> AxError {
-    AxError::failure(
-        AxCode::StorageFatal,
-        "install a skill",
-        format!(
-            "{} landed but does not read back as a holding",
-            target.display()
-        ),
-    )
-    .with_recovery("take what landed at the path above off the shelf, then install again")
-}
-
 fn store_disagrees(ours: &B3Hash, stored: &B3Hash) -> AxError {
     AxError::failure(
         AxCode::CasCorrupt,
@@ -403,4 +531,19 @@ fn store_disagrees(ours: &B3Hash, stored: &B3Hash) -> AxError {
         format!("the store answered {stored} for content that hashes to {ours}"),
     )
     .with_recovery("check the store this install registers with before installing again")
+}
+
+fn legacy_io(path: &Path, err: std::io::Error) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "remove a migrated skill directory",
+        format!("{}: {err}", path.display()),
+    )
+    // The index row has already landed, so re-running the migration
+    // refuses "both an index row and a legacy directory": the directory
+    // has to go by hand before the name installs again.
+    .with_recovery(
+        "the index row already names the new version; make the old shelf writable and remove \
+         it by hand",
+    )
 }

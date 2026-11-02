@@ -30,6 +30,18 @@ fn cas_constructor_is_the_parsed_spelling_of_its_digest() {
 }
 
 #[test]
+fn a_digest_parses_only_its_canonical_hex() {
+    let digest = B3Hash::digest(b"stored bytes");
+    assert_eq!(digest.to_string().parse::<B3Hash>().unwrap(), digest);
+    for invalid in ["", "abc", &H64.to_uppercase(), &format!("{H64}00")] {
+        assert!(
+            invalid.parse::<B3Hash>().is_err(),
+            "{invalid:?} was accepted"
+        );
+    }
+}
+
+#[test]
 fn file_locator_roundtrips_and_splits_on_last_at() {
     let raw = format!("file:role@building.1/notes.md@{OID}");
     let loc = Locator::parse(&raw).unwrap();

@@ -50,10 +50,9 @@ mod miss;
 mod package;
 
 use super::BoundReader;
-use super::chosen_path::{CityRoot, Located, ReadBound};
+use super::chosen_path::{CityRoot, ReadBound};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
-use miss::Floor;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -64,13 +63,7 @@ const LINE_CAP: u16 = 512;
 enum Found {
     /// An admitted address the model chose, read by `engine`.
     Chosen(kernel::Address),
-    /// A document inside a package, and the highest directory a miss
-    /// there may list. The reading room admitted it and no edit reaches
-    /// it by name, so reading it is no look (§8-64).
-    File {
-        at: Located,
-        floor: Floor,
-    },
+    /// Text an admitted catalog entry or CAS object supplied.
     Text(String),
 }
 
@@ -338,19 +331,8 @@ impl ReadTool {
         })?;
         if let Some(expansion) = catalog.expand(asked) {
             return match expansion {
-                Expansion::Skill { addr, .. } => {
-                    let addr = kernel::Address::parse(&addr).map_err(|err| {
-                        AxError::failure(
-                            AxCode::ConfigInvalid,
-                            "read",
-                            format!("{asked} is shelved at {}", err.subject()),
-                        )
-                        .with_recovery(
-                            "this building's reading room names a skill the city cannot address; \
-                             the User has to fix the shelf",
-                        )
-                    })?;
-                    package::open_document(&self.reader.city_root, &addr, asked)
+                Expansion::Skill { manifest } => {
+                    package::open_document(&self.reader.block_store, &manifest, asked)
                 }
                 // The catalog's own second level. The prompt carries one
                 // line per entry, and this is what that line stood for,
@@ -358,7 +340,7 @@ impl ReadTool {
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
         }
-        if let Some(inside) = package::open_in_package(&catalog, &self.reader.city_root, asked) {
+        if let Some(inside) = package::open_in_package(&catalog, &self.reader.block_store, asked) {
             return inside;
         }
         drop(catalog);
@@ -425,7 +407,6 @@ impl Tool for ReadTool {
                 looked = Some((addr, before, after));
                 text
             }
-            Found::File { at, floor } => miss::text_at(asked, at, &floor)?.0,
         };
         let interval = Interval::asked_for(call)?;
         // Where the interval starts, as an index the drawn header and line
@@ -469,6 +450,7 @@ impl Tool for ReadTool {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
-    reason = "test code"
+    clippy::permissions_set_readonly_false,
+    reason = "test code, including a deliberately corrupted writable CAS object"
 )]
 mod tests;

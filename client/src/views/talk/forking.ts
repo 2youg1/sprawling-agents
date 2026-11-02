@@ -66,8 +66,9 @@ export type Boundary =
   | {
       readonly kind: "forked";
       readonly at: number | null;
-      readonly turn: number;
+      readonly turn: number | null;
       readonly mother: RunId;
+      readonly origin: Origin;
     };
 
 // The three lists the picker offers, in the order Ctrl-O cycles them.

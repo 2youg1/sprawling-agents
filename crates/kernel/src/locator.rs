@@ -49,6 +49,45 @@ impl B3Hash {
     }
 }
 
+impl std::str::FromStr for B3Hash {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        if text.len() != 64 {
+            return Err("a BLAKE3 digest is 64 lowercase hex digits".to_owned());
+        }
+        let mut bytes = [0_u8; 32];
+        for (at, pair) in text.as_bytes().as_chunks::<2>().0.iter().enumerate() {
+            let high = pair
+                .first()
+                .copied()
+                .ok_or_else(|| "short digest".to_owned())?;
+            let low = pair
+                .get(1)
+                .copied()
+                .ok_or_else(|| "short digest".to_owned())?;
+            let value = (hex_digit(high)? << 4) | hex_digit(low)?;
+            let slot = bytes
+                .get_mut(at)
+                .ok_or_else(|| "a BLAKE3 digest is 32 bytes".to_owned())?;
+            *slot = value;
+        }
+        Ok(B3Hash(bytes))
+    }
+}
+
+fn hex_digit(byte: u8) -> Result<u8, String> {
+    let invalid = || "a BLAKE3 digest is 64 lowercase hex digits".to_owned();
+    match byte {
+        b'0'..=b'9' => byte.checked_sub(b'0').ok_or_else(invalid),
+        b'a'..=b'f' => byte
+            .checked_sub(b'a')
+            .and_then(|value| value.checked_add(10))
+            .ok_or_else(invalid),
+        _ => Err(invalid()),
+    }
+}
+
 impl std::fmt::Display for B3Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write_hex(f, &self.0)

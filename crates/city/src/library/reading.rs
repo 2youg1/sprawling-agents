@@ -16,12 +16,12 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
-use kernel::{Address, AxCode, AxError};
+use kernel::{AxCode, AxError, B3Hash, SkillManifest};
 
 use crate::config_layers::SHELVES_KEY;
 
 use super::ShelfKey;
-use super::shelf::{Holding, OwnShelf, Shelf, holding_name, plain_name};
+use super::shelf::{Holding, HoldingSource, OwnShelf, Shelf};
 
 pub(super) use kernel::layout::SKILL_FILE;
 
@@ -41,74 +41,75 @@ pub(super) fn shelve(
     city_root: &Path,
     shelf: &OwnShelf,
     holdings: &mut BTreeMap<ShelfKey, Holding>,
+    read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
 ) -> Result<(), AxError> {
     let root = shelf.root(&CityLayout::new(city_root));
-    if !root.exists() {
-        return Ok(());
-    }
-    for section in read_dir(&root)? {
-        if !section.is_dir() {
-            continue;
-        }
-        let section_name = spelled(&section)?;
-        if !plain_name(&section_name) {
-            continue;
-        }
-        for item in read_dir(&section)? {
-            if let Some(holding) = holding_at(city_root, shelf, &section_name, &item)? {
-                holdings.insert(ShelfKey::of(&holding.name), holding);
-            }
-        }
+    for row in super::shelf::read_index(&root)? {
+        let manifest = read_manifest(read, &row.digest)?;
+        let document = manifest.document().ok_or_else(|| {
+            AxError::failure(
+                AxCode::CasCorrupt,
+                "read a skill from a shelf",
+                format!("{}/{} has no {}", row.section, row.name, SKILL_FILE),
+            )
+            .with_recovery("reinstall the skill through the city's install door")
+        })?;
+        let text = read_text(read, document)?;
+        holdings.insert(
+            ShelfKey::of(&row.name),
+            Holding::of(HoldingSource {
+                name: row.name,
+                section: row.section,
+                text: &text,
+                shelf: shelf.as_shelf(),
+                hash: row.digest,
+            }),
+        );
     }
     Ok(())
 }
 
-/// The holding one item on a section shelf is, or `None` when it is not
-/// one: the one derivation the scan and an install's read-back share.
-///
-/// # Errors
-/// Propagates a holding that cannot be read, a name this machine spells
-/// outside Unicode, and a path the city cannot spell as an address.
-pub(super) fn holding_at(
-    city_root: &Path,
-    shelf: &OwnShelf,
-    section: &str,
-    item: &Path,
-) -> Result<Option<Holding>, AxError> {
-    let Some((name, document)) = filed(item)? else {
-        return Ok(None);
-    };
-    if !plain_name(&name) {
-        return Ok(None);
-    }
-    let text = read_holding(&document)?;
-    // The address is read back off the path the layout chose, so a
-    // shelf that moves cannot leave the addresses of what sits on it
-    // pointing at where it used to be.
-    let addr = address_of(city_root, &document)?;
-    let package = (document != item)
-        .then(|| address_of(city_root, item))
-        .transpose()?;
-    Ok(Some(Holding {
-        package,
-        ..Holding::of(name, section.to_owned(), &text, shelf.at(addr))
-    }))
+/// Reads one admitted manifest and its SKILL.md through verified full
+/// reads, so the disclosure and document always come from one version.
+pub fn skill_document(
+    read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
+    digest: &B3Hash,
+    name: &str,
+) -> Result<String, AxError> {
+    let manifest = read_manifest(read, digest)?;
+    let document = manifest.document().ok_or_else(|| {
+        AxError::failure(
+            AxCode::CasCorrupt,
+            "read a skill from a shelf",
+            format!("{name} has no SKILL.md in its admitted manifest"),
+        )
+        .with_recovery("reinstall the skill through the city's install door")
+    })?;
+    read_text(read, document)
 }
 
-/// What one item on a section shelf holds, as its name and the document
-/// the catalog reads: `<name>.md` is the document itself, and a package
-/// `<name>/` is its [`SKILL_FILE`], the files beside which stay on the
-/// shelf for `read` to open. A directory without that file is not a
-/// holding, the same as on an external shelf.
-fn filed(item: &Path) -> Result<Option<(String, PathBuf)>, AxError> {
-    if item.is_dir() {
-        let document = item.join(SKILL_FILE);
-        return document
-            .is_file()
-            .then(|| spelled(item).map(|name| (name, document)))
-            .transpose();
-    }
-    Ok(holding_name(&spelled(item)?).map(|name| (name, item.to_path_buf())))
+/// A full, verified manifest read, then the document it names. The index
+/// is trusted only as a locator, never as proof of the bytes.
+pub(super) fn read_manifest(
+    read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
+    digest: &B3Hash,
+) -> Result<SkillManifest, AxError> {
+    SkillManifest::decode(&read(digest)?)
+}
+
+pub(super) fn read_text(
+    read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
+    digest: &B3Hash,
+) -> Result<String, AxError> {
+    let bytes = read(digest)?;
+    String::from_utf8(bytes).map_err(|_| {
+        AxError::failure(
+            AxCode::CasCorrupt,
+            "read a skill document",
+            digest.to_string(),
+        )
+        .with_recovery("reinstall the skill as UTF-8 text through the install door")
+    })
 }
 
 /// Reads one skill off a shelf the city does not keep: one directory per
@@ -157,11 +158,18 @@ pub(super) fn shelve_external(
         if !document.is_file() {
             continue;
         }
+        let inspected = super::install::precheck::inspect(&item)?;
         let text = read_holding(&document)?;
         let path = format!("{name}/{SKILL_FILE}");
         holdings.insert(
             ShelfKey::of(&name),
-            Holding::of(name, String::new(), &text, Shelf::External { index, path }),
+            Holding::of(HoldingSource {
+                name,
+                section: String::new(),
+                text: &text,
+                shelf: Shelf::External { index, path },
+                hash: inspected.hash,
+            }),
         );
     }
     Ok(())
@@ -180,28 +188,6 @@ pub(super) fn read_holding(item: &Path) -> Result<String, AxError> {
              take it off the shelf, then scan again",
         )
     })
-}
-
-/// How the city addresses a file on one of its shelves.
-pub(super) fn address_of(city_root: &Path, item: &Path) -> Result<Address, AxError> {
-    let relative = item.strip_prefix(city_root).map_err(|_| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "address a library holding",
-            format!("{} is outside {}", item.display(), city_root.display()),
-        )
-        .with_recovery("scan the library of the city the holding sits in")
-    })?;
-    let mut spelled_out = Vec::new();
-    for component in relative.components() {
-        spelled_out.push(
-            component
-                .as_os_str()
-                .to_str()
-                .ok_or_else(|| unspellable(item))?,
-        );
-    }
-    Address::parse(&spelled_out.join("/"))
 }
 
 /// The last element of a path, as the city has to be able to write it.
