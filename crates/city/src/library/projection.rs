@@ -30,7 +30,7 @@ pub fn materialize(
         std::fs::remove_dir_all(&staged).map_err(|err| projection_io(&staged, err))?;
     }
     if target.exists() {
-        std::fs::remove_dir_all(&target).map_err(|err| projection_io(&target, err))?;
+        remove_projected(&target)?;
     }
     std::fs::create_dir_all(&staged).map_err(|err| projection_io(&staged, err))?;
     let mut files = Vec::new();
@@ -63,6 +63,45 @@ pub fn materialize(
         std::fs::set_permissions(&file, permissions).map_err(|err| projection_io(&file, err))?;
     }
     Ok(target)
+}
+
+/// Removes a landed projection. Its files were made read-only after the
+/// rename, and Windows refuses to delete a read-only file, so the bit
+/// is cleared there first; unix removes a read-only file as readily as
+/// any other. A re-materialization of one digest otherwise refuses on
+/// Windows, and the auditor materializes on every pass.
+fn remove_projected(path: &Path) -> Result<(), AxError> {
+    clear_readonly(path)?;
+    std::fs::remove_dir_all(path).map_err(|err| projection_io(path, err))
+}
+
+#[cfg(windows)]
+fn clear_readonly(path: &Path) -> Result<(), AxError> {
+    for entry in std::fs::read_dir(path).map_err(|err| projection_io(path, err))? {
+        let entry = entry.map_err(|err| projection_io(path, err))?;
+        let at = entry.path();
+        let metadata = entry.metadata().map_err(|err| projection_io(&at, err))?;
+        if metadata.is_dir() {
+            clear_readonly(&at)?;
+        } else {
+            let mut permissions = metadata.permissions();
+            if permissions.readonly() {
+                #[expect(
+                    clippy::permissions_set_readonly_false,
+                    reason = "Windows only: this clears the read-only attribute and grants nothing else"
+                )]
+                permissions.set_readonly(false);
+                std::fs::set_permissions(&at, permissions)
+                    .map_err(|err| projection_io(&at, err))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn clear_readonly(_path: &Path) -> Result<(), AxError> {
+    Ok(())
 }
 
 fn projection_io(path: &Path, err: std::io::Error) -> AxError {
@@ -136,5 +175,38 @@ mod tests {
                 .readonly()
         );
         assert_eq!(crate::skill_digest(&projected).unwrap(), digest);
+    }
+
+    /// A second pass over one digest replaces the projection it made on
+    /// the first: the read-only files of the landed tree must not make
+    /// the removal refuse (they do on Windows, where this test bites).
+    #[test]
+    fn rematerializing_replaces_the_read_only_projection() {
+        let dir = tempfile::tempdir().unwrap();
+        let document = b"# Twice\n".to_vec();
+        let document_digest = B3Hash::digest(&document);
+        let manifest = SkillManifest::new(vec![SkillItem::File {
+            path: "SKILL.md".to_owned(),
+            digest: document_digest,
+        }])
+        .unwrap();
+        let manifest_bytes = manifest.encode().unwrap();
+        let digest = B3Hash::digest(&manifest_bytes);
+        let read = |hash: &B3Hash| {
+            if hash == &digest {
+                Ok(manifest_bytes.clone())
+            } else if hash == &document_digest {
+                Ok(document.clone())
+            } else {
+                Err(
+                    AxError::failure(AxCode::PathNotFound, "read a test object", hash.to_string())
+                        .with_recovery("name a stored object"),
+                )
+            }
+        };
+        let first = materialize(dir.path(), &digest, &read).unwrap();
+        let second = materialize(dir.path(), &digest, &read).unwrap();
+        assert_eq!(second, first);
+        assert_eq!(std::fs::read(second.join("SKILL.md")).unwrap(), document);
     }
 }
