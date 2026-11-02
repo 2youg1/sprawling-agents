@@ -20,6 +20,24 @@ release notes and their commits.
 
 ---
 
+## v0.0.15-Alpha-261102
+
+**sprawling 0.0.15 henceforth**
+
+Alpha, cut on 2026-11-02 (UTC+8) as `v0.0.15-Alpha-261102`. The workspace manifest carries 0.0.15; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.14-Alpha-261027`. The wire contract moves: WIRE_V goes from 70 to 74, so a browser tab left open by 0.0.14 is refused rather than misread — reload it against the new city. The stored-data contracts do not change: EVENT_LOG_V stays 2 and the configuration formats stay at format 1, so a city written by 0.0.14 opens without a new migration. The default port moves from 8787 to 2501. Keep the backup the [update guide](docs/getting-started.md#updating) asks for before updating; the compatibility limits already documented for 0.0.14 itself are unchanged.
+
+### Behaviour changes
+
+- **Maple Mono replaces Geist Mono for reading text, and the doctor offers the wider NF CN build instead of bundling it.** The official CJK build reads Chinese, Japanese and Korean with the same letterforms and warms the whole visual style; the NF CN character set is several times larger than this project, so every archive would carry several times itself in font. The preference answer and the frame set move with the offer, and the wire moves with them (#219).
+- **Connectors and skills are pinned references, and one catalog edits them.** The catalog saves connector and skill pins as versioned references with digests, refuses an external pin no read can answer, and records the pin, drift, save-order and digest decisions in its SPEC. The sessions answer owns parentage, branch origins and a valid tail, so a reload or a truncated hot view cannot change the tree; an attached endpoint manages its provider's models in its own rows; a corrupt CAS object gains a recovery-only repair write that verifies before it replaces; and a skill package gains one canonical manifest, validated by the kernel, with a package digest taken over the manifest itself (#228).
+- **The default port is 2501, with every reader and quote moved off 8787.** A bookmark, script or client that names the port names the new one; the wire and the saved-data formats are untouched by the move (#226).
+
+### Toolchain, CI and repository gates
+
+- **The typecheck lane drops ts-go for `bun check` beside svelte-check classic.** (#227)
+- **Commit subjects read CS<stage>.<index>.** The commits judge, its SPEC and the dependabot prefix follow the CS spelling, and the contributor workflow reviews a design before the final check (#222).
+- **Dependencies and actions.** `zip` moves to 9.1.0 (#210); `self-replace` and `taiki-e/install-action` move (#214, #211, #223); the patch-and-minor group lands three updates (#224).
+
 ## v0.0.14-Alpha-261027
 
 **sprawling 0.0.14 still walking**

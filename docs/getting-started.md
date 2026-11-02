@@ -127,7 +127,7 @@ You need a desktop browser and a callable model: a compatible provider or a loca
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.14<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.15<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
 
 Choose one channel:
 
@@ -253,6 +253,8 @@ Update through the original channel:
 | Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
 
 After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`, which opens the page. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
+
+From 0.0.14 to 0.0.15 nothing has to be converted by hand. The wire moved from WIRE_V 70 to 74, so a browser tab left open by 0.0.14 is refused rather than misread — reload it against the new city. EVENT_LOG_V stays 2 and the configuration formats do not change, so a city written by 0.0.14 opens without a new migration. The default port moves from 8787 to 2501, so a bookmark, script or client that names the port names the new one. Keep the verified backup above even though this release has no migration.
 
 From 0.0.13 to 0.0.14 nothing has to be converted by hand. WIRE_V stays 70, EVENT_LOG_V stays 2 and the configuration formats do not change, so a city written by 0.0.13 opens without a new migration, and there is no protocol-driven requirement to reload an existing browser tab. Keep the verified backup above even though this release has no migration.
 

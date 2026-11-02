@@ -127,7 +127,7 @@ shelves = ["~/.claude/skills"]
 
 ## 1 安装
 
-本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.14<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
+本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.15<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
 
 选择一种渠道：
 
@@ -253,6 +253,8 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行 [Nix 命令](#用-nix)。 | 使用原固定 checkout 和 lockfile；固定 commit 不会跟随新版。 |
 
 更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城市，它会打开页面。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。
+
+从 0.0.14 升到 0.0.15 不需要手工转换任何文件。协议从 WIRE_V 70 升到 74，0.0.14 留下的浏览器标签页会被明确拒绝而不是读错，对新城市重新加载即可。EVENT_LOG_V 保持 2，配置格式不变，所以 0.0.14 写下的城市不需要新的迁移即可打开。默认端口从 8787 移到 2501，写过旧端口的书签、脚本或客户端改成新端口即可。虽然本版没有迁移，仍请保留上面验证过的备份。
 
 从 0.0.13 升到 0.0.14 不需要手工转换任何文件。WIRE_V 保持 70，EVENT_LOG_V 保持 2，配置格式不变，所以 0.0.13 写下的城市不需要新的迁移即可打开，也不要求因为协议而重新加载现有浏览器标签页。虽然本版没有迁移，仍请保留上面验证过的备份。
 
