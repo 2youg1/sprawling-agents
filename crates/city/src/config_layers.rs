@@ -320,19 +320,15 @@ impl ConfigLayer {
     }
 }
 
-/// Resolves the ladder into the snapshot a run is frozen with.
-///
-/// Concern by concern rather than layer by layer: the ladder knows
-/// which layers exist, so this reads as the list of what a run is
-/// governed by, and a layer added later is picked up by all of it at
-/// once.
+/// Judges a replacement building reference table through the same
+/// ladder and connector resolver a later run will use, so a table the
+/// city refuses leaves the building as it was: the writer calls this
+/// before the first face of one save lands.
 ///
 /// # Errors
 /// Refuses an address with no building, an unreadable file, and a file
-/// that does not parse. A missing file is not an error: it is the
-/// ordinary case.
-/// Validates a replacement building reference table through the same
-/// ladder and connector resolver a later run will use.
+/// that does not parse, and a reference the resolver would refuse: a
+/// label with no definition at any nearer rung, or a duplicate.
 pub fn check_mcp_references(
     city_root: &Path,
     building: &Address,
@@ -350,6 +346,17 @@ pub fn check_mcp_references(
     .map(|_| ())
 }
 
+/// Resolves the ladder into the snapshot a run is frozen with.
+///
+/// Concern by concern rather than layer by layer: the ladder knows
+/// which layers exist, so this reads as the list of what a run is
+/// governed by, and a layer added later is picked up by all of it at
+/// once.
+///
+/// # Errors
+/// Refuses an address with no building, an unreadable file, and a file
+/// that does not parse. A missing file is not an error: it is the
+/// ordinary case.
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
     kernel::config::freeze(&StatedConfig {

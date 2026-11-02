@@ -212,9 +212,19 @@ impl PlannedInstall {
                 continue;
             }
             if inspect(&target)?.source_hash != previous {
-                return Err(moved_underneath(
-                    &target,
-                    "the old shelf changed before its index landed",
+                // The index row has already landed, so every later
+                // install of this name refuses "both an index row and a
+                // legacy directory" until the directory is gone: a
+                // retry cannot recover, and the recovery says what
+                // actually unblocks the name.
+                return Err(AxError::failure(
+                    AxCode::VersionConflict,
+                    "remove a migrated skill directory",
+                    format!("{} changed before its index landed", target.display()),
+                )
+                .with_recovery(
+                    "the index row already names the new version; remove the old directory by \
+                     hand, then install again",
                 ));
             }
             if target.is_dir() {
@@ -529,5 +539,11 @@ fn legacy_io(path: &Path, err: std::io::Error) -> AxError {
         "remove a migrated skill directory",
         format!("{}: {err}", path.display()),
     )
-    .with_recovery("make the old shelf writable and run the migration again")
+    // The index row has already landed, so re-running the migration
+    // refuses "both an index row and a legacy directory": the directory
+    // has to go by hand before the name installs again.
+    .with_recovery(
+        "the index row already names the new version; make the old shelf writable and remove \
+         it by hand",
+    )
 }
