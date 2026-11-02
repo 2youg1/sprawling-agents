@@ -51,6 +51,23 @@ deny = [
 
 [advisories]
 yanked = "deny"
+# RUSTSEC-2026-0418 (libz-sys build script leaks the environment) and
+# RUSTSEC-2026-0420/-0422/-0423/-0424 (the wasmtime 48.0.7 engine and
+# wasi socket bugs), all published 2026-11-02, rest until the wasmtime
+# rework, which the person has already decided and which clears this
+# list by replacing the family, not by renewing the ignore. A patch
+# bump of a family about to move would spend release verification on a
+# throwaway tree. The engine sits behind the opt-in `wasm` feature of
+# `sprawling-runtime`, off the default build; the libz-sys leak is
+# build-time. Loosening a gate in the change it is failing carries the
+# person's ruling, recorded as `Verdict: user-approved` on the commit.
+ignore = [
+    { id = "RUSTSEC-2026-0418", reason = "build-time env leak in libz-sys; cleared by the wasmtime rework's lockfile sweep, not worth a throwaway patch bump" },
+    { id = "RUSTSEC-2026-0420", reason = "wasip3 UDP in the opt-in wasm engine 48.0.7; the wasmtime rework replaces the family" },
+    { id = "RUSTSEC-2026-0422", reason = "i31/nullref panic in the opt-in wasm engine 48.0.7; the wasmtime rework replaces the family" },
+    { id = "RUSTSEC-2026-0423", reason = "cross-engine type confusion in the opt-in wasm engine 48.0.7; the wasmtime rework replaces the family" },
+    { id = "RUSTSEC-2026-0424", reason = "borrowed-resource memory in the opt-in wasm engine 48.0.7; the wasmtime rework replaces the family" },
+]
 
 [sources]
 unknown-registry = "deny"
