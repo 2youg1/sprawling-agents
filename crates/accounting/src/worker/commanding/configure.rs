@@ -151,6 +151,13 @@ impl RunWorker {
 /// Copies only external candidates whose current digest the page accepted.
 /// Internal candidates are already in CAS; old pins kept across a candidate
 /// change do not copy or approve the new content.
+///
+/// A pin that no longer matches the shelf is honored only when an earlier
+/// save already admitted its bytes: keeping an admitted version changes
+/// nothing, while keeping a version nobody admitted leaves a pin whose
+/// manifest no read can answer — the catalog page and the building's runs
+/// both fail on the missing object (`crates/accounting/spec/Connectors.lean`
+/// D119). That save refuses instead of landing half of what the page asked.
 fn admit_external_pins(
     city_root: &std::path::Path,
     building: &kernel::Address,
@@ -165,7 +172,18 @@ fn admit_external_pins(
     let read = |digest: &kernel::B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
     let shelves = city::Library::scan(city_root, Some(building), home.path(), &read)?;
     let external = city::city_shelves(city_root, home.path())?;
-    for holding in shelves.all().into_iter().filter(|holding| {
+    let holdings = shelves.all();
+    for (name, pin) in pins {
+        let current = holdings
+            .iter()
+            .find(|holding| holding.name == *name)
+            .map(|holding| holding.hash);
+        if current == Some(*pin) {
+            continue;
+        }
+        held_pin_must_answer(&cas, name, pin)?;
+    }
+    for holding in holdings.into_iter().filter(|holding| {
         holding.shelf.is_external() && pins.get(&holding.name) == Some(&holding.hash)
     }) {
         let city::Shelf::External { index, .. } = holding.shelf else {
@@ -200,6 +218,30 @@ fn admit_external_pins(
         }
     }
     Ok(())
+}
+
+/// Whether a pin kept across a change still names bytes the store has. An
+/// absent object means the page accepted a version the shelf no longer
+/// holds and no save ever admitted; keeping that pin would write a
+/// locator nothing can read. Corruption and other read failures are the
+/// storage layer's own story and propagate as they are.
+fn held_pin_must_answer(
+    cas: &storage::Cas,
+    name: &str,
+    pin: &kernel::B3Hash,
+) -> Result<(), AxError> {
+    match cas.get(pin) {
+        Ok(_) => Ok(()),
+        Err(storage::StorageError::CasMissing { .. }) => Err(AxError::failure(
+            kernel::AxCode::VersionConflict,
+            "save the building catalog",
+            format!(
+                "{name} changed after the page read it, and the pinned version was never admitted"
+            ),
+        )
+        .with_recovery("open the catalog again and accept or keep the version it shows now")),
+        Err(stopped) => Err(stopped.into_ax()),
+    }
 }
 
 impl RunWorker {

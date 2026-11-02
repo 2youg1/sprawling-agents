@@ -51,30 +51,61 @@ fn admit(city_root: &Path, lab: &Address, names: &[&str]) {
 }
 
 fn save_pins(city_root: &Path, lab: &Address, name: &str, pin: B3Hash) {
+    save_pins_result(city_root, lab, name, pin).unwrap();
+}
+
+/// The same save, with the refusal in hand: a red test asserts the code
+/// and the untouched building beside it.
+fn save_pins_result(
+    city_root: &Path,
+    lab: &Address,
+    name: &str,
+    pin: B3Hash,
+) -> Result<(), kernel::AxError> {
+    configure_pins(city_root, lab, name, pin, true)
+}
+
+/// The pins face alone, without the reading-room face: the half one
+/// save leaves when its second door never runs
+/// (`crates/accounting/spec/Connectors.lean` D121).
+fn pin_only_result(
+    city_root: &Path,
+    lab: &Address,
+    name: &str,
+    pin: B3Hash,
+) -> Result<(), kernel::AxError> {
+    configure_pins(city_root, lab, name, pin, false)
+}
+
+fn configure_pins(
+    city_root: &Path,
+    lab: &Address,
+    name: &str,
+    pin: B3Hash,
+    room: bool,
+) -> Result<(), kernel::AxError> {
     let mut worker = crate::worker::RunWorker::new(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
         crate::worker::fixture::hands(),
     )
     .unwrap();
-    worker
-        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
-            addr: lab.clone(),
-            sandbox: None,
-            mcp: None,
-            desktop: None,
-            context_second_threshold: None,
-            catalog: None,
-            mcp_references: None,
-            skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
-            reading_room: Some(vec![name.to_owned()]),
-            idem: kernel::IdemKey::derive(
-                &RunId::CITY,
-                Seq::FIRST,
-                format!("{name}:{pin}").as_bytes(),
-            ),
-        }))
-        .unwrap();
+    worker.handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+        addr: lab.clone(),
+        sandbox: None,
+        mcp: None,
+        desktop: None,
+        context_second_threshold: None,
+        catalog: None,
+        mcp_references: None,
+        skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
+        reading_room: room.then(|| vec![name.to_owned()]),
+        idem: kernel::IdemKey::derive(
+            &RunId::CITY,
+            Seq::FIRST,
+            format!("{name}:{pin}:room={room}").as_bytes(),
+        ),
+    }))
 }
 
 fn catalog(city_root: &Path, lab: &Address) -> wire::CatalogAnswer {
@@ -222,6 +253,79 @@ fn an_accepted_skill_removal_leaves_no_historical_ghost_row() {
         !answer.skill_rows.iter().any(|row| row.name == "guide"),
         "an accepted removal left a ghost row: {:?}",
         answer.skill_rows
+    );
+}
+
+/// The page accepted an external skill whose shelf rewrote it before the
+/// save. The pinned version was never admitted to the store, so the save
+/// refuses before anything lands: a pin that names bytes no read can
+/// answer would take the catalog panel and the building's runs down
+/// (`crates/accounting/spec/Connectors.lean` D119).
+#[test]
+fn a_pin_for_a_rewritten_external_skill_is_refused_before_anything_lands() {
+    let (dir, lab) = city_with_lab();
+    let outside = dir.path().join("outside-skills");
+    let package = outside.join("roam");
+    std::fs::create_dir_all(&package).unwrap();
+    std::fs::write(package.join("SKILL.md"), "# Outside one\n").unwrap();
+    std::fs::write(
+        dir.path()
+            .join(kernel::RESERVED_PREFIX)
+            .join(city::CONFIG_FILE),
+        format!(
+            "[skills]\nshelves = [{}]\n",
+            serde_json::to_string(&outside.to_string_lossy()).unwrap()
+        ),
+    )
+    .unwrap();
+    admit(dir.path(), &lab, &["roam"]);
+    // What the page's answer showed; the shelf then moves before the save.
+    let stale = candidate(dir.path(), &lab, "roam");
+    std::fs::write(package.join("SKILL.md"), "# Outside two\n").unwrap();
+
+    let refused = save_pins_result(dir.path(), &lab, "roam", stale).unwrap_err();
+
+    assert_eq!(refused.code(), &kernel::AxCode::VersionConflict);
+    assert!(
+        refused.recovery().contains("catalog"),
+        "the recovery names where the person settles the change: {}",
+        refused.recovery()
+    );
+    let file = kernel::layout::CityLayout::new(dir.path()).config(&lab);
+    assert!(
+        !file.exists(),
+        "a refused save left {} behind",
+        file.display()
+    );
+}
+
+/// One save lands its CONFIG.toml face and then its RULES.toml face; the
+/// half where pins landed and the admission did not must still read —
+/// the skill shows pinned and withheld — and the next save converges
+/// (`crates/accounting/spec/Connectors.lean` D121).
+#[test]
+fn pins_without_a_reading_room_entry_read_as_pinned_and_withheld() {
+    let (dir, lab) = city_with_lab();
+    let digest = install(dir.path(), &lab, "guide", "# Guide\n");
+    pin_only_result(dir.path(), &lab, "guide", digest).unwrap();
+
+    let answer = catalog(dir.path(), &lab);
+    assert_eq!(answer.skill_pins.get("guide"), Some(&digest));
+    let row = skill(&answer, "guide");
+    assert_eq!(row.pinned, Some(digest));
+    assert_eq!(row.change, None);
+    assert_eq!(
+        row.exposure,
+        kernel::config::Exposure::Off,
+        "a pinned skill the reading room does not admit is withheld"
+    );
+
+    save_pins(dir.path(), &lab, "guide", digest);
+    let answer = catalog(dir.path(), &lab);
+    assert_eq!(
+        skill(&answer, "guide").exposure,
+        kernel::config::Exposure::Dormant,
+        "the next save admits the pinned skill and converges"
     );
 }
 
