@@ -83,6 +83,32 @@ export function sameSelection(left: Selection, right: Selection): boolean {
   return canonicalSelection(left) === canonicalSelection(right);
 }
 
+// What a refreshed answer does to a save in flight. When the answer
+// matches what was sent, the save landed; the draft resets only when
+// the person has not edited since sending, so a quick second edit made
+// inside the round trip is not clobbered by the acknowledgement.
+export interface SaveSettle {
+  readonly landed: boolean;
+  readonly edited: boolean;
+  readonly saved: boolean;
+}
+
+export function settleSave(
+  held: Selection,
+  draft: Selection,
+  sent: Selection,
+  layer: Scope,
+): SaveSettle {
+  const landed = sameDraft(held, sent, layer);
+  if (!landed) return { landed: false, edited: false, saved: false };
+  const edited = !sameDraft(draft, sent, layer);
+  return { landed: true, edited, saved: !edited };
+}
+
+function sameDraft(left: Selection, right: Selection, layer: Scope): boolean {
+  return layer === "building" ? sameSelection(left, right) : sameTable(left.catalog, right.catalog);
+}
+
 function canonicalSelection(selection: Selection): string {
   return JSON.stringify({
     catalog: canonical(selection.catalog),

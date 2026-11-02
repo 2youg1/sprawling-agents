@@ -28,6 +28,7 @@ import {
   pressSkill,
   rowsOf,
   sameTable,
+  settleSave,
   skillMeterOf,
 } from "./catalog";
 import type { Row, Selection, Table } from "./catalog";
@@ -76,6 +77,18 @@ const ROWS: readonly Row[] = [
 ];
 
 const EMPTY: Table = { tools: {}, namespaces: {}, skills: {} };
+
+function selection(
+  reading: readonly string[],
+  skills: Readonly<Record<string, Exposure>> = {},
+): Selection {
+  return {
+    catalog: { tools: {}, namespaces: {}, skills },
+    references: [],
+    skillPins: {},
+    readingRoom: reading,
+  };
+}
 
 type Edit =
   { readonly row: readonly [number, Exposure] } | { readonly group: readonly [number, Exposure] };
@@ -442,5 +455,42 @@ describe("the capabilities draft", () => {
         meter: vector.meter,
       });
     }
+  });
+});
+
+describe("settleSave", () => {
+  test("a landed save acknowledges only a draft the person has not moved on from", () => {
+    const sent = selection([]);
+    expect(settleSave(sent, sent, sent, "building")).toEqual({
+      landed: true,
+      edited: false,
+      saved: true,
+    });
+    // The person edited again inside the round trip: the acknowledgement
+    // must not clobber those edits.
+    const edited = selection(["guide"]);
+    expect(settleSave(sent, edited, sent, "building")).toEqual({
+      landed: true,
+      edited: true,
+      saved: false,
+    });
+    // The answer does not match what was sent yet: nothing settles.
+    const earlier = selection(["other"]);
+    expect(settleSave(earlier, sent, sent, "building").landed).toBe(false);
+  });
+
+  test("the city layer settles on the catalog table alone", () => {
+    const sent = selection([]);
+    // A building-scope face legitimately differs from what a city save
+    // sent: the table match is the landing.
+    const held = { ...sent, readingRoom: ["guide"] };
+    expect(settleSave(held, sent, sent, "city").landed).toBe(true);
+    const skills: Readonly<Record<string, Exposure>> = { guide: "off" };
+    const edited = { ...sent, catalog: { tools: {}, namespaces: {}, skills } };
+    expect(settleSave(sent, edited, sent, "city")).toEqual({
+      landed: true,
+      edited: true,
+      saved: false,
+    });
   });
 });

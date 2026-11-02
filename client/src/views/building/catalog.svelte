@@ -19,7 +19,7 @@
   import type { Address, Answer, CatalogAnswer, Query } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
   import { useBuildings } from "../shared/buildings";
-  import { catalogLook, draftOf, sameSelection, sameTable, selectionOf } from "./catalog";
+  import { catalogLook, draftOf, selectionOf, settleSave } from "./catalog";
   import type { Scope, Selection } from "./catalog";
   import Look from "./catalog.look.svelte";
 
@@ -64,14 +64,16 @@
     const held = initial(now, layer);
     const waiting = untrack(() => sent);
     if (waiting !== null) {
-      const landed =
-        layer === "building"
-          ? sameSelection(held, waiting)
-          : sameTable(held.catalog, waiting.catalog);
-      if (landed) {
+      const settled = settleSave(
+        held,
+        untrack(() => draft),
+        waiting,
+        layer,
+      );
+      if (settled.landed) {
         sent = null;
-        edited = false;
-        saved = true;
+        edited = settled.edited;
+        saved = settled.saved;
       }
     }
     if (!untrack(() => edited)) draft = held;
