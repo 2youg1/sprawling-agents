@@ -225,7 +225,7 @@ A working record is noise to a contributor and a model, and signal to an attacke
 
 The client is exempt from steps 2 and 3, as *The view layer* says.
 
-Unless the change is mechanical, keep the lines a diff adds under 800, and under 500 when the logic is not obvious. Deleted lines do not count, because a reviewer reads what arrives, and a clean-up or a cut that removes more than it adds is never split for its size. When more lines arrive, land the smallest coherent stage that holds on its own and name the remaining stages, splitting along the actual diff and its call sites.
+Keep individual files from growing too long: split reusable new modules out along functional lines. Keep each pull request's change surface as small as possible, ideally within 99 files; a clean-up or a cut that removes more than it adds is never split for its size. When a change still exceeds that surface, land the smallest coherent stage that holds on its own and name the remaining stages, splitting along the actual diff and its call sites.
 
 ## Skills
 
