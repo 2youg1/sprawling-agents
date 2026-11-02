@@ -62,7 +62,25 @@ fn save_pins_result(
     name: &str,
     pin: B3Hash,
 ) -> Result<(), kernel::AxError> {
-    configure_pins(city_root, lab, name, pin, true)
+    run_settings(
+        city_root,
+        wire::BuildingSettings {
+            addr: lab.clone(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: None,
+            skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
+            reading_room: Some(vec![name.to_owned()]),
+            idem: kernel::IdemKey::derive(
+                &RunId::CITY,
+                Seq::FIRST,
+                format!("save-pins:{name}:{pin}").as_bytes(),
+            ),
+        },
+    )
 }
 
 /// The pins face alone, without the reading-room face: the half one
@@ -74,38 +92,37 @@ fn pin_only_result(
     name: &str,
     pin: B3Hash,
 ) -> Result<(), kernel::AxError> {
-    configure_pins(city_root, lab, name, pin, false)
+    run_settings(
+        city_root,
+        wire::BuildingSettings {
+            addr: lab.clone(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: None,
+            mcp_references: None,
+            skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
+            reading_room: None,
+            idem: kernel::IdemKey::derive(
+                &RunId::CITY,
+                Seq::FIRST,
+                format!("pin-only:{name}:{pin}").as_bytes(),
+            ),
+        },
+    )
 }
 
-fn configure_pins(
-    city_root: &Path,
-    lab: &Address,
-    name: &str,
-    pin: B3Hash,
-    room: bool,
-) -> Result<(), kernel::AxError> {
+/// Runs one settings frame through a fresh worker: the construction
+/// every save in this module shares.
+fn run_settings(city_root: &Path, settings: wire::BuildingSettings) -> Result<(), kernel::AxError> {
     let mut worker = crate::worker::RunWorker::new(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
         crate::worker::fixture::hands(),
     )
     .unwrap();
-    worker.handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
-        addr: lab.clone(),
-        sandbox: None,
-        mcp: None,
-        desktop: None,
-        context_second_threshold: None,
-        catalog: None,
-        mcp_references: None,
-        skill_pins: Some(BTreeMap::from([(name.to_owned(), pin)])),
-        reading_room: room.then(|| vec![name.to_owned()]),
-        idem: kernel::IdemKey::derive(
-            &RunId::CITY,
-            Seq::FIRST,
-            format!("{name}:{pin}:room={room}").as_bytes(),
-        ),
-    }))
+    worker.handle(wire::Command::ConfigureBuilding(settings))
 }
 
 fn catalog(city_root: &Path, lab: &Address) -> wire::CatalogAnswer {
@@ -227,14 +244,9 @@ fn an_accepted_skill_removal_leaves_no_historical_ghost_row() {
         .building_skills(&lab)
         .join(kernel::layout::SHELF_INDEX);
     std::fs::write(&index, "version = 1\n").unwrap();
-    let mut worker = crate::worker::RunWorker::new(
+    run_settings(
         dir.path(),
-        runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
-    )
-    .unwrap();
-    worker
-        .handle(wire::Command::ConfigureBuilding(wire::BuildingSettings {
+        wire::BuildingSettings {
             addr: lab.clone(),
             sandbox: None,
             mcp: None,
@@ -245,8 +257,9 @@ fn an_accepted_skill_removal_leaves_no_historical_ghost_row() {
             skill_pins: Some(BTreeMap::new()),
             reading_room: Some(vec!["guide".to_owned()]),
             idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, b"accept-skill-removal"),
-        }))
-        .unwrap();
+        },
+    )
+    .unwrap();
 
     let answer = catalog(dir.path(), &lab);
     assert!(
