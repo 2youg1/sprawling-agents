@@ -138,15 +138,21 @@ fn a_session_reads_as_one_left_edge_with_times_beside_it() {
     let entries = transcript();
     let scene = Scene::inline(&Inline {
         columns: 80,
+        rows: 24,
         erase: 0,
         previous: None,
         entries: &entries,
         live: Some(live("make the August total a test too", 32, None)),
     });
     let (bytes, frame) = drawn(&scene);
-    let (shown, cursor) = screen(80, 34, &[bytes]);
+    let written = String::from_utf8(bytes.clone()).unwrap();
+    assert!(
+        written.contains("  Type \x1b[0;1m/web\x1b[0;2m to open the WebUI"),
+        "{written:?}"
+    );
+    let (shown, cursor) = screen(80, 24, &[bytes]);
     let wanted = [
-        "sprawling  ~/cities/first                   127.0.0.1:7341  /web opens the page",
+        "sprawling  ~/cities/first           127.0.0.1:7341  Type /web to open the WebUI",
         "",
         "01:24:31  › the readings report double-counts August; find where and fix it",
         "",
@@ -179,10 +185,52 @@ fn a_session_reads_as_one_left_edge_with_times_beside_it() {
 }
 
 #[test]
+fn the_composer_sits_at_the_bottom_while_the_window_has_room() {
+    let entries = vec![Entry::Banner {
+        city: "~/cities/first".to_owned(),
+        address: "127.0.0.1:7341".to_owned(),
+        url: "http://127.0.0.1:7341/".to_owned(),
+    }];
+    let mut resting = live("", 0, None);
+    resting.waiting = None;
+    resting.working = None;
+    resting.calling = Vec::new();
+    let scene = Scene::inline(&Inline {
+        columns: 80,
+        rows: 12,
+        erase: 0,
+        previous: None,
+        entries: &entries,
+        live: Some(resting),
+    });
+    let (bytes, frame) = drawn(&scene);
+    let (shown, cursor) = screen(80, 12, &[bytes]);
+    let wanted = [
+        "sprawling  ~/cities/first           127.0.0.1:7341  Type /web to open the WebUI",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "          to the Mayor…",
+        "          ──╌╌╌┄┄┄",
+        "          hall/mayor                                      deepseek-flash · high",
+    ]
+    .join("\n");
+    assert_eq!(shown, wanted);
+    assert_eq!(cursor, (9, 10));
+    assert_eq!(frame.cursor_row, 1);
+}
+
+#[test]
 fn the_next_frame_erases_the_live_region_and_writes_under_the_transcript() {
     let entries = transcript();
     let first = Scene::inline(&Inline {
         columns: 80,
+        rows: 24,
         erase: 0,
         previous: None,
         entries: &entries,
@@ -194,6 +242,7 @@ fn the_next_frame_erases_the_live_region_and_writes_under_the_transcript() {
     }];
     let second = Scene::inline(&Inline {
         columns: 80,
+        rows: 24,
         erase: frame.cursor_row,
         previous: Some(Part::Ended),
         entries: &more,
@@ -213,12 +262,15 @@ fn the_next_frame_erases_the_live_region_and_writes_under_the_transcript() {
         }),
     });
     let (second_bytes, _) = drawn(&second);
-    let (shown, _) = screen(80, 34, &[first_bytes, second_bytes]);
-    let tail: Vec<&str> = shown.lines().rev().take(6).collect();
+    let (shown, _) = screen(80, 24, &[first_bytes, second_bytes]);
+    let tail: Vec<&str> = shown.lines().rev().take(9).collect();
     let wanted = vec![
         "          lab/report                                             deepseek-flash",
         "          ──╌╌╌┄┄┄",
         "          to report…",
+        "",
+        "",
+        "",
         "",
         "            plain lines go to lab/report",
         "01:25:15  ■ done · 44 s",
@@ -247,6 +299,7 @@ fn the_slash_menu_takes_the_place_of_the_settings_row() {
     };
     let scene = Scene::inline(&Inline {
         columns: 80,
+        rows: 6,
         erase: 0,
         previous: None,
         entries: &[],
@@ -287,6 +340,7 @@ fn a_narrow_window_drops_the_times_and_keeps_every_line_inside_it() {
     let entries = transcript();
     let scene = Scene::inline(&Inline {
         columns: 40,
+        rows: 60,
         erase: 0,
         previous: None,
         entries: &entries,

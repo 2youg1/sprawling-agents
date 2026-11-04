@@ -26,6 +26,7 @@ fn a_control_sequence_inside_a_reply_reaches_the_screen_as_a_mark() {
     }];
     let scene = Scene::inline(&Inline {
         columns: 80,
+        rows: 4,
         erase: 0,
         previous: None,
         entries: &entries,
@@ -46,6 +47,7 @@ fn a_scene_cut_short_is_refused_rather_than_read_past() {
     let entries = transcript();
     let scene = Scene::inline(&Inline {
         columns: 80,
+        rows: 24,
         erase: 0,
         previous: None,
         entries: &entries,
@@ -72,6 +74,7 @@ fn a_frame_without_a_live_region_leaves_the_cursor_shown() {
     }];
     let scene = Scene::inline(&Inline {
         columns: 80,
+        rows: 4,
         erase: 0,
         previous: None,
         entries: &entries,
@@ -93,6 +96,7 @@ fn a_narrow_working_row_keeps_who_is_working() {
     narrow.calling = Vec::new();
     let scene = Scene::inline(&Inline {
         columns: 28,
+        rows: 6,
         erase: 0,
         previous: None,
         entries: &[],

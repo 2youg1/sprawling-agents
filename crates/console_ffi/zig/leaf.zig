@@ -6,7 +6,7 @@
 // The console's renderer: one export that reads a scene Rust lent and
 // writes the bytes of one frame into a buffer Rust lent, and nothing
 // else. It reads no clock, opens no file and keeps no state between
-// calls: the frame is a function of the scene and the width in it.
+// calls: the frame is a function of the scene and the terminal size in it.
 //
 // Every pointer is lent for the call alone; the leaf writes nothing past
 // `capacity`, and a frame that does not fit answers `full` so the caller

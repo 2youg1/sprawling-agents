@@ -158,6 +158,9 @@ pub struct Live<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inline<'a> {
     pub columns: u16,
+    /// How many rows the terminal shows; the renderer puts the live
+    /// region at the bottom while the whole region fits.
+    pub rows: u16,
     /// How many rows the cursor stands below the live region the last
     /// frame drew, which this frame erases first.
     pub erase: u16,
@@ -193,6 +196,7 @@ impl Scene {
         let mut scene = Scene::default();
         scene.tag(Part::Inline);
         scene.short(frame.columns);
+        scene.short(frame.rows);
         scene.short(frame.erase);
         scene.byte(frame.previous.map_or(0, Part::number));
         scene.count(frame.entries.len());

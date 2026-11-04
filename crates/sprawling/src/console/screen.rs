@@ -87,7 +87,7 @@ impl Screen {
     /// screen left, the cursor as the person had it, raw mode off.
     pub(crate) fn give_back(&mut self) -> Written {
         let left = self.leave_quiet();
-        let erased = self.frame(&[], None, size().0);
+        let erased = self.frame(&[], None, size());
         let ended = self.write(|out| {
             plain(out)?;
             queue!(out, cursor::SetCursorStyle::DefaultUserShape, cursor::Show)
@@ -108,18 +108,19 @@ impl Screen {
 
     /// One frame on the main screen: the live region drawn last time
     /// erased, `entries` written into the scrollback, and `live` drawn
-    /// under them, `columns` wide.
+    /// under them, at the current terminal `size`.
     pub(crate) fn frame(
         &mut self,
         entries: &[Entry],
         live: Option<Live<'_>>,
-        columns: u16,
+        size: (u16, u16),
     ) -> Written {
         if self.lost || self.is_quiet() {
             return Written::Shown;
         }
         let scene = Scene::inline(&Inline {
-            columns,
+            columns: size.0,
+            rows: size.1,
             erase: self.erase,
             previous: self.previous,
             entries,
@@ -147,7 +148,7 @@ impl Screen {
         let entered = if ALTERNATE.load(Ordering::SeqCst) {
             Written::Shown
         } else {
-            let erased = self.frame(&[], None, size().0);
+            let erased = self.frame(&[], None, size());
             ALTERNATE.store(true, Ordering::SeqCst);
             self.erase = 0;
             worst(

@@ -339,7 +339,7 @@ impl Ui {
             )),
             Face::QuietHost | Face::Opening | Face::Headless | Face::Gone(_) => None,
         };
-        let written = screen.frame(entries, live, super::screen::size().0);
+        let written = screen.frame(entries, live, super::screen::size());
         self.drawn(written);
     }
 

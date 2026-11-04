@@ -282,6 +282,12 @@ sprawling up ./cities/first
 
 按 Esc，终端变成城市的 CLI：第一行写着城市的文件夹和服务地址，最下面是输入行，直接写话发给输入行下方写着的那个房间，或者输入斜杠命令。Tab 补全斜杠命令；几个都合适时打开一个菜单，光标在第一项，Tab 和方向键在其中移动，Enter 选定，所以 `/w`、Tab、Enter 就会打开页面。
 
+横幅写着 `Type /web to open the WebUI`，命令本身用粗体。窗口有空行时，整个活动区贴底；下面两张分别是宽窗口与 61 列窗口里的实际画面。
+
+![宽窗口里的 CLI：横幅中的 WebUI 提示与位于底部的空 composer](images/console-web-entry.png)
+
+![61 列窗口里的 CLI：同样的横幅与位于底部的 composer](images/console-composer-narrow.png)
+
 ![输入 `/w` 再按 Tab 之后的斜杠菜单：光标在 `/web` 上，下面是 `/wire`，以及在其中移动的按键](images/console-slash-menu.png)`/help` 列出全部命令，`/room <addr>` 换一个对话的房间，`/serving` 重报一遍城市在哪里监听，`/web` 再打开一次页面并回到安静宿主，`/quit` 关闭城市。有居民问你事情、输入行又是空的时候，`y` 允许，`n` 拒绝。CLI 会显示你正在对话的那个房间的对话内容，因为是你选了在终端里干活：你说的话、每个 run 用的模型、每次工具调用花了多久、答复和 run 怎样结束，每一行旁边是你这台电脑上的时刻，下面是等你答复的请求和正在工作的居民。它从不显示凭据，用的是你终端自己的配色，安静宿主显示期间它的回滚内容原样保留。
 
 <p align="center">
