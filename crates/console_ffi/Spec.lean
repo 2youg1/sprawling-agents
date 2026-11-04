@@ -99,12 +99,12 @@ pub enum Refused { Malformed, TooLong }
 pub struct TimeOfDay(u32);                             // 本地午夜以来的秒
 pub enum Entry { Banner{..}, You{..}, Head{..}, Reasoning{..}, Tool{..}, Reply{..}, Note{..}, Ended{..}, Resolved{..} }
 pub struct Live<'a> { pub waiting, pub working, pub calling, pub asking, pub composer, pub menu }
-pub struct Inline<'a> { pub columns: u16, pub erase: u16, pub previous: Option<Part>, pub entries: &'a [Entry], pub live: Option<Live<'a>> }
+pub struct Inline<'a> { pub columns: u16, pub rows: u16, pub erase: u16, pub previous: Option<Part>, pub entries: &'a [Entry], pub live: Option<Live<'a>> }
 pub struct Quiet<'a> { pub columns: u16, pub rows: u16, pub url, pub code, pub key, pub transient }
 impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 ```
 
-- **主屏一帧**：从上一帧光标所在的行向上 `erase` 行回到活动区第一行，清到屏底，写下新的转写行，再画活动区，把光标放回 composer。整帧包在 `ESC [ ? 2026 h` 与 `ESC [ ? 2026 l` 之间；不认 2026 的终端忽略它，画出同样的字节。
+- **主屏一帧**：从上一帧光标所在的行向上 `erase` 行回到活动区第一行，清到屏底，写下新的转写行，再画活动区，把光标放回 composer。`rows` 是可见窗口的高度，活动区的位置由 D8 决定。整帧包在 `ESC [ ? 2026 h` 与 `ESC [ ? 2026 l` 之间；不认 2026 的终端忽略它，画出同样的字节。
 - **转写行只写一次**，进终端自己的回滚，搜索、选中、复制都归终端。人说的一行前写 OSC 133 `A`，记得这个标记的终端能在人说过的话之间跳。
 - **安静宿主**：备用屏中央两行——地址、配对码（为超出这台电脑的 serve 现铸的 key 跟在配对码后面）——至多再一行临时行，在下方隔一行。
 -/
@@ -160,4 +160,22 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 /-! D7 composer 照 WebUI 的样子
 
 决定：字在上，下一行一条线跟着字走——实线画到字的最右端（至少两列），后面接 `╌╌╌┄┄┄` 淡出；空的时候线是淡色，有字时实线是默认前景。线下一行左边是房间，右边是平线问的模型与思考档位；斜杠菜单打开时占这一行的位置，至多五项，光标所在那项前画蓝色的 `▎`，最后一行说还有几项与哪些键。来源：`docs/frontend-method.md` §7I。
+-/
+
+/-! D8 窗口尚有空行时活动区贴底
+
+决定：写完本帧的新转写后，先算活动区完整的高度；它的第一行若能向下移而让整个活动区仍在可见窗口内，就移到能让最后一行落在窗口底行的位置，否则从转写之后继续，由终端照常滚动。
+
+理由：空城里把 composer 紧跟在横幅后面会让人以为输入区浮在上方；贴底后，人的视线与终端里常见的输入位置一致。
+
+被否：①改用全屏备用屏——会失去主屏与终端自己的回滚，违背 D1；②只在启动时补固定数量的空行——缩放、多行输入与菜单改变高度后位置就错了。`console_ffi::tests::the_composer_sits_at_the_bottom_while_the_window_has_room` 在终端模拟器里比对整屏与光标；既有逐帧测试守住后续转写与擦除。
+-/
+
+/-! D9 入口提示说明人的动作与结果
+
+决定：横幅的入口提示写成「Type /web to open the WebUI」，其中 `/web` 用粗体，其余字保持淡色。
+
+理由：这句话同时说出要输入什么与会打开什么；粗体只强调命令本身，不占用 ACCENT 的「在动或被选中」语义（D3）。
+
+被否：只把 `page` 换成 `WebUI`——仍没有说明人要输入命令；给整句换蓝色或黄色——静态提示既不是「在动或被选中」，也不是「需要人或出了缺」。`console_ffi::tests::a_session_reads_as_one_left_edge_with_times_beside_it` 比对整句与命令的 SGR 样式。
 -/

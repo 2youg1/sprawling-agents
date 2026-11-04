@@ -144,9 +144,14 @@ fn a_session_reads_as_one_left_edge_with_times_beside_it() {
         live: Some(live("make the August total a test too", 32, None)),
     });
     let (bytes, frame) = drawn(&scene);
+    let written = String::from_utf8(bytes.clone()).unwrap();
+    assert!(
+        written.contains("  Type \x1b[0;1m/web\x1b[0;2m to open the WebUI"),
+        "{written:?}"
+    );
     let (shown, cursor) = screen(80, 34, &[bytes]);
     let wanted = [
-        "sprawling  ~/cities/first                   127.0.0.1:7341  /web opens the page",
+        "sprawling  ~/cities/first          127.0.0.1:7341  Type /web to open the WebUI",
         "",
         "01:24:31  › the readings report double-counts August; find where and fix it",
         "",
@@ -176,6 +181,46 @@ fn a_session_reads_as_one_left_edge_with_times_beside_it() {
     assert_eq!(shown, wanted);
     assert_eq!(cursor, (21, 42));
     assert_eq!(frame.cursor_row, 5);
+}
+
+#[test]
+fn the_composer_sits_at_the_bottom_while_the_window_has_room() {
+    let entries = vec![Entry::Banner {
+        city: "~/cities/first".to_owned(),
+        address: "127.0.0.1:7341".to_owned(),
+        url: "http://127.0.0.1:7341/".to_owned(),
+    }];
+    let mut resting = live("", 0, None);
+    resting.waiting = None;
+    resting.working = None;
+    resting.calling = Vec::new();
+    let scene = Scene::inline(&Inline {
+        columns: 80,
+        erase: 0,
+        previous: None,
+        entries: &entries,
+        live: Some(resting),
+    });
+    let (bytes, frame) = drawn(&scene);
+    let (shown, cursor) = screen(80, 12, &[bytes]);
+    let wanted = [
+        "sprawling  ~/cities/first          127.0.0.1:7341  Type /web to open the WebUI",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "          to the Mayor…",
+        "          ──╌╌╌┄┄┄",
+        "          hall/mayor                                      deepseek-flash · high",
+    ]
+    .join("\n");
+    assert_eq!(shown, wanted);
+    assert_eq!(cursor, (9, 10));
+    assert_eq!(frame.cursor_row, 1);
 }
 
 #[test]

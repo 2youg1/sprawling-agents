@@ -52,9 +52,9 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **CLI（`Cli`）**：主屏、raw 模式、内联，终端自己的回滚、搜索、复制照常可用。屏上分两块：**转写**写一次就进回滚；**活动区**在转写下面，每一帧重画。两块都由控制台的渲染器画（`console_ffi`，`crates/console_ffi/Spec.lean`）：控制台说屏上有什么，渲染器决定它长什么样，颜色只取终端自己的调色板，所以跟着人选的主题走。
 
-- 第一行是横幅：`sprawling  <城目录>`，右边是地址与「/web opens the page」；窗口窄时先省掉提示，再省掉地址。默认房间是 `kernel::consts_policy::HALL_MAYOR`，房间写在 composer 下面那一行。
+- 第一行是横幅：`sprawling  <城目录>`，右边是地址与「Type /web to open the WebUI」（`crates/console_ffi/Spec.lean` D9）；窗口窄时先省掉提示，再省掉地址。默认房间是 `kernel::consts_policy::HALL_MAYOR`，房间写在 composer 下面那一行。
 - 普通一行派给当前房间（`Dispatch`，`Mode::Work`），带 `/model` 与 `/effort` 选下的模型与档位。人提交的一行进转写，前面是本地时刻与 `›`。选中房间的一个 run 照 WebUI 的会话页进转写：第一次请求模型时一行头（住户、模型、模式、档位），每一轮推理的长度，每次工具调用在它答复时一行（名字、对象、用时，失败的标 `failed`），答复的正文（反引号里的代码原样、反引号淡色，`**` 之间加粗，围栏里的行保留空白），最后一行结局与总用时。时刻是这台电脑所在时区的 `HH:MM:SS`（`bin::console::local_time`），由记录的 `t` 换算，不另取时钟。一条记录属于这个房间，当它的地址是这个房间、写它的是这个房间的住户、或它是这个房间里正在工作的那个 run 的一行：run 的请求、调用、答复与冻结不带地址。别的房间与城级的记录不进转写。拒绝与斜杠动词的回答作为控制台自己的一行进转写。
-- 活动区自上而下：最早的待批请求（`?`、它的说明、`y approve   n deny`）；正在工作的 run（`●`、住户、开始的时刻、`esc stops it`）；进行中的调用（至多最新三个，`running`）；`/quit` 问的那一句；然后是 composer——字在上，下一行一条线跟着字走，再下一行左边是房间、右边是平线问的模型与档位。活动区只在有事发生时重画：一条记录、一个键、一个粘贴、一次缩放，从不自己动（`crates/console_ffi/Spec.lean` D4）。
+- 活动区自上而下：最早的待批请求（`?`、它的说明、`y approve   n deny`）；正在工作的 run（`●`、住户、开始的时刻、`esc stops it`）；进行中的调用（至多最新三个，`running`）；`/quit` 问的那一句；然后是 composer——字在上，下一行一条线跟着字走，再下一行左边是房间、右边是平线问的模型与档位。窗口尚有空行时整个活动区贴底，转写增多后照常滚动（`crates/console_ffi/Spec.lean` D8）。活动区只在有事发生时重画：一条记录、一个键、一个粘贴、一次缩放，从不自己动（`crates/console_ffi/Spec.lean` D4）。
 - 键（全部不用 Ctrl 组合键：Ctrl+C 与 Ctrl+V 是几乎所有人都会的两个键，归终端；Alt 在 macOS 默认终端里输入特殊字符、在 Windows Terminal 里是全屏与窗格）：Enter 发送；行尾的 `\` 加 Enter，或终端分得清时的 Shift+Enter，是换行；Esc 依次关菜单、清空输入、中断当前房间的 run（发 `Cancel`）；↑/↓ 是本次会话的历史；←/→、Home、End 移动；Alt+Backspace 删一个词，Alt+←/→ 按词移动；输入为空且有待批请求时 y、n 答它。
 - **斜杠菜单**（`bin::console::ui::menu`）：Tab 补全斜杠动词，以及 `/model` 与 `/effort` 的参数；只有一个合适的就直接换上，几个合适的就打开菜单，光标在第一个——按 `wire::Slash` 的次序，所以 `/w` 加 Tab 加 Enter 是 `/web`。菜单开着时 Tab 与 ↓ 往下，Shift+Tab 与 ↑ 往上，Enter 取光标所在的那一项：不带参数的动词与参数取了就发送，带参数的动词写成「动词加空格」等参数；再打字时菜单跟着筛，什么都不合适就关上。菜单至多显示五项，下面一行说还有几项。
 - 在 Unix 上，控制台向终端要两样东西：不含糊的键（kitty 键盘协议的第一级，Shift+Enter 因此与 Enter 分得开）与整段粘贴（bracketed paste）；不认得的终端忽略这两个请求。Windows 上读键走控制台 API，两样都没有。交还终端之前两样都撤回，光标形状也还原。
