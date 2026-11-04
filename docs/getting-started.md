@@ -282,6 +282,12 @@ This raises the city if the directory does not hold one, serves it on `127.0.0.1
 
 Esc turns the terminal into the city's CLI: its first line names the city's folder and the serving address, and at the foot you write to the room named under the line you type on, or type a slash command. Tab completes a slash command; when several fit, it opens a menu on the first, Tab and the arrows move through it and Enter takes one, so `/w`, Tab, Enter opens the page.
 
+The banner says `Type /web to open the WebUI`, with the command in bold. While the window has room, the whole live region sits at its foot, as these wide and 61-column captures show.
+
+![The CLI in a wide window: the WebUI hint in the banner and the empty composer at the bottom](images/console-web-entry.png)
+
+![The CLI in a 61-column window: the same banner and the composer at the bottom](images/console-composer-narrow.png)
+
 ![The slash menu after `/w` and Tab: `/web` under the cursor, `/wire` below it, and the keys that move through them](images/console-slash-menu.png) `/help` lists the commands, `/room <addr>` changes the room you speak to, `/serving` repeats where the city listens, `/web` opens the page again and returns to the quiet host, and `/quit` closes the city. When a resident asks you something and the line is empty, `y` allows and `n` denies. The CLI shows the conversation of the room you speak to, because you chose to work in the terminal: what you said, each run's model, how long each tool call took, the reply and how the run ended, each beside the time on your clock, and under them what is waiting for you and who is working. It never shows a credential, it draws in your terminal's own colours, and it keeps its scrollback while the quiet host is shown.
 
 <p align="center">
