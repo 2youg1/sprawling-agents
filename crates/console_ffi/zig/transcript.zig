@@ -68,18 +68,24 @@ fn banner(p: *paint.Painter, r: *scene.Reader) Error!void {
     const city = try r.text();
     const address = try r.text();
     const url = try r.text();
-    const hint = "  /web opens the page";
+    const instruction = "  Type ";
+    const command = "/web";
+    const action = " to open the WebUI";
     try p.fit(.bold, "sprawling", 9);
     try p.to(11);
     const room = p.room() -| (text.width(city) + 2);
-    const right = text.width(address) + hint.len;
+    const right = text.width(address) + instruction.len + command.len + action.len;
     const shown_hint = room >= right;
     const shown_address = room >= text.width(address);
     try p.fit(.faint, city, p.room());
     if (!shown_address) return;
     try p.to(p.limit - if (shown_hint) right else text.width(address));
     try p.link(.faint, url, address);
-    if (shown_hint) try p.fit(.faint, hint, hint.len);
+    if (shown_hint) {
+        try p.fit(.faint, instruction, instruction.len);
+        try p.fit(.bold, command, command.len);
+        try p.fit(.faint, action, action.len);
+    }
 }
 
 fn you(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {

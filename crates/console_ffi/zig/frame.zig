@@ -6,8 +6,10 @@
 // One frame on the main screen, as one synchronized update (mode 2026):
 // the live region drawn last time erased from its first row down, the
 // new transcript lines written where it stood, and the live region drawn
-// again under them with the cursor put back in the composer. A terminal
-// that does not know mode 2026 ignores it and draws the same bytes.
+// again under them with the cursor put back in the composer. While the
+// window has room below the transcript, the whole live region sits at
+// its bottom. A terminal that does not know mode 2026 ignores it and
+// draws the same bytes.
 
 const std = @import("std");
 const part = @import("part.zig");
@@ -25,6 +27,7 @@ pub const Left = struct { cursor_row: usize };
 
 pub fn inline_frame(out: *std.Io.Writer, r: *scene.Reader) Error!Left {
     const columns = try r.short();
+    const rows = try r.short();
     const erase = try r.short();
     const before = try r.byte();
     const entries = try r.word();
@@ -42,8 +45,11 @@ pub fn inline_frame(out: *std.Io.Writer, r: *scene.Reader) Error!Left {
     }
     var left: Left = .{ .cursor_row = 0 };
     if (!r.done()) {
-        const top = p.row;
-        const cursor = try live.region(&p, r, grid);
+        const top = try live_top(&p, r, rows);
+        if (top > p.row) try out.print("\x1b[{d};1H", .{top + 1});
+        p = paint.Painter.init(out, columns);
+        p.row = top;
+        const cursor = try live.region(&p, r, Grid.of(&p));
         const up = p.row - cursor.row;
         if (up > 0) try out.print("\x1b[{d}A", .{up});
         try out.print("\x1b[{d}G", .{cursor.column + 1});
@@ -53,4 +59,21 @@ pub fn inline_frame(out: *std.Io.Writer, r: *scene.Reader) Error!Left {
     // whether or not a live region put it back in the composer.
     try out.writeAll("\x1b[?25h\x1b[?2026l");
     return left;
+}
+
+/// Where the live region starts so its last row is the window's bottom,
+/// or where the transcript ended when the region no longer fits below
+/// it. The trial layout writes into the same fixed buffer and is rewound
+/// before the real frame; the reader and terminal see it only once.
+fn live_top(p: *paint.Painter, r: *scene.Reader, rows: u16) Error!usize {
+    const out = p.out;
+    const written = out.end;
+    const unread = r.*;
+    var trial = paint.Painter.init(out, p.limit + 1);
+    trial.row = p.row;
+    _ = try live.region(&trial, r, Grid.of(&trial));
+    const height = trial.row - p.row + 1;
+    out.end = written;
+    r.* = unread;
+    return @max(p.row, @as(usize, rows) -| height);
 }
