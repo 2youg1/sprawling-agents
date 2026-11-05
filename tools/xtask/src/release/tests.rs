@@ -12,9 +12,9 @@ fn one_machine_stays_behind_and_everything_that_explains_the_code_goes_out() {
     }
     for out in [
         "README.md",
-        "README.zh-CN.md",
+        "docs/README.zh-CN.md",
         "AGENTS.md",
-        "ARCHITECTURE.md",
+        "docs/ARCHITECTURE.md",
         "CLAUDE.md",
         "LICENSE",
         "docs/glossary.md",

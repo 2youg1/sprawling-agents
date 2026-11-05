@@ -14,6 +14,11 @@ The documents for people who use, run or change sprawling, grouped by who reads 
 | Someone debugging | [`logging.md`](logging.md) | What goes in the diagnostic log and what goes in the Ledger, and why the two stay apart |
 | Anyone | [`glossary.md`](glossary.md) | What each word means; the `lexicon` gate holds the code and the documents to these words |
 | Someone changing the code | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution preparation, feature admission and submission, with links to the repository rules |
+| Someone changing structure | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and the dependency rules between them, the seams, and where each kind of change goes |
+| Someone running or reading a check | [`verification.md`](verification.md) | The command table, the CI tiers, forks and scheduled workflows |
+| Someone loosening or touching a gate | [`gates.md`](gates.md) | What each machine gate holds, and the rules for changing one |
+| Someone writing or judging tests | [`testing.md`](testing.md) | Scenarios first, the three fixture kinds, and the Rust, Lean and adversary split |
+| Someone designing a screen | [`ui-design.md`](ui-design.md) | The design judgement; the method and the approved design stay in `frontend-method.md` |
 | Someone changing a screen | [`frontend-method.md`](frontend-method.md) | How a screen under `client/` is built, settled and accepted |
 | Anyone checking what is owed | [`third-party.md`](third-party.md) | Whose work this stands on, and the licence obligations |
 

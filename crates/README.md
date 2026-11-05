@@ -1,6 +1,6 @@
 # crates
 
-Every Rust package of the product lives in this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
+Every Rust package of the product lives in this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../docs/ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
 
 ## The crates
 

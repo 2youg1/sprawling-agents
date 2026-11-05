@@ -21,7 +21,7 @@
 //! name survives a reordering that a line number does not.
 
 /// The document every gate in this module's field of view judges.
-pub(crate) const PATH: &str = "ARCHITECTURE.md";
+pub(crate) const PATH: &str = "docs/ARCHITECTURE.md";
 
 /// Every line under the `## <number>` heading, the heading excluded, or
 /// nothing when this document has no such section.

@@ -1,6 +1,6 @@
 # Contributing — preparing and submitting a change
 
-This guide explains contribution preparation, feature admission and submission. [AGENTS.md](../AGENTS.md) holds the repository rules, [ARCHITECTURE.md](../ARCHITECTURE.md) holds structure, and [the glossary](glossary.md) defines the vocabulary. Follow the authority order in AGENTS.md when documents disagree, and correct the lower-priority document in the same change.
+This guide explains contribution preparation, feature admission and submission. [AGENTS.md](../AGENTS.md) holds the repository rules, [ARCHITECTURE.md](ARCHITECTURE.md) holds structure, and [the glossary](glossary.md) defines the vocabulary. Follow the authority order in AGENTS.md when documents disagree, and correct the lower-priority document in the same change.
 
 ## 0 Development tools
 
@@ -12,7 +12,7 @@ Before editing, follow [AGENTS.md's reading requirements](../AGENTS.md#read-befo
 
 Read the official documentation of the tools you use and load the vendor's agent guide or skill when one exists, as the same reading requirements specify. Before changing a client screen, read [the frontend method](frontend-method.md); the client's SPEC-first and red-stage exemptions are defined in [The view layer](../AGENTS.md#the-view-layer).
 
-For a new feature, apply the [core-feature criteria](../AGENTS.md#read-before-you-write) before choosing an implementation and follow that section's commit-body requirement. Use the applicable submission template when opening an issue or pull request.
+A new core feature must clear all five tests before any implementation: the need exceeds what a skill can meet; no hook plugin should own the behaviour; MCP, CLI or ACP integration cannot reasonably meet the requirement and its guarantees; it serves most users; it is neither a theme nor a workflow for one deployment. Otherwise keep it out of core; if it is still worth building, prefer an extension or a separate repository and bring the result back in an issue. If the seams are too narrow, an issue may propose the smallest interface needed before any implementation. The commit body carries one prose paragraph — the need, the alternatives, why the core should own it, with concrete scenarios and evidence for "most users". Bug fixes are exempt, except a new feature bundled with one. Use the applicable submission template when opening an issue or pull request.
 
 ## 2 The five steps of one change
 
@@ -40,7 +40,7 @@ Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state spec
 
 For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply. For pull requests and review comments, follow [Language](../AGENTS.md#language).
 
-Before committing or submitting text or attachments, apply [Privacy](../AGENTS.md#privacy) to establish their public necessity and inspect what readers will receive. Use [the private security channel](../SECURITY.md) for vulnerabilities.
+Before committing or submitting text or attachments, apply [Privacy](../AGENTS.md#privacy) to establish their public necessity and inspect what readers will receive. Use [the private security channel](SECURITY.md) for vulnerabilities.
 
 ### Other projects
 
@@ -85,7 +85,7 @@ Every label — its name, colour and description — has one authority, [`.githu
 
 - `type:` — what the issue is, exactly one: `bug`, `enhancement` or `feature`. The forms apply it: [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml), [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml). An issue about documentation is still one of the three, with `area: docs` naming where it lands.
 - `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary, `crates/` and `tools/`), `docs`.
-- `aspect:` — a cross-cutting concern, zero or more: `performance`, `security`, `accessibility`. A security bug is `type: bug` plus `aspect: security`, reported through [SECURITY.md](../SECURITY.md) rather than a public issue.
+- `aspect:` — a cross-cutting concern, zero or more: `performance`, `security`, `accessibility`. A security bug is `type: bug` plus `aspect: security`, reported through [SECURITY.md](SECURITY.md) rather than a public issue.
 - `status:` — the triage state, below.
 - `help wanted` and `good first issue` — the contribution labels, below.
 - `duplicate`, `invalid`, `wontfix` and `question` — close out or redirect an issue.

@@ -5,11 +5,11 @@
 > dispatched, what is on disk, what crosses the wire, and how the whole thing
 > is verified.
 >
-> It does not teach the vocabulary ([`docs/glossary.md`](docs/glossary.md)),
-> install anything ([`docs/getting-started.md`](docs/getting-started.md)),
+> It does not teach the vocabulary ([`docs/glossary.md`](glossary.md)),
+> install anything ([`docs/getting-started.md`](getting-started.md)),
 > list the rules a change must satisfy
-> ([`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)), or explain how to swap a
-> provider ([`docs/operating.md`](docs/operating.md)).
+> ([`docs/CONTRIBUTING.md`](CONTRIBUTING.md)), or explain how to swap a
+> provider ([`docs/operating.md`](operating.md)).
 >
 > **What is written here is what is true across modules today.** A rule that
 > governs one module lives in that module's SPEC and its rustdoc, and the
@@ -684,9 +684,9 @@ the part worth knowing before starting, not after.
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
-local model — is [`docs/operating.md`](docs/operating.md), and what a
+local model — is [`docs/operating.md`](operating.md), and what a
 change must satisfy before it merges is
-[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
+[`docs/CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## 9 Seven shapes
 
@@ -727,7 +727,7 @@ node's `Held` have none yet, and rest on their types alone.
 
 These expectations are byte comparisons against a compiler's output, so the
 toolchain is part of them. What to do when an installed component changes
-that output is in [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md); it is
+that output is in [`docs/CONTRIBUTING.md`](CONTRIBUTING.md); it is
 a fact about running the tests, not about the design.
 
 ### LLM First: mechanism from the city, method from the model
@@ -1258,7 +1258,7 @@ yet.
 
 Each diagram is Mermaid, so it is text that diffs and reviews like the
 rest of this file and GitHub renders it in place. Nodes use the names in
-[`docs/glossary.md`](docs/glossary.md), or a module path where the
+[`docs/glossary.md`](glossary.md), or a module path where the
 glossary has no name for the thing; the line under each diagram names the
 code it describes, and where the two disagree the code is right.
 

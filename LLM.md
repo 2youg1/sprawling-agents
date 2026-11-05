@@ -138,7 +138,7 @@ tree is not an operating-system sandbox, and it is copied from the run's own roo
 not the whole building; host-command guarantees depend on the
 selected platform mechanism. Built-in taint gates do not control all external
 programs. Use [execution boundaries](docs/operating.md#how-exec-is-confined) and
-[the security policy](SECURITY.md) when those conditions affect the reader's task.
+[the security policy](docs/SECURITY.md) when those conditions affect the reader's task.
 
 The wire serves both the browser and scripts, and every caller presents a
 credential, on loopback too: a browser pairs once and then signs in with a
@@ -167,11 +167,11 @@ Use [performance](docs/performance.md) for monitoring, reproducible workloads an
 Use [getting started](docs/getting-started.md) for installation, first work,
 Sessions, skills and model setup; use [operating](docs/operating.md) for control,
 MCP, remote access and failure recovery. The [wire reference](docs/wire.md)
-contains CLI usage, frames, answers and exit codes. [Architecture](ARCHITECTURE.md)
+contains CLI usage, frames, answers and exit codes. [Architecture](docs/ARCHITECTURE.md)
 explains runtime flow, document layout, extension seams and verification;
 [the glossary](docs/glossary.md) defines concepts. [Third-party sources](docs/third-party.md)
 identify upstream material and licences. [AGENTS.md](AGENTS.md) governs changes
-to this repository, and [SECURITY.md](SECURITY.md) governs vulnerability reports.
+to this repository, and [SECURITY.md](docs/SECURITY.md) governs vulnerability reports.
 
 </references>
 

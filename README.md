@@ -4,7 +4,7 @@
 
 **Let agents live like citizens in the “city” of sprawling, and save your attention and time.**
 
-<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
+<p align="center"><a href="README.md">English</a> · <a href="docs/README.zh-CN.md">简体中文</a></p>
 
 <p align="center">
   <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main"></a>
@@ -127,7 +127,7 @@ The page and the whole city are served and run by one process, with no database 
 
 ### Privacy
 
-A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. The port on your own machine asks every caller for a credential, so a web page in another tab cannot drive the city: the browser `/web` opens is paired without typing, a second browser asks for the pairing code the terminal shows, and a script on this machine reads a key file that only your account can read ([SECURITY.md](SECURITY.md)). The programs the city starts, such as ACP agents, MCP servers and browsers, do not inherit the city's credentials from its environment. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
+A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. The port on your own machine asks every caller for a credential, so a web page in another tab cannot drive the city: the browser `/web` opens is paired without typing, a second browser asks for the pairing code the terminal shows, and a script on this machine reads a key file that only your account can read ([SECURITY.md](docs/SECURITY.md)). The programs the city starts, such as ACP agents, MCP servers and browsers, do not inherit the city's credentials from its environment. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
 
 ### Code signing policy
 
@@ -137,15 +137,15 @@ Free code signing provided by [SignPath.io](https://signpath.io), certificate by
 - **Reviewers** — a change proposed by anyone outside the project is reviewed in its pull request before it merges.
 - **Approvers** — [@2youg1](https://github.com/2youg1) approves every signing request before a binary is signed.
 
-Privacy policy: [Privacy](#privacy) in this file, and [SECURITY.md](SECURITY.md). The services a city reaches keep their own: the model providers you connect, and Exa, which the default web search sends search words to ([Exa privacy policy](https://exa.ai/privacy-policy)).
+Privacy policy: [Privacy](#privacy) in this file, and [SECURITY.md](docs/SECURITY.md). The services a city reaches keep their own: the model providers you connect, and Exa, which the default web search sends search words to ([Exa privacy policy](https://exa.ai/privacy-policy)).
 
 ### A history you can replay
 
-Every decision the city makes is a line in the Ledger, and replaying those lines on any machine gives a byte-for-byte identical result, because decision paths take time as a parameter, use no random source and keep a fixed order ([determinism](ARCHITECTURE.md#10-determinism-and-hardening)). A replay does not run tools or call models again; it reads back the results recorded at the time. The city supplies only the facts and the limits, and leaves how to do the work to the model ([LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)).
+Every decision the city makes is a line in the Ledger, and replaying those lines on any machine gives a byte-for-byte identical result, because decision paths take time as a parameter, use no random source and keep a fixed order ([determinism](docs/ARCHITECTURE.md#10-determinism-and-hardening)). A replay does not run tools or call models again; it reads back the results recorded at the time. The city supplies only the facts and the limits, and leaves how to do the work to the model ([LLM First](docs/ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)).
 
 ### Customisation and development
 
-How agents work is defined by role documents, project rules and skills; connect whatever models and MCP tools you need (one provider can hold several accounts, used in the priority order you set), or bring in any agent that speaks ACP: the ACP page lists the agents found on this machine and the ACP registry's catalog, and takes a pasted command or configuration block. You can build your own interface on the wire, or change the runtime along the seams in the architecture. If your workflow or AgentOS needs standing project teams, handoffs through documents and a shared history on one machine, these parts are there to build it with; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) shows where to change the runtime.
+How agents work is defined by role documents, project rules and skills; connect whatever models and MCP tools you need (one provider can hold several accounts, used in the priority order you set), or bring in any agent that speaks ACP: the ACP page lists the agents found on this machine and the ACP registry's catalog, and takes a pasted command or configuration block. You can build your own interface on the wire, or change the runtime along the seams in the architecture. If your workflow or AgentOS needs standing project teams, handoffs through documents and a shared history on one machine, these parts are there to build it with; [integrations](docs/integrations.md) covers the existing connections, and [architecture](docs/ARCHITECTURE.md#8-where-to-change-what) shows where to change the runtime.
 
 ## Why I built this
 
@@ -184,7 +184,7 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 | [`docs/wire.md`](docs/wire.md) | The CLI, frames, answers and exit codes for controlling the city from a program |
 | [`docs/integrations.md`](docs/integrations.md) | Any ACP agent as a resident, MCP tool servers, and controlling the city through the CLI from an existing agent |
 | [`docs/performance.md`](docs/performance.md) | Monitor readings, reproducible workloads and where the measurements come from |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and the dependency rules between them, the seams, one dispatch from start to finish, what is on disk, how it is verified, and where each kind of change goes |
+| [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The crates and the dependency rules between them, the seams, one dispatch from start to finish, what is on disk, how it is verified, and where each kind of change goes |
 | [`AGENTS.md`](AGENTS.md) | The rules every change keeps and the commands that check them; people and agents both read it first |
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Preparing a contribution, feature admission and the submission process, with the way into the repository rules |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
@@ -193,8 +193,8 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 | [`crates/city/skills/`](crates/city/skills/) | The skills distributed with the release |
 | [`docs/logging.md`](docs/logging.md) | What goes into the diagnostic log, what goes into the Ledger, and why the two are kept apart |
 | [`docs/third-party.md`](docs/third-party.md) | The upstream facts this repository follows, credits and licence obligations |
-| [`CHANGELOG.md`](CHANGELOG.md) | What each release changed, and which known problems are still unfixed |
-| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
+| [`CHANGELOG.md`](docs/CHANGELOG.md) | What each release changed, and which known problems are still unfixed |
+| [`SECURITY.md`](docs/SECURITY.md) | How to report a vulnerability |
 
 ## Sources and credits
 
@@ -202,6 +202,6 @@ Provider interfaces follow vendor documentation, and ACP agent launch commands f
 
 The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills; `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository; all four keep the MIT licence. Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
 
-To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Report vulnerabilities through the private channel in [SECURITY.md](SECURITY.md).
+To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Report vulnerabilities through the private channel in [SECURITY.md](docs/SECURITY.md).
 
 The project is licensed under [MPL-2.0](LICENSE); the shipped skills each carry their own licence with their files.
