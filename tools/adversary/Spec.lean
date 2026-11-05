@@ -47,7 +47,7 @@ import tools.adversary.spec.Model
 1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，本规格不抄。
 
    **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
-2. `just check` 不读本目录的任何文件：删掉 `tools/adversary/` 后 `just check` 的每一步不变。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
+2. `just check` 不构建或运行检验器；`xtask spec` 读取本规格的 Lean 文件，检查 `sorry`、`admit`、`axiom` 与不允许的 import。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。
 5. **咬得动的证据**：把 `Model.lean` 的 `refusal` 里 `work` 那条停摆守卫摘掉后，`a halted city takes no work until it is released` 必须失败。一个永远为真的性质与没有性质等价。
@@ -71,7 +71,7 @@ import tools.adversary.spec.Model
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
-| `just check` 读不读本目录 | `AGENTS.md` 写着 `just check` 不读 `tools/adversary/` 下的任何文件。本规格迁到 Lean 之后，`just models` 构建本文件与 `spec/`（ARCHITECTURE.md §11 为 `tools/` 下的规格定的位置），仍不构建检验器 | 那一句要改成「不构建检验器」；它在 `AGENTS.md`，本次迁移没有改它，这一格等它改了就删 |
+| `just check` 怎样读这个目录 | 不构建或运行检验器；`xtask spec` 读取本规格的 Lean 文件（`docs/testing.md`），`just models` 构建本文件与 `spec/`（ARCHITECTURE.md §11 为 `tools/` 下的规格定的位置） | 检验器或 `spec` 门的读取范围改变时 |
 | 协作那一串在哪栋楼里走 | 在一栋要评审的楼（`beta`）自己的计划上走：`plan` 只读写派活那栋楼自己的 `Roadmap.md`，市长在 City Hall 分的是 hall 的计划，没有一栋 builder 楼从那里认领，而 City Hall 没有自己的树，提不出请求。所以分计划的是这栋楼里的一个居民（`beta/planner`），市长那一半——City Hall 把一件事分给几栋楼——U9 不走 | 一栋楼的 `plan` 能认领另一栋楼计划里的叶子时，分计划的那一步改由 `hall/mayor` 来做 |
 | 计划的第一行谁写 | 人用编辑器写：新立的楼的 `Roadmap.md` 一行都没有，`plan` 的 `split` 只分已有的行，而门（`Door.lean`）不拼写 `put_spine`。人照模板的六列写下一行，与 U9 改阅览室、改 `review` 那两处是同一种手动作 | 门拼写了 `put_spine` 之后，这一步经它写，断言一字不改 |
 | 一次可用性验收还该走什么 | U9 走的是一个人第一天能做的事：城答话、挂上 provider、立楼、准入 skill、派活到结尾、历史自证；进程被杀之后城回来接着干；以及一栋楼里的协作：分计划、认领冲突、重派、评审不通过 | 市长跨楼分活、红队消融与多日小镇属 V0.1.0（G4、G8），各自照 U9 的样子从 justfile 接收替身 |
@@ -599,7 +599,7 @@ D4 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个
 
 1. 本文件与 `spec/` 下的分部。
 2. `ARCHITECTURE.md` §11 的验证层表——本目录是 V9 之外的一层，记为 V10，并写明它不是门。
-3. `AGENTS.md` 的命令表（`just adversary` 一行）与边界那一节。
+3. `docs/verification.md` 的命令表（`just adversary` 一行）与 `docs/testing.md` 的边界那一节。
 4. `justfile` 的 `adversary` 配方。
 5. `.gitignore` 的 `/.lake`（Lean 包在仓库根），以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。

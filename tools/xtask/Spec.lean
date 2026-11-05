@@ -23,7 +23,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 
 /-! ## 1 需求分解
 
-把 ARCHITECTURE.md 与 AGENTS.md 里能由机器判定的规则变成检查。门的名册与次序只住 `gates::GATES`（§7），下表只说每道门判什么，另列几条不是门的命令：
+把 ARCHITECTURE.md、AGENTS.md 与 docs/gates.md 里能由机器判定的规则变成检查。门的名册与次序只住 `gates::GATES`（§7），下表只说每道门判什么，另列几条不是门的命令：
 
 | 单元 | 一句话 |
 |---|---|
@@ -109,7 +109,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 
 /-! ## 5 权威信源
 
-AGENTS.md 的「Rust」一节（硬化规则）与「The machine gates」一节（门表与门机械的提交纪律）；MPL 头全文（`LICENSE`）；退役词全集（`tools/xtask/lexicon.toml`）；ARCHITECTURE.md §3（`depmap` 与 `directions` 围栏块）、§4（缝清单）、§11（「Specifications in Lean」：Lean 规格的布局与门读它的受限形状）；`architecture.toml`（模块图字段契约）；`tools/xtask/budgets.toml`（每一项预算）；`skills/sdd/SKILL.md`（`spec` 骨架的十七节）。
+AGENTS.md 的「Rust」一节（工程判断与平台调用）、ARCHITECTURE.md §10（硬化规则）、docs/gates.md（门表与门机械的提交纪律）；MPL 头全文（`LICENSE`）；退役词全集（`tools/xtask/lexicon.toml`）；ARCHITECTURE.md §3（`depmap` 与 `directions` 围栏块）、§4（缝清单）、§11（「Specifications in Lean」：Lean 规格的布局与门读它的受限形状）；`architecture.toml`（模块图字段契约）；`tools/xtask/budgets.toml`（每一项预算）；`skills/sdd/SKILL.md`（`spec` 骨架的十七节）。
 -/
 
 /-! ## 6 命名统一
@@ -1434,7 +1434,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 /-! ## 17 文档关系
 
-新增或删去一道门时，同一枚提交改 `gates::GATES` 与 AGENTS.md「The machine gates」一节的门表；没有门比较这两者（AGENTS.md 在那一节里写明），由评审核对。门机械的路径清单变时，AGENTS.md 同一节的清单同集更新。
+新增或删去一道门时，同一枚提交改 `gates::GATES` 与 docs/gates.md 的门表；没有门比较这两者（docs/gates.md 写明），由评审核对。门机械的路径清单变时，docs/gates.md 的清单同集更新。
 
 文档里的数字不靠同步，靠受管区段：把数字圈进一对 `xtask:begin` ／ `xtask:end` 注释，`cargo xtask docnum --write` 负责它此后的每一次取值（§8-16）。
 
