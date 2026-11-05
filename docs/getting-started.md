@@ -2,7 +2,7 @@
 
 This guide takes you from nothing installed to a city that does work for you, and explains every idea you meet on the way. It is written for two kinds of reader: someone who already uses a terminal agent such as Claude Code or Codex CLI, and someone who has only used a chat window and has never handed a model a folder to work in. Part 1 explains the ideas, Part 2 walks one complete loop from install to a reviewed merge on your branch, and Part 3 covers what you do with a city once it is running.
 
-For the meaning of a single word, [`glossary.md`](glossary.md) is the reference; for day-to-day operation and recovery, [`operating.md`](operating.md); for the design, [`../ARCHITECTURE.md`](ARCHITECTURE.md). 中文版：[`getting-started.zh-CN.md`](getting-started.zh-CN.md).
+For the meaning of a single word, [`glossary.md`](glossary.md) is the reference; for day-to-day operation and recovery, [`operating.md`](operating.md); for the design, [`ARCHITECTURE.md`](ARCHITECTURE.md). 中文版：[`getting-started.zh-CN.md`](getting-started.zh-CN.md).
 
 ---
 

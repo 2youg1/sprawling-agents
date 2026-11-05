@@ -2,7 +2,7 @@
 
 > **For someone using this city every day.** It covers steering and stopping work, answering what residents ask, what each page answers, driving a city from a script, and the routes out of the situations that actually occur.
 >
-> It does not cover installation ([`getting-started.md`](getting-started.md)) or the design ([`../ARCHITECTURE.md`](ARCHITECTURE.md)). The diagnostic log has its own file ([`logging.md`](logging.md)), because it is a thing to understand once rather than a step to follow.
+> It does not cover installation ([`getting-started.md`](getting-started.md)) or the design ([`ARCHITECTURE.md`](ARCHITECTURE.md)). The diagnostic log has its own file ([`logging.md`](logging.md)), because it is a thing to understand once rather than a step to follow.
 
 ## What the User does to running work
 
