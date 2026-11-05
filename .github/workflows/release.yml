@@ -449,7 +449,7 @@ jobs:
           #
           # Relative links are why this is a full URL rather than a
           # short one. A release body resolves them against
-          # `<repo>/blob/<tag>/`, so `CHANGELOG.md` renders as a path
+          # `<repo>/blob/<tag>/`, so `docs/CHANGELOG.md` renders as a path
           # inside the tag directory and 404s; v0.0.4 shipped exactly
           # that broken link. Only an absolute URL survives.
           #
@@ -459,7 +459,7 @@ jobs:
           anchor=$(printf '%s' "${GITHUB_REF_NAME}" | tr 'A-Z' 'a-z' | tr -d '.')
           notes="${RUNNER_TEMP}/release-notes.md"
           cp .github/release-notes.md "${notes}"
-          printf '\n📋 What changed / 本版改动：[CHANGELOG.md](%s/%s/blob/main/CHANGELOG.md#%s)\n' \
+          printf '\n📋 What changed / 本版改动：[CHANGELOG.md](%s/%s/blob/main/docs/CHANGELOG.md#%s)\n' \
             "${GITHUB_SERVER_URL}" "${GITHUB_REPOSITORY}" "${anchor}" >>"${notes}"
           # Who this version came from, in GitHub's own words: the pull requests
           # merged since the previous tag, and the contributors who were new
