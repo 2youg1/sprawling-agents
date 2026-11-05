@@ -90,7 +90,7 @@ fn prose_names_no_spec_the_tree_lacks() {
         "crates/j/src/lib.rs",
         "// see x-SPEC\nconst S: &str = \"y-SPEC.md\";\n",
     );
-    crate::root::fixture::write(&root, "CHANGELOG.md", "old-SPEC.md\n");
+    crate::root::fixture::write(&root, "docs/CHANGELOG.md", "old-SPEC.md\n");
     assert_eq!(
         judged(&root),
         Ok(vec![
