@@ -4,7 +4,7 @@ A violation turns the check red with a message naming the rule, the violation an
 
 | Gate | Holds |
 |---|---|
-| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust); `unsafe` only in `crates/desktop/ffi` and `crates/console_ffi` |
+| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); `unsafe` only in `crates/desktop/ffi` and `crates/console_ffi` |
 | `xtask header` | the MPL-2.0 notice, then the copyright line, atop every `.rs` file |
 | `xtask lexicon` | one name per concept, from the glossary |
 | `xtask modmap`, `xtask length` | production modules in the module map; production functions within 200 lines and 4 parameters |
