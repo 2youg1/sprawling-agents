@@ -109,13 +109,13 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "crate_graph",
-        home: "the depmap block in ARCHITECTURE.md section 3",
+        home: "the depmap block in docs/ARCHITECTURE.md section 3",
         takes: None,
         recount: |root, _arg| depmap::graph(&walk::read_text(&root.join(architecture::PATH))?),
     },
     Fact {
         key: "crate_table",
-        home: "cargo metadata, the depmap block in ARCHITECTURE.md section 3, and the family \
+        home: "cargo metadata, the depmap block in docs/ARCHITECTURE.md section 3, and the family \
                duties in architecture.toml",
         takes: None,
         recount: |root, _arg| crate_table::recount(root),

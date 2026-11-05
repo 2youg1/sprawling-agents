@@ -2,7 +2,7 @@
 
 这份指南带你从什么都没装，走到一座替你干活的城市，并把路上遇到的每个概念讲清楚。它写给两类读者：已经在用 Claude Code、Codex CLI 这类终端 agent 的人，以及只用过聊天窗口、从没把一个文件夹交给模型去干活的人。第一部分讲概念，第二部分从安装到一次落在你分支上、经过审查的合并完整走一遍，第三部分讲城市跑起来之后你日常做什么。
 
-查单个词的意思看 [`glossary.md`](glossary.md)；日常操作与出错后的处置看 [`operating.md`](operating.md)；设计看 [`../ARCHITECTURE.md`](../ARCHITECTURE.md)。English: [`getting-started.md`](getting-started.md)。下文按钮与页面的名字取界面的中文；界面切到英文时，两份文档一一对应。
+查单个词的意思看 [`glossary.md`](glossary.md)；日常操作与出错后的处置看 [`operating.md`](operating.md)；设计看 [`ARCHITECTURE.md`](ARCHITECTURE.md)。English: [`getting-started.md`](getting-started.md)。下文按钮与页面的名字取界面的中文；界面切到英文时，两份文档一一对应。
 
 ---
 

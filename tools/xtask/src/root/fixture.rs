@@ -53,7 +53,7 @@ const FILES: [(&str, &str); 8] = [
     ),
     ("crates/j/src/lib.rs", ""),
     (
-        "ARCHITECTURE.md",
+        "docs/ARCHITECTURE.md",
         "# Fixture\n\n## 2 Crates\n\n```depmap\nk:\nj: k\n```\n\n## 4 Seams\n\n```directions\n```\n",
     ),
     (

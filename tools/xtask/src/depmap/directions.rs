@@ -89,7 +89,7 @@ pub(super) fn parse_block(text: &str) -> Result<Vec<Direction>, XtaskError> {
     let mut lines = text.lines().map(str::trim);
     if !lines.any(|line| line == "```directions") {
         return Err(doc_error(
-            "no ```directions fenced block found in ARCHITECTURE.md".to_owned(),
+            "no ```directions fenced block found in docs/ARCHITECTURE.md".to_owned(),
         ));
     }
     let mut out = Vec::new();
