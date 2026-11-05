@@ -111,7 +111,7 @@ pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String
     }
     Err(XtaskError::Doc {
         file: ARCH.to_owned(),
-        msg: "no closed ```depmap fenced block found in ARCHITECTURE.md".to_owned(),
+        msg: "no closed ```depmap fenced block found in docs/ARCHITECTURE.md".to_owned(),
     })
 }
 

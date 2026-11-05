@@ -2,7 +2,7 @@
 
 Everything between a decision to call a model and the bytes on the wire. The city keeps one canonical request shape, and `dialect` translates it to and from each provider's format, OpenAI-shaped or Anthropic-shaped, as pure functions. `endpoint` is the HTTP client this crate writes itself and the production adapter of the `kernel::model` seam. `credential` takes custody of the API keys a person hands over, keeps them in the vault, and redeems a `secret:` reference only when a request is assembled; a subscription does not pass through this crate, and reaches the city through an ACP agent instead. The other modules record cost against market snapshots (`market`, `cost`), give each endpoint its permits and queue and hold calls that share a cold prefix behind one pre-warm (`concurrency`, `hold`), keep the endpoint book the Ledger rebuilds (`router`), and write down once what each vendor's documentation says about hosts, output ceilings and thinking levels (`provider`). Rust code names the crate `gateway`; `cargo -p` takes `sprawling-gateway`.
 
-It depends on `kernel` and `child`. `agent_protocols`, `accounting` and `sprawling` depend on it in the product, and `citysim` outside it; `cargo tree --workspace -i sprawling-gateway --depth 1 -e normal` prints the current list, and the `depmap` block in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) section 3 holds what each crate may name.
+It depends on `kernel` and `child`. `agent_protocols`, `accounting` and `sprawling` depend on it in the product, and `citysim` outside it; `cargo tree --workspace -i sprawling-gateway --depth 1 -e normal` prints the current list, and the `depmap` block in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3 holds what each crate may name.
 
 ## Specification
 

@@ -30,7 +30,7 @@ const CITED: &str = "-SPEC";
 
 /// The one document whose SPEC names are history: each of its sections
 /// describes the tree of that release.
-const HISTORY: &str = "CHANGELOG.md";
+const HISTORY: &str = "docs/CHANGELOG.md";
 
 /// The extensions whose prose lines `release::is_prose` can tell apart.
 const PROSE: [&str; 4] = [".md", ".html", ".rs", ".lean"];

@@ -2,7 +2,7 @@
 
 Use the performance page for a live city's resource readings, the conversation and cost views for model and tool activity, and `sprawling gauge` for repeatable command or process measurements. These answer different questions: provider response time includes external waiting, while a local harness benchmark measures the work sprawling owns.
 
-The [performance register](../tools/xtask/budgets.toml) is the authority for project budgets, recorded baselines, measurement recipes and whether a reading is owed. The [architecture's performance section](../ARCHITECTURE.md#the-performance-register) renders its managed figures and explains their scope. Read each row's `status` before using a number: a reading from an earlier tree does not establish the performance of the current release. This guide supplies methods, not a second baseline table.
+The [performance register](../tools/xtask/budgets.toml) is the authority for project budgets, recorded baselines, measurement recipes and whether a reading is owed. The [architecture's performance section](ARCHITECTURE.md#the-performance-register) renders its managed figures and explains their scope. Read each row's `status` before using a number: a reading from an earlier tree does not establish the performance of the current release. This guide supplies methods, not a second baseline table.
 
 ## Watch a city
 
