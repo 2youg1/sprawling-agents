@@ -660,16 +660,18 @@ minimum_worthwhile_relative_permille = 50
 minimum_worthwhile_absolute_us = 1000
 bootstrap_confidence_permille = 9500
 bootstrap_resamples = 10000
-status = "instrumented, not gated; no baseline is recorded yet. Missing, malformed and non-CPython guests fail with E_TOOL_UNAVAILABLE and no Python report. Prewarm awaited/racing and instantiate/interpreter-initialization rows remain uninstrumented, so S1 remains pending. For a candidate, interleave baseline and candidate on one machine in release; adopt only when the bootstrap interval of the median relative change at the declared confidence excludes zero and the improvement clears both minimum-worthwhile fields. Apply Holm correction across the candidate's declared primary metrics. The guest-initialization figures are targets, not readings."
+change_method = "pre-registered difference-in-differences (DiD), with distribution-first reporting and round-level dependence handling under docs/performance.md"
+status = "instrumented, not gated; no baseline is recorded yet. Missing, malformed and non-CPython guests fail with E_TOOL_UNAVAILABLE and no Python report. Prewarm awaited/racing and instantiate/interpreter-initialization rows remain uninstrumented, so S1 remains pending. Current fixed counts are pilot settings, not a precision-based final design. Before any candidate, pre-register an unaffected control and the full protocol named in change_method; adopt only when its DiD interval at the declared confidence excludes zero and clears both minimum-worthwhile fields, with Holm correction across the declared primary metrics. The guest-initialization figures are targets, not readings."
 
 # Declared before any pooling candidate. The S3 probe and any S4 campaign use
 # the comparison method and confidence declared by [python_execution].
 [python_pooling]
 what = "the adopt/reject boundary for a bench-only pooling probe and any later pooling campaign"
-measured_by = "just bench python_execution rows for baseline and candidate, then the S3 bench-only probe; no production pooling is enabled by this row"
+measured_by = "just bench python_execution rows for baseline and candidate, then the S3 bench-only probe; the DiD design and distribution evidence follow docs/performance.md; no production pooling is enabled by this row"
 minimum_warm_p50_reduction_permille = 100
 minimum_concurrent_throughput_increase_permille = 50
 maximum_warm_p99_regression_permille = 50
+estimator = "warm p50 and p99 use a pre-registered quantile-DiD estimator; concurrent throughput uses log-scale DiD; docs/performance.md owns the protocol"
 status = "declared before any candidate run, not gated. Adopt only when both the warm-p50 reduction and concurrent-throughput increase clear their minima with corrected bootstrap intervals at the declared confidence excluding zero, warm p99 stays within its declared regression allowance, and after-drain retention stays inside the explicit S4 pool bound derived from the fixed guest and product concurrency. Otherwise reject pooling; an undecided campaign is a rejection. No candidate has run."
 
 [local_latency]
