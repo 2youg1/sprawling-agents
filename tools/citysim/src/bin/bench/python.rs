@@ -6,9 +6,9 @@
 //! Real CPython-WASI execution readings; WAT correctness fixtures are
 //! never performance substitutes (`tools/citysim/spec/Bench.lean` §8-6-1).
 
-use std::io::{BufRead as _, BufReader, Write as _};
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+
 use std::sync::{Barrier, LazyLock, mpsc};
 use std::time::Duration;
 
@@ -19,27 +19,29 @@ use sprawling::monitor::tree::{Tree, TreeReading};
 
 use super::reading::{MachineClass, row_line, spread_of};
 
-/// Enough cold processes to expose startup variation without letting the
-/// Python family dominate an already broad `just bench` run.
-const COLD_SAMPLES: usize = 5;
+mod cold;
+pub(crate) use cold::COLD_COMMAND;
+
+/// Pilot counts for a baseline capture; a final comparison chooses precision
+/// from its pre-registered interval width instead of treating these as enough.
 const WARM_SAMPLES: usize = 20;
 const CONCURRENT_CALLERS: usize = 4;
 const CONCURRENT_BURSTS: usize = 5;
-const COLD_PATIENCE: Duration = Duration::from_secs(120);
-const PROCESS_POLL: Duration = Duration::from_millis(10);
 /// The process-table reader is deliberately not run more often than gauge's
 /// shortest beat: a finer reading can disturb the latency it is measuring.
 const MEMORY_BEAT: Duration = sprawling::monitor::tree::MINIMUM_BEAT;
-pub(crate) const COLD_COMMAND: &str = "python-cold";
-const COLD_COMPLETE_LINE: &str = "python-cold-complete\n";
+
 const STATE_WRITTEN: &str = "sprawling-state-written";
 const STATE_CLEAN: &str = "sprawling-state-clean";
 const STATE_LEAKED: &str = "sprawling-state-leaked";
 
-/// A deterministic resident-shaped script against the advertised stdlib.
-/// Its implementation assertion and marker make the first call both the
-/// measured work and the proof that the selected guest is CPython.
+/// A deterministic resident-shaped script against the advertised stdlib. Its
+/// implementation assertion and exact output validate the configured fixture;
+/// S2 still owns supply-chain provenance.
 const MARKER: &str = "sprawling-python-bench-v1:";
+const EXPECTED_SUFFIX: &str = "7:2:alpha,beta\n";
+static EXPECTED: LazyLock<Vec<u8>> =
+    LazyLock::new(|| format!("{MARKER}{EXPECTED_SUFFIX}").into_bytes());
 static SCRIPT: LazyLock<String> = LazyLock::new(|| {
     format!(
         r#"import collections
@@ -53,7 +55,7 @@ right = "alpha gamma beta"
 counts = collections.Counter(re.findall(r"[a-z]+", left))
 diff = list(difflib.unified_diff(left.split(), right.split()))
 ordered = sorted(counts.items())
-names = itertools.chain.from_iterable((name for name, _count in ordered))
+names = itertools.chain.from_iterable([name] for name, _count in ordered)
 print(f"{MARKER}{{len(diff)}}:{{counts['beta']}}:{{','.join(names)}}")
 "#
     )
@@ -122,6 +124,8 @@ struct Observation {
 struct Guest {
     path: PathBuf,
     digest: B3Hash,
+    /// Owns the snapshot directory for every call in this measurement.
+    _snapshot: tempfile::TempDir,
 }
 
 /// Two digests always travel together: neither a guest nor a script reading
@@ -137,7 +141,6 @@ struct Identity {
 struct Prepared {
     guest: Guest,
     sandbox: WasmtimeSandbox,
-    expected: Vec<u8>,
 }
 
 /// Measures the external guest selected by the production doctor door.
@@ -156,17 +159,15 @@ pub(crate) fn measure_as(arm: Arm) -> Result<Report, String> {
 
 /// Runs exactly one real CPython call in this fresh process, then writes and
 /// flushes the completion line that ends the parent's timing.
-pub(crate) fn cold_child(expected_guest: &str) -> Result<(), String> {
-    let wasm = sprawling::doctor::usable_python_wasm()
-        .ok_or_else(|| prerequisite("the doctor found no usable CPython-WASI guest".to_owned()))?;
-    let prepared = prepare(&wasm)?;
+pub(crate) fn cold_child(expected_guest: &str, snapshot: &Path) -> Result<(), String> {
+    let prepared = prepare(snapshot)?;
     if prepared.guest.digest.to_string() != expected_guest {
         return Err(fixture(
             "the cold child received different guest bytes from its parent",
         ));
     }
     let mut out = std::io::stdout().lock();
-    out.write_all(COLD_COMPLETE_LINE.as_bytes())
+    out.write_all(cold::COMPLETE_LINE.as_bytes())
         .and_then(|()| out.flush())
         .map_err(|why| format!("report the cold CPython call's completion: {why}"))
 }
@@ -193,7 +194,7 @@ fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
     let mut report = Report::new(arm);
     report.add(record(
         "python_cold_call",
-        cold_calls(identity.guest)?,
+        cold::calls(&prepared.guest)?,
         identity,
         " mode=no_prewarm",
     )?);
@@ -235,12 +236,15 @@ fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
         identity,
         &format!(" concurrency={CONCURRENT_CALLERS} bursts={CONCURRENT_BURSTS}"),
     )?);
+    report
+        .observations
+        .extend(round_observations(identity, &concurrent.walls));
     let memory = measure_memory(&prepared)?;
     report.lines.push(memory_line(identity, &memory)?);
     report
         .observations
         .extend(memory_observations(identity, &memory));
-    if Guest::at(wasm)?.digest != prepared.guest.digest {
+    if Guest::digest_at(&prepared.guest.path)? != prepared.guest.digest {
         return Err(fixture(
             "the guest bytes changed while the baseline was running",
         ));
@@ -249,17 +253,33 @@ fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
 }
 
 impl Guest {
-    fn at(path: &Path) -> Result<Guest, String> {
-        let bytes = std::fs::read(path).map_err(|why| {
+    /// Reads the configured source once, then executes only a bench-owned
+    /// snapshot whose digest is the identity of those same bytes.
+    fn at(source: &Path) -> Result<Guest, String> {
+        let bytes = std::fs::read(source).map_err(|why| {
             prerequisite(format!(
                 "read the CPython-WASI guest {}: {why}",
-                path.display()
+                source.display()
             ))
         })?;
+        let snapshot = tempfile::tempdir().map_err(|why| {
+            prerequisite(format!("create a private CPython guest snapshot: {why}"))
+        })?;
+        let path = snapshot.path().join("python.wasm");
+        std::fs::write(&path, &bytes).map_err(|why| {
+            prerequisite(format!("write the private CPython guest snapshot: {why}"))
+        })?;
         Ok(Guest {
-            path: path.to_path_buf(),
+            path,
             digest: B3Hash::digest(&bytes),
+            _snapshot: snapshot,
         })
+    }
+
+    fn digest_at(path: &Path) -> Result<B3Hash, String> {
+        std::fs::read(path)
+            .map(|bytes| B3Hash::digest(&bytes))
+            .map_err(|why| prerequisite(format!("reread the CPython guest snapshot: {why}")))
     }
 }
 
@@ -277,21 +297,17 @@ impl Identity {
     }
 }
 
-/// Validates and compiles the guest with the first run of the real load. WAT
-/// can pass the engine checks, but cannot produce this script's CPython marker.
+/// Validates and compiles the snapshot with the first run of the real load.
+/// WAT can pass the engine checks, but cannot produce the exact CPython output.
 fn prepare(wasm: &Path) -> Result<Prepared, String> {
     let guest = Guest::at(wasm)?;
     let mut sandbox = WasmtimeSandbox::new().map_err(|why| prerequisite(why.to_string()))?;
-    let expected = run_checked(&mut sandbox, &guest.path, None).map_err(|why| {
+    run_checked(&mut sandbox, &guest.path).map_err(|why| {
         prerequisite(format!(
             "the selected guest is not a usable CPython-WASI fixture: {why}"
         ))
     })?;
-    Ok(Prepared {
-        guest,
-        sandbox,
-        expected,
-    })
+    Ok(Prepared { guest, sandbox })
 }
 
 fn raw_job(wasm: &Path, script: &str) -> SandboxJob {
@@ -306,196 +322,56 @@ fn raw_job(wasm: &Path, script: &str) -> SandboxJob {
     }
 }
 
-fn run_checked(
-    sandbox: &mut WasmtimeSandbox,
-    wasm: &Path,
-    expected: Option<&[u8]>,
-) -> Result<Vec<u8>, String> {
+fn run_checked(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<(), String> {
     let outcome = sandbox
         .run(&raw_job(wasm, SCRIPT.as_str()))
         .map_err(|why| why.to_string())?;
-    checked_output(outcome, expected)
+    checked_output(&outcome)
 }
 
-fn timed_call(
-    sandbox: &mut WasmtimeSandbox,
-    wasm: &Path,
-    expected: &[u8],
-) -> Result<Duration, String> {
+struct TimedOutcome {
+    took: Duration,
+    returned: std::time::Instant,
+    outcome: runtime::SandboxOutcome,
+}
+
+fn timed_outcome(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<TimedOutcome, String> {
     let started = super::stamp();
     let outcome = sandbox
         .run(&raw_job(wasm, SCRIPT.as_str()))
         .map_err(|why| why.to_string())?;
-    let took = started.elapsed();
-    checked_output(outcome, Some(expected))?;
-    Ok(took)
+    let returned = super::stamp();
+    Ok(TimedOutcome {
+        took: returned.duration_since(started),
+        returned,
+        outcome,
+    })
 }
 
-fn checked_output(
-    outcome: runtime::SandboxOutcome,
-    expected: Option<&[u8]>,
-) -> Result<Vec<u8>, String> {
+fn checked_output(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
     if outcome.exit != SandboxExit::Success {
         return Err(format!("the benchmark guest ended with {:?}", outcome.exit));
     }
     if !outcome.stderr.is_empty() {
         return Err("the benchmark guest wrote to stderr".to_owned());
     }
-    if !outcome.stdout.starts_with(MARKER.as_bytes()) {
-        return Err("the benchmark guest did not produce the CPython marker".to_owned());
+    if outcome.stdout != *EXPECTED {
+        return Err("the fixed CPython script produced unexpected stdout".to_owned());
     }
-    if let Some(expected) = expected
-        && outcome.stdout != expected
-    {
-        return Err("repeated CPython calls produced different stdout".to_owned());
-    }
-    Ok(outcome.stdout)
-}
-
-fn cold_calls(guest: B3Hash) -> Result<Vec<Sample>, String> {
-    (0..COLD_SAMPLES)
-        .map(|index| {
-            cold_call(guest).map(|took| Sample {
-                took,
-                round: index.saturating_add(1),
-                metric: "latency",
-            })
-        })
-        .collect()
-}
-
-#[expect(
-    clippy::disallowed_methods,
-    reason = "a developer bench spawns its own executable; it is not a city child"
-)]
-fn cold_call(guest: B3Hash) -> Result<Duration, String> {
-    let started = super::stamp();
-    let executable = std::env::current_exe().map_err(|why| why.to_string())?;
-    let mut child = Command::new(executable)
-        .arg(COLD_COMMAND)
-        .arg(guest.to_string())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|why| format!("start a cold CPython bench child: {why}"))?;
-    let Some(stdout) = child.stdout.take() else {
-        return Err(stop_child(
-            &mut child,
-            "the cold child has no completion pipe".to_owned(),
-        ));
-    };
-    let (send, received) = mpsc::channel();
-    let reader = std::thread::spawn(move || {
-        let mut line = String::new();
-        let read = BufReader::new(stdout)
-            .read_line(&mut line)
-            .map(|_| line)
-            .map_err(|why| format!("read the cold child's completion: {why}"));
-        send.send(read).map_err(|why| why.to_string())
-    });
-    let waited = wait_for_cold(&mut child, started, received);
-    let read = reader
-        .join()
-        .map_err(|_| fixture("the cold completion reader panicked"))
-        .and_then(|result| result);
-    let ((completed, status), ()) = keep_both(waited, read)?;
-    let output = child.wait_with_output().map_err(|why| why.to_string())?;
-    if !status.success() {
-        return Err(prerequisite(format!(
-            "the cold CPython child exited with {status}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )));
-    }
-    Ok(completed)
-}
-
-fn wait_for_cold(
-    child: &mut std::process::Child,
-    started: std::time::Instant,
-    received: mpsc::Receiver<Result<String, String>>,
-) -> Result<(Duration, ExitStatus), String> {
-    let mut completed = None;
-    loop {
-        match received.try_recv() {
-            Ok(Ok(line)) if line == COLD_COMPLETE_LINE => {
-                completed = Some(started.elapsed());
-            }
-            Ok(Ok(line)) => {
-                return Err(stop_child(
-                    child,
-                    format!("the cold child wrote an unexpected protocol line: {line:?}"),
-                ));
-            }
-            Ok(Err(why)) => return Err(stop_child(child, why)),
-            Err(mpsc::TryRecvError::Empty) => {}
-            Err(mpsc::TryRecvError::Disconnected) if completed.is_some() => {}
-            Err(mpsc::TryRecvError::Disconnected) => {
-                return Err(stop_child(
-                    child,
-                    "the cold child's completion pipe closed before its call completed".to_owned(),
-                ));
-            }
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let Some(completed) = completed else {
-                    return Err(prerequisite(format!(
-                        "the cold CPython child exited with {status} before reporting call completion"
-                    )));
-                };
-                return Ok((completed, status));
-            }
-            Ok(None) => {}
-            Err(why) => {
-                return Err(stop_child(
-                    child,
-                    format!("wait for a cold CPython bench child: {why}"),
-                ));
-            }
-        }
-        if started.elapsed() >= COLD_PATIENCE {
-            return Err(stop_child(
-                child,
-                format!(
-                    "the cold CPython child did not finish within {} seconds",
-                    COLD_PATIENCE.as_secs()
-                ),
-            ));
-        }
-        std::thread::sleep(PROCESS_POLL);
-    }
-}
-
-fn stop_child(child: &mut std::process::Child, detail: String) -> String {
-    let stopped = child
-        .kill()
-        .map_err(|why| format!("kill the cold CPython bench child: {why}"))
-        .and_then(|()| {
-            child
-                .wait()
-                .map_err(|why| format!("reap the cold CPython bench child: {why}"))
-        });
-    match stopped {
-        Ok(_) => prerequisite(detail),
-        Err(cleanup) => prerequisite(format!("{detail}; {cleanup}")),
-    }
+    Ok(())
 }
 
 fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
     check_state_isolation(prepared)?;
     (0..WARM_SAMPLES)
         .map(|index| {
-            timed_call(
-                &mut prepared.sandbox,
-                &prepared.guest.path,
-                &prepared.expected,
-            )
-            .map(|took| Sample {
-                took,
+            let measured = timed_outcome(&mut prepared.sandbox, &prepared.guest.path)?;
+            checked_output(&measured.outcome)?;
+            Ok(Sample {
+                took: measured.took,
                 round: index.saturating_add(1),
                 metric: "latency",
             })
-            .map_err(fixture)
         })
         .collect()
 }
@@ -538,35 +414,73 @@ struct Call {
     latency: Duration,
     start_delay: Duration,
     round: usize,
+    returned: std::time::Instant,
+    outcome: runtime::SandboxOutcome,
 }
 
 struct Concurrent {
     calls: Vec<Call>,
+    walls: Vec<Duration>,
     calls_per_s: u64,
 }
 
 struct Memory {
     before: TreeReading,
-    peak_virtual_bytes: u64,
+    peak_address_bytes: u64,
     peak_resident_bytes: u64,
     after: TreeReading,
     beats: u64,
 }
 
+/// `sysinfo` calls the same field virtual size on Unix but PrivateUsage on
+/// Windows. The report names the measured counter rather than promising an
+/// unavailable Windows address-space reservation reading.
+enum VirtualCounter {
+    Virtual,
+    PrivateCommit,
+}
+
+impl VirtualCounter {
+    fn current() -> VirtualCounter {
+        if cfg!(windows) {
+            VirtualCounter::PrivateCommit
+        } else {
+            VirtualCounter::Virtual
+        }
+    }
+
+    fn names(self) -> [&'static str; 3] {
+        match self {
+            VirtualCounter::Virtual => ["before_virtual", "peak_virtual", "after_virtual"],
+            VirtualCounter::PrivateCommit => [
+                "before_private_commit",
+                "peak_private_commit",
+                "after_private_commit",
+            ],
+        }
+    }
+}
+
 fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String> {
     let mut calls = Vec::new();
-    let mut wall = Duration::ZERO;
+    let mut walls = Vec::new();
+    let mut wall_us = 0_u64;
     for round in 1..=CONCURRENT_BURSTS {
         let burst = concurrent_burst(prepared, round)?;
-        wall = wall.saturating_add(burst.1);
+        wall_us = wall_us.saturating_add(micros(burst.1));
+        walls.push(burst.1);
         calls.extend(burst.0);
     }
     let call_count = u64::try_from(calls.len()).unwrap_or(u64::MAX);
     let calls_per_s = call_count
         .saturating_mul(1_000_000)
-        .checked_div(micros(wall).max(1))
+        .checked_div(wall_us.max(1))
         .unwrap_or(0);
-    Ok(Concurrent { calls, calls_per_s })
+    Ok(Concurrent {
+        calls,
+        walls,
+        calls_per_s,
+    })
 }
 
 /// Memory is read in a separate burst so the process-table walk never
@@ -576,8 +490,9 @@ fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
     let before = tree
         .read(Duration::ZERO)
         .ok_or_else(|| fixture("the memory reader could not find this bench process"))?;
+    let before_at = super::stamp();
     let (stop, stopped) = mpsc::channel();
-    let monitor = std::thread::spawn(move || monitor_memory(tree, stopped));
+    let monitor = std::thread::spawn(move || monitor_memory(tree, stopped, before_at));
     let measured: Result<(), String> = (|| {
         for round in 1..=CONCURRENT_BURSTS {
             concurrent_burst(prepared, round)?;
@@ -589,17 +504,23 @@ fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
         .join()
         .map_err(|_| fixture("the memory monitor panicked"))
         .and_then(|result| result);
-    let ((), monitored) = keep_both(sent, monitored)?;
-    let ((), (mut tree, beats)) = keep_both(measured, Ok(monitored))?;
+    let cleanup = keep_both(sent, monitored).map(|((), monitored)| monitored);
+    let ((), (mut tree, beats, last_read)) = keep_both(measured, cleanup)?;
+    let now = super::stamp();
+    let remaining = MEMORY_BEAT.saturating_sub(now.saturating_duration_since(last_read));
+    if !remaining.is_zero() {
+        std::thread::sleep(remaining);
+    }
+    let after_at = super::stamp();
     let after = tree
-        .read(Duration::ZERO)
+        .read(after_at.saturating_duration_since(last_read))
         .ok_or_else(|| fixture("the memory reader lost this bench process after the burst"))?;
     let seen = tree
         .seen()
         .ok_or_else(|| fixture("the memory reader kept no readings"))?;
     Ok(Memory {
         before,
-        peak_virtual_bytes: seen.peak_private_bytes,
+        peak_address_bytes: seen.peak_private_bytes,
         peak_resident_bytes: seen.peak_working_set_bytes,
         after,
         beats: beats.saturating_add(2),
@@ -614,16 +535,17 @@ fn concurrent_burst(prepared: &Prepared, round: usize) -> Result<(Vec<Call>, Dur
         for _ in 0..CONCURRENT_CALLERS {
             let barrier = &barrier;
             let mut sandbox = prepared.sandbox.clone();
-            let expected = &prepared.expected;
             let guest = &prepared.guest.path;
             handles.push(scope.spawn(move || {
                 barrier.wait();
                 let start_delay = spawned_at.elapsed();
-                let latency = timed_call(&mut sandbox, guest, expected).map_err(fixture)?;
+                let measured = timed_outcome(&mut sandbox, guest)?;
                 Ok::<Call, String>(Call {
-                    latency,
+                    latency: measured.took,
                     start_delay,
                     round,
+                    returned: measured.returned,
+                    outcome: measured.outcome,
                 })
             }));
         }
@@ -634,16 +556,30 @@ fn concurrent_burst(prepared: &Prepared, round: usize) -> Result<(Vec<Call>, Dur
         for result in joined {
             calls.push(result.map_err(|_| fixture("a concurrent CPython caller panicked"))??);
         }
-        Ok((calls, started.elapsed()))
+        let wall = calls
+            .iter()
+            .map(|call| call.returned)
+            .max()
+            .map(|returned| returned.saturating_duration_since(started))
+            .ok_or_else(|| fixture("a concurrent burst contained no calls"))?;
+        for call in &calls {
+            checked_output(&call.outcome)?;
+        }
+        Ok((calls, wall))
     })
 }
 
-fn monitor_memory(mut tree: Tree, stopped: mpsc::Receiver<()>) -> Result<(Tree, u64), String> {
+fn monitor_memory(
+    mut tree: Tree,
+    stopped: mpsc::Receiver<()>,
+    mut previous: std::time::Instant,
+) -> Result<(Tree, u64, std::time::Instant), String> {
     let mut beats = 0_u64;
-    let mut previous = super::stamp();
     loop {
         match stopped.recv_timeout(MEMORY_BEAT) {
-            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => return Ok((tree, beats)),
+            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Ok((tree, beats, previous));
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let now = super::stamp();
                 if tree.read(now.duration_since(previous)).is_none() {
@@ -676,15 +612,16 @@ fn memory_line(identity: Identity, memory: &Memory) -> Result<String, String> {
             "a platform memory counter answered zero for a live process",
         ));
     }
+    let [before_name, peak_name, after_name] = VirtualCounter::current().names();
     Ok(format!(
-        "python_memory machine_class={} os={} arch={} {} beats={} before_virtual_bytes={} peak_virtual_bytes={} after_virtual_bytes={} before_resident_bytes={} peak_resident_bytes={} after_resident_bytes={}",
+        "python_memory machine_class={} os={} arch={} {} beats={} {before_name}_bytes={} {peak_name}_bytes={} {after_name}_bytes={} before_resident_bytes={} peak_resident_bytes={} after_resident_bytes={}",
         MachineClass::General.as_str(),
         std::env::consts::OS,
         std::env::consts::ARCH,
         identity.labels(),
         memory.beats,
         memory.before.private_bytes,
-        memory.peak_virtual_bytes,
+        memory.peak_address_bytes,
         memory.after.private_bytes,
         memory.before.working_set_bytes,
         memory.peak_resident_bytes,
@@ -755,7 +692,7 @@ impl Report {
     /// Writes raw observations, not copied summaries, as one CSV artifact.
     ///
     /// # Errors
-    /// Refuses an existing result and reports creation, write or rename failure
+    /// Refuses an existing result and reports creation, write or publication failure
     /// without presenting the partial file as a completed measurement.
     pub(crate) fn write_csv(&self) -> Result<PathBuf, String> {
         let root = std::env::var_os("CARGO_TARGET_DIR")
@@ -775,12 +712,6 @@ impl Report {
             .parent()
             .ok_or_else(|| fixture("the CSV output path has no parent directory"))?;
         std::fs::create_dir_all(parent).map_err(|why| csv_storage(path, why))?;
-        if path.try_exists().map_err(|why| csv_storage(path, why))? {
-            return Err(fixture(format!(
-                "refuse to replace the existing measurement {}",
-                path.display()
-            )));
-        }
         let part = path.with_extension("csv.part");
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -797,16 +728,14 @@ impl Report {
             })
             .and_then(|()| file.sync_all());
         drop(file);
-        let written = written.and_then(|()| std::fs::rename(&part, path));
-        if let Err(why) = written {
-            let cleanup = std::fs::remove_file(&part).map_err(|cleanup| cleanup.to_string());
-            return Err(match cleanup {
-                Ok(()) => csv_storage(path, why),
-                Err(cleanup) => {
-                    csv_storage(path, format!("{why}; remove its partial file: {cleanup}"))
-                }
-            });
-        }
+        // A same-directory hard link publishes atomically and fails when the
+        // target already exists, unlike a replacement-style rename.
+        let published = written.and_then(|()| std::fs::hard_link(&part, path));
+        let cleanup = std::fs::remove_file(&part);
+        keep_both(
+            published.map_err(|why| csv_storage(path, why)),
+            cleanup.map_err(|why| csv_storage(&part, why)),
+        )?;
         Ok(())
     }
 }
@@ -836,11 +765,28 @@ impl Observation {
     }
 }
 
+fn round_observations(identity: Identity, walls: &[Duration]) -> Vec<Observation> {
+    walls
+        .iter()
+        .enumerate()
+        .map(|(index, wall)| Observation {
+            row: "python_concurrent_round".to_owned(),
+            index: index.saturating_add(1),
+            round: index.saturating_add(1),
+            metric: "wall",
+            value: micros(*wall),
+            unit: "us",
+            identity,
+        })
+        .collect()
+}
+
 fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> {
+    let [before_name, peak_name, after_name] = VirtualCounter::current().names();
     [
-        ("before_virtual", memory.before.private_bytes),
-        ("peak_virtual", memory.peak_virtual_bytes),
-        ("after_virtual", memory.after.private_bytes),
+        (before_name, memory.before.private_bytes),
+        (peak_name, memory.peak_address_bytes),
+        (after_name, memory.after.private_bytes),
         ("before_resident", memory.before.working_set_bytes),
         ("peak_resident", memory.peak_resident_bytes),
         ("after_resident", memory.after.working_set_bytes),
@@ -855,6 +801,15 @@ fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> 
         unit: "bytes",
         identity,
     })
+    .chain(std::iter::once(Observation {
+        row: "python_memory".to_owned(),
+        index: 1,
+        round: 1,
+        metric: "beats",
+        value: memory.beats,
+        unit: "count",
+        identity,
+    }))
     .collect()
 }
 
@@ -968,5 +923,19 @@ mod tests {
                 std::env::consts::ARCH
             )
         );
+    }
+
+    #[test]
+    fn csv_publication_preserves_an_existing_target_and_removes_the_partial_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("observations.csv");
+        std::fs::write(&path, b"previous measurement").unwrap();
+        let part = path.with_extension("csv.part");
+        let refused = Report::new(Arm::Baseline)
+            .write_csv_at(&path)
+            .expect_err("an existing target was replaced");
+        assert!(refused.contains("E_STORAGE_FATAL"), "{refused}");
+        assert_eq!(std::fs::read(path).unwrap(), b"previous measurement");
+        assert!(!part.exists(), "the partial publication survived");
     }
 }
