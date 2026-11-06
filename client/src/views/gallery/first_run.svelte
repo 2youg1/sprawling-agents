@@ -6,11 +6,10 @@
 -->
 
 <script lang="ts" module>
-  // The first-run guide in the three states a person meets it in: a
-  // fresh city, where the one required step is open and nothing else is
-  // marked; a city with a main model, the dependencies put off and the
-  // texts step open over a name already written; and a guide walked to
-  // its end, every optional step either looked at or put off. Each is
+  // The first-run guide in four states a person meets it in: a fresh
+  // city; an attached endpoint whose required main-model editor must be
+  // reachable by keyboard; a city with a main model and the texts step
+  // open; and a guide walked to its end. Each is
   // drawn at a phone's 390 and a desktop's 1440, because the step list
   // is one column at both and its order is the whole point.
   //
@@ -23,6 +22,7 @@
   import { ENDPOINTS } from "./served";
 
   const BARE: EndpointsAnswer = { chosen: [], endpoints: [] };
+  const ATTACHED: EndpointsAnswer = { ...ENDPOINTS, chosen: [] };
 
   const NAMED: IdentityAnswer = {
     stated: {
@@ -44,6 +44,12 @@
 
   const STATES: readonly State[] = [
     { name: "a fresh city", endpoints: BARE, guide: {}, identity: undefined },
+    {
+      name: "an attached endpoint, main model open",
+      endpoints: ATTACHED,
+      guide: { at: "provider" },
+      identity: undefined,
+    },
     {
       name: "a main model, dependencies put off, texts open",
       endpoints: ENDPOINTS,

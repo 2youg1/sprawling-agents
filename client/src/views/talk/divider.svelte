@@ -31,7 +31,7 @@
     // (ux B7).
     readonly earlier: readonly RunBelief[];
     // How many runs the session now open holds, which decides whether
-    // the earlier stretch starts open (client D80).
+    // the earlier stretch appears at all (client D80).
     readonly shown: number;
     readonly boundary: Boundary | null;
     readonly onFork: (plan: ForkPlan) => void;
@@ -46,7 +46,8 @@
   // The person's own choice, once they press the line; until then the
   // rule both modes share decides.
   let pressed = $state<boolean | null>(null);
-  const open = $derived(pressed ?? earlierDrawn(shown, earlier.length) === "open");
+  const drawn = $derived(earlierDrawn(shown, earlier.length, boundary?.kind === "forked"));
+  const open = $derived(pressed ?? drawn === "open");
 
   // The count is the folded runs themselves: what expands is one thread
   // per run, so the number a person reads is the number of things the
@@ -136,7 +137,7 @@
   });
 </script>
 
-{#if earlier.length > 0}
+{#if drawn !== "none"}
   {#if open}
     <div class="fade">
       {#each earlier as run (run.run)}

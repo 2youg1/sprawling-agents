@@ -53,6 +53,51 @@
 .pulse {
   animation: pulse calc(var(--transition-duration-page) * 6) ease-in-out infinite;
 }
+/* Thinking gathers three hairlines into one and lets them open again.
+ * Their translucent tails and their brightness stay constant: only the
+ * positions and lengths move, so there is no flashing point. With motion
+ * off the three resting lines remain as the same quiet mark. */
+.thinking-mark {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+}
+.thinking-mark i {
+  --thinking-y: 0px;
+  position: absolute;
+  inset-inline-start: 50%;
+  top: calc(50% + var(--thinking-y));
+  inline-size: 7px;
+  block-size: 1px;
+  margin-inline-start: -3.5px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-accent) 36%, transparent),
+    transparent
+  );
+  animation: thinking-gather calc(var(--transition-duration-page) * 9) var(--ease-arrive) infinite;
+}
+.thinking-mark i:first-child {
+  --thinking-y: -3px;
+}
+.thinking-mark i:last-child {
+  --thinking-y: 3px;
+}
+@keyframes thinking-gather {
+  0%,
+  18%,
+  82%,
+  100% {
+    transform: translateY(0) scaleX(1);
+  }
+  46%,
+  58% {
+    transform: translateY(calc(-1 * var(--thinking-y))) scaleX(0.3);
+  }
+}
 /* The two entrances: a popover rises into place, a page-level banner
  * drops from the edge it belongs to. Both surfaces appearing in their
  * own place, so both take `panel`, and both only move transform and

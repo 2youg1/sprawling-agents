@@ -158,7 +158,9 @@
   // The run the band and the fork picker speak for: the one still going,
   // or the last one this room finished. The same question `Thread` asks, merged with it
   // by `asking` because the two ask it in the same words.
-  const current = $derived(live ?? runs.at(-1));
+  const current = $derived(
+    live ?? shown.at(-1) ?? (origin === null ? undefined : $belief.runs[origin.run]),
+  );
 
   // The rounds of that run, asked here for the band's last line and the
   // fork picker. Subscribed by hand because the run it follows changes:
@@ -167,6 +169,7 @@
   let answer = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
     const run = current?.run;
+    answer = undefined;
     if (run === undefined) return;
     return u.conn.asking.ask({ rounds: { run } }).subscribe((held) => {
       answer = held !== undefined && "rounds" in held ? held.rounds : undefined;
@@ -260,7 +263,7 @@
   // An empty room: nothing to read and nothing just sent, so the box
   // stands in the middle. The first send lets it sink at once, before
   // the city has answered, because the words it shows are already there.
-  const blank = $derived(runs.length === 0 && echo === null);
+  const blank = $derived(shown.length === 0 && origin === null && echo === null);
   // The address line stands in the box, as the address its placeholder
   // names, so the page names the room once (client/Spec.lean 4-10a).
   const addressed = $derived(!band && drawsAddress(seat));
@@ -445,7 +448,7 @@ composition is rebuilt on the way. -->
 >
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
-      {#if runs.length > 0}
+      {#if shown.length > 0 || origin !== null}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
           <Divider {earlier} shown={shown.length} {boundary} onFork={doFork} onRetry={send} />

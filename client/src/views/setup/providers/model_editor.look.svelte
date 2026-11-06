@@ -15,6 +15,7 @@
     readonly table: Snippet;
     readonly holdSummary: Attachment<HTMLElement>;
     readonly open?: boolean;
+    readonly onToggle: (open: boolean) => void;
   }
 </script>
 
@@ -27,7 +28,13 @@
   const look: ModelEditorLookProps = $props();
 </script>
 
-<details class="mt-snug" open={look.open ?? false}>
+<details
+  class="mt-snug"
+  open={look.open ?? false}
+  ontoggle={(event) => {
+    look.onToggle(event.currentTarget.open);
+  }}
+>
   <summary
     class="w-fit cursor-pointer rounded-control px-tight text-text-quiet transition-[background-color] ease-leave hover:bg-raised hover:ease-arrive"
     {@attach look.holdSummary}

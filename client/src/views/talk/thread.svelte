@@ -378,7 +378,7 @@
   {/if}
   {#if !frozen && !streaming && !lineSaysIt}
     <div class="my-snug flex items-center gap-snug text-note text-text-faint">
-      <span class="inline-block size-dot pulse rounded-pill bg-accent"></span>
+      <span class="thinking-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span>{posture}</span>
       {#if run.doing.kind === "thinking"}
         <SteerPin />

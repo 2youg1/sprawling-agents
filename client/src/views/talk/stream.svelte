@@ -34,7 +34,8 @@
   const belief = conn.belief;
 
   let pressed = $state<boolean | null>(null);
-  const open = $derived(pressed ?? earlierDrawn(shown.length, earlier.length) === "open");
+  const drawn = $derived(earlierDrawn(shown.length, earlier.length, boundary?.kind === "forked"));
+  const open = $derived(pressed ?? drawn === "open");
 
   const heading = $derived(
     boundary?.kind === "forked"
@@ -64,7 +65,7 @@
     </ul>
   </section>
 {/if}
-{#if earlier.length > 0}
+{#if drawn !== "none"}
   <section class="mb-section" aria-label={earlierHeading}>
     <h2 class="mb-base text-note text-text-quiet">
       <Fold
