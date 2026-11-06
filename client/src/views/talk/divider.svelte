@@ -13,7 +13,7 @@
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import type { RunBelief } from "../../core/belief";
-  import type { RoundsAnswer } from "../../wire";
+  import type { RoundsAnswer, Seq } from "../../wire";
   import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import { foldWire } from "./fold";
@@ -25,6 +25,7 @@
   import Thread from "./thread.svelte";
 
   interface Props {
+    readonly session?: Seq | null;
     // Everything before the boundary, oldest first. Folded to one line
     // and opened in place: this is the same conversation, earlier -
     // neither a dialog nor a route is the right weight for a scroll
@@ -38,7 +39,7 @@
     readonly onRetry: (task: string) => void;
   }
 
-  const { earlier, shown, boundary, onFork, onRetry }: Props = $props();
+  const { earlier, shown, boundary, onFork, onRetry, session = null }: Props = $props();
 
   const { lang, conn } = ui();
   const belief = conn.belief;
@@ -46,6 +47,12 @@
   // The person's own choice, once they press the line; until then the
   // rule both modes share decides.
   let pressed = $state<boolean | null>(null);
+  let previousSession: Seq | null | undefined;
+  $effect(() => {
+    if (session === previousSession) return;
+    previousSession = session;
+    pressed = null;
+  });
   const drawn = $derived(earlierDrawn(shown, earlier.length, boundary?.kind === "forked"));
   const open = $derived(pressed ?? drawn === "open");
 
@@ -141,7 +148,14 @@
   {#if open}
     <div class="fade">
       {#each earlier as run (run.run)}
-        <Thread {run} {onFork} {onRetry} />
+        <Thread
+          {run}
+          through={boundary?.kind === "forked" && boundary.mother === run.run
+            ? boundary.origin.at_seq
+            : null}
+          {onFork}
+          {onRetry}
+        />
       {/each}
     </div>
   {/if}

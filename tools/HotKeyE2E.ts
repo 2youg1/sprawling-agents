@@ -19,6 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ORIGIN, phrase, prepareCity } from "../client/scripts/walk";
+import { FIGURED, PROBED, TYPED } from "../client/src/views/gallery/served";
 import { DevTools } from "../client/scripts/walk_devtools";
 
 const ROOT = join(import.meta.dir, "..");
@@ -319,6 +320,7 @@ async function settledFlows(): Promise<DevTools> {
   record("run page", "the keyboard opens the current run's changes lens");
 
   await tabUntil(tools, "settings");
+  await evaluate(tools, "window.settingsOpener = document.activeElement; undefined");
   await key(tools, "Enter", "Enter", 13);
   await waitFor(tools, `document.querySelector("dialog[open]") !== null`, "the settings dialog");
   await key(tools, "End", "End", 35);
@@ -333,6 +335,11 @@ async function settledFlows(): Promise<DevTools> {
     "the settings model editor stays folded",
   );
   await key(tools, "Escape", "Escape", 27);
+  await waitFor(
+    tools,
+    `document.querySelector("dialog[open]") === null && document.activeElement === window.settingsOpener`,
+    "settings closes and restores opener focus",
+  );
   record("settings keyboard", "tree keys work, settings stays folded, Escape returns focus");
 
   await hotkey(tools, "\\", "Backslash", 220);
@@ -363,6 +370,11 @@ async function settledFlows(): Promise<DevTools> {
     "the mailbox",
   );
   await key(tools, "Escape", "Escape", 27);
+  await waitFor(
+    tools,
+    `document.querySelector("aside[aria-label=mailbox]") === null`,
+    "Escape closes the mailbox",
+  );
   record("mailbox keyboard", "the mailbox opens and Escape closes it");
 
   return tools;
@@ -424,7 +436,12 @@ async function visuals(tools: DevTools): Promise<void> {
       );
       if (!target) return ["fixture missing"];
       const collisions = [];
-      for (const [rowIndex, row] of [...target.querySelectorAll("tbody tr")].entries()) {
+      const rows = [...target.querySelectorAll("tbody tr")];
+      const expected = ${JSON.stringify([...PROBED.map((row) => row.id), TYPED])};
+      if (rows.length !== expected.length || expected.some((id) => !rows.some((row) => row.textContent?.includes(id)))) return ["expected fixture rows missing"];
+      const expectedPairs = ${JSON.stringify(FIGURED.map((row) => row.id))};
+      let measured = 0;
+      for (const [rowIndex, row] of rows.entries()) {
         const cells = [...row.querySelectorAll("td")];
         const groups = [2, 3].map((column) => {
           const cell = cells[column];
@@ -433,17 +450,21 @@ async function visuals(tools: DevTools): Promise<void> {
             (node) => node.getClientRects().length > 0,
           );
         });
+        if (!expectedPairs.some((id) => row.textContent?.includes(id))) continue;
+        if (!groups[0]?.length || !groups[1]?.length) return ["missing visible source pair", rowIndex];
         for (const left of groups[0] || []) {
           for (const right of groups[1] || []) {
             const a = left.getBoundingClientRect();
             const b = right.getBoundingClientRect();
+            if (a.width <= 0 || a.height <= 0 || b.width <= 0 || b.height <= 0) return ["unmeasured source pair", rowIndex];
+            measured += 1;
             const width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
             const height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
             if (width > 1 && height > 1) collisions.push({ rowIndex, width, height });
           }
         }
       }
-      return collisions;
+      return measured > 0 ? collisions : ["no source pairs measured"];
     })()`,
   );
   if (!Array.isArray(overlaps) || overlaps.length > 0)

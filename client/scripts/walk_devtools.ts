@@ -151,14 +151,16 @@ export class DevTools {
       }
     }
     browser.kill();
+    await browser.exited;
     return failed(
       "the browser never offered a page to attach to; set SPRAWLING_BROWSER to a Chromium-family browser",
     );
   }
 
-  close(): void {
+  async close(): Promise<void> {
     this.socket.close();
     this.browser.kill();
+    await this.browser.exited;
   }
 
   send(

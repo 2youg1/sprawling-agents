@@ -27,6 +27,7 @@
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
   import { MAYOR } from "../core/route";
+  import { roundsThrough } from "./talk/forking";
   import { lineIn } from "../core/stretches";
   import { QUERIES } from "../core/asking";
   import { forkAsked } from "../core/forking";
@@ -126,10 +127,15 @@
       undefined,
     ),
   );
-  const origin = $derived(currentLine?.branched_from ?? null);
+  const origin = $derived(
+    currentLine?.began === began ? (currentLine.branched_from ?? null) : null,
+  );
+  const mother = $derived(origin === null ? undefined : $belief.runs[origin.run]);
   const earlier = $derived(
     origin !== null
-      ? runs.filter((run) => run.run === origin.run)
+      ? mother === undefined
+        ? []
+        : [mother]
       : began === null
         ? []
         : runs.filter((run) => run.lastSeq <= began),
@@ -166,13 +172,21 @@
   // fork picker. Subscribed by hand because the run it follows changes:
   // `$store` binds one store at initialisation, and this question moves
   // to a new run the moment one starts.
-  let answer = $state<RoundsAnswer | undefined>(undefined);
+  let rawAnswer = $state<RoundsAnswer | undefined>(undefined);
+  const answer = $derived(
+    rawAnswer === undefined
+      ? undefined
+      : roundsThrough(
+          rawAnswer,
+          live === undefined && shown.length === 0 ? (origin?.at_seq ?? null) : null,
+        ),
+  );
   $effect(() => {
     const run = current?.run;
-    answer = undefined;
+    rawAnswer = undefined;
     if (run === undefined) return;
     return u.conn.asking.ask({ rounds: { run } }).subscribe((held) => {
-      answer = held !== undefined && "rounds" in held ? held.rounds : undefined;
+      rawAnswer = held !== undefined && "rounds" in held ? held.rounds : undefined;
     });
   });
 
@@ -451,7 +465,14 @@ composition is rebuilt on the way. -->
       {#if shown.length > 0 || origin !== null}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} shown={shown.length} {boundary} onFork={doFork} onRetry={send} />
+          <Divider
+            session={began}
+            {earlier}
+            shown={shown.length}
+            {boundary}
+            onFork={doFork}
+            onRetry={send}
+          />
           {#each shown as run, at (run.run)}
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
@@ -462,7 +483,7 @@ composition is rebuilt on the way. -->
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
           {/if}
         {:else}
-          <Stream {shown} {earlier} {boundary} />
+          <Stream session={began} {shown} {earlier} {boundary} />
         {/if}
       {/if}
       {#if echo !== null}

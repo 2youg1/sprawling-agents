@@ -165,6 +165,9 @@ async function standIn(
       stderr: "inherit",
     },
   );
+  started.push(() => {
+    provider.kill();
+  });
   const reader = provider.stdout.getReader();
   let said = "";
   while (!said.includes("\n")) {
@@ -200,6 +203,9 @@ async function serve(
         said += decoder.decode(bytes);
       },
     },
+  });
+  started.push(() => {
+    served.kill();
   });
   for (let tries = 0; tries < 150; tries += 1) {
     const code = /pairing code\s+(\S+)/.exec(said.replace(STYLING, ""))?.[1];
@@ -342,7 +348,7 @@ export async function prepareCity(
     HOME: home,
     USERPROFILE: home,
     SPRAWLING_MODEL_URL: provider.url,
-    ...(populated ? { SPRAWLING_MODEL: MODEL } : {}),
+    SPRAWLING_MODEL: populated ? MODEL : undefined,
   };
   const raised = Bun.spawnSync([binary("sprawling"), "init", city], { env });
   if (raised.exitCode !== 0) fail(`init: ${raised.stderr.toString()}`);
@@ -352,18 +358,20 @@ export async function prepareCity(
     await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT),
     "open the browser",
   );
-  let closed = false;
-  const close = async (): Promise<void> => {
-    if (closed) return;
-    closed = true;
-    tools.close();
+  started.push(() => {
+    void tools.close();
+  });
+  let closed: Promise<void> | undefined;
+  const close = (): Promise<void> => {
+    if (closed !== undefined) return closed;
+    const browserExited = tools.close();
     provider.process.kill();
     served.process.kill();
-    await Promise.all([provider.process.exited, served.process.exited]);
+    closed = Promise.all([browserExited, provider.process.exited, served.process.exited]).then(
+      () => undefined,
+    );
+    return closed;
   };
-  started.push(() => {
-    void close();
-  });
   await pairWith(tools, served.code);
   return { city, env, run, tools, served, close };
 }
