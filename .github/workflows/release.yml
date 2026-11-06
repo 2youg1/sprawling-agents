@@ -23,6 +23,27 @@ on:
         required: true
         default: true
         type: boolean
+  workflow_call:
+    inputs:
+      channel:
+        description: Archive identity to build (source or nightly)
+        required: true
+        type: string
+      nightly-tag:
+        description: UTC-dated tag with the full source SHA, required for a nightly build
+        required: false
+        default: ""
+        type: string
+      source-sha:
+        description: Complete source commit, required for a nightly build
+        required: false
+        default: ""
+        type: string
+      sign:
+        description: Allow the Windows signing integration
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -35,6 +56,7 @@ jobs:
   # Same-commit validation, including the cache environment, belongs to CI.
   # D27 in tools/xtask/Spec.lean preserves the existing release blocking scope.
   verify:
+    if: github.event_name != 'workflow_call'
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
@@ -109,6 +131,12 @@ jobs:
     # `aws-lc-rs` and all three archives keep one crypto implementation.
     env:
       CC_x86_64_unknown_linux_musl: musl-gcc
+      RELEASE_CHANNEL: ${{ inputs.channel || (github.event_name == 'push' && 'release' || 'source') }}
+      SPRAWLING_RELEASE_CHANNEL: ${{ inputs.channel == 'nightly' && 'nightly' || 'release' }}
+      NIGHTLY_TAG: ${{ inputs.nightly-tag }}
+      SOURCE_SHA: ${{ inputs.source-sha }}
+      SIGN_ARCHIVES: ${{ inputs.sign || github.event_name != 'workflow_call' }}
+      LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # A rustup home of its own, holding only the toolchain
@@ -176,7 +204,6 @@ jobs:
       - name: build the client and the binary
         shell: bash
         env:
-          RELEASE_EVENT: ${{ github.event_name }}
           RELEASE_REF: ${{ github.ref_name }}
           ARCHIVE_TARGET: ${{ matrix.target }}
         run: |
@@ -185,12 +212,24 @@ jobs:
           git rev-parse HEAD 'HEAD^{tree}' > target/release-evidence/source.txt
           rustc --version --verbose > target/release-evidence/toolchain.txt
           start=$SECONDS
-          # Only a tag push identifies an actual release; dispatch builds source.
-          if [ "$RELEASE_EVENT" = push ]; then
-            export SPRAWLING_RELEASE_TAG="$RELEASE_REF"
-          else
-            unset SPRAWLING_RELEASE_TAG
-          fi
+          case "$RELEASE_CHANNEL" in
+            release)
+              export SPRAWLING_RELEASE_TAG="$RELEASE_REF"
+              unset SPRAWLING_NIGHTLY_TAG SPRAWLING_SOURCE_SHA
+              ;;
+            nightly)
+              export SPRAWLING_NIGHTLY_TAG="$NIGHTLY_TAG"
+              export SPRAWLING_SOURCE_SHA="$SOURCE_SHA"
+              unset SPRAWLING_RELEASE_TAG
+              ;;
+            source)
+              unset SPRAWLING_RELEASE_TAG SPRAWLING_NIGHTLY_TAG SPRAWLING_SOURCE_SHA
+              ;;
+            *)
+              echo "unknown release channel: $RELEASE_CHANNEL" >&2
+              exit 1
+              ;;
+          esac
           # xtask (dev profile, target/debug) compiles beside the release
           # build (target/release), which ends in one fat-LTO codegen unit
           # on one core: cargo locks each profile directory on its own, so
@@ -229,7 +268,7 @@ jobs:
       # fails, so the file carries the commit and the attempt and a re-run
       # can upload again.
       - name: name the unsigned Windows binary for this attempt
-        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
+        if: runner.os == 'Windows' && env.SIGN_ARCHIVES == 'true' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         id: unsigned-name
         shell: pwsh
         run: |
@@ -242,7 +281,7 @@ jobs:
           "version=$version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "path=$file" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
       - name: upload the unsigned Windows binary
-        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
+        if: runner.os == 'Windows' && env.SIGN_ARCHIVES == 'true' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         id: unsigned
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -253,7 +292,7 @@ jobs:
           archive: false
           if-no-files-found: error
       - name: sign the Windows binary through SignPath
-        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
+        if: runner.os == 'Windows' && env.SIGN_ARCHIVES == 'true' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -277,15 +316,15 @@ jobs:
           skip-decompress: true
           output-artifact-directory: target/signed
       - name: vouch for the returned signature before it is packed
-        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
+        if: runner.os == 'Windows' && env.SIGN_ARCHIVES == 'true' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         shell: pwsh
         env:
-          # Only a tag push publishes, and only it may demand a trusted chain:
+          # Only the curated release may demand a trusted chain:
           # the Foundation hands a project its self-signed test certificate
           # first and orders the production certificate after reviewing the
           # setup, so a dispatch run is how the integration is proved while
           # the chain is still a project-local one.
-          RELEASE_EVENT: ${{ github.event_name }}
+          REQUIRE_TRUSTED_SIGNATURE: ${{ env.RELEASE_CHANNEL == 'release' }}
         run: |
           $returned = @(Get-ChildItem -LiteralPath target/signed -Recurse -File)
           if ($returned.Count -ne 1) {
@@ -298,7 +337,7 @@ jobs:
           }
           $status = $signature.Status.ToString()
           $timestamped = $null -ne $signature.TimeStamperCertificate
-          if ($env:RELEASE_EVENT -eq 'push') {
+          if ($env:REQUIRE_TRUSTED_SIGNATURE -eq 'true') {
             if ($status -ne 'Valid') {
               throw "A release ships only a signature a person's system trusts, and this one is $status."
             }
@@ -308,7 +347,7 @@ jobs:
           }
           @{ status = $status; subject = $signature.SignerCertificate.Subject
              thumbprint = $signature.SignerCertificate.Thumbprint
-             timestamped = $timestamped; trusted_chain_required = $env:RELEASE_EVENT -eq 'push' } |
+             timestamped = $timestamped; trusted_chain_required = $env:REQUIRE_TRUSTED_SIGNATURE -eq 'true' } |
             ConvertTo-Json -Depth 3 | Set-Content -LiteralPath target/release-evidence/windows-signature.json -Encoding utf8
           ($signature | Format-List | Out-String) | Add-Content -LiteralPath target/release-evidence/windows-signature.log
           Write-Host "signature status: $status, timestamped: $timestamped"
@@ -319,6 +358,27 @@ jobs:
         run: |
           set -euo pipefail
           just archive "$ARCHIVE_TARGET"
+          if [ "$RELEASE_CHANNEL" != nightly ]; then
+            if [ "$RUNNER_OS" = macOS ]; then
+              shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
+            else
+              sha256sum target/package/*.zip > target/release-evidence/archives.sha256
+            fi
+          fi
+      - name: name a nightly archive after its complete snapshot
+        if: env.RELEASE_CHANNEL == 'nightly'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "sprawling") | .version')
+          archives=(target/package/*.zip)
+          test "${#archives[@]}" -eq 1
+          for path in "${archives[@]}"; do
+            name=$(basename "$path")
+            suffix=${name#"sprawling-$version-"}
+            test "$suffix" != "$name"
+            mv "$path" "target/package/sprawling-$NIGHTLY_TAG-$suffix"
+          done
           if [ "$RUNNER_OS" = macOS ]; then
             shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
           else
@@ -342,7 +402,7 @@ jobs:
       - name: install and uninstall the archive through the Windows production installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence target/release-evidence
+        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence target/release-evidence -Tag "$LOOPBACK_RELEASE_TAG"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -365,7 +425,7 @@ jobs:
         shell: bash
         run: sh .github/install-loopback.sh target/package
       - name: generate system channels from this archive
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && env.RELEASE_CHANNEL != 'nightly'
         shell: bash
         run: |
           tag="$GITHUB_REF_NAME"
@@ -375,10 +435,10 @@ jobs:
           fi
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
       - name: validate native payloads without decoding binaries
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
         run: python3 tools/xtask/src/channel/validate_test.py
       - name: install the generated Arch package
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
         run: python3 tools/xtask/src/channel/validate.py target/channels target/package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

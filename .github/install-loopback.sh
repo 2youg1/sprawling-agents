@@ -53,22 +53,29 @@ origin="http://127.0.0.1:${port}"
 
 # The list in the shape GitHub's API answers with: an array of releases,
 # each asset carrying its size, its digest and its download URL.
-python3 - "$root/www/$name" "$origin" "${SPRAWLING_RELEASE_TAG:-loopback}" \
-    >"$root/www/releases" <<'PY'
+mkdir -p "$root/www/releases"
+python3 - "$root/www/$name" "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-Alpha-260101}" "$root/www" \
+    >"$root/www/releases/index.html" <<'PY'
 import hashlib, json, os, sys
-path, origin, tag = sys.argv[1:4]
+path, origin, tag, www = sys.argv[1:5]
 with open(path, "rb") as f:
     digest = hashlib.sha256(f.read()).hexdigest()
 name = os.path.basename(path)
-json.dump([{
+release = {
     "tag_name": tag,
+    "published_at": "2026-01-01T00:00:00Z",
+    "draft": False,
     "assets": [{
         "name": name,
         "size": os.path.getsize(path),
         "digest": "sha256:" + digest,
         "browser_download_url": origin + "/" + name,
     }],
-}], sys.stdout, indent=2)
+}
+json.dump([release], sys.stdout, indent=2)
+os.makedirs(os.path.join(www, "releases", "tags", tag), exist_ok=True)
+with open(os.path.join(www, "releases", "tags", tag, "index.html"), "w", encoding="utf-8") as f:
+    json.dump(release, f, indent=2)
 PY
 
 # Every request that would leave this machine goes to a port nothing

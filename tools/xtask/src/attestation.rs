@@ -8,7 +8,6 @@
 
 use std::path::Path;
 
-use crate::platform::WORKFLOW;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -17,20 +16,33 @@ use crate::walk;
 /// # Errors
 /// When the release workflow cannot be read.
 pub(crate) fn unattested(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    Ok(findings(&walk::read_text(&root.join(WORKFLOW))?)
-        .into_iter()
-        .map(|violation| Violation {
-            gate: "artifact",
-            location: WORKFLOW.to_owned(),
-            rule: "every archive a release attaches is attested before it is attached".to_owned(),
-            violation,
-            alternative: "in the job that runs `gh release create`, grant `id-token: write` and \
-                          `attestations: write`, and run `actions/attest-build-provenance` \
-                          on the same glob before the release is created"
-                .to_owned(),
-        })
-        .collect())
+    let mut violations = Vec::new();
+    for workflow in PUBLISH_WORKFLOWS {
+        violations.extend(
+            findings(&walk::read_text(&root.join(workflow))?)
+                .into_iter()
+                .map(|violation| Violation {
+                    gate: "artifact",
+                    location: workflow.to_owned(),
+                    rule: "every archive a release attaches is attested before it is attached"
+                        .to_owned(),
+                    violation,
+                    alternative:
+                        "in the job that runs `gh release create`, grant `id-token: write` and \
+                                  `attestations: write`, and run `actions/attest-build-provenance` \
+                                  on the same glob before the release is created"
+                            .to_owned(),
+                }),
+        );
+    }
+    Ok(violations)
 }
+
+/// Every workflow that creates a public GitHub release from archives.
+const PUBLISH_WORKFLOWS: [&str; 2] = [
+    ".github/workflows/release.yml",
+    ".github/workflows/nightly-release.yml",
+];
 
 /// The action whose step writes the attestation.
 const ATTEST: &str = "actions/attest-build-provenance@";
