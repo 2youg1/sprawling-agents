@@ -53,7 +53,7 @@ The workspace lint table (`-D warnings`, checked arithmetic, `#[expect]` over `#
 - For a platform call, use a safe standard-library or crate interface first, otherwise a Zig leaf behind a `(ptr, len)` boundary checked against a Rust reference, fuzzed on both sides and with its boundary properties proved in Lean; use `unsafe` Rust only when measurement shows it is best overall, and give every `unsafe` block a `SAFETY:` line stating the falsifiable precondition that makes it sound.
 - Give an error the failed action, the subject, a stable code and a recovery the caller can act on.
 - Make invalid states unrepresentable: an enum or newtype instead of a `bool` or bare `Option` parameter, a typestate instead of a runtime check. Values that always travel together are one named value.
-- Take the time as a parameter; use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point.
+- Take the time as a parameter; keep decision-path iteration explicitly ordered, never a hash order (`BTreeMap` by default, measured exception per [ARCHITECTURE.md](docs/ARCHITECTURE.md) §10 rule 1); keep floats out of ledger payloads; start tasks from the one spawn point.
 - Call an API directly rather than through a wrapper that only renames it.
 
 ## Where code goes
