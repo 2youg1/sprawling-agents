@@ -6,7 +6,7 @@
 /-!
 # citysim::bench 与 citysim::fixture_digest
 
-规定 `just bench` 的测量 Main `bin/bench`（`tools/citysim/src/bin/bench/main.rs`）、它的读数 `bench::reading`（`tools/citysim/src/bin/bench/reading.rs`）与场景 `bench::scenarios`（`tools/citysim/src/bin/bench/scenarios.rs`），以及两族 bench 共用的夹具摘要 `citysim::fixture_digest`（`tools/citysim/src/fixture_digest.rs`）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-6、§8-12，别处引作 `tools/citysim/Spec.lean §8-6`。
+规定 `just bench` 的测量 Main `bin/bench`（`tools/citysim/src/bin/bench/main.rs`）、它的读数 `bench::reading`（`tools/citysim/src/bin/bench/reading.rs`）、负载场景 `bench::scenarios`（`tools/citysim/src/bin/bench/scenarios.rs`）与 CPython-WASI 场景 `bench::python`（`tools/citysim/src/bin/bench/python.rs`），以及两族 bench 共用的夹具摘要 `citysim::fixture_digest`（`tools/citysim/src/fixture_digest.rs`）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-6、§8-12，别处引作 `tools/citysim/Spec.lean §8-6`。
 
 本分部是描述，不是形式规格：这里没有状态机，夹具的钉子（D8）是一个判断的两臂——bench 在量任何东西之前先算一遍登记夹具的摘要，与钉住的值不等就拒绝测量——把它写成定理只会重述那个 `if`。摘要怎样从账本的字节算出、读数行的文法与分位怎样取，由 `fixture_digest`、`Reading::line` 与 sprawling 的 `Spread` 持有，各自的测试按字节对拍（§16）；挂钟读数本身不是任何定理的对象。
 -/
@@ -97,6 +97,42 @@ D18 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 
 D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写在 `crates/sprawling/Cargo.toml` 的 `[features] default` 一处。** 人下载的二进制带执行引擎（`sandbox` feature），而 `sandbox` 是默认 feature，所以 `dist`、`bench`、`bench-startup`、`mem` 四个 recipe 不写 `--features` 就构建出人下载的那个二进制；citysim 经工作区依赖带着 `sprawling` 的默认 feature，`bench` 里的场景与仪表也在同一套 feature 下编译。于是 install 解包的、startup 拉起的、首字节服务的、内存读数量到的，与人下载的是同一个二进制。被否：①justfile 再留一个变量写 `sprawling/sandbox`——它重述清单的默认 feature，两处可以只改一处，而读数看不出它们已经分开；②每个 recipe 自己写 `--features`——漏写的那个 recipe 量的是一个没人下载的二进制。**重开参数**：人下载的二进制要带一个不是默认的 feature，那时这套 feature 回到 justfile 的一个变量里，由每个构建与测量的 recipe 读。
 
 Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 与 `fixture` 字段；`a_reading_line_carries_its_floor_beside_the_middle`——同一文法下 floor 与 p50 并列；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）；`the_registered_fixture_writes_the_bytes_its_digest_pins`——`REGISTERED.digest` 等于 `REGISTERED.pinned`（D8）。
+-/
+
+/-!
+### 8-6-1 CPython-WASI 执行基线（`bench::python`）
+
+这一族量居民经 `exec` 的 Python 臂实际抵达的 `runtime::sandbox` 适配器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，guest 与脚本的完整 BLAKE3 摘要都进读数行。`SandboxJob` 与 Python 臂同形：`argv = ["python", "-c", script]`、无环境继承、无 mount、`GuestMemory::Wasm32`，燃料取 `kernel::consts_policy::SANDBOX_FUEL_DEFAULT`。场景只走产品已有的 `WasmtimeSandbox`，不复制一份 Wasmtime 驱动。
+
+```rust
+// bench 是二进制，以下都是 pub(crate)
+pub struct Report { pub lines: Vec<String> }
+pub fn measure() -> Result<Report, String>;
+pub fn cold_child() -> Result<(), String>;   // 仅 Main 的 python-cold 内部入口调用
+```
+
+`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先与组件目录回退不由 bench 重写。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先读 guest 摘要，再运行校验脚本：它检查 `sys.implementation.name == "cpython"` 并打印固定标记；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
+
+场景与读数行：
+
+| 行 | 驱动方式 | 回答的问题 |
+|---|---|---|
+| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold` 子进程；子进程重新经 doctor 找 guest、校验并运行负载，父进程计时到退出，等待有上限 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm` |
+| `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
+| `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；逐次核对输出 | 并发调用延迟、从开始到各线程实际起跑的 `start_delay`、整批吞吐与尾延迟；当前没有 admission queue，故不把 start delay 改名成 queue delay |
+| `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程 | virtual 与 resident 的 before／peak／after；peak 是采样看到的下界，采样节拍数随行，不能补猜未观察到的峰值 |
+
+每个计时样本保留一行，索引从 1 开始，微秒仍由 `monitor::spread::micros` 转换：
+
+`python_sample row=<行名> index=<n> took_us=<n> guest=<64 位十六进制> script=<64 位十六进制>`
+
+汇总复用 `reading::row_line` 与 `Spread`，旁注依次带 `machine_class`、`os`、`arch`、两个摘要和场景参数；原始样本使后续同一机器的 interleaved A/B 可以计算中位相对变化的 bootstrap 区间，而不是只剩一个无法复核的 p50。`python_memory` 是字节读数，不套 duration 行，也不印假的 `floor_us=0`。可执行文件、包大小、构建时间与 startup-to-ready 继续分别由 `[release_binary]` 与 `bench-startup` 的既有行负责，本族不另造第二仪表。
+
+当前适配器没有 pre-warm 或阶段观察面，所以本切片不产 pre-warm awaited／racing、`instantiate` 或 `interpreter_initialization` 行；S1 的这些读数仍欠。冷／热之差不能冒充其中任何一项，WAT 正确性夹具也不能成为 CPython 计时。后续测量面须同时守住 roadmap 的「不新增 callback API」与计时采样点约束。
+
+D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：S2 的固定 guest 成为唯一工件后，路径解析可以删除，校验仍须确认实际运行的是该工件。
+
+Rust 检查：`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`；三者走默认测试套件，不需要本机装有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python` 触发，缺工件即非零拒绝。
 -/
 
 /-!

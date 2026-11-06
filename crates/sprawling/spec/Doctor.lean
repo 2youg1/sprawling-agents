@@ -138,7 +138,7 @@ pub(super) fn ask(command: &mut Command, knocks: u32, keep: impl FnMut(&str) -> 
 
 ```rust
 // lib.rs：doctor 从二进制半边搬进 lib，装配层与浏览器层才够得着它
-pub mod doctor;                                   // 公开面唯一新增：`pub use screen::verb`
+pub mod doctor;                                   // 公开面：`screen::verb` 与 Python bench 共用的 `host::usable_python_wasm`
 
 // bin::doctor::presence（形状 2 value）：运行中的机器对一项东西的回答，三态而非两态
 pub(crate) enum Presence {
@@ -164,6 +164,7 @@ pub(crate) enum Detection {
 pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有的那个牌子（§8-57）
 pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
 pub(crate) fn python_wasm() -> Presence;
+pub fn usable_python_wasm() -> Option<PathBuf>;      // 生产 exec 与 citysim 的 CPython baseline 共用同一选择门
 pub(crate) fn shell() -> Presence;
 pub(crate) fn pwsh() -> Presence;              // 表里的 `pwsh` 行（runtime D30）
 pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 只在 `pwsh --version` 读出的主版本不小于 7 时
@@ -186,7 +187,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
 - **`ffmpeg` 进表但 doctor 管不到 `crates/desktop/`**：`crates/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`crates/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
 - **`browser::profile` 没有探测可搬**：读 `crates/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `crates/browser`。
-- **doctor 进 lib 的公开面只多一行**：`pub use screen::verb`，二进制半边 `main/router.rs` 改调 `sprawling::doctor::verb`；`Machine` 仍是 `pub(crate) trait`，不上缝清单。
+- **doctor 进 lib 的公开面只有 verb 与既有 guest 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python_wasm` 供 citysim 的 CPython baseline 与生产 exec 读同一份变量优先、组件目录回退答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
 
 **探测可失败的路径，逐条**（本节与 §8-48 共用，测试点名「丑的那几条」）：
 

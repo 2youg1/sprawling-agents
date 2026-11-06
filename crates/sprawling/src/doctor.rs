@@ -50,6 +50,7 @@ pub(crate) use pin::Pin;
 pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine, on_search_path};
 pub(crate) use report::answer;
+pub use host::usable_python_wasm;
 pub use screen::verb;
 pub(crate) use table::{REQUIREMENTS, recipe_for};
 pub(crate) use upstream::{Upstream, newest};
