@@ -1,6 +1,10 @@
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:168466b0eb1d9aa58c75673f28d8da92d845895eed269ff6a83736114223a650 -->
+
 # Cross-agent benchmark measurement method
 
-This file binds the cross-agent benchmark to a design that a reader can audit without rerunning it. It names the series, estimators, sample-size rules, parameters, schemas and commands behind every published statistic.
+For future rounds, this file binds the cross-agent benchmark to a design that a reader can audit without rerunning it. It names the series, estimators, sample-size rules, parameters, schemas and commands behind every published statistic.
 
 The [performance guide](../performance.md#evaluate-a-change-without-hiding-its-distribution) governs every published evaluation and wins if the two documents disagree. This file supplies the benchmark-specific choices that the guide leaves open. A round directory owns its observations and exports; it does not redefine this method.
 
@@ -99,15 +103,15 @@ n = ceil(n0 * (h / h_target)^2 / m) * m
 
 so that the target is a whole number of cohorts, each carrying the pilot's observation count.
 
-The target half-width is 10% of the point estimate for P50 and 25% for P99. The square-root scaling is a sizing rule derived from the pilot, not a claim that observations within a round are independent. A zero pilot half-width does not justify a zero sample target: add one fresh pilot-sized cohort and recompute, stopping with a sizing failure if the pre-registered resource ceiling is reached before a non-zero width is observed. A non-positive point estimate needs a pre-registered absolute width target instead of a relative one. Stage two adds fresh cohorts until the cell reaches `n`; the final estimate and interval are recomputed from all eligible stages, and the achieved width is printed beside the target. A pilot that poorly represents the workload can therefore leave a visible miss rather than a hidden pass.
+The target half-width is 10% of the pilot point estimate for P50 and 25% for P95 or P99. Before the first observation, register the headline quantile, its relative target, an absolute target for non-positive estimates, and the pilot-to-target calculation. A P95 headline uses its own pilot P95 interval and estimate to compute `n95`; a P99 headline registers both `n99` and fallback `n95` calculations. Freeze the resulting numerical width targets after the pilot, before stage two. The square-root scaling is a sizing rule derived from the pilot, not a claim that observations within a round are independent. A zero pilot half-width does not justify a zero sample target: add one fresh pilot-sized cohort and recompute, stopping with a sizing failure if the pre-registered resource ceiling is reached before a non-zero width is observed. A non-positive point estimate needs a pre-registered absolute width target instead of a relative one. Stage two adds fresh cohorts until the cell reaches `n` (for a P99 headline, `max(200, n99, n95)`); the final estimate and interval are recomputed from all eligible stages, and the achieved width is printed beside the target. A pilot that poorly represents the workload can therefore leave a visible miss rather than a hidden pass.
 
-A published P99 requires `n >= 200` and an interval half-width no greater than 25% of its point estimate. These are publication policies, not tests. If either fails, the export sets `p99_publishable: false` with the failed condition, and the headline reports P95 with its interval and the maximum instead. The analyzer still retains the P99 estimate and interval in the exports for diagnosis; it cannot be used for a ranking.
+A published P99 requires `n >= 200` and an interval half-width no greater than 25% of its point estimate. These are publication policies, not tests. If either fails, the export sets `p99_publishable: false` with the failed condition, and the headline reports P95 with its interval and the maximum instead. The fallback retains the pre-registered `n95` and frozen P95 width target; it neither substitutes `n99` for `n95` nor resizes after seeing the confirmatory result. A missed P95 count or width target is printed and permits description only, with no quantile ranking. The analyzer still retains the P99 estimate and interval in the exports for diagnosis; it cannot be used for a ranking.
 
 ### Outcome cells
 
-Size a two-arm pass-rate comparison by exact binomial power at the pre-registered two-sided alpha and power target. Enumerate the possible outcome counts under the planned allocation and the pre-registered score-test rejection rule; choose the smallest per-arm count whose exact power reaches the target, or the smallest total count along a pre-registered unequal-allocation ratio. Report the assumed proportions, allocation, alpha, power and resulting count per arm. Score-based normal and arcsine approximations are cross-checks only, especially near proportions zero or one.
+Pre-register the eligible-attempt estimand, assumed proportions, two-sided family alpha, power target, family size `K`, allocation ratio and rejection rule. Use the common alpha and power values below. For genuinely independent, unpaired Bernoulli trials only, enumerate both arms' possible counts under the score-test rejection rule at conservative single-comparison alpha `alpha / K`. Choose the smallest per-arm count meeting the power target, or the smallest total count along the registered unequal-allocation ratio. This guarantees the target under Holm's stricter first rejection threshold; unadjusted-alpha power is insufficient. Report family alpha, allocated alpha, assumed proportions, allocation, achieved power and counts per arm. Approximations are cross-checks only.
 
-A round that cannot afford the exact-power target still reports each proportion's Wilson interval and each contrast's Newcombe interval, but supports no pass-rate ranking.
+Repeated attempts within a round and candidates observed in the same round require a joint method: pre-register a round-level dependence model (including within-round correlation and cross-candidate pairing), cluster sizes, an interval estimator and test that preserve whole paired rounds, and power simulation of that same rejection rule at `alpha / K`. Size independent rounds along the registered allocation, report attempts per round as well as round counts, and demonstrate the power target and null error control under the registered model and sensitivity scenarios. Independent-binomial enumeration cannot size this design. Until these methods and their calibration checks are specified and implemented in the analyzer, pass-rate ranking is unavailable. An unaffordable target also precludes ranking. Descriptive counts and rates remain reportable; independent-binomial intervals cannot serve as confirmatory intervals for correlated attempts.
 
 ### Continuous primaries
 
@@ -124,14 +128,14 @@ All primary confidence intervals are two-sided 95%. Confirmatory tests use two-s
 | `n`, `min`, `max`, `p50`, `p95`, `p99` | Hyndman–Fan type 1, the inverse empirical CDF: for `q > 0`, the one-based order statistic `ceil(q*n)` | Point estimates with their sample count. |
 | `p50_ci`, `p95_ci`, `p99_ci` | BCa interval from dependence-preserving bootstrap replicates; percentile interval retained as sensitivity | Uncertainty of the named quantile. |
 | `cv`, `max_over_p99`, `over_2x_p99`, `over_5x_p99` | Arithmetic on observed values | Descriptive tail mass and profiling targets, not a stability test. |
-| `dip`, `dip_p` | Hartigan's dip statistic using AS 217; uniform-null Monte Carlo draws per sample size; Holm adjustment within the pre-registered modality family | Rejection of unimodality, not proof of a particular execution path. |
-| `modes`, `antimodes`, `shares` and their intervals | Gaussian KDE with Sheather–Jones bandwidth; supported local maxima are centres and intervening local minima are cut points; the same bootstrap supplies intervals | Shape summaries for a multimodal cell. |
+| `dip`, `dip_p` | Hartigan's dip statistic using AS 217; `dip_p` requires the dependence calibration below, followed by Holm within the registered modality family | Rejection of unimodality, not proof of a particular execution path. |
+| `modes`, `antimodes`, `shares` and their intervals | Gaussian KDE with Sheather–Jones bandwidth; grid, support, matching and interval rules below | Shape summaries for a multimodal cell. |
 | `pettitt`, `pettitt_p` | Pettitt single-change-point statistic with unit-preserving permutations; Holm adjustment within the drift family | A calibrated drift reading and estimated change point. |
 | `split_half_ratio`, `cusum`, `cohort_range_over_median` | Half-medians, normalized cumulative sums and per-cohort quantiles | Descriptive effect sizes and plots; the ratio warning named below is a policy. |
 | `slope`, `intercept`, `r_squared`, `slope_ci` | Ordinary least squares on one point per independent cohort; pairs bootstrap over cohorts | Memory scaling with uncertainty and fit quality. |
-| `wilson_ci` | Wilson score interval | Uncertainty of one eligible pass count. |
-| `risk_difference`, `risk_difference_ci` | Difference of proportions with the Newcombe hybrid score interval | A two-arm rate contrast; never interval overlap as a substitute test. |
-| `required_n` | The quantitative pilot rule or exact binomial power rule above | The cell's sample-size rationale. |
+| `wilson_ci` | Wilson score interval for independent Bernoulli trials only | Unavailable as a confirmatory interval for repeated or paired attempts. |
+| `risk_difference`, `risk_difference_ci` | Difference of proportions; Newcombe hybrid score interval only for independent, unpaired trials; otherwise the registered round-aware interval | A two-arm rate contrast; never interval overlap as a substitute test. |
+| `required_n` | The quantitative pilot rule or applicable outcome sizing rule above | The cell's sample-size rationale. |
 
 ### Resampling, order and deterministic seeds
 
@@ -141,15 +145,25 @@ BCa bias correction comes from the bootstrap distribution; acceleration comes fr
 
 An empty `index` declares that collection order was not preserved. Such a cell may receive an iid bootstrap sensitivity interval, clearly labelled, but not a confirmatory dependent-data interval.
 
-Derive each statistic's random stream as SHA-256 over the length-prefixed UTF-8 fields `(seed_string, round, cell key, statistic)`. The stream therefore depends on the cell's identity rather than hash-map iteration or CSV row order. The manifest fixes `seed_string`. The dip null depends only on sample size, so it is generated once per `n` using `dip-null` as the statistic key and the sample size in the cell-key field; every export records the draw count.
+Derive each statistic's random stream as SHA-256 over the length-prefixed UTF-8 fields `(seed_string, round, cell key, statistic)`. The stream therefore depends on the cell's identity rather than hash-map iteration or CSV row order. The manifest fixes `seed_string`. Dip calibration keys also include the registered null model, cluster layout and dependence parameters; a cache keyed only by sample size is invalid. Every calibrated export records the draw count and calibration revision.
 
 All families use Holm's procedure at the level above. The manifest defines family membership before measurement. Reports include raw and adjusted p-values. A stricter pre-registered simultaneous procedure may replace the common interval confidence level for its family.
+
+### Modality calibration and shape definitions
+
+`dip` remains a descriptive statistic for correlated observations. A confirmatory `dip_p` requires a pre-registered unimodal null model that generates whole rounds with the observed cluster sizes, within-round dependence and candidate pairing. Record the generator, nuisance-parameter treatment, statistic, rejection rule and simulation seed. Before using it, validate type-I error over the registered null/dependence parameter range, including boundary cases, with Monte Carlo uncertainty reported. Resampling the empirical multimodal distribution is not null calibration, and iid uniform draws indexed by sample size do not control errors for this design. No validated dependent-null calibration is specified or implemented yet: export `dip_p: null` with status `unavailable`, and make no inferential multimodality claim until one is supplied. Holm cannot repair an uncalibrated p-value.
+
+For reproducible descriptive shape summaries, evaluate the Gaussian KDE on 4097 equally spaced points from `min - 4*bw` to `max + 4*bw`, using the positive Sheather–Jones solve-the-equation bandwidth `bw`. Export the bandwidth, grid and selector variant from the pinned analyzer; a failed selector makes the shape analysis unavailable. Use this same grid and bandwidth for every dependence-preserving bootstrap replicate. A local maximum is an interior grid point higher than both neighbours; collapse an exactly equal plateau to its leftmost point when both outside neighbours are lower. Between adjacent maxima, the lowest grid value is the antimode (leftmost on ties). The two exterior basins extend to infinity. `shares` are empirical fractions in these basins, with an observation exactly on a cut assigned to the basin on its left; shares sum to one.
+
+Match replicate maxima to the original maxima by original basin membership. When several replicate maxima enter a basin, keep the one nearest its original maximum, breaking ties to the left; other maxima are unmatched and their count is exported. An empty basin has an unmatched original mode. A supported mode has a match in at least 95% of replicates; this threshold is a descriptive policy. Export support frequencies for all original maxima. Remove unsupported maxima, recompute antimodes between adjacent retained maxima, and compute the final shares. `modes` contains retained maxima in increasing coordinate order, `antimodes` their intervening cuts, and `shares` their basin fractions; no retained maxima means an unavailable shape summary.
+
+For intervals, match replicates again to the retained modes using their final basins and the same tie rules. Compute replicate cuts between adjacent matched modes and replicate empirical shares using those cuts. If any retained mode is unmatched, mark that replicate's shape vector missing; do not set its share to zero, silently renormalize or relabel remaining modes. Export the missing fraction and unmatched counts. Centre, cut and share intervals use BCa only when every bootstrap and delete-unit jackknife shape vector is complete and the BCa checks pass; otherwise export null intervals with an explicit topology-change or numerical-failure reason. Do not present intervals conditional on a convenient subset of mode counts as unconditional uncertainty.
 
 ## Distribution first, then drift
 
 Every latency cell publishes its ECDF and quantiles with intervals. A memory cell publishes its one point per cohort, the fit over them, and a distribution only when at least eight cohorts make one readable. A density chart uses the Gaussian kernel and Sheather–Jones bandwidth named above. Keep cold observations and outliers visible: publish the maximum and the tail counts beyond two and five times P99.
 
-A cell whose Holm-adjusted dip p-value rejects unimodality at that level is flagged multimodal. Its report prints mode centres, antimode cut points and component shares with intervals beside the quantiles, never P50 or P99 alone. Do not cut at the midpoint of the dip modal interval and do not use forced two-cluster k-means as modality evidence. A mode tree or SiZer may support exploration, but an exploratory grouping does not replace the pre-registered analysis.
+A cell with an available, calibrated Holm-adjusted dip p-value that rejects unimodality at that level is flagged multimodal. Its report prints mode centres, antimode cut points and component shares beside the quantiles, with intervals or the explicit interval-unavailability reasons required above. Do not cut at the midpoint of the dip modal interval and do not use forced two-cluster k-means as modality evidence. A mode tree or SiZer may support exploration, but an exploratory grouping does not replace the pre-registered analysis.
 
 Multimodality does not identify a second execution path. That claim needs tracing, profiling or equivalent execution evidence named beside it. If KDE bandwidth or mode estimation fails, the report carries a failed analysis row and the raw observations rather than inventing one cluster.
 
@@ -169,11 +183,15 @@ Every outcome row has one failure class:
 | `guard` | A declared request, resource or execution guard stopped the attempt. |
 | `timeout` | The declared deadline stopped the attempt. |
 
+For `functional` and `contract`, the denominator includes every selected, attempted, non-infrastructure outcome with a known check result, including guard and timeout attempts. Score each check independently: `1` only if its declared check passes, otherwise `0`; stopping does not erase an already verified result. A check not run or with unknown evidence is missing, with its count and reason reported separately. For `normal_completion`, all selected, attempted, non-infrastructure outcomes with known termination status are eligible: normal exit is `1`, and guard, timeout or abnormal exit is `0`, regardless of check results. Failure class describes termination or failure cause; it does not substitute for the three metric-specific results.
+
+For example, one normally completed attempt passing both checks plus nine timeouts failing both checks gives `functional = 1/10`, `contract = 1/10` and `normal_completion = 1/10`. If all ten fail a check, that check's rate is `0/10`; if the nine timed-out checks were never evaluated, its observed rate is `1/1` with nine missing results, and is not a suite pass rate or ranking basis. Report numerator, eligible denominator and missing count for each metric.
+
 Guard and timeout outcomes remain visible separately because their recovery differs. An infrastructure exclusion is not a success. Missing and unknown outcomes remain missing; they are not encoded as either success or failure.
 
 A deadline hit is right-censored: its value is a lower bound, `censored = 1`, and the report writes `>= T`. It is not a completed duration. Exclude it from ordinary wall-time sums and state the exclusion, or use a pre-registered censored-data estimator that actually uses the bound.
 
-For one proportion, report successes, eligible trials and the Wilson interval. For two proportions, report the risk difference and Newcombe interval; when a hypothesis test is needed, use the corresponding score test in the declared multiplicity family. A ranking requires the difference interval to exclude the pre-registered no-benefit region. An interval covering those bounds does not support ranking and does not prove equality.
+Report successes and eligible trials for each proportion and the risk difference for each contrast. Wilson intervals, Newcombe intervals and the score test apply only to independent, unpaired trials. Repeated or paired attempts use the matched sizing, interval and testing methods required under Outcome cells; absent those methods, report descriptive rates with confirmatory intervals and tests unavailable. A ranking requires the difference interval to exclude the pre-registered no-benefit region. An interval covering those bounds does not support ranking and does not prove equality.
 
 Practical equivalence uses two one-sided tests against pre-registered no-benefit bounds. The bounds are policy choices justified before measurement. Excluding zero alone establishes neither practical benefit nor equivalence.
 
@@ -188,7 +206,7 @@ Memory contributes one phase-aligned point per cohort, not hundreds of autocorre
 - Fix in-flight queue depth across subjects, or record it per cohort and include it as a pre-registered factor. Subjects with different in-flight counts at the same submitted-session level do not share an unlabelled comparison axis.
 - A capacity claim reports slope, intercept, `r_squared` and the slope interval rather than per-level point tables alone. The counter name and adapter travel with every value.
 - The analyzer refuses a slope from fewer than four cohorts or fewer than three session levels. The design target remains at least eight cohorts; meeting only the refusal floor is not the planned confirmatory design.
-- Size the memory-slope interval to a half-width no greater than 25% of the slope estimate using fresh cohorts and the recorded pilot arithmetic. Report non-positive or unstable slopes as analysis failures rather than hiding the width ratio.
+- Pre-register a positive near-zero slope threshold `s0` and positive absolute half-width target `h_abs`, both in the slope's units, before the pilot. Use fresh cohorts and recorded pilot arithmetic to size the slope interval: when `abs(slope) <= s0`, require half-width at most `h_abs`; otherwise require at most 25% of `abs(slope)`. Export the selected target and achieved width. Zero or negative slopes remain valid fits when estimable; report their sign and interval without calling sign an analysis failure. A precision miss is a reported target miss. Numerical instability, non-finite estimates, insufficient cohorts or levels, and failed bootstrap/jackknife checks remain analysis failures.
 
 A high `r_squared` describes linear fit; it does not confirm a process model. Maximum feasible concurrency needs direct completion and resource evidence, not extrapolation from a memory slope alone.
 
@@ -206,16 +224,19 @@ docs/benchmarks/<round>/
 `results.csv` uses LF line endings and this header:
 
 ```text
-schema_version,observation_id,round,build,arm,agent,series,workload,case,cohort,state,sessions,metric,unit,index,value,failure_class,missing_reason,censored,usage_complete,selected,in_flight,counter_source,condition
+schema_version,observation_id,task_attempt_id,request_id,span_start,span_end,round,build,arm,agent,series,workload,case,cohort,state,sessions,metric,unit,index,value,failure_class,missing_reason,censored,usage_complete,selected,in_flight,counter_source,condition
 ```
 
-- `observation_id` is stable and unique within the round; `series` comes from the design registry.
+- `observation_id` identifies one metric row, stable and unique within the published round directory; `series` comes from the design registry. It is not a task or request identifier.
+- `task_attempt_id` uniquely identifies an execution attempt within that directory across all cells and series; retries and retained alternatives get distinct IDs. Every task outcome, wall, request count, token and request-latency row carries it. Rows sharing it must agree on subject, build, arm, workload, case and interleaved round. Non-task readings leave it empty.
+- `request_id` identifies one model or tool invocation within its task attempt; the pair `(task_attempt_id, request_id)` joins all metrics for that invocation. Concurrent requests have distinct IDs; a request retry is a new invocation. Task aggregates leave `request_id` empty. Queue, model and tool spans carry their owning invocation's pair, so interleaving in a cell is unambiguous.
+- `span_start` and `span_end` record monotonic seconds relative to the owning attempt's start for each task wall and request latency span. Export zero as the task start and the measured or censored end as its wall endpoint. Spans must lie within that window; retain cancellation activity after the wall endpoint as separately labelled diagnostic spans excluded from the decomposition. Validate duration against endpoint differences and count distinct model invocation IDs against `requests`. Decompose wall time using the union of request spans and its uncovered residual; report overlaps separately, since concurrent span durations cannot simply be added. Missing spans make the decomposition unavailable rather than implying zero overhead.
 - `metric` names the raw quantity, such as `latency`, `memory_private`, `wall`, `requests`, `input_tokens`, `output_tokens`, `read_bytes`, `write_bytes`, `functional`, `contract`, `normal_completion`, `model_latency`, `tool_latency` or `queue_latency`.
 - `value` is in `unit`; a censored value is a lower bound. Rate rows use `0` or `1`, with eligibility determined by the failure and missingness fields rather than by dropping inconvenient rows.
 - `index` is position in collection order. `state` and `sessions` apply to memory rows; `in_flight` records actual queue depth and `counter_source` names the instrument and adapter.
 - `usage_complete` distinguishes known token totals from unknown usage; `selected` distinguishes a pre-registered primary attempt from a retained alternative. `condition` records configuration differences such as a compatibility gateway or non-native tool route.
 
-The manifest's coverage entries use the exact fields and status rules above. It also records input hashes, toolchain, machine class, estimator version, bootstrap unit, resampling count, block lengths, seed and balanced-order schedule. Unknown units, duplicate observation identifiers and non-finite estimates are validation errors.
+The manifest's coverage entries use the exact fields and status rules above. It also records an immutable `analysis_revision` (full Git commit SHA containing this method and the analyzer), input hashes, toolchain, machine class, estimator version, bootstrap unit, resampling count, block lengths, seed and balanced-order schedule. Unknown units, duplicate observation identifiers, inconsistent task ownership, orphan request spans, invalid span endpoints and non-finite estimates are validation errors.
 
 `exports.json` has sorted keys, six-decimal numeric formatting, LF line endings and no timestamp. Identical observations, manifest and estimator version therefore produce identical bytes; a diff identifies changed input or analysis rather than generation time.
 
@@ -224,6 +245,8 @@ The manifest's coverage entries use the exact fields and status rules above. It 
 ## Reproduce a published round
 
 The round's analyzer is one Rust workspace package named `benchstat`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. The ruling that tools live under `crates/` places it there with `publish = false`: it is a repository tool, and publishing waits until a consumer outside this tree exists.
+
+To reproduce a future round, read `analysis_revision` from its manifest, run `git worktree add --detach <analysis-checkout> <analysis_revision>`, and build there with `cargo build --locked -p benchstat`, using that revision's recorded toolchain. Run its `target/debug/benchstat` with the commands below against an absolute path to a copy of the published round. The analysis revision must be an ancestor available in repository history; record round input digests separately so the analyzer commit need not contain its own SHA. Never use the latest analyzer as a substitute.
 
 The package is not written yet, so no round meets this contract today and `benchstat` is not yet a command a reader can run. The interface it must expose is the completion condition for the next stage:
 
@@ -247,7 +270,7 @@ Historical artifacts, including the [v0.0.11 observations](v0.0.11/README.md), r
 
 **Pettitt and descriptive effect sizes, not a threshold presented as a change-point test.** The permutation test supplies calibration; split-half and CUSUM displays show the magnitude and shape of the change.
 
-**Newcombe differences and exact binomial power, not Wilson-overlap rules and arcsine-only sizing.** Each two-rate claim receives an interval for the actual contrast, and near-certain proportions do not rely on a normal approximation for their primary sample-size calculation.
+**Outcome methods follow the independent unit.** Independent, unpaired trials permit Newcombe contrasts and exact binomial sizing at the allocated alpha. Repeated and paired attempts require joint round-aware sizing and inference; rankings wait for validated implementation. Interval overlap and independent-trial formulas cannot establish a correlated contrast.
 
 **One self-contained HTML view beside the Markdown report, not LaTeX or PDF.** Inline SVG carries the charts without network access, the Markdown remains reviewable as text, and both consume the same exports.
 
@@ -282,3 +305,6 @@ Configuration confounds remain: shell-backed versus native tools, different prov
 A round measures only its named fixtures and actual conditions. Coverage rows state what a particular round deferred or failed to measure and when that measurement reopens; historical omissions never become permission to omit a required series later.
 
 Sizing depends on a representative pilot, so the report always exposes achieved interval width beside its target. Statistical uncertainty cannot repair incompatible endpoints, queue regimes, counter adapters or workload definitions. No generated ranking, equivalence statement, capacity claim or execution-path explanation may be stronger than its observations, interval, test and coverage record support.
+
+
+<!-- /coderabbit-ai-generated:v1 -->
