@@ -13,7 +13,7 @@
     readonly answer: EndpointsAnswer;
     readonly name: string;
     readonly flight: FlightState;
-    // Gallery fixtures open the native disclosure; production rows start closed.
+    // The disclosure's initial state; afterwards the native summary owns it.
     readonly open?: boolean;
   }
 </script>
@@ -46,6 +46,8 @@
   const belief = u.conn.belief;
   // svelte-ignore state_referenced_locally (each keyed endpoint row seeds one editor; later answers settle it rather than replacing its draft)
   const editor = $state(freshModelEditor(answer, name, flight));
+  // svelte-ignore state_referenced_locally (open is the documented initial state; the native summary owns it afterwards)
+  let expanded = $state(open ?? false);
   let summary: HTMLElement | undefined;
 
   const hands: Hands = $derived.by((): Hands => ({
@@ -100,4 +102,12 @@
   />
 {/snippet}
 
-<Look {...look} {table} {holdSummary} open={open ?? false} />
+<Look
+  {...look}
+  {table}
+  {holdSummary}
+  open={expanded}
+  onToggle={(next) => {
+    expanded = next;
+  }}
+/>

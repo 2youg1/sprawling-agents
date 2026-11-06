@@ -17,17 +17,21 @@
   import { lastCheckpointIn } from "../checkpoints";
   import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
   import { fill, say } from "../../core/lang";
+  import type { Seq } from "../../wire";
   import type { RunBelief } from "../../core/belief";
   import { outcomeOf } from "../../core/results";
   import { toFragment } from "../../core/route";
   import { hhmm } from "../../core/time";
   import { ui } from "../../ui";
 
+  import { roundsThrough } from "./forking";
+
   interface Props {
+    readonly through?: Seq | null;
     readonly run: RunBelief;
   }
 
-  const { run }: Props = $props();
+  const { run, through = null }: Props = $props();
   const u = ui();
   const { lang } = u;
 
@@ -35,7 +39,7 @@
   const asked = $derived(u.conn.asking.ask({ rounds: { run: run.run } }));
   const rounds = $derived.by(() => {
     const held = $asked;
-    return held !== undefined && "rounds" in held ? held.rounds : null;
+    return held !== undefined && "rounds" in held ? roundsThrough(held.rounds, through) : null;
   });
   const quote = $derived(
     [...(rounds?.turns ?? [])].reverse().find((turn) => (turn.said ?? "") !== "")?.said ?? null,

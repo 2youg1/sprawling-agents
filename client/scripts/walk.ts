@@ -46,7 +46,7 @@ const GROUND = join(ROOT, "target", "walk");
 const BINARIES = join(process.env.CARGO_TARGET_DIR ?? join(ROOT, "target"), "debug");
 const EXE = process.platform === "win32" ? ".exe" : "";
 const AT = "127.0.0.1:8799";
-const ORIGIN = `http://${AT}`;
+export const ORIGIN = `http://${AT}`;
 const DEVTOOLS_PORT = 9333;
 // The one model the stand-in's script lists.
 const MODEL = "stand-in-1";
@@ -97,7 +97,7 @@ function held<T>(outcome: Outcome<T>, doing: string): T {
   return outcome.ok ? outcome.value : fail(`${doing}: ${outcome.why}`);
 }
 
-function phrase(key: keyof typeof phrases): string {
+export function phrase(key: keyof typeof phrases): string {
   return phrases[key].en;
 }
 
@@ -165,6 +165,9 @@ async function standIn(
       stderr: "inherit",
     },
   );
+  started.push(() => {
+    provider.kill();
+  });
   const reader = provider.stdout.getReader();
   let said = "";
   while (!said.includes("\n")) {
@@ -200,6 +203,9 @@ async function serve(
         said += decoder.decode(bytes);
       },
     },
+  });
+  started.push(() => {
+    served.kill();
   });
   for (let tries = 0; tries < 150; tries += 1) {
     const code = /pairing code\s+(\S+)/.exec(said.replace(STYLING, ""))?.[1];
@@ -265,7 +271,7 @@ function runStarted(frames: readonly unknown[]): string {
 // The city a walk photographs: two buildings, three rooms that each ran
 // once, an empty Mayor's room and a folder nobody adopted. The runs take
 // the stand-in's replies in this order.
-function settle(env: Record<string, string | undefined>, city: string): string {
+export function settle(env: Record<string, string | undefined>, city: string): string {
   for (const building of ["atlas", "garden"]) {
     held(
       call(createBuilding(Address.make(building), "minimal", null), env, "building_created"),
@@ -313,6 +319,61 @@ function settle(env: Record<string, string | undefined>, city: string): string {
     "# Lab notes\n\nLoose notes from the bench, not yet a building.\n",
   );
   return first;
+}
+
+export interface PreparedCity {
+  readonly city: string;
+  readonly env: Record<string, string | undefined>;
+  readonly run: string | null;
+  readonly tools: DevTools;
+  readonly served: { readonly process: ReturnType<typeof Bun.spawn> };
+  readonly close: () => Promise<void>;
+}
+
+// One throwaway city, paired and ready. A populated walk gets the three
+// settled runs and a configured main model; the first-hours path starts
+// with the endpoint attached but no main model and chooses it by keyboard.
+export async function prepareCity(
+  webDir: string | undefined,
+  populated: boolean,
+  pairWith: (tools: DevTools, code: string) => Promise<void> = pair,
+): Promise<PreparedCity> {
+  rmSync(GROUND, { recursive: true, force: true });
+  const city = join(GROUND, "city");
+  const home = join(GROUND, "home");
+  mkdirSync(home, { recursive: true });
+  const provider = await standIn(join(GROUND, "exchanges.jsonl"));
+  const env = {
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    SPRAWLING_MODEL_URL: provider.url,
+    SPRAWLING_MODEL: populated ? MODEL : undefined,
+  };
+  const raised = Bun.spawnSync([binary("sprawling"), "init", city], { env });
+  if (raised.exitCode !== 0) fail(`init: ${raised.stderr.toString()}`);
+  const served = await serve(city, env, webDir);
+  const run = populated ? settle(env, city) : null;
+  const tools = held(
+    await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT),
+    "open the browser",
+  );
+  started.push(() => {
+    void tools.close();
+  });
+  let closed: Promise<void> | undefined;
+  const close = (): Promise<void> => {
+    if (closed !== undefined) return closed;
+    const browserExited = tools.close();
+    provider.process.kill();
+    served.process.kill();
+    closed = Promise.all([browserExited, provider.process.exited, served.process.exited]).then(
+      () => undefined,
+    );
+    return closed;
+  };
+  await pairWith(tools, served.code);
+  return { city, env, run, tools, served, close };
 }
 
 // ------------------------------------------------------------- the shots
@@ -458,37 +519,14 @@ async function photograph(tools: DevTools, wanted: Options, run: string): Promis
 
 // ------------------------------------------------------------------ main
 
-const wanted = options(Bun.argv.slice(2));
-rmSync(GROUND, { recursive: true, force: true });
-const city = join(GROUND, "city");
-const home = join(GROUND, "home");
-mkdirSync(home, { recursive: true });
-const provider = await standIn(join(GROUND, "exchanges.jsonl"));
-started.push(() => {
-  provider.process.kill();
-});
-const env = {
-  ...process.env,
-  HOME: home,
-  USERPROFILE: home,
-  SPRAWLING_MODEL_URL: provider.url,
-  SPRAWLING_MODEL: MODEL,
-};
-const raised = Bun.spawnSync([binary("sprawling"), "init", city], { env });
-if (raised.exitCode !== 0) fail(`init: ${raised.stderr.toString()}`);
-const served = await serve(city, env, wanted.webDir);
-started.push(() => {
-  served.process.kill();
-});
-const run = settle(env, city);
-const tools = held(await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT), "open the browser");
-started.push(() => {
-  tools.close();
-});
-await pair(tools, served.code);
-const missed = await photograph(tools, wanted, run);
-if (wanted.keep) {
-  console.log(`walk: ${ORIGIN} stays served; Ctrl-C ends it`);
-  await served.process.exited;
+if (import.meta.main) {
+  const wanted = options(Bun.argv.slice(2));
+  const { run, tools, served } = await prepareCity(wanted.webDir, true);
+  if (run === null) fail("a populated walk started no run");
+  const missed = await photograph(tools, wanted, run);
+  if (wanted.keep) {
+    console.log(`walk: ${ORIGIN} stays served; Ctrl-C ends it`);
+    await served.process.exited;
+  }
+  process.exit(missed === 0 ? 0 : 1);
 }
-process.exit(missed === 0 ? 0 : 1);

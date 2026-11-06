@@ -23,6 +23,8 @@
     // lists on it. Absent where there is nothing beside the door to
     // bring up to date.
     readonly onAttached?: () => void;
+    // Open required model controls on entry, as the welcome guide does.
+    readonly openModels?: boolean;
   }
 </script>
 
@@ -33,7 +35,7 @@
   import Unanswered from "../parts/unanswered.svelte";
   import { AttachForm, EndpointList } from "../setup/providers";
 
-  const { onAttached }: ProviderDoorProps = $props();
+  const { onAttached, openModels = false }: ProviderDoorProps = $props();
   const u = ui();
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
@@ -44,7 +46,7 @@
 
 <div class="flex flex-col gap-base">
   {#if read.kind === "held"}
-    <EndpointList answer={read.value} />
+    <EndpointList answer={read.value} {openModels} />
   {:else if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.endpoints} />
   {/if}

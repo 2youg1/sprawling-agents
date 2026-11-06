@@ -33,8 +33,9 @@
 
 import type { RunBelief } from "../../core/belief";
 import type { View } from "../../core/route";
-import type { Call, Origin, RunId, SessionLine, Turn } from "../../wire";
+import type { Call, Origin, RoundsAnswer, RunId, SessionLine, Turn } from "../../wire";
 import { Seq } from "../../wire";
+import { noteAt } from "./note_line";
 
 // What a person pointed at. A message is a person's own words - the
 // opening task or a steer that arrived mid-turn - and carries the text
@@ -141,4 +142,20 @@ export function originalOf(
   const line = held === undefined ? undefined : lines.find((each) => each.began <= held.lastSeq);
   if (room === null || line === undefined) return { kind: "run", run: mother };
   return { kind: "talk", address: room, session: line.began };
+}
+
+// A branch inherits only entries at or before its inclusive ledger position.
+export function roundsThrough(answer: RoundsAnswer, through: Seq | null): RoundsAnswer {
+  if (through === null) return answer;
+  return {
+    ...answer,
+    closing: null,
+    turns: answer.turns
+      .filter((turn) => turn.opened <= through)
+      .map((turn) => ({
+        ...turn,
+        calls: turn.calls.filter((call) => call.at <= through),
+        notes: turn.notes.filter((note) => noteAt(note) <= through),
+      })),
+  };
 }
