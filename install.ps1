@@ -16,9 +16,9 @@
 # Three facts about this repository's releases that the obvious script
 # gets wrong:
 #
-#   * Every release so far is a pre-release, and GitHub's `releases/latest`
-#     endpoint excludes those - it answers 404 here. The list endpoint is
-#     asked for its newest entry instead.
+#   * Every curated release so far is a pre-release, and GitHub's
+#     `releases/latest` endpoint excludes those - it answers 404 here. The
+#     list endpoint is asked for the newest entry in the selected channel.
 #   * The tag and the archive carry different versions: tag
 #     `v0.0.3-Pre-alpha-260903` ships `sprawling-0.0.3-windows-x86_64.zip`.
 #     An asset is chosen by its platform suffix, never by a name built out
@@ -28,7 +28,8 @@
 #     carry, rather than guessed at.
 #
 # SPRAWLING_REPO overrides the canonical release repository for a fork
-# or mirror.
+# or mirror. SPRAWLING_RELEASE_CHANNEL selects `release` (the default) or
+# `nightly`; SPRAWLING_VERSION pins an exact tag and must not conflict with it.
 
 $ErrorActionPreference = 'Stop'
 
@@ -36,6 +37,17 @@ $ErrorActionPreference = 'Stop'
 $repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { '2youg1/sprawling-agents' }
 $api = if ($env:SPRAWLING_API) { $env:SPRAWLING_API } else { "https://api.github.com/repos/$repo/releases" }
 $releases = "https://github.com/$repo/releases"
+$channel = if ($env:SPRAWLING_RELEASE_CHANNEL) { $env:SPRAWLING_RELEASE_CHANNEL } else { 'release' }
+if ($channel -notin @('release', 'nightly')) {
+    Die "SPRAWLING_RELEASE_CHANNEL must be release or nightly, not $channel"
+}
+if ($env:SPRAWLING_VERSION) {
+    $inferred = if ($env:SPRAWLING_VERSION.StartsWith('v')) { 'release' } `
+        elseif ($env:SPRAWLING_VERSION.StartsWith('nightly-')) { 'nightly' } else { '' }
+    if ($env:SPRAWLING_RELEASE_CHANNEL -and $inferred -and $inferred -ne $channel) {
+        Die "SPRAWLING_VERSION names the $inferred channel but SPRAWLING_RELEASE_CHANNEL is $channel"
+    }
+}
 
 function Die($message) {
     Write-Error "sprawling install: $message"
@@ -144,10 +156,11 @@ try {
     $release = if ($env:SPRAWLING_VERSION) {
         Invoke-RestMethod -Uri "$api/tags/$($env:SPRAWLING_VERSION)" -UseBasicParsing
     } else {
-        # `-1` is what the list endpoint answers with when asked for one
-        # entry; PowerShell unwraps a single-element array, so the value
-        # is the release either way.
-        @(Invoke-RestMethod -Uri "${api}?per_page=1" -UseBasicParsing)[0]
+        $published = @(Invoke-RestMethod -Uri "${api}?per_page=100" -UseBasicParsing)
+        @($published | Where-Object {
+            -not $_.draft -and (($channel -eq 'release' -and $_.tag_name.StartsWith('v')) -or
+                ($channel -eq 'nightly' -and $_.tag_name.StartsWith('nightly-')))
+        } | Sort-Object -Property published_at -Descending | Select-Object -First 1)[0]
     }
 } catch {
     Die "cannot reach $api ($($_.Exception.Message)); download from $releases instead"

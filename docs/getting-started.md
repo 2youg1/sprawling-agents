@@ -249,6 +249,25 @@ Operating-system code signing is a third, separate thing. A signing application 
 
 To build the complete deliverable from a checkout, use `just dist`. A `cargo build` without `just build-web` first leaves a page in the binary that only says the client bundle is missing. Source-build prerequisites are in [contributing](CONTRIBUTING.md).
 
+### Follow a nightly snapshot
+
+A nightly is an automatically built snapshot of `main`, not a curated release. Its tag is `nightly-YYMMDD-fullSHA`, where the date is UTC and the complete commit SHA is included. Its release notes carry the same fixed instability warning, the curated baseline and commit count, a comparison with the previous nightly, and GitHub's generated list of merged PRs since that baseline. Nightly archives are published only for Windows x86-64, macOS on Apple silicon and Linux x86-64, and only the two newest published snapshots are retained.
+
+The default shell installer stays on curated releases. Opt into the nightly channel explicitly:
+
+```sh
+SPRAWLING_RELEASE_CHANNEL=nightly sh -c 'curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh'
+```
+
+In PowerShell:
+
+```powershell
+$env:SPRAWLING_RELEASE_CHANNEL = 'nightly'
+irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
+```
+
+The binary remembers that it is a nightly and `sprawling status --check` compares its complete source SHA with the newest published nightly. To return to curated releases, run the installer again with `SPRAWLING_RELEASE_CHANNEL=release`, or pin an exact curated tag with `SPRAWLING_VERSION`. A tag and an explicitly conflicting channel are refused. Nightlies are GitHub Releases only: they do not move npm, crates.io or AUR. Back up the city before updating; an older binary is not guaranteed to read data a newer nightly migrated.
+
 ### With AUR
 
 The AUR package is not published yet. Release builds generate and verify it on Arch Linux; publishing needs an AUR account and the `AUR_SSH_KEY` secret, and without them publication is skipped with a notice.
@@ -563,7 +582,7 @@ Then update through the original channel:
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell installer | stop the city and run the same installer again | set `SPRAWLING_VERSION` to the exact published tag, as described above |
+| shell/PowerShell installer | stop the city and run the same installer again; an installed nightly keeps using `SPRAWLING_RELEASE_CHANNEL=nightly` | set `SPRAWLING_VERSION` to the exact published tag, as described above |
 | Manual archive | download and verify the selected archive; if you installed it before, run the `install` command of the binary inside it | keep or download the archive of the selected tag |
 | AUR sprawling-bin | in the original checkout, `git pull --ff-only && makepkg -si` | inspect and build the PKGBUILD revision for the selected release |
 | Repository Nix flake | check out the selected tag or commit and run the commands under [With Nix](#with-nix) | use the original pinned checkout and lockfile; a fixed commit does not follow newer releases |

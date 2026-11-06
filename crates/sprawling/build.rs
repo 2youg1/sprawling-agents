@@ -79,6 +79,8 @@ fn main() {
     // because cargo otherwise reuses a binary compiled under the previous
     // tag and every copy of it would name the wrong release.
     println!("cargo::rerun-if-env-changed=SPRAWLING_RELEASE_TAG");
+    println!("cargo::rerun-if-env-changed=SPRAWLING_NIGHTLY_TAG");
+    println!("cargo::rerun-if-env-changed=SPRAWLING_SOURCE_SHA");
     if let Err(msg) = embed() {
         // cargo >= 1.84: `cargo::error` fails the build loudly instead of
         // leaving a stale or missing asset for include_bytes! to trip on.

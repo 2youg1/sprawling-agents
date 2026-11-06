@@ -17,9 +17,9 @@
 # Three facts about this repository's releases that the obvious script
 # gets wrong:
 #
-#   * Every release so far is a pre-release, and GitHub's `releases/latest`
-#     endpoint excludes those - it answers 404 here. The list endpoint is
-#     asked for its newest entry instead.
+#   * Every curated release so far is a pre-release, and GitHub's
+#     `releases/latest` endpoint excludes those - it answers 404 here. The
+#     list endpoint is asked for the newest entry in the selected channel.
 #   * The tag and the archive carry different versions: tag
 #     `v0.0.3-Pre-alpha-260903` ships `sprawling-0.0.3-macos-aarch64.zip`.
 #     An asset is chosen by its platform suffix, never by a name built out
@@ -34,6 +34,8 @@
 # SPRAWLING_API replaces the whole release-list address, for a mirror or
 # for the release workflow, which serves this run's archive from
 # 127.0.0.1 and installs it through this script before publishing it.
+# SPRAWLING_RELEASE_CHANNEL selects `release` (the default) or `nightly`;
+# SPRAWLING_VERSION pins an exact tag and must not conflict with it.
 
 set -eu
 
@@ -89,16 +91,73 @@ platform() {
     esac
 }
 
-# The newest release, or the one SPRAWLING_VERSION names. A pinned tag is
-# what makes an install reproducible, so it is asked for by tag rather
-# than searched for in the list.
+# The release channel is independent of the installation mechanism. An
+# exact tag remains reproducible; a conflicting explicit channel is an
+# error rather than a silent switch.
+release_channel() {
+    channel=${SPRAWLING_RELEASE_CHANNEL:-release}
+    case "$channel" in
+        release | nightly) ;;
+        *) die "SPRAWLING_RELEASE_CHANNEL must be release or nightly, not $channel" ;;
+    esac
+    case "${SPRAWLING_VERSION:-}" in
+        v*) inferred=release ;;
+        nightly-*) inferred=nightly ;;
+        *) inferred= ;;
+    esac
+    if [ -n "${SPRAWLING_RELEASE_CHANNEL:-}" ] && [ -n "$inferred" ] &&
+        [ "$inferred" != "$channel" ]; then
+        die "SPRAWLING_VERSION names the $inferred channel but SPRAWLING_RELEASE_CHANNEL is $channel"
+    fi
+}
+
+# Tag and publication pairs, newest publication first. Inserting newlines
+# before these two field names keeps release bodies and asset objects out
+# of the selection without requiring jq or Python on a person's machine.
+release_index() {
+    printf '%s' "$1" | tr -d '\n\r' |
+        sed -e 's/"tag_name":/\
+"tag_name":/g' -e 's/"published_at":/\
+"published_at":/g' |
+        awk '
+            /"tag_name":/ {
+                tag = $0
+                sub(/^[^"]*"tag_name": *"/, "", tag)
+                sub(/".*$/, "", tag)
+                next
+            }
+            /"published_at":/ {
+                published = $0
+                sub(/^[^"]*"published_at": *"/, "", published)
+                sub(/".*$/, "", published)
+                if (tag != "" && published != "") print published "\t" tag
+                tag = ""
+            }
+        ' | sort -r
+}
+
+# The newest release in the selected channel, or the one SPRAWLING_VERSION
+# names. A pinned tag is asked for directly; a channel selection fetches
+# its exact release after finding it in the bounded list.
 release_json() {
     if [ -n "${SPRAWLING_VERSION:-}" ]; then
         curl -fsSL "${API}/tags/${SPRAWLING_VERSION}" ||
             die "no release tagged ${SPRAWLING_VERSION}; the tags are listed at ${RELEASES}"
     else
-        curl -fsSL "${API}?per_page=1" ||
+        listed=$(curl -fsSL "${API}?per_page=100") ||
             die "cannot reach ${API}; check the network, or download from ${RELEASES}"
+        selected=$(release_index "$listed" |
+            while IFS="$(printf '\t')" read -r published candidate; do
+                case "$channel:$candidate" in
+                    release:v* | nightly:nightly-*)
+                        printf '%s\n' "$candidate"
+                        break
+                        ;;
+                esac
+            done)
+        [ -n "$selected" ] || die "no published release is available in the $channel channel; see ${RELEASES}"
+        curl -fsSL "${API}/tags/${selected}" ||
+            die "cannot read release $selected; check the network, or download from ${RELEASES}"
     fi
 }
 
@@ -177,9 +236,12 @@ need curl
 need uname
 need sed
 need tr
+need awk
+need sort
 platform
 
 say "sprawling: asking ${REPO} what it has for ${os}-${arch}"
+release_channel
 json=$(release_json)
 tag=$(field "$json" 'tag_name' '\([^"]*\)')
 [ -n "$tag" ] || die "the release list came back without a tag; see ${RELEASES}"

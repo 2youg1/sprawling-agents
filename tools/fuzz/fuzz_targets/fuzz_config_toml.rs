@@ -7,6 +7,16 @@
 
 use libfuzzer_sys::fuzz_target;
 
+fn assert_unique_labels<'a, T: Ord + 'a>(labels: impl Iterator<Item = &'a T>) {
+    let mut seen = std::collections::BTreeSet::new();
+    for label in labels {
+        assert!(
+            seen.insert(label),
+            "two servers under one label put one tool name in front of two processes"
+        );
+    }
+}
+
 // The text of one CONFIG.toml, as a person typed it.
 //
 // Property under fuzz: reading a layer never panics; an accepted layer
@@ -35,12 +45,19 @@ fuzz_target!(|data: &[u8]| {
         }
     }
     if let Some(servers) = layer.mcp() {
-        for (at, server) in servers.iter().enumerate() {
-            let before = servers.get(..at).unwrap_or_default();
-            assert!(
-                !before.iter().any(|held| held.label == server.label),
-                "two servers under one label put one tool name in front of two processes"
-            );
-        }
+        assert_unique_labels(
+            servers
+                .definitions
+                .iter()
+                .flatten()
+                .map(|definition| &definition.server.label),
+        );
+        assert_unique_labels(
+            servers
+                .references
+                .iter()
+                .flatten()
+                .map(|reference| &reference.label),
+        );
     }
 });

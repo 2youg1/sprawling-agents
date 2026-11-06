@@ -535,7 +535,7 @@ impl GitStatusAsk { fn read(self) -> wire::Answer; } // 锁外：读工作树（
 ### 8-68 `bin::release`：构建身份与按安装来源查询（形状 4 适配器）
 
 ```rust
-pub enum Built { Released(Release), FromSource }
+pub enum Built { Released(Release), Nightly(NightlyBuild), FromSource }
 pub fn built() -> Result<Built, AxError>;
 pub fn answer() -> ReleaseAnswer;
 ```
@@ -544,11 +544,15 @@ pub fn answer() -> ReleaseAnswer;
 `crates/wire/spec/Answer/Release.lean` D24 定义。未带发行 tag 的 Cargo 安装按编译版本
 比较 crates.io，开发构建保留 FromSource，不能从缺席 tag 推出安装来源。
 `SPRAWLING_RELEASE_TAG` 由构建脚本声明重跑条件，存在时必须与 Cargo 版本及成熟度一致。
+nightly 身份与发布状态由 `crates/sprawling/spec/Nightly.lean` D105 规定：`SPRAWLING_NIGHTLY_TAG`
+与 `SPRAWLING_SOURCE_SHA` 成对出现，完整 SHA 用于幂等与 compare，正式与 nightly 环境输入互斥。
 
 `release::registry`（`crates/sprawling/src/release/registry.rs`）拥有注册表 HTTP 读取与
 npm、crates.io 和 GitHub 发布列表的解码，沿用 gateway 的代理规则、请求耐心与
 分阶段网络拒绝；父模块拥有来源判定，适配器不切换注册表。GitHub API 和归档页面的
 repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
+正式 GitHub 查询跳过 nightly；nightly 查询读取发布说明里的完整 SHA 标记，并以 GitHub compare
+回答 Current/Behind/Ahead/Unconfirmed，不能拿 Cargo 裸版本号猜快照顺序。
 只有 `status --check` 或人的检查按钮调用 `answer` 才出网，成功读数与拒绝一起返回；
 查询与手动命令选择不下载、不安装、不覆写二进制。
 
