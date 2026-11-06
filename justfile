@@ -837,10 +837,13 @@ budget:
 # `sprawling` executable with the dev-dependency features (kernel and
 # agent_protocols `conformance`, storage `fault`), and on Windows and
 # macOS an executable has one output path whatever its features, so the
-# next product build relinks it.
+# next product build relinks it. A missing CPython guest leaves a nonzero
+# verdict without suppressing the independent instruments.
 bench:
-    cargo run --release -p citysim --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    status=0; \
+    cargo run --release -p citysim --bin bench || status=$?; \
+    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture || status=$?; \
+    exit "$status"
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.

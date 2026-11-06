@@ -652,16 +652,17 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 # same doctor door as production. Raw `python_sample` lines are retained beside
 # every summary so an interleaved candidate comparison can be reproduced.
 [python_execution]
-what = "real CPython-WASI cold no-prewarm and warm calls, concurrent call latency and throughput, and virtual/resident memory before, during and after a separate concurrent burst"
-measured_by = "just bench, or cargo run --release -p citysim --bin bench -- python; bench::python in tools/citysim/src/bin/bench/python.rs; guest and script BLAKE3 digests on every reading"
+what = "real CPython-WASI cold no-prewarm and warm calls, concurrent call latency and throughput, and virtual memory (Windows: private commit) plus resident memory before, during and after a separate concurrent burst"
+measured_by = "just bench, or cargo run --release -p citysim --bin bench -- python [baseline|candidate]; bench::python and bench::python::cold in tools/citysim/src/bin/bench/; executable, guest and script BLAKE3 digests on every CSV reading"
 guest_initialization_target_p50_us = 250000
 guest_initialization_target_p95_us = 500000
 minimum_worthwhile_relative_permille = 50
-minimum_worthwhile_absolute_us = 1000
-bootstrap_confidence_permille = 9500
+minimum_worthwhile_latency_us = 1000
+minimum_worthwhile_throughput_calls_per_s = 1
+bootstrap_confidence_permille = 950
 bootstrap_resamples = 10000
 change_method = "pre-registered difference-in-differences (DiD), with distribution-first reporting and round-level dependence handling under docs/performance.md"
-status = "instrumented, not gated; no baseline is recorded yet. Missing, malformed and non-CPython guests fail with E_TOOL_UNAVAILABLE and no Python report. Prewarm awaited/racing and instantiate/interpreter-initialization rows remain uninstrumented, so S1 remains pending. Current fixed counts are pilot settings, not a precision-based final design. Before any candidate, pre-register an unaffected control and the full protocol named in change_method; adopt only when its DiD interval at the declared confidence excludes zero and clears both minimum-worthwhile fields, with Holm correction across the declared primary metrics. The guest-initialization figures are targets, not readings."
+status = "instrumented, not gated; no baseline is recorded yet. Missing, malformed and non-CPython guests fail with E_TOOL_UNAVAILABLE and no Python report. Prewarm awaited/racing and instantiate/interpreter-initialization rows remain uninstrumented, so S1 remains pending. Current fixed counts are pilot settings, not a precision-based final design. Before any candidate, pre-register an unaffected control and the full protocol named in change_method; adopt only when its DiD interval at the declared confidence excludes zero and the effect clears the applicable absolute and relative minima for each metric, with Holm correction across the declared primary metrics. The guest-initialization figures are targets, not readings."
 
 # Declared before any pooling candidate. The S3 probe and any S4 campaign use
 # the comparison method and confidence declared by [python_execution].
@@ -672,6 +673,7 @@ minimum_warm_p50_reduction_permille = 100
 minimum_concurrent_throughput_increase_permille = 50
 maximum_warm_p99_regression_permille = 50
 estimator = "warm p50 and p99 use a pre-registered quantile-DiD estimator; concurrent throughput uses log-scale DiD; docs/performance.md owns the protocol"
+after_drain_retention_bound = "bytes; a numeric bound must be declared from the S2 fixed guest and measured S4 product concurrency before a candidate run; an absent bound rejects the candidate"
 status = "declared before any candidate run, not gated. Adopt only when both the warm-p50 reduction and concurrent-throughput increase clear their minima with corrected bootstrap intervals at the declared confidence excluding zero, warm p99 stays within its declared regression allowance, and after-drain retention stays inside the explicit S4 pool bound derived from the fixed guest and product concurrency. Otherwise reject pooling; an undecided campaign is a rejection. No candidate has run."
 
 [local_latency]
