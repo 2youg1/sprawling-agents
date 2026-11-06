@@ -1,0 +1,309 @@
+# A UTC-dated snapshot of main, not another curated release channel.
+#
+# The full source SHA is the idempotency key. A scheduled run builds only a
+# new snapshot whose exact CI run was green and which extends the currently
+# published nightly. A manual run always remains build-only unless the person
+# explicitly asks for publication on canonical main. Forks never publish.
+name: nightly release
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish on canonical main (manual runs are build-only by default)
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Runs are serialized rather than cancelled: a run may be between draft
+# creation and publication. The ancestry check below still rejects a stale
+# candidate if two independent triggers somehow finish out of order.
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      publish: ${{ steps.decide.outputs.publish }}
+      cleanup: ${{ steps.decide.outputs.cleanup }}
+      source: ${{ steps.decide.outputs.source }}
+      tag: ${{ steps.decide.outputs.tag }}
+      title: ${{ steps.decide.outputs.title }}
+      baseline: ${{ steps.decide.outputs.baseline }}
+      commits: ${{ steps.decide.outputs.commits }}
+      previous_tag: ${{ steps.decide.outputs.previous_tag }}
+      previous_sha: ${{ steps.decide.outputs.previous_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: decide whether this exact snapshot advances the channel
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          source_sha=$GITHUB_SHA
+          tag="nightly-$(date -u +%y%m%d)-$source_sha"
+          title="nightly $(date -u +%F) ($source_sha)"
+          publish=false
+          if [ "${{ github.event.repository.fork }}" = false ] && \
+              [ "$GITHUB_REF" = refs/heads/main ] && \
+              { [ "$GITHUB_EVENT_NAME" = schedule ] || [ "$INPUT_PUBLISH" = true ]; }; then
+            publish=true
+          fi
+          build=true
+          cleanup=false
+          baseline=""
+          commits=""
+          previous_tag=""
+          previous_sha=""
+          releases=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100")
+          nightlies=$(jq -c '[.[] | select(.draft | not)
+              | select(.tag_name | startswith("nightly-"))
+              | select(.target_commitish != null)
+              | select(.target_commitish | test("^[0-9a-f]{40}$"))]
+              | sort_by(.published_at) | reverse' <<<"$releases")
+          count=$(jq -r 'length' <<<"$nightlies")
+          current=$(jq -c '.[0] // empty' <<<"$nightlies")
+          if [ "$count" -gt 2 ]; then
+            cleanup=true
+          fi
+          if [ "$count" -gt 0 ]; then
+            previous_tag=$(jq -r '.tag_name' <<<"$current")
+            previous_sha=$(jq -r '.target_commitish' <<<"$current")
+          fi
+          if [ "$previous_sha" = "$source_sha" ]; then
+            build=false
+            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$INPUT_PUBLISH" != true ]; then
+              build=true
+            fi
+            echo "The current nightly already names $source_sha; publication is idempotent." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # A manual dry run builds even an already published snapshot. Every
+          # other new build requires a green CI run on the exact commit.
+          if [ "$build" = true ] && [ "$previous_sha" != "$source_sha" ]; then
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$source_sha&per_page=100")
+            if ! jq -e '[.workflow_runs[] | select(.status == "completed"
+                and .conclusion == "success"
+                and (.event == "push" or .event == "workflow_dispatch"))] | length > 0' \
+                <<<"$runs" >/dev/null; then
+              build=false
+              publish=false
+              echo "CI has not succeeded on $source_sha; no nightly is built or published." \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+          # A stale retry or a rewritten history must never move the channel
+          # backwards. GitHub compares `base...head`, so asking with the
+          # current nightly as base and the candidate as head answers `ahead`
+          # exactly when the candidate extends what is published.
+          if [ "$build" = true ] && [ -n "$previous_sha" ]; then
+            comparison=$(gh api "repos/$GITHUB_REPOSITORY/compare/$previous_sha...$source_sha")
+            standing=$(jq -r '.status' <<<"$comparison")
+            if [ "$standing" != ahead ]; then
+              publish=false
+              if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$INPUT_PUBLISH" = true ]; then
+                build=false
+              fi
+              echo "The candidate is $standing relative to the current nightly; it is not published." \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+          if [ "$build" = true ]; then
+            baseline=$(git describe --tags --match 'v[0-9]*' --abbrev=0 "$source_sha")
+            commits=$(git rev-list --count "$baseline..$source_sha")
+          fi
+          {
+            echo "build=$build"
+            echo "publish=$publish"
+            echo "cleanup=$cleanup"
+            echo "source=$source_sha"
+            echo "tag=$tag"
+            echo "title=$title"
+            echo "baseline=$baseline"
+            echo "commits=$commits"
+            echo "previous_tag=$previous_tag"
+            echo "previous_sha=$previous_sha"
+          } >> "$GITHUB_OUTPUT"
+
+  archive:
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: read
+    with:
+      channel: nightly
+      nightly-tag: ${{ needs.prepare.outputs.tag }}
+      source-sha: ${{ needs.prepare.outputs.source }}
+      sign: false
+
+  publish:
+    needs: [prepare, archive]
+    if: always() && needs.prepare.outputs.publish == 'true' && ((needs.prepare.outputs.build == 'true' && needs.archive.result == 'success') || (needs.prepare.outputs.build == 'false' && needs.prepare.outputs.cleanup == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: needs.prepare.outputs.build == 'true'
+        with:
+          pattern: archive-*
+          path: assets
+          merge-multiple: true
+      - name: all three archives are present before any public action
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archives=(assets/*.zip)
+          test -f "${archives[0]}"
+          test "${#archives[@]}" -eq 3
+      - name: a tag of this name already names this commit
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # `gh release create --target` does not move a tag that already
+          # exists, so a tag naming another commit would attach these
+          # archives to a different tree while the notes and the installer
+          # URLs name this one. Refuse before anything is attested.
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" \
+              --jq '.object.type + " " + .object.sha' 2>/dev/null); then
+            read -r kind existing <<<"$ref"
+            if [ "$kind" = tag ]; then
+              existing=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing" --jq '.object.sha')
+            fi
+            test "$existing" = "$SOURCE_SHA" || {
+              echo "::error::$TAG already points to $existing, not $SOURCE_SHA"
+              exit 1
+            }
+          fi
+      # Attestation precedes draft creation, so every attached archive is
+      # covered. The draft is published only after its assets are read back.
+      - name: attest where each archive was built
+        if: needs.prepare.outputs.build == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: assets/*.zip
+      - name: the fixed warning and GitHub's generated PR list
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          BASELINE: ${{ needs.prepare.outputs.baseline }}
+          COMMITS: ${{ needs.prepare.outputs.commits }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          PREVIOUS_SHA: ${{ needs.prepare.outputs.previous_sha }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/nightly-notes.md"
+          {
+            echo "## Nightly — unstable"
+            echo
+            echo "This is an automatically built experimental snapshot, not a curated release."
+            echo "Behaviour, protocols and stored-data formats may change without notice."
+            echo "Back up the city before updating; rolling back the binary does not promise"
+            echo "that an older binary can read data a newer one migrated."
+            echo
+            echo "Source: [\`$SOURCE_SHA\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SOURCE_SHA)"
+            echo "Baseline: [\`$BASELINE\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$BASELINE)"
+            echo "Delta: **$COMMITS commits** since the baseline"
+            echo "Compare: [\`$BASELINE...$SOURCE_SHA\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$BASELINE...$SOURCE_SHA)"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "Previous nightly: [\`$PREVIOUS_TAG\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$PREVIOUS_TAG) · [compare]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS_SHA...$SOURCE_SHA)"
+            fi
+            echo
+          } > "$notes"
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f target_commitish="$SOURCE_SHA" \
+            -f previous_tag_name="$BASELINE" --jq .body >> "$notes"
+      - name: replace only an unfinished draft of this exact snapshot
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The tag was verified against the source above, and `--cleanup-tag`
+          # removes it with the draft so `gh release create --target` below
+          # recreates it at the commit this run built.
+          if gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx true; then
+            gh release delete "$TAG" --yes --cleanup-tag
+          fi
+      - name: attach every archive to a draft prerelease
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TITLE: ${{ needs.prepare.outputs.title }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" assets/*.zip \
+            --draft --prerelease --latest=false --target "$SOURCE_SHA" \
+            --title "$TITLE" --notes-file "$RUNNER_TEMP/nightly-notes.md"
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true
+          test "$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.name | endswith(".zip"))] | length')" -eq 3
+      - name: publish the complete prerelease
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --prerelease --latest=false
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false
+      # Retention runs only after a new publication succeeded, or by itself
+      # after an earlier cleanup failed. Never before those two conditions.
+      - name: retain the two newest published nightlies
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+            jq -r '[.[] | select(.draft | not)
+                | select(.tag_name | startswith("nightly-"))
+                | select(.target_commitish != null)
+                | select(.target_commitish | test("^[0-9a-f]{40}$"))]
+                | sort_by(.published_at) | reverse | .[2:][] | .tag_name' |
+            while IFS= read -r old; do
+              test -n "$old" || continue
+              gh release delete "$old" --yes --cleanup-tag
+            done

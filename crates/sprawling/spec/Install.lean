@@ -183,7 +183,8 @@ pub(crate) fn install(direction: Direction) -> Result<Report, AxError>;
 **形状：适配器的验收。** `install.sh` 是 `curl | sh` 那条通道：它向发布 API 要最新一版，按平台后缀挑归档，下载、比对 sha256、解包、问一句 `status`，再把二进制交给 `sprawling install` 落位。这一串里每一步都只在真的发布之后才被执行，所以它坏了，第一个知道的是下载的人。
 
 **接口。**
-- `install.sh` 与 `install.ps1` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=1`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
+- `install.sh` 与 `install.ps1` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=100`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
+- `SPRAWLING_RELEASE_CHANNEL` 取 `release`（缺省）或 `nightly`：release 只选非 draft 的 `v*` tag，nightly 只选非 draft 的 `nightly-*` tag，并按 `published_at` 取最新。`SPRAWLING_VERSION` 仍固定精确 tag；它与显式通道矛盾时拒绝，不能静默换通道。nightly 的 zip 文件名也带该 tag，脱离 release 页面后仍能与正式归档区分。
 - `.github/install-loopback.sh <archive-dir>`：`<archive-dir>` 里恰好一份 `.zip`（`just package` 在一个 matrix 行上产出的那份）。脚本在 `127.0.0.1` 上起 `python3 -m http.server`（端口取 0，由内核分配，从服务的第一行读出），写一份与 GitHub 同形的发布列表（`tag_name`；每个资产的 `name`、`size`、`digest: sha256:<hex>`、`browser_download_url`），然后以沙箱 `HOME` 跑 `install.sh`，最后执行 `sprawling install` 放进沙箱 `HOME` 的 `.local` 下 `bin` 里的那个文件的 `status`，打印第一行。
 - 判定，三条都成立才绿：`install.sh` 退出 0；落位的文件与归档里的 `sprawling` 逐字节相同（`cmp`）；落位的二进制的 `status` 第一行以 `sprawling ` 开头。任何一条不成立，脚本以非 0 退出并说出是哪一条。
 - 离机的请求一律失败：脚本给 `install.sh` 设 `https_proxy`／`http_proxy` 指向 `127.0.0.1:9`，`no_proxy=127.0.0.1`。所以一个不认 `SPRAWLING_API` 的 `install.sh` 不会偷偷装上 GitHub 上已发布的那一版，而是在第一次请求就红。

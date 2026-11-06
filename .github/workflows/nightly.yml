@@ -217,19 +217,19 @@ jobs:
   # Advisories and yanked versions: the one check in this repository whose
   # input is written by other people at a time of their choosing. On a
   # pull request it would turn a change red for a reason its author cannot
-  # act on, which is how people learn to ignore a red build; here red
-  # means "go and look today". It compiles nothing - it reads Cargo.lock -
-  # so it is also the cheapest job in the repository.
+  # act on. Here each finding opens one issue, and an advisory already
+  # filed and still open is not filed again. The title carries the
+  # advisory and the locked version, so a fix that lands on another
+  # vulnerable version is a new issue rather than a stale one.
   #
-  # Red also files one issue for each advisory the lockfile is exposed to,
-  # because a security fix should reach a person the day it is published,
-  # and a red scheduled run is only read when somebody opens the Actions
-  # tab. Unlike the kani leads above, this queue drains itself: the fix
-  # is a lockfile change, and an advisory already filed and still open is
-  # not filed again, so a night that finds nothing new opens nothing.
-  # The title carries the advisory and the locked version, so a fix that
-  # lands on another vulnerable version is a new issue rather than a
-  # stale one.
+  # A finding that is tracked by those issues does not also make every
+  # later scheduled run red: the issue is the queue a person reads, not
+  # the Actions badge. Red is reserved for a cargo-deny failure that
+  # carries no advisory, a malformed report, or an issue that could not
+  # be listed or written. The formal release's advisory job remains red
+  # on every exposure, so this reporting rule does not weaken publication.
+  # It compiles nothing - it reads Cargo.lock - so it is also the cheapest
+  # job in the repository.
   advisories:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -243,27 +243,40 @@ jobs:
           tool: cargo-deny
       - name: what has been published against what we depend on
         id: deny
+        continue-on-error: true
         run: cargo deny check advisories
       - name: one open issue for each advisory the lockfile is exposed to
-        if: failure() && steps.deny.outcome == 'failure'
+        id: track
+        if: always() && steps.deny.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cargo deny --format json check advisories 2> deny.json || true
           python3 - <<'PY' > advisories.tsv
-          import json
+          import json, sys
           TAB, LINE = chr(9), chr(10)
+          unrelated_errors = False
           for line in open("deny.json", encoding="utf-8"):
               fields = json.loads(line).get("fields", {})
               advisory = fields.get("advisory")
               if not advisory:
+                  # A diagnostic without an advisory carries `severity`, as a
+                  # yanked crate does; only a tracked advisory may pass.
+                  if fields.get("severity") == "error":
+                      unrelated_errors = True
                   continue
               locked = fields["graphs"][0]["Krate"]["version"] if fields.get("graphs") else "?"
               solution = next((note[len("Solution: "):] for note in fields.get("notes", []) if note.startswith("Solution: ")), "see the advisory")
               row = [advisory["id"], advisory["package"], locked, advisory["title"], solution, "https://rustsec.org/advisories/" + advisory["id"]]
               print(TAB.join(cell.replace(TAB, " ").replace(LINE, " ") for cell in row))
+          if unrelated_errors:
+              sys.exit("cargo-deny reported an error that carries no advisory; the run stays red rather than counting it as a tracked finding")
           PY
+          if [ ! -s advisories.tsv ]; then
+            echo "cargo-deny failed without an advisory; this is a checker failure, not a tracked finding" >&2
+            exit 1
+          fi
           open=$(gh issue list --state open --label "aspect: security" --json title --jq '.[].title' --limit 200)
           while IFS="$(printf '\t')" read -r id crate locked title solution url; do
             [ -z "$id" ] && continue
@@ -276,3 +289,15 @@ jobs:
               "$id" "$url" "$title" "$crate" "$locked" "$solution")
             gh issue create --title "$name" --label "type: bug" --label "aspect: security" --body "$body"
           done < advisories.tsv
+      - name: what the advisory run means
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.track.outcome }}" = failure ]; then
+            exit 1
+          fi
+          if [ "${{ steps.deny.outcome }}" = success ]; then
+            echo "No advisory is known against Cargo.lock." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Every advisory cargo-deny reported is tracked by an open issue." >> "$GITHUB_STEP_SUMMARY"
+          fi

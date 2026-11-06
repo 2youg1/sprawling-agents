@@ -14,8 +14,10 @@
 #   swap      every look under client/swap/ drawn in place of the shipped
 #             one, and judged by render as the shipped bundle is
 #   models    the Lean specifications under `crates/`
-#   clippy    the zero-warning build of every target and feature, and the
-#             feature combinations `just features` runs
+#   clippy    the zero-warning build of every target and feature, the
+#             feature combinations `just features` runs, and a stable compile
+#             of the standalone fuzz targets without executing them
+#   nix-eval  evaluation of the Nix package when one of its inputs moves
 #   test build, test (<slice>), test
 #             the suite, compiled once into a nextest archive and run in
 #             four slices on separate runners; `test` collects all
@@ -51,7 +53,7 @@
 #
 # Which jobs a pull request must pass is a repository setting rather than a
 # line in this file. `changes` is deliberately not required: it exists to
-# let `proof` skip, and a skipped required check counts as met while a
+# let `proof` and `nix-eval` skip, and a skipped required check counts as met while a
 # required check that never starts blocks the branch for ever.
 #
 # Windows for everything a person can reproduce at their desk, because it is
@@ -134,6 +136,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       proof: ${{ steps.filter.outputs.proof }}
+      nix: ${{ steps.filter.outputs.nix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
@@ -146,6 +149,43 @@ jobs:
               - 'tools/xtask/src/proof/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
+            nix:
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'rust-toolchain.toml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'justfile'
+              - 'client/package.json'
+              - 'client/bun.lock'
+              - 'crates/sprawling/build.rs'
+              - 'crates/sprawling/Cargo.toml'
+              - 'crates/desktop/ffi/zig-version'
+              - 'tools/xtask/src/package/**'
+              - 'tools/xtask/src/bundle.rs'
+
+  # Evaluation catches a malformed flake input without paying for the full
+  # build. The complete Nix build and its installation acceptance stay in
+  # platforms.yml; this job exists so a deterministic failure such as a bad
+  # fetcher hash is met on the change that wrote it.
+  nix-eval:
+    needs: changes
+    if: ${{ !inputs.release-validation && (needs.changes.outputs.nix == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: the committed builder lock is present and unchanged
+        run: |
+          test -f flake.lock
+          nix flake metadata --no-update-lock-file
+          git diff --exit-code -- flake.lock
+      - name: evaluate the complete application without building it
+        run: nix eval --raw .#packages.x86_64-linux.default.drvPath --no-update-lock-file
 
   # The verdicts that compile nothing but xtask, in the order they cost:
   # the source half first, then the Zig leaf, then the bundle and the
@@ -192,6 +232,9 @@ jobs:
       - name: the gates that read sources
         if: ${{ !cancelled() }}
         run: just gates-sources
+      - name: nightly publication decisions, without GitHub
+        if: ${{ !cancelled() }}
+        run: sh .github/workflows/test-nightly-release.sh
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
       # (tools/xtask/Spec.lean §8-35).
@@ -291,6 +334,12 @@ jobs:
       # so they ride here rather than paying a runner of their own.
       - name: the feature combinations
         run: just features
+      # The standalone fuzz workspace is deliberately outside the root one,
+      # so workspace clippy cannot see a target whose parser API has drifted.
+      # Stable check is enough for that contract; nightly remains responsible
+      # for the sanitizer instrumentation and the fresh random input.
+      - name: compile the fuzz targets without running them
+        run: cargo check --manifest-path tools/fuzz/Cargo.toml --all-targets
 
   # The suite, compiled once. The archive carries every test binary and
   # the workspace binaries they spawn; the slices below run it on
@@ -507,7 +556,8 @@ jobs:
   # and compiles nothing. `advisories` is deliberately absent from
   # `just deny`: an advisory published today against a dependency nobody
   # touched would turn a pull request red for a reason its author did not
-  # write. It runs in `nightly.yml`, where red means "go and look".
+  # write. It runs in `nightly.yml`, which files each finding as an issue
+  # rather than repeating the same red run after the issue is already open.
   supply:
     runs-on: ubuntu-latest
     timeout-minutes: 20

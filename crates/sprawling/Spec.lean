@@ -22,6 +22,7 @@ import crates.sprawling.spec.Main
 import crates.sprawling.spec.Main.Exit
 import crates.sprawling.spec.Main.Grammar
 import crates.sprawling.spec.Monitor
+import crates.sprawling.spec.Nightly
 import crates.sprawling.spec.Privacy
 import crates.sprawling.spec.Privacy.State
 import crates.sprawling.spec.Privacy.Journal
@@ -75,6 +76,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Main/Exit.lean` | `bin::main::exit` |
 | `spec/Main/Grammar.lean` | `bin::main::grammar` |
 | `spec/Monitor.lean` | `bin::monitor` |
+| `spec/Nightly.lean` | `bin::release::nightly` 与 `.github/workflows/nightly-release.yml` |
 | `spec/Privacy.lean` | `bin::privacy::coordinator`、`bin::privacy::plan` 与 `bin::privacy::fault`：主机 privacy 的写入次序、读回与恢复；目录、确认、磁盘投影、日志、平台、CLI 与页面的服务各在 `spec/Privacy/` 下一个分部 |
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
@@ -97,6 +99,7 @@ import crates.sprawling.spec.WireClient
 - `spec/Console/Lifecycle.lean`：只有停城请求进入收口，交互面上信号形式的 `SIGINT` 不停城，先到的缘由作数，一条轨迹至多写一次交接且交接带着缘由，装上的时限一直装着直到进程退出、时限到了一定退出（§8-11）。
 - `spec/Console/ProgramStatus.lean`：写出的报告总与终端此刻存着的不同，写出的就是此后终端存着的那条，每次计数之后终端存着的就是判出的状态，清掉之后再没有报告（§8-11、D77）。
 - `spec/Install.lean`：追加幂等、追加不遮挡、追加再移除回到原值、移除只动那一个目录（§8-9）。
+- `spec/Nightly.lean`：通道不串线、同 SHA 不重发、CI 未绿或候选倒退不公开、平台未齐不公开、失败保留已公开历史、公开后最多两份（D105）。
 - `spec/Main/Exit.lean`：五个退出码两两不同，`Unheard` 的三种原因各落到一个码（§8-103）。
 - `spec/Main/Grammar.lean`：版本先于一切，帮助先于任何动词运行，`--` 之后的词不参与这两个判断，空行是首屏（§8-89）。
 - `spec/Serving/Standing.lean`：降回是吸收态、窗口没关上不判、忙满一个窗口即判降回、设置为 `normal` 从不升档、平台拒绝之后不再试（§8-93）。
@@ -478,6 +481,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D79 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | D82 | `crates/sprawling/spec/Doctor.lean` |
 | D80 | `crates/sprawling/spec/Supervising.lean` |
+| D105 | `crates/sprawling/spec/Nightly.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

@@ -100,7 +100,7 @@
           version = bunVersion;
           src = pkgs.fetchurl {
             url = "https://github.com/oven-sh/bun/releases/download/bun-v${bunVersion}/bun-${bunArchive.name}.zip";
-            hash = bunArchive.hash;
+            sha256 = bunArchive.hash;
           };
         });
 

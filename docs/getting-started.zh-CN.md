@@ -249,6 +249,25 @@ gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
 
 从 checkout 构建完整交付物用 `just dist`。先 `cargo build` 而没有先 `just build-web`，二进制里嵌入的页面只会说明客户端包缺失。源码构建的前提见[贡献指南](CONTRIBUTING.md)。
 
+### 跟随 nightly 快照
+
+nightly 是 main 的自动构建快照，不是整理过的正式发行。tag 为 `nightly-YYMMDD-fullSHA`，日期按 UTC，并保留完整 commit SHA。发行说明包含固定的不稳定警告、正式版基准与 commit 数、相对上一份 nightly 的比较，以及 GitHub 自动生成的基准范围内 merged PR 列表。nightly 归档只为 Windows x86-64、Apple 芯片的 macOS 和 Linux x86-64 发布，只保留最新两份公开快照。
+
+shell 安装器默认仍然选择正式发行。要明确选择 nightly 通道：
+
+```sh
+SPRAWLING_RELEASE_CHANNEL=nightly sh -c 'curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh'
+```
+
+PowerShell：
+
+```powershell
+$env:SPRAWLING_RELEASE_CHANNEL = 'nightly'
+irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
+```
+
+二进制会记住自己是 nightly，`sprawling status --check` 用完整 source SHA 与最新公开 nightly 比较。要回到正式发行，以 `SPRAWLING_RELEASE_CHANNEL=release` 重跑安装器，或用 `SPRAWLING_VERSION` 固定一个正式 tag。精确 tag 与显式通道冲突会被拒绝。nightly 只进 GitHub Releases，不推进 npm、crates.io 或 AUR。更新前先备份城市；旧二进制不保证能读新版 nightly 已迁移的数据。
+
 ### 用 AUR
 
 AUR 包还没有发布。发行构建会在 Arch Linux 上生成并验证它；发布需要 AUR 账号与 `AUR_SSH_KEY` secret，缺少凭据时以一条 notice 跳过。
@@ -563,7 +582,7 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell 安装器 | 停止城市后重跑原安装器 | 按前文把 `SPRAWLING_VERSION` 设为实际发布的完整 tag |
+| shell/PowerShell 安装器 | 停止城市后重跑原安装器，每次都要设 `SPRAWLING_RELEASE_CHANNEL=nightly`：二进制记住自己的通道，安装器不记住 | 按前文把 `SPRAWLING_VERSION` 设为实际发布的完整 tag |
 | 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令 | 保留或下载所选 tag 的归档 |
 | AUR sprawling-bin | 在原 checkout 里 `git pull --ff-only && makepkg -si` | 检查并构建所选发行对应的 PKGBUILD 修订 |
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行[用 Nix](#用-nix) 里的命令 | 使用原来那份固定的 checkout 和 lockfile；固定 commit 不会跟随新版 |

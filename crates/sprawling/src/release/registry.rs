@@ -7,7 +7,7 @@
 use kernel::release::Version;
 use kernel::{AxCode, AxError, Proxying, Reach, Release};
 
-use super::RELEASES;
+use super::{NightlyBuild, RELEASES};
 
 const USER_AGENT: &str = concat!("sprawling/", env!("CARGO_PKG_VERSION"));
 const RELEASE_PAGE_SIZE: usize = 100;
@@ -92,6 +92,9 @@ pub(super) fn github_newest(url: &str) -> Result<GithubRelease, AxError> {
             .get("tag_name")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| registry_refused(url, "a published release has no tag_name"))?;
+        if tag.starts_with("nightly-") {
+            continue;
+        }
         return Release::from_published_tag(tag).map(|cut| GithubRelease {
             cut,
             tag: tag.to_owned(),
@@ -101,6 +104,80 @@ pub(super) fn github_newest(url: &str) -> Result<GithubRelease, AxError> {
         url,
         "no published release is available; select a fixed tag from the release page",
     ))
+}
+
+/// The newest published nightly, ordered by publication time rather than tag date.
+///
+/// An entry whose identity or publication time cannot be read is passed
+/// over: one malformed release must not hide a newer snapshot a person can
+/// actually install. The refusal below is for a list that holds no valid
+/// snapshot at all.
+pub(super) fn nightly_newest(url: &str) -> Result<NightlyBuild, AxError> {
+    let body = manifest(&format!("{url}?per_page={RELEASE_PAGE_SIZE}"))?;
+    let releases = body
+        .as_array()
+        .ok_or_else(|| registry_refused(url, "expected a release list"))?;
+    let mut newest: Option<(String, NightlyBuild)> = None;
+    for release in releases {
+        if release.get("draft").and_then(serde_json::Value::as_bool) == Some(true) {
+            continue;
+        }
+        let tag = release
+            .get("tag_name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| registry_refused(url, "a published release has no tag_name"))?;
+        if !tag.starts_with("nightly-") {
+            continue;
+        }
+        let Some(source) = release
+            .get("target_commitish")
+            .and_then(serde_json::Value::as_str)
+        else {
+            continue;
+        };
+        let Ok(build) = NightlyBuild::new(tag, source) else {
+            continue;
+        };
+        let Some(published) = release
+            .get("published_at")
+            .and_then(serde_json::Value::as_str)
+        else {
+            continue;
+        };
+        let replace = newest.as_ref().is_none_or(|(current_at, current)| {
+            (published, tag) > (current_at.as_str(), current.tag())
+        });
+        if replace {
+            newest = Some((published.to_owned(), build));
+        }
+    }
+    newest.map(|(_, build)| build).ok_or_else(|| {
+        registry_refused(url, "no published nightly is available; select a fixed tag")
+    })
+}
+
+/// GitHub's commit comparison, with divergence left unconfirmed rather than ordered.
+///
+/// The newest snapshot is the base and this build's source is the head, so
+/// the answer names this build: `behind` is the installed nightly falling
+/// short of the newest one. Swapping the operands would read every update
+/// backwards, which is why the test pins the requested path.
+pub(super) fn nightly_standing(
+    url: &str,
+    mine: &NightlyBuild,
+    newest: &NightlyBuild,
+) -> Result<Option<kernel::ReleaseVerdict>, AxError> {
+    let comparison = format!("{url}/{}...{}", newest.source_sha(), mine.source_sha());
+    match manifest_field(&comparison, &["status"])?.as_str() {
+        "identical" => Ok(Some(kernel::ReleaseVerdict::Current)),
+        "behind" => Ok(Some(kernel::ReleaseVerdict::Behind)),
+        "ahead" => Ok(Some(kernel::ReleaseVerdict::Ahead)),
+        "diverged" => Ok(None),
+        status => Err(registry_refused(
+            &comparison,
+            &format!("GitHub returned an unknown comparison status: {status}"),
+        )),
+    }
 }
 
 fn registry_refused(url: &str, recovery: &str) -> AxError {

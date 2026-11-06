@@ -42,6 +42,7 @@ pub(super) fn headline(maturity: Maturity) -> String {
 fn cut() -> String {
     match release::built() {
         Ok(Built::Released(mine)) => format!(", released {}", mine.released()),
+        Ok(Built::Nightly(mine)) => format!(", {}", mine.tag()),
         Ok(Built::FromSource) => String::from(", built from source"),
         // A build that carries a tag it cannot decode is mislabelled.
         // Saying so here is cheaper than letting every later line

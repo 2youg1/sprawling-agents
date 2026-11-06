@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2026 2youg1 and the sprawling contributors
 
-param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence)
+param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence, [string]$Tag = 'v0.0.0-Alpha-260101')
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
@@ -14,7 +14,7 @@ if ($assets.Count -ne 1) { throw 'Expected exactly one Windows archive.' }
 $root = Join-Path $env:RUNNER_TEMP "install-check-$([Guid]::NewGuid())"
 New-Item -ItemType Directory -Path $root, $Evidence -Force | Out-Null
 $server = $null
-$before = @{ LocalAppData = $env:LOCALAPPDATA; Api = $env:SPRAWLING_API; Version = $env:SPRAWLING_VERSION }
+$before = @{ LocalAppData = $env:LOCALAPPDATA; Api = $env:SPRAWLING_API; Version = $env:SPRAWLING_VERSION; ReleaseChannel = $env:SPRAWLING_RELEASE_CHANNEL }
 $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
 $hadPath = $key.GetValueNames() -contains 'Path'
 $pathValue = if ($hadPath) { $key.GetValue('Path', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } else { $null }
@@ -41,7 +41,7 @@ try {
     }
     if (-not $port) { throw 'The loopback asset server did not report its port.' }
     $hash = (Get-FileHash -LiteralPath $assets[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    $release = @(@{ tag_name = 'loopback'; assets = @(@{ name = $assets[0].Name; size = $assets[0].Length; digest = "sha256:$hash"; browser_download_url = "http://127.0.0.1:$port/$($assets[0].Name)" }) })
+    $release = @(@{ tag_name = $Tag; published_at = '2026-01-01T00:00:00Z'; draft = $false; assets = @(@{ name = $assets[0].Name; size = $assets[0].Length; digest = "sha256:$hash"; browser_download_url = "http://127.0.0.1:$port/$($assets[0].Name)" }) })
     $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
     $env:LOCALAPPDATA = Join-Path $root 'profile'
     $env:SPRAWLING_API = "http://127.0.0.1:$port/releases.json"
@@ -102,6 +102,7 @@ try {
     $env:LOCALAPPDATA = $before.LocalAppData
     $env:SPRAWLING_API = $before.Api
     $env:SPRAWLING_VERSION = $before.Version
+    $env:SPRAWLING_RELEASE_CHANNEL = $before.ReleaseChannel
     if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id; $server.WaitForExit() }
     Remove-Item -LiteralPath $root -Recurse -Force
 }

@@ -5,7 +5,7 @@
 //! Manual checks: install origin selects the registry, comparison operand and updater.
 //! Specified by `crates/wire/spec/Answer/Release.lean` and `crates/sprawling/spec/Install.lean`.
 use kernel::release::Version;
-use kernel::{AxError, Release};
+use kernel::{AxCode, AxError, Release};
 use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
 const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
@@ -24,18 +24,36 @@ const ARCHIVE_SIBLING: &str = "skills";
 pub enum Built {
     /// Built by the release workflow, from this tag.
     Released(Release),
+    /// Built from a UTC-dated main snapshot.
+    Nightly(NightlyBuild),
     /// Compiled without a release tag, including Cargo source installations.
     FromSource,
 }
+
+pub use nightly::NightlyBuild;
 
 /// Reads the build tag.
 /// # Errors
 /// Refuses a tag that disagrees with the Cargo version or maturity.
 pub fn built() -> Result<Built, AxError> {
-    match option_env!("SPRAWLING_RELEASE_TAG") {
-        None => Ok(Built::FromSource),
-        Some("") => Ok(Built::FromSource),
-        Some(tag) => Release::from_tag(tag, env!("CARGO_PKG_VERSION")).map(Built::Released),
+    let curated = option_env!("SPRAWLING_RELEASE_TAG").filter(|tag| !tag.is_empty());
+    let nightly = option_env!("SPRAWLING_NIGHTLY_TAG").filter(|tag| !tag.is_empty());
+    let source = option_env!("SPRAWLING_SOURCE_SHA").filter(|sha| !sha.is_empty());
+    match (curated, nightly, source) {
+        (Some(tag), None, None) => {
+            Release::from_tag(tag, env!("CARGO_PKG_VERSION")).map(Built::Released)
+        }
+        (None, Some(tag), Some(source)) => NightlyBuild::new(tag, source).map(Built::Nightly),
+        (None, None, None) => Ok(Built::FromSource),
+        _ => Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "read the build identity",
+            "release environment",
+        )
+        .with_recovery(
+            "set SPRAWLING_RELEASE_TAG alone, or set SPRAWLING_NIGHTLY_TAG and \
+             SPRAWLING_SOURCE_SHA together; unset all three for a source build",
+        )),
     }
 }
 
@@ -57,17 +75,34 @@ struct Registries<'a> {
     npm: &'a str,
     crates: &'a str,
     github: &'a str,
+    compare: &'a str,
+}
+
+enum GithubAnswer {
+    Curated(registry::GithubRelease),
+    Nightly(NightlyBuild),
+}
+
+impl GithubAnswer {
+    fn line(&self) -> ReleaseLine {
+        match self {
+            GithubAnswer::Curated(release) => line(&release.cut),
+            GithubAnswer::Nightly(build) => ReleaseLine {
+                version: build.tag().to_owned(),
+                released: String::new(),
+            },
+        }
+    }
 }
 
 /// Reads registries only on request; returns the selected comparison or a refusal.
 #[must_use]
 pub fn answer() -> ReleaseAnswer {
-    let github = format!(
-        "https://api.github.com/repos/{}/releases",
-        env!("CARGO_PKG_REPOSITORY")
-            .trim_start_matches("https://github.com/")
-            .trim_end_matches('/')
-    );
+    let repository = env!("CARGO_PKG_REPOSITORY")
+        .trim_start_matches("https://github.com/")
+        .trim_end_matches('/');
+    let github = format!("https://api.github.com/repos/{repository}/releases");
+    let compare = format!("https://api.github.com/repos/{repository}/compare");
     match built() {
         Ok(mine) => judged(
             mine,
@@ -76,18 +111,25 @@ pub fn answer() -> ReleaseAnswer {
                 npm: LATEST_URL,
                 crates: CRATES_URL,
                 github: &github,
+                compare: &compare,
             },
         ),
         Err(refusal) => ReleaseAnswer::Refused { refusal },
     }
 }
 
+mod nightly;
 mod registry;
 
 fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> ReleaseAnswer {
     let npm = registry::npm_newest(at.npm);
     let crates = registry::crates_newest(at.crates);
-    let github = registry::github_newest(at.github);
+    let github = match &mine {
+        Built::Nightly(_) => registry::nightly_newest(at.github).map(GithubAnswer::Nightly),
+        Built::Released(_) | Built::FromSource => {
+            registry::github_newest(at.github).map(GithubAnswer::Curated)
+        }
+    };
     let registries = vec![
         RegistryNewest {
             registry: Registry::Npm,
@@ -99,7 +141,7 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
         },
         RegistryNewest {
             registry: Registry::Github,
-            reading: reading(github.as_ref().map(|release| line(&release.cut))),
+            reading: reading(github.as_ref().map(GithubAnswer::line)),
         },
     ];
     let mine = match mine {
@@ -128,6 +170,9 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
                 update: hint(installed),
             };
         }
+        Built::Nightly(mine) => {
+            return at.nightly_judged(mine, installed, github, registries);
+        }
         Built::Released(mine) => mine,
     };
     let verdict = match installed {
@@ -147,22 +192,40 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
                 hint(installed),
             )
         }),
-        InstallChannel::Aur => github.map(|newest| {
-            (
+        InstallChannel::Aur => match github {
+            Ok(GithubAnswer::Curated(newest)) => Ok((
                 kernel::release::stands(&mine, &newest.cut),
                 line(&newest.cut),
                 hint(installed),
-            )
-        }),
-        InstallChannel::Archive => github.map(|newest| {
-            let mut update = hint(installed);
-            update.command = Some(archive_command(ArchiveVersion::Tag(&newest.tag)));
-            (
-                kernel::release::stands(&mine, &newest.cut),
-                line(&newest.cut),
-                update,
-            )
-        }),
+            )),
+            Ok(GithubAnswer::Nightly(_)) => {
+                return ReleaseAnswer::Unconfirmed {
+                    mine: line(&mine),
+                    registries,
+                    update: hint(installed),
+                };
+            }
+            Err(refusal) => Err(refusal),
+        },
+        InstallChannel::Archive => match github {
+            Ok(GithubAnswer::Curated(newest)) => {
+                let mut update = hint(installed);
+                update.command = Some(archive_command(ArchiveVersion::Tag(&newest.tag)));
+                Ok((
+                    kernel::release::stands(&mine, &newest.cut),
+                    line(&newest.cut),
+                    update,
+                ))
+            }
+            Ok(GithubAnswer::Nightly(_)) => {
+                return ReleaseAnswer::Unconfirmed {
+                    mine: line(&mine),
+                    registries,
+                    update: hint(installed),
+                };
+            }
+            Err(refusal) => Err(refusal),
+        },
         InstallChannel::Unknown | InstallChannel::Source => {
             return ReleaseAnswer::Unconfirmed {
                 mine: line(&mine),
@@ -180,6 +243,58 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
             update,
         },
         Err(refusal) => ReleaseAnswer::Refused { refusal },
+    }
+}
+
+impl Registries<'_> {
+    fn nightly_judged(
+        &self,
+        mine: NightlyBuild,
+        installed: InstallChannel,
+        github: Result<GithubAnswer, AxError>,
+        registries: Vec<RegistryNewest>,
+    ) -> ReleaseAnswer {
+        let line = |build: &NightlyBuild| ReleaseLine {
+            version: build.tag().to_owned(),
+            released: String::new(),
+        };
+        if installed != InstallChannel::Archive {
+            return match github {
+                Ok(_) => ReleaseAnswer::Unconfirmed {
+                    mine: line(&mine),
+                    registries,
+                    update: hint(installed),
+                },
+                Err(refusal) => ReleaseAnswer::Refused { refusal },
+            };
+        }
+        match github {
+            Ok(GithubAnswer::Nightly(newest)) => {
+                let mut update = hint(installed);
+                update.command = Some(archive_command(ArchiveVersion::Nightly(&newest)));
+                match registry::nightly_standing(self.compare, &mine, &newest) {
+                    Ok(Some(verdict)) => ReleaseAnswer::Stands {
+                        mine: line(&mine),
+                        newest: line(&newest),
+                        registries,
+                        verdict,
+                        update,
+                    },
+                    Ok(None) => ReleaseAnswer::Unconfirmed {
+                        mine: line(&mine),
+                        registries,
+                        update,
+                    },
+                    Err(refusal) => ReleaseAnswer::Refused { refusal },
+                }
+            }
+            Ok(GithubAnswer::Curated(_)) => ReleaseAnswer::Unconfirmed {
+                mine: line(&mine),
+                registries,
+                update: hint(installed),
+            },
+            Err(refusal) => ReleaseAnswer::Refused { refusal },
+        }
     }
 }
 
@@ -252,6 +367,7 @@ pub(crate) fn channel(
 enum ArchiveVersion<'a> {
     Latest,
     Tag(&'a str),
+    Nightly(&'a NightlyBuild),
 }
 
 fn archive_command(version: ArchiveVersion<'_>) -> String {
@@ -264,6 +380,11 @@ fn archive_command(version: ArchiveVersion<'_>) -> String {
             tag,
             format!("SPRAWLING_VERSION='{tag}' "),
             format!("$env:SPRAWLING_VERSION='{tag}'; "),
+        ),
+        ArchiveVersion::Nightly(build) => (
+            build.tag(),
+            "SPRAWLING_RELEASE_CHANNEL=nightly ".to_owned(),
+            "$env:SPRAWLING_RELEASE_CHANNEL='nightly'; ".to_owned(),
         ),
     };
     if cfg!(windows) {
@@ -324,17 +445,29 @@ mod tests {
     use kernel::ReleaseVerdict;
     use std::io::{BufRead, BufReader, Write};
     use wire::{InstallChannel, ReleaseAnswer};
+
+    /// The source this build was cut from, and the newer one published
+    /// after it; a nightly test compares the two through GitHub.
+    const INSTALLED_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const NEWEST_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// A published nightly newer than the installed one, followed by the
+    /// curated release both curated queries read, so one fixture shows the
+    /// curated answer skipping nightlies.
+    const PUBLISHED: &str = r#"[{"tag_name":"nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","draft":false,"published_at":"2026-11-06T00:00:00Z","target_commitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},{"tag_name":"v0.0.8-Alpha-261006","draft":false}]"#;
     /// A loopback stand-in for both registries: `/npm` answers npm's
-    /// manifest, `/crates` crates.io's, every request closes its
-    /// connection, and the User-Agent of each request is sent back to the
-    /// test.
+    /// manifest, `/crates` crates.io's, `/github` the release list the
+    /// caller supplies, every request closes its connection, and the
+    /// User-Agent of each request is sent back to the test.
     fn registries(
         npm: &'static str,
         crates: &'static str,
+        published: &'static str,
     ) -> (String, std::sync::mpsc::Receiver<String>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let (agents, seen) = std::sync::mpsc::channel();
+        let compared = format!("GET /compare/{NEWEST_SHA}...{INSTALLED_SHA} ");
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
@@ -349,7 +482,18 @@ mod tests {
                     head.push(line);
                 }
                 let body = if head[0].contains("/github") {
-                    r#"[{"tag_name":"v0.0.8-Alpha-261006","draft":false}]"#
+                    published
+                } else if head[0].contains("/compare") {
+                    // The path is the answer: the newest snapshot is the
+                    // base and this build's source the head, so `behind`
+                    // says the installed nightly is older. Any other
+                    // operand or order is `diverged`, which the caller
+                    // reads as unconfirmed rather than as an order.
+                    if head[0].starts_with(&compared) {
+                        r#"{"status":"behind"}"#
+                    } else {
+                        r#"{"status":"diverged"}"#
+                    }
                 } else if head[0].contains("/crates") {
                     crates
                 } else {
@@ -384,6 +528,7 @@ mod tests {
         let (base, seen) = registries(
             r#"{"version":"0.0.8-pre.261005"}"#,
             r#"{"crate":{"max_version":"0.0.8"}}"#,
+            PUBLISHED,
         );
         let npm = format!("{base}/npm");
         let crates = format!("{base}/crates");
@@ -391,6 +536,7 @@ mod tests {
             npm: &npm,
             crates: &crates,
             github: &format!("{base}/github"),
+            compare: &format!("{base}/compare"),
         };
         let mine =
             || Built::Released(kernel::Release::from_npm_version("0.0.8-pre.261002").unwrap());
@@ -434,11 +580,13 @@ mod tests {
         let (base, _seen) = registries(
             r#"{"version":"0.0.9-pre.261005"}"#,
             r#"{"crate":{"max_version":"1.0.0"}}"#,
+            PUBLISHED,
         );
         let at = Registries {
             npm: &format!("{base}/npm"),
             crates: &format!("{base}/crates"),
             github: &format!("{base}/github"),
+            compare: &format!("{base}/compare"),
         };
         let mine =
             || Built::Released(kernel::Release::from_npm_version("0.0.8-pre.261002").unwrap());
@@ -514,6 +662,72 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_nightly_archive_compares_complete_source_and_keeps_its_channel() {
+        let (base, _seen) = registries(
+            r#"{"version":"0.0.9-pre.261005"}"#,
+            r#"{"crate":{"max_version":"1.0.0"}}"#,
+            PUBLISHED,
+        );
+        let at = Registries {
+            npm: &format!("{base}/npm"),
+            crates: &format!("{base}/crates"),
+            github: &format!("{base}/github"),
+            compare: &format!("{base}/compare"),
+        };
+        let mine = Built::Nightly(
+            super::NightlyBuild::new(&format!("nightly-261105-{INSTALLED_SHA}"), INSTALLED_SHA)
+                .unwrap(),
+        );
+        let newest =
+            super::NightlyBuild::new(&format!("nightly-261106-{NEWEST_SHA}"), NEWEST_SHA).unwrap();
+        match judged(mine, InstallChannel::Archive, &at) {
+            ReleaseAnswer::Stands {
+                verdict,
+                newest: found,
+                update,
+                ..
+            } => assert_eq!(
+                (verdict, found.version, update.command),
+                (
+                    ReleaseVerdict::Behind,
+                    format!("nightly-261106-{NEWEST_SHA}"),
+                    Some(super::archive_command(super::ArchiveVersion::Nightly(
+                        &newest
+                    )))
+                )
+            ),
+            other => panic!("not judged: {other:?}"),
+        }
+    }
+
+    /// An unreadable identity is not the newest snapshot: a malformed newer
+    /// entry must not hide the version a person can install.
+    #[test]
+    fn an_unreadable_nightly_does_not_hide_a_valid_older_one() {
+        let (base, _seen) = registries(
+            r#"{"version":"0.0.9-pre.261005"}"#,
+            r#"{"crate":{"max_version":"1.0.0"}}"#,
+            r#"[{"tag_name":"nightly-261107-bc930372","draft":false,"published_at":"2026-11-07T00:00:00Z","target_commitish":"bc930372"},{"tag_name":"nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","draft":false,"published_at":"2026-11-06T00:00:00Z","target_commitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]"#,
+        );
+        let at = Registries {
+            npm: &format!("{base}/npm"),
+            crates: &format!("{base}/crates"),
+            github: &format!("{base}/github"),
+            compare: &format!("{base}/compare"),
+        };
+        let mine = Built::Nightly(
+            super::NightlyBuild::new(&format!("nightly-261105-{INSTALLED_SHA}"), INSTALLED_SHA)
+                .unwrap(),
+        );
+        match judged(mine, InstallChannel::Archive, &at) {
+            ReleaseAnswer::Stands { newest, .. } => {
+                assert_eq!(newest.version, format!("nightly-261106-{NEWEST_SHA}"));
+            }
+            other => panic!("not judged: {other:?}"),
+        }
+    }
+
     /// The four channels, read from fixture paths rather than from where
     /// this test binary happens to run. Each OS spells its paths its own
     /// way; the rule reads components, so one fixture set covers all three.
@@ -576,6 +790,10 @@ mod tests {
                         .expect("what this release publishes"),
                     mine
                 );
+            }
+            Built::Nightly(mine) => {
+                assert!(mine.tag().starts_with("nightly-"));
+                assert_eq!(mine.source_sha().len(), 40);
             }
         }
     }
