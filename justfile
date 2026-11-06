@@ -825,8 +825,9 @@ mutants-diff base shard:
 budget:
     cargo xtask budget
 
-# The wall-clock readings, never gated: citysim's load scenarios, then
-# the two instruments that drive the city's own accounting loop - a relay
+# The wall-clock readings, never gated: citysim's load scenarios and real
+# CPython-WASI baseline, then the two instruments that drive the city's own
+# accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
 # (`crates/sprawling/Spec.lean` §8-84) - and the phases of each tool,
 # its call and the secret scan of its result (`crates/runtime/Spec.lean`).
