@@ -238,6 +238,10 @@ impl<'a> Camera<'a> {
             .arg("--headless=new")
             .arg("--disable-gpu")
             .arg("--no-sandbox")
+            // Skip the first-run flow on each fresh profile, as in
+            // render::engine.
+            .arg("--no-first-run")
+            .arg("--no-default-browser-check")
             .arg("--hide-scrollbars")
             .arg("--use-mock-keychain")
             .arg("--allow-file-access-from-files")

@@ -179,6 +179,12 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--no-sandbox")
+        // Every opening uses a fresh profile, and without these the
+        // first-run flow runs on each one; some Edge builds spend tens of
+        // seconds in its importer per opening, enough to exhaust the
+        // patience.
+        .arg("--no-first-run")
+        .arg("--no-default-browser-check")
         .arg("--hide-scrollbars")
         // On macOS an engine that reaches for the login keychain waits for
         // a prompt nobody on a runner can answer.
