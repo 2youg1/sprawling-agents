@@ -326,7 +326,7 @@ fn run_checked(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<(), String>
     let outcome = sandbox
         .run(&raw_job(wasm, SCRIPT.as_str()))
         .map_err(|why| why.to_string())?;
-    checked_output(&outcome)
+    output_detail(&outcome)
 }
 
 struct TimedOutcome {
@@ -349,19 +349,19 @@ fn timed_outcome(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<TimedOutc
 }
 
 fn checked_output(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
+    output_detail(outcome).map_err(fixture)
+}
+
+/// Returns validation details before the caller assigns the phase-specific code.
+fn output_detail(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
     if outcome.exit != SandboxExit::Success {
-        return Err(fixture(format!(
-            "the benchmark guest ended with {:?}",
-            outcome.exit
-        )));
+        return Err(format!("the benchmark guest ended with {:?}", outcome.exit));
     }
     if !outcome.stderr.is_empty() {
-        return Err(fixture("the benchmark guest wrote to stderr"));
+        return Err("the benchmark guest wrote to stderr".to_owned());
     }
     if outcome.stdout != *EXPECTED {
-        return Err(fixture(
-            "the fixed CPython script produced unexpected stdout",
-        ));
+        return Err("the fixed CPython script produced unexpected stdout".to_owned());
     }
     Ok(())
 }
@@ -735,29 +735,10 @@ impl Report {
         drop(file);
         // A same-directory hard link publishes atomically and fails when the
         // target already exists, unlike a replacement-style rename.
-        let published = written.and_then(|()| std::fs::hard_link(&part, path));
-        let cleanup = std::fs::remove_file(&part).map_err(|why| {
-            if published.is_ok() {
-                let error = AxError::failure(
-                    AxCode::StorageFatal,
-                    "remove the temporary CPython-WASI CSV after publication",
-                    format!(
-                        "CSV published at {}; temporary file {} remains: {why}",
-                        path.display(),
-                        part.display()
-                    ),
-                )
-                .with_recovery(format!(
-                    "delete only the residual .part file {}; keep the published CSV at {}",
-                    part.display(),
-                    path.display()
-                ));
-                format!("{error}; recovery: {}", error.recovery())
-            } else {
-                csv_storage(&part, why)
-            }
-        });
-        keep_both(published.map_err(|why| csv_storage(path, why)), cleanup)?;
+        let published = publish_csv(written, &part, path);
+        let cleanup = std::fs::remove_file(&part)
+            .map_err(|why| csv_cleanup_error(path, &part, published.is_ok(), why));
+        keep_both(published, cleanup)?;
         Ok(())
     }
 }
@@ -835,27 +816,65 @@ fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> 
     .collect()
 }
 
-fn csv_storage(path: &Path, detail: impl std::fmt::Display) -> String {
-    AxError::failure(
-        AxCode::StorageFatal,
-        "write raw CPython-WASI measurements",
-        format!("{}: {detail}", path.display()),
+/// Associates write/sync errors with the partial file and link errors with the result.
+fn publish_csv(written: std::io::Result<()>, part: &Path, path: &Path) -> Result<(), String> {
+    written.map_err(|why| csv_storage(part, why))?;
+    std::fs::hard_link(part, path).map_err(|why| csv_storage(path, why))
+}
+
+/// Preserves both paths when publication succeeded before cleanup failed.
+fn csv_cleanup_error(path: &Path, part: &Path, published: bool, why: std::io::Error) -> String {
+    if !published {
+        return csv_storage(part, why);
+    }
+    error_with_recovery(
+        AxError::failure(
+            AxCode::StorageFatal,
+            "remove the temporary CPython-WASI CSV after publication",
+            format!(
+                "CSV published at {}; temporary file {} remains: {why}",
+                path.display(),
+                part.display()
+            ),
+        )
+        .with_recovery(format!(
+            "delete only the residual .part file {}; keep the published CSV at {}",
+            part.display(),
+            path.display()
+        )),
     )
-    .with_recovery("choose a writable target directory and rerun; the partial CSV is not a result")
-    .to_string()
+}
+
+/// Keeps the existing error display and its actionable recovery together.
+fn error_with_recovery(error: AxError) -> String {
+    format!("{error}; recovery: {}", error.recovery())
+}
+
+fn csv_storage(path: &Path, detail: impl std::fmt::Display) -> String {
+    error_with_recovery(
+        AxError::failure(
+            AxCode::StorageFatal,
+            "write raw CPython-WASI measurements",
+            format!("{}: {detail}", path.display()),
+        )
+        .with_recovery(
+            "choose a writable target directory and rerun; the partial CSV is not a result",
+        ),
+    )
 }
 
 fn prerequisite(detail: String) -> String {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "measure the real CPython-WASI baseline",
-        detail,
-    )
-    .with_recovery(
-        "configure a real CPython-WASI guest through the external guest door documented by \
+    error_with_recovery(
+        AxError::failure(
+            AxCode::ToolUnavailable,
+            "measure the real CPython-WASI baseline",
+            detail,
+        )
+        .with_recovery(
+            "configure a real CPython-WASI guest through the external guest door documented by \
          `sprawling doctor`, then rerun; a WAT correctness fixture is not a timing substitute",
+        ),
     )
-    .to_string()
 }
 
 fn fixture(detail: impl Into<String>) -> String {
@@ -865,7 +884,7 @@ fn fixture(detail: impl Into<String>) -> String {
         detail.into(),
     )
     .with_recovery("check the selected guest and the fixed script; no partial report is emitted");
-    format!("{error}; recovery: {}", error.recovery())
+    error_with_recovery(error)
 }
 
 #[cfg(test)]
@@ -914,6 +933,11 @@ mod tests {
         let refused =
             measure_from(None, Arm::Baseline).expect_err("a missing guest produced a report");
         assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
+        assert!(
+            refused.contains("configure a real CPython-WASI guest"),
+            "{refused}"
+        );
+        assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
     }
 
     #[test]
@@ -923,6 +947,11 @@ mod tests {
         std::fs::write(&wasm, b"not WebAssembly").unwrap();
         let refused = measure_at(&wasm).expect_err("an invalid guest produced a report");
         assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
+        assert!(
+            refused.contains("configure a real CPython-WASI guest"),
+            "{refused}"
+        );
+        assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
     }
 
     #[test]
@@ -938,7 +967,13 @@ mod tests {
         let wasm = dir.path().join("correctness.wasm");
         std::fs::write(&wasm, EMPTY_START).unwrap();
         let refused = measure_at(&wasm).expect_err("a WAT fixture produced a CPython report");
-        assert!(refused.contains("CPython"), "{refused}");
+        assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
+        assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
+        assert!(refused.contains("unexpected stdout"), "{refused}");
+        assert!(
+            refused.contains("configure a real CPython-WASI guest"),
+            "{refused}"
+        );
     }
 
     #[test]
@@ -988,7 +1023,71 @@ mod tests {
             .write_csv_at(&path)
             .expect_err("an existing target was replaced");
         assert!(refused.contains("E_STORAGE_FATAL"), "{refused}");
+        assert!(refused.contains(&path.display().to_string()), "{refused}");
+        assert!(
+            refused.contains("choose a writable target directory"),
+            "{refused}"
+        );
         assert_eq!(std::fs::read(path).unwrap(), b"previous measurement");
         assert!(!part.exists(), "the partial publication survived");
+    }
+
+    #[test]
+    fn csv_write_failure_names_the_partial_path_and_keeps_cleanup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("observations.csv");
+        let part = path.with_extension("csv.part");
+        std::fs::write(&part, b"partial").unwrap();
+        let published = publish_csv(
+            Err(std::io::Error::other("injected write or sync failure")),
+            &part,
+            &path,
+        );
+        let cleanup = std::fs::remove_file(&part)
+            .map_err(|why| csv_cleanup_error(&path, &part, published.is_ok(), why));
+        let refused = keep_both(published, cleanup).unwrap_err();
+        assert!(refused.contains("E_STORAGE_FATAL"), "{refused}");
+        assert!(
+            refused.contains(&format!("{}: injected write", part.display())),
+            "{refused}"
+        );
+        assert!(
+            refused.contains("choose a writable target directory"),
+            "{refused}"
+        );
+        assert!(!part.exists());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn csv_cleanup_failure_keeps_the_published_and_residual_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("observations.csv");
+        let part = path.with_extension("csv.part");
+        std::fs::write(&part, b"measurement").unwrap();
+        let published = publish_csv(Ok(()), &part, &path);
+        assert!(published.is_ok());
+        let cleanup = Err::<(), _>(csv_cleanup_error(
+            &path,
+            &part,
+            published.is_ok(),
+            std::io::Error::other("injected cleanup failure"),
+        ));
+        let refused = keep_both(published, cleanup).unwrap_err();
+        assert!(refused.contains("E_STORAGE_FATAL"), "{refused}");
+        assert!(
+            refused.contains(&format!("CSV published at {}", path.display())),
+            "{refused}"
+        );
+        assert!(
+            refused.contains(&format!("temporary file {} remains", part.display())),
+            "{refused}"
+        );
+        assert!(
+            refused.contains("delete only the residual .part file"),
+            "{refused}"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"measurement");
+        assert_eq!(std::fs::read(&part).unwrap(), b"measurement");
     }
 }
