@@ -350,13 +350,18 @@ fn timed_outcome(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<TimedOutc
 
 fn checked_output(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
     if outcome.exit != SandboxExit::Success {
-        return Err(format!("the benchmark guest ended with {:?}", outcome.exit));
+        return Err(fixture(format!(
+            "the benchmark guest ended with {:?}",
+            outcome.exit
+        )));
     }
     if !outcome.stderr.is_empty() {
-        return Err("the benchmark guest wrote to stderr".to_owned());
+        return Err(fixture("the benchmark guest wrote to stderr"));
     }
     if outcome.stdout != *EXPECTED {
-        return Err("the fixed CPython script produced unexpected stdout".to_owned());
+        return Err(fixture(
+            "the fixed CPython script produced unexpected stdout",
+        ));
     }
     Ok(())
 }
@@ -731,11 +736,28 @@ impl Report {
         // A same-directory hard link publishes atomically and fails when the
         // target already exists, unlike a replacement-style rename.
         let published = written.and_then(|()| std::fs::hard_link(&part, path));
-        let cleanup = std::fs::remove_file(&part);
-        keep_both(
-            published.map_err(|why| csv_storage(path, why)),
-            cleanup.map_err(|why| csv_storage(&part, why)),
-        )?;
+        let cleanup = std::fs::remove_file(&part).map_err(|why| {
+            if published.is_ok() {
+                let error = AxError::failure(
+                    AxCode::StorageFatal,
+                    "remove the temporary CPython-WASI CSV after publication",
+                    format!(
+                        "CSV published at {}; temporary file {} remains: {why}",
+                        path.display(),
+                        part.display()
+                    ),
+                )
+                .with_recovery(format!(
+                    "delete only the residual .part file {}; keep the published CSV at {}",
+                    part.display(),
+                    path.display()
+                ));
+                format!("{error}; recovery: {}", error.recovery())
+            } else {
+                csv_storage(&part, why)
+            }
+        });
+        keep_both(published.map_err(|why| csv_storage(path, why)), cleanup)?;
         Ok(())
     }
 }
@@ -837,13 +859,13 @@ fn prerequisite(detail: String) -> String {
 }
 
 fn fixture(detail: impl Into<String>) -> String {
-    AxError::failure(
+    let error = AxError::failure(
         AxCode::InvalidArgs,
         "measure the registered CPython-WASI scenario",
         detail.into(),
     )
-    .with_recovery("check the selected guest and the fixed script; no partial report is emitted")
-    .to_string()
+    .with_recovery("check the selected guest and the fixed script; no partial report is emitted");
+    format!("{error}; recovery: {}", error.recovery())
 }
 
 #[cfg(test)]
@@ -855,6 +877,37 @@ fn fixture(detail: impl Into<String>) -> String {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn measured_output_failures_carry_a_code_action_and_recovery() {
+        for (exit, stdout, stderr) in [
+            (
+                SandboxExit::Failure { code: 1 },
+                EXPECTED.to_vec(),
+                Vec::new(),
+            ),
+            (SandboxExit::Success, b"wrong output".to_vec(), Vec::new()),
+            (SandboxExit::Success, EXPECTED.to_vec(), b"warning".to_vec()),
+        ] {
+            let outcome = runtime::SandboxOutcome {
+                exit,
+                stdout,
+                stderr,
+                ceiling: None,
+            };
+            let refused = checked_output(&outcome).expect_err("invalid output was accepted");
+            assert!(refused.contains("E_INVALID_ARGS"), "{refused}");
+            assert!(
+                refused.contains("measure the registered CPython-WASI scenario"),
+                "{refused}"
+            );
+            assert!(
+                refused.contains("check the selected guest and the fixed script"),
+                "{refused}"
+            );
+            assert!(!refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
+        }
+    }
 
     #[test]
     fn a_missing_guest_is_a_prerequisite_error() {

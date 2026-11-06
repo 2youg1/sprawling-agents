@@ -130,7 +130,7 @@ impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 
 `python_sample row=<行名> index=<n> took_us=<n> guest=<64 位十六进制> script=<64 位十六进制>`
 
-汇总复用 `reading::row_line` 与 `Spread`，旁注依次带 `machine_class`、`os`、`arch`、两个摘要和场景参数。同一组 `Sample` 还生成 `Report` 私有的原始 `Observation`，所以终端与 CSV 不会各自抄一份数。Main 把报告写到 `<CARGO_TARGET_DIR>/python-bench-<arm>-<pid>.csv`（未设变量时为 `target/`），不覆盖既有结果，经临时文件与同目录硬链接发布，目标已存在时原子拒绝而不覆盖；写盘或清理失败是 `E_STORAGE_FATAL`，且不打印成功报告。CSV 是长表，每行一个观测，字段依次为 `schema_version, build_blake3, workload, observation, round, cohort, arm, metric, value, unit, guest_blake3, script_blake3, machine_class, os, arch`；build 是当前 bench 可执行文件的 BLAKE3；duration 的单位是 `us`，内存是 `bytes`，派生汇总不另抄进表。
+汇总复用 `reading::row_line` 与 `Spread`，旁注依次带 `machine_class`、`os`、`arch`、两个摘要和场景参数。同一组 `Sample` 还生成 `Report` 私有的原始 `Observation`，所以终端与 CSV 不会各自抄一份数。Main 把报告写到 `<CARGO_TARGET_DIR>/python-bench-<arm>-<pid>.csv`（未设变量时为 `target/`），不覆盖既有结果，经临时文件与同目录硬链接发布，目标已存在时原子拒绝而不覆盖；写盘或清理失败是 `E_STORAGE_FATAL`，且不打印成功报告。硬链接已发布而 `.part` 清理失败时，错误明确给出最终 CSV 与残留 `.part` 的路径，并指示只删除 `.part` 以保留已发布的 CSV；此时仍返回失败。CSV 是长表，每行一个观测，字段依次为 `schema_version, build_blake3, workload, observation, round, cohort, arm, metric, value, unit, guest_blake3, script_blake3, machine_class, os, arch`；build 是当前 bench 可执行文件的 BLAKE3；duration 的单位是 `us`，内存是 `bytes`，派生汇总不另抄进表。
 
 后续变化报告按 `docs/performance.md` 做预注册的 DiD 与分布分析：CSV 的臂和轮次是分析输入，不把两个 P50 的差改名为 DiD。大型或横向测量另附人类可读、带分布图与 DiD 表的 HTML 或 LaTeX 报告；本族的原始 CSV 不冒充那份报告。`python_memory` 是字节读数，不套 duration 行，也不印假的 `floor_us=0`。可执行文件、包大小、构建时间与 startup-to-ready 继续分别由 `[release_binary]` 与 `bench-startup` 的既有行负责，本族不另造第二仪表。
 
@@ -138,7 +138,9 @@ impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 
 D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：S2 的固定 guest 成为唯一工件后，路径解析可以删除，校验仍须确认实际运行的是该工件。
 
-Rust 检查：`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`、`the_csv_report_keeps_raw_observations_in_long_form`、`csv_publication_preserves_an_existing_target_and_removes_the_partial_file`；五条走默认测试套件，不要求测量环境已有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python [baseline|candidate]` 触发，缺工件即非零拒绝。
+**计时后的 `checked_output` 校验失败沿用 bench 自身的 `E_INVALID_ARGS`，不新增错误码，也不冒充计时前的 `E_TOOL_UNAVAILABLE`。** 热调用与并发调用的非成功状态、stderr 非空或 stdout 不符都经 `AxError::failure` 给出动作、主体与检查 guest／固定脚本的恢复方法；Main 的 `finish` 保留格式化错误并退出非零。这样复用既有失败出口，正常路径不增加分配；被否：把中途失败全归为 guest 前置条件失败，混淆可用性与测量有效性。
+
+Rust 检查：`measured_output_failures_carry_a_code_action_and_recovery`、`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`、`the_csv_report_keeps_raw_observations_in_long_form`、`csv_publication_preserves_an_existing_target_and_removes_the_partial_file`；这些检查走默认测试套件，不要求测量环境已有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python [baseline|candidate]` 触发，缺工件即非零拒绝。
 -/
 
 /-!
