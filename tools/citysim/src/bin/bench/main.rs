@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bench harness the performance register calls for: the three
-//! wall-clock budgets (`tools/xtask/budgets.toml`) measured on this machine,
-//! reported with their machine, never gated.
+//! The bench harness the performance register calls for: its wall-clock
+//! budgets and real CPython-WASI scenarios (`tools/xtask/budgets.toml`),
+//! measured on this machine, reported with their machine, never gated.
 //!
 //! This is a measuring Main, so it is the second sanctioned sampling
 //! point besides `bin::assembly`: every `Instant::now` here carries the
@@ -26,6 +26,17 @@ mod reading;
 mod scenarios;
 
 fn main() -> std::process::ExitCode {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    match arguments.as_slice() {
+        [command, guest] if command == "python-cold" => {
+            return finish(python::cold_child(guest));
+        }
+        [command] if command == "python" => {
+            return finish(python::measure().map(print_python));
+        }
+        [] => {}
+        _ => return finish(Err(invalid_arguments())),
+    }
     let machine = format!(
         "{}-{}, {} core(s)",
         std::env::consts::OS,
@@ -52,8 +63,29 @@ fn main() -> std::process::ExitCode {
             for reading in &readings {
                 println!("{}", reading.line());
             }
-        });
+        })
+        .and_then(|()| python::measure().map(print_python));
     std::fs::remove_dir_all(&scratch).ok();
+    finish(outcome)
+}
+
+fn print_python(report: python::Report) {
+    for line in report.lines {
+        println!("{line}");
+    }
+}
+
+fn invalid_arguments() -> String {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "read the bench command line",
+        "the bench accepts no arguments, or `python`",
+    )
+    .with_recovery("run `just bench` for every reading, or `bench python` for CPython alone")
+    .to_string()
+}
+
+fn finish(outcome: Result<(), String>) -> std::process::ExitCode {
     match outcome {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(why) => {

@@ -108,16 +108,16 @@ Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一�
 // bench 是二进制，以下都是 pub(crate)
 pub struct Report { pub lines: Vec<String> }
 pub fn measure() -> Result<Report, String>;
-pub fn cold_child() -> Result<(), String>;   // 仅 Main 的 python-cold 内部入口调用
+pub fn cold_child(expected_guest: &str) -> Result<(), String>;   // 仅 Main 的 python-cold 内部入口调用
 ```
 
-`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先与组件目录回退不由 bench 重写。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先读 guest 摘要，再运行校验脚本：它检查 `sys.implementation.name == "cpython"` 并打印固定标记；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
+`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先与组件目录回退不由 bench 重写。全部场景结束后重读 guest 摘要，与开始时不同就拒掉整份 Report；冷子进程也核对父进程交给它的摘要，所以一行读数不会混入另一份字节。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先读 guest 摘要，再运行校验脚本：它检查 `sys.implementation.name == "cpython"` 并打印固定标记；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
 
 场景与读数行：
 
 | 行 | 驱动方式 | 回答的问题 |
 |---|---|---|
-| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold` 子进程；子进程重新经 doctor 找 guest、校验并运行负载，父进程计时到退出，等待有上限 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm` |
+| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要>` 子进程；子进程重新经 doctor 找 guest、校验并运行负载，父进程计时到退出，等待有上限 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
 | `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
 | `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；逐次核对输出 | 并发调用延迟、从开始到各线程实际起跑的 `start_delay`、整批吞吐与尾延迟；当前没有 admission queue，故不把 start delay 改名成 queue delay |
 | `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程 | virtual 与 resident 的 before／peak／after；peak 是采样看到的下界，采样节拍数随行，不能补猜未观察到的峰值 |
