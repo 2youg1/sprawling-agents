@@ -103,7 +103,7 @@
       onInput={box.input}
     />
     {#if box.value === "" && box.source !== ""}
-      <span class="whitespace-nowrap text-note text-text-faint">{box.source}</span>
+      <span class="min-w-0 text-note text-text-faint">{box.source}</span>
     {/if}
   </div>
 {/snippet}

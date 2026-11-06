@@ -13,7 +13,7 @@
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import type { RunBelief } from "../../core/belief";
-  import type { RoundsAnswer } from "../../wire";
+  import type { RoundsAnswer, Seq } from "../../wire";
   import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import { foldWire } from "./fold";
@@ -25,20 +25,21 @@
   import Thread from "./thread.svelte";
 
   interface Props {
+    readonly session?: Seq | null;
     // Everything before the boundary, oldest first. Folded to one line
     // and opened in place: this is the same conversation, earlier -
     // neither a dialog nor a route is the right weight for a scroll
     // (ux B7).
     readonly earlier: readonly RunBelief[];
     // How many runs the session now open holds, which decides whether
-    // the earlier stretch starts open (client D80).
+    // the earlier stretch appears at all (client D80).
     readonly shown: number;
     readonly boundary: Boundary | null;
     readonly onFork: (plan: ForkPlan) => void;
     readonly onRetry: (task: string) => void;
   }
 
-  const { earlier, shown, boundary, onFork, onRetry }: Props = $props();
+  const { earlier, shown, boundary, onFork, onRetry, session = null }: Props = $props();
 
   const { lang, conn } = ui();
   const belief = conn.belief;
@@ -46,7 +47,14 @@
   // The person's own choice, once they press the line; until then the
   // rule both modes share decides.
   let pressed = $state<boolean | null>(null);
-  const open = $derived(pressed ?? earlierDrawn(shown, earlier.length) === "open");
+  let previousSession: Seq | null | undefined;
+  $effect(() => {
+    if (session === previousSession) return;
+    previousSession = session;
+    pressed = null;
+  });
+  const drawn = $derived(earlierDrawn(shown, earlier.length, boundary?.kind === "forked"));
+  const open = $derived(pressed ?? drawn === "open");
 
   // The count is the folded runs themselves: what expands is one thread
   // per run, so the number a person reads is the number of things the
@@ -136,11 +144,18 @@
   });
 </script>
 
-{#if earlier.length > 0}
+{#if drawn !== "none"}
   {#if open}
     <div class="fade">
       {#each earlier as run (run.run)}
-        <Thread {run} {onFork} {onRetry} />
+        <Thread
+          {run}
+          through={boundary?.kind === "forked" && boundary.mother === run.run
+            ? boundary.origin.at_seq
+            : null}
+          {onFork}
+          {onRetry}
+        />
       {/each}
     </div>
   {/if}

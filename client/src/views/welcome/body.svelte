@@ -34,11 +34,14 @@
   const answer = $derived(
     readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)),
   );
+  const mainMissing = $derived(
+    answer.kind === "held" && !answer.value.chosen.some((chosen) => chosen.tag === "main"),
+  );
 </script>
 
 {#if step === "provider"}
   <div class="flex min-w-0 max-w-talk flex-col gap-wide">
-    <ProviderDoor />
+    <ProviderDoor openModels={mainMissing} />
     {#if answer.kind === "held" && answer.value.endpoints.length > 0}
       <ModelChoice answer={answer.value} tags={["main"]} />
     {/if}

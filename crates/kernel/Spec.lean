@@ -318,7 +318,7 @@ gate ──▶ 上述全部（组合面）＋idem
 /-! ## 10 实现逻辑
 
 0. **AxError 内部装箱**：`{ code, Box<ErrorDetail> }`，serde flatten 保持 wire 形与字段序不变。理由：AxError 走每一道缝的返回位，扁平结构超过 clippy `result_large_err` 的阈值；装箱后只剩码与一个指针，接口与序列化形态不变。
-1. 全模块零 I/O、零时钟、零随机；BTreeMap/BTreeSet only（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。
+1. 全模块零 I/O、零时钟、零随机；迭代顺序显式确定、禁止哈希序，默认 BTreeMap/BTreeSet（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。基准证实的热点可换用其他结构，须以显式排序固定顺序、在本 SPEC 记录替换，且 citysim 确定性场景与跨 OS 字节夹具保持绿色（ARCHITECTURE.md §10 规则 1）。
 2. hex 编解码手写（16 行内，查表小写），不引 hex crate——C12 精神：依赖面只进钉版清单所列。
 3. `EventKind`/`AxCode` 的 serde 呈现名逐 variant `#[serde(rename = …)]`（AxCode）与 `#[serde(rename_all = "snake_case")]`（EventKind）；`as_str` 与 serde 用同一份拼写（单测对拍）。
 4. `Payload` 校验先判深度、再拒浮点：深度检查逐层迭代，不占调用栈；浮点检查递归下降 serde_json::Value，`Number::is_i64 || is_u64` 之外即拒，数组与对象深入。次序是这条递归的界：它只走深度检查已放行的至多 `PAYLOAD_DEPTH_MAX` 层，一个程序拼出的深嵌套值因此在深度处被拒，不会先把写方的栈耗尽。读侧 parse_line 的深度由 serde_json 的递归上限封住，对浮点恒拒。

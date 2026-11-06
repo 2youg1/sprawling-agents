@@ -20,21 +20,30 @@
   import type { Boundary } from "./forking";
   import { earlierDrawn } from "./earlier";
   import { fill, say } from "../../core/lang";
+  import type { Seq } from "../../wire";
   import type { RunBelief } from "../../core/belief";
   import { ui } from "../../ui";
 
   interface Props {
+    readonly session?: Seq | null;
     readonly shown: readonly RunBelief[];
     readonly earlier: readonly RunBelief[];
     readonly boundary: Boundary | null;
   }
 
-  const { shown, earlier, boundary }: Props = $props();
+  const { shown, earlier, boundary, session = null }: Props = $props();
   const { lang, conn } = ui();
   const belief = conn.belief;
 
   let pressed = $state<boolean | null>(null);
-  const open = $derived(pressed ?? earlierDrawn(shown.length, earlier.length) === "open");
+  let previousSession: Seq | null | undefined;
+  $effect(() => {
+    if (session === previousSession) return;
+    previousSession = session;
+    pressed = null;
+  });
+  const drawn = $derived(earlierDrawn(shown.length, earlier.length, boundary?.kind === "forked"));
+  const open = $derived(pressed ?? drawn === "open");
 
   const heading = $derived(
     boundary?.kind === "forked"
@@ -59,12 +68,17 @@
     <h2 class="mb-base text-note text-text-quiet">{heading}</h2>
     <ul>
       {#each [...shown].reverse() as run (run.run)}
-        <Result {run} />
+        <Result
+          {run}
+          through={boundary?.kind === "forked" && boundary.mother === run.run
+            ? boundary.origin.at_seq
+            : null}
+        />
       {/each}
     </ul>
   </section>
 {/if}
-{#if earlier.length > 0}
+{#if drawn !== "none"}
   <section class="mb-section" aria-label={earlierHeading}>
     <h2 class="mb-base text-note text-text-quiet">
       <Fold
@@ -77,7 +91,12 @@
     {#if open}
       <ul>
         {#each [...earlier].reverse() as run (run.run)}
-          <Result {run} />
+          <Result
+            {run}
+            through={boundary?.kind === "forked" && boundary.mother === run.run
+              ? boundary.origin.at_seq
+              : null}
+          />
         {/each}
       </ul>
     {/if}

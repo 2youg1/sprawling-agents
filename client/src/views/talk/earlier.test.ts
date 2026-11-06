@@ -7,15 +7,15 @@ import { expect, test } from "bun:test";
 
 import { earlierDrawn } from "./earlier";
 
-// The regression this guards: one round, then a model change opened a
-// new session, so the round became the earlier stretch. "Everything"
-// drew one folded line over an empty session while "results only" drew
-// the round open; both modes now read this one answer.
-test("the earlier stretch opens while the open session holds no run, and folds once it does", () => {
-  expect([earlierDrawn(0, 1), earlierDrawn(1, 1), earlierDrawn(2, 0), earlierDrawn(0, 0)]).toEqual([
-    "open",
-    "folded",
-    "none",
-    "none",
-  ]);
+// One accepted `/new` after a round: the current session is visibly
+// empty until its first run arrives, then the earlier stretch is one
+// folded entry in both readings. No history is deleted.
+test("an empty new session draws no earlier run, and its first run folds the earlier stretch", () => {
+  expect([
+    earlierDrawn(0, 1, false),
+    earlierDrawn(1, 1, false),
+    earlierDrawn(2, 0, false),
+    earlierDrawn(0, 0, false),
+    earlierDrawn(0, 1, true),
+  ]).toEqual(["none", "folded", "none", "none", "open"]);
 });

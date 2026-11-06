@@ -44,13 +44,14 @@
   import type { FrozenFacts } from "./seat";
   import { restriction, sandboxQuery, sandboxSaid } from "./sandbox";
   import { called, dispatcherOf } from "./naming";
-  import { planFork } from "./forking";
+  import { planFork, roundsThrough } from "./forking";
   import { turnsAround } from "./around";
   import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
 
   interface Props {
+    readonly through?: Seq | null;
     readonly run: RunBelief;
     // Absent where the page holding the thread cannot branch: the run
     // page draws the same conversation with nowhere to fork to.
@@ -69,7 +70,7 @@
     readonly around?: Seq | null;
   }
 
-  const { run, onFork, onRetry, facts = "head", around = null }: Props = $props();
+  const { run, onFork, onRetry, facts = "head", around = null, through = null }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -93,7 +94,7 @@
   const read = $derived(
     readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)),
   );
-  const answer = $derived(read.kind === "held" ? read.value : undefined);
+  const answer = $derived(read.kind === "held" ? roundsThrough(read.value, through) : undefined);
   const turns = $derived(answer?.turns ?? []);
   const drawn = $derived(turnsAround(turns, around));
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
@@ -135,7 +136,7 @@
   // page's own text until the record holds it. When the call returns,
   // belief clears `saying` and the settled record takes over, so nothing
   // has to decide when the growing text stops growing.
-  const streaming = $derived(!frozen && run.saying.length > 0);
+  const streaming = $derived(through === null && !frozen && run.saying.length > 0);
   const closedAt = $derived(answer?.closing?.at ?? null);
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
@@ -335,7 +336,7 @@
   <!-- No `aria-live` on the growing text: a screen reader told every
        token hears noise (ux B2). The frozen line below is what speaks,
        and it speaks once. -->
-  {#if !frozen && run.thinking.length > 0 && whole}
+  {#if through === null && !frozen && run.thinking.length > 0 && whole}
     <div class="my-tight">
       <Reasoning
         label={say($lang, "talk_reasoning")}
@@ -378,7 +379,7 @@
   {/if}
   {#if !frozen && !streaming && !lineSaysIt}
     <div class="my-snug flex items-center gap-snug text-note text-text-faint">
-      <span class="inline-block size-dot pulse rounded-pill bg-accent"></span>
+      <span class="thinking-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span>{posture}</span>
       {#if run.doing.kind === "thinking"}
         <SteerPin />

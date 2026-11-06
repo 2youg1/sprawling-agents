@@ -27,6 +27,7 @@
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
   import { MAYOR } from "../core/route";
+  import { roundsThrough } from "./talk/forking";
   import { lineIn } from "../core/stretches";
   import { QUERIES } from "../core/asking";
   import { forkAsked } from "../core/forking";
@@ -126,10 +127,15 @@
       undefined,
     ),
   );
-  const origin = $derived(currentLine?.branched_from ?? null);
+  const origin = $derived(
+    currentLine?.began === began ? (currentLine.branched_from ?? null) : null,
+  );
+  const mother = $derived(origin === null ? undefined : $belief.runs[origin.run]);
   const earlier = $derived(
     origin !== null
-      ? runs.filter((run) => run.run === origin.run)
+      ? mother === undefined
+        ? []
+        : [mother]
       : began === null
         ? []
         : runs.filter((run) => run.lastSeq <= began),
@@ -158,18 +164,29 @@
   // The run the band and the fork picker speak for: the one still going,
   // or the last one this room finished. The same question `Thread` asks, merged with it
   // by `asking` because the two ask it in the same words.
-  const current = $derived(live ?? runs.at(-1));
+  const current = $derived(
+    live ?? shown.at(-1) ?? (origin === null ? undefined : $belief.runs[origin.run]),
+  );
 
   // The rounds of that run, asked here for the band's last line and the
   // fork picker. Subscribed by hand because the run it follows changes:
   // `$store` binds one store at initialisation, and this question moves
   // to a new run the moment one starts.
-  let answer = $state<RoundsAnswer | undefined>(undefined);
+  let rawAnswer = $state<RoundsAnswer | undefined>(undefined);
+  const answer = $derived(
+    rawAnswer === undefined
+      ? undefined
+      : roundsThrough(
+          rawAnswer,
+          live === undefined && shown.length === 0 ? (origin?.at_seq ?? null) : null,
+        ),
+  );
   $effect(() => {
     const run = current?.run;
+    rawAnswer = undefined;
     if (run === undefined) return;
     return u.conn.asking.ask({ rounds: { run } }).subscribe((held) => {
-      answer = held !== undefined && "rounds" in held ? held.rounds : undefined;
+      rawAnswer = held !== undefined && "rounds" in held ? held.rounds : undefined;
     });
   });
 
@@ -260,7 +277,7 @@
   // An empty room: nothing to read and nothing just sent, so the box
   // stands in the middle. The first send lets it sink at once, before
   // the city has answered, because the words it shows are already there.
-  const blank = $derived(runs.length === 0 && echo === null);
+  const blank = $derived(shown.length === 0 && origin === null && echo === null);
   // The address line stands in the box, as the address its placeholder
   // names, so the page names the room once (client/Spec.lean 4-10a).
   const addressed = $derived(!band && drawsAddress(seat));
@@ -445,10 +462,17 @@ composition is rebuilt on the way. -->
 >
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
-      {#if runs.length > 0}
+      {#if shown.length > 0 || origin !== null}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} shown={shown.length} {boundary} onFork={doFork} onRetry={send} />
+          <Divider
+            session={began}
+            {earlier}
+            shown={shown.length}
+            {boundary}
+            onFork={doFork}
+            onRetry={send}
+          />
           {#each shown as run, at (run.run)}
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
@@ -459,7 +483,7 @@ composition is rebuilt on the way. -->
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
           {/if}
         {:else}
-          <Stream {shown} {earlier} {boundary} />
+          <Stream session={began} {shown} {earlier} {boundary} />
         {/if}
       {/if}
       {#if echo !== null}

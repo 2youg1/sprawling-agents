@@ -17,6 +17,8 @@
 
   export interface EndpointListProps {
     readonly answer: EndpointsAnswer;
+    // Initial model-disclosure state, used by the required welcome step.
+    readonly openModels?: boolean;
   }
 </script>
 
@@ -31,7 +33,7 @@
   import ModelEditor from "./model_editor.svelte";
   import { endpointRoster } from "./rosters";
 
-  const { answer }: EndpointListProps = $props();
+  const { answer, openModels = false }: EndpointListProps = $props();
   const u = ui();
   const { lang } = u;
   // The retry count an endpoint calls with when none is chosen is the
@@ -61,7 +63,7 @@
 {/snippet}
 
 {#snippet models(name: string)}
-  <ModelEditor {answer} {name} flight={flightFor(name)} />
+  <ModelEditor {answer} {name} flight={flightFor(name)} open={openModels} />
 {/snippet}
 
 <Look {...look} {accounts} {models} />
