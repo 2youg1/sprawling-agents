@@ -130,7 +130,7 @@ Pin input digests and build settings, change one thing, then alternate before/af
 
 ## Evaluate a change without hiding its distribution
 
-This section governs published evaluations and optimization claims. A terminal's point summaries are useful while exploring, but they are not enough evidence for a change claim.
+This section governs published evaluations and optimization claims. A terminal's point summaries are useful while exploring, but they are not enough evidence for a change claim. The cross-agent benchmark's [measurement method](benchmarks/methodology.md) binds its series coverage, estimators, sample-size rules, schemas and reproduction commands; this section remains the authority for the general rules.
 
 ### Pre-register the estimate, not the desired answer
 
