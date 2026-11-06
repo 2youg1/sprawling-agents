@@ -272,7 +272,9 @@ pub(super) enum Misread {                   // 每一臂退 2，Display 写出�
     NothingAfterDashes,
 }
 pub(super) enum Measured { City, Process, Command } // Misread 说出是哪个对象，并写出它的合法写法
-pub(super) struct Every(Duration);          // 250 ms ..= 60 s，缺省 1 s
+pub const MINIMUM_BEAT_MS: u64 = 250;       // monitor::tree：整表读取拍距的唯一数值权威
+pub const MINIMUM_BEAT: Duration = Duration::from_millis(MINIMUM_BEAT_MS);
+pub(super) struct Every(Duration);          // MINIMUM_BEAT ..= 60 s，缺省 1 s；citysim 的内存 burst 也读同一个下限
 pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, watched: Watched, child: ChildPeaks }
 pub(super) struct Watched { beats: u64, seen: Option<Seen>, read_cost: Duration } // 拍线程交回的东西
 pub(super) struct ChildPeaks { private_bytes: Option<u64>, working_set_bytes: Option<u64> }

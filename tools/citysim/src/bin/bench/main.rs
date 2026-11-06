@@ -28,11 +28,17 @@ mod scenarios;
 fn main() -> std::process::ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     match arguments.as_slice() {
-        [command, guest] if command == "python-cold" => {
+        [command, guest] if command == python::COLD_COMMAND => {
             return finish(python::cold_child(guest));
         }
         [command] if command == "python" => {
-            return finish(python::measure().map(print_python));
+            return finish(python::measure().and_then(present_python));
+        }
+        [command, arm] if command == "python" => {
+            return match python::Arm::parse(arm) {
+                Some(arm) => finish(python::measure_as(arm).and_then(present_python)),
+                None => finish(Err(invalid_arguments())),
+            };
         }
         [] => {}
         _ => return finish(Err(invalid_arguments())),
@@ -64,24 +70,29 @@ fn main() -> std::process::ExitCode {
                 println!("{}", reading.line());
             }
         })
-        .and_then(|()| python::measure().map(print_python));
+        .and_then(|()| python::measure().and_then(present_python));
     std::fs::remove_dir_all(&scratch).ok();
     finish(outcome)
 }
 
-fn print_python(report: python::Report) {
+fn present_python(report: python::Report) -> Result<(), String> {
+    let csv = report.write_csv()?;
     for line in report.lines {
         println!("{line}");
     }
+    println!("python_csv path={}", csv.display());
+    Ok(())
 }
 
 fn invalid_arguments() -> String {
     AxError::failure(
         AxCode::InvalidArgs,
         "read the bench command line",
-        "the bench accepts no arguments, or `python`",
+        "the bench accepts no arguments, or `python [baseline|candidate]`",
     )
-    .with_recovery("run `just bench` for every reading, or `bench python` for CPython alone")
+    .with_recovery(
+        "run `just bench` for every reading, or `bench python [baseline|candidate]` for CPython alone",
+    )
     .to_string()
 }
 

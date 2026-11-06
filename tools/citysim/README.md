@@ -22,6 +22,6 @@ just provider <script> <record>  # the stand-in provider on a loopback port; pri
 just mem long-turn               # the memory counters of the long turn, read at each of its pauses
 ```
 
-The Python bench uses the same external CPython-WASI guest as the production Python arm. Run it alone with `cargo run --release -p citysim --bin bench -- python`. A missing, malformed or non-CPython guest is a prerequisite error and produces no Python readings; hand-written WAT remains a correctness fixture, never a timing substitute.
+The Python bench uses the same external CPython-WASI guest as the production Python arm. Run it alone with `cargo run --release -p citysim --bin bench -- python [baseline|candidate]`. It writes raw observations as CSV beside the build output and prints their paths. A missing, malformed or non-CPython guest is a prerequisite error and produces no Python readings; hand-written WAT remains a correctness fixture, never a timing substitute. Change evaluation, DiD and report requirements live in [`docs/performance.md`](../../docs/performance.md).
 
 Two golden Ledgers under `tools/fixtures/` are rebuilt byte for byte by tests: `golden-s1` by `tests/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/interventions.rs` from a whole run, with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand.

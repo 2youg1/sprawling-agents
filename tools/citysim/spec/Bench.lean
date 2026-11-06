@@ -106,9 +106,12 @@ Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一�
 
 ```rust
 // bench 是二进制，以下都是 pub(crate)
-pub struct Report { pub lines: Vec<String> }
-pub fn measure() -> Result<Report, String>;
+pub struct Report { pub lines: Vec<String>, /* arm 与原始 Observation 行私有 */ }
+pub enum Arm { Baseline, Candidate }
+pub fn measure() -> Result<Report, String>;             // Baseline
+pub fn measure_as(arm: Arm) -> Result<Report, String>;
 pub fn cold_child(expected_guest: &str) -> Result<(), String>;   // 仅 Main 的 python-cold 内部入口调用
+impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 ```
 
 `measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先与组件目录回退不由 bench 重写。全部场景结束后重读 guest 摘要，与开始时不同就拒掉整份 Report；冷子进程也核对父进程交给它的摘要，所以一行读数不会混入另一份字节。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先读 guest 摘要，再运行校验脚本：它检查 `sys.implementation.name == "cpython"` 并打印固定标记；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
@@ -117,22 +120,25 @@ pub fn cold_child(expected_guest: &str) -> Result<(), String>;   // 仅 Main 的
 
 | 行 | 驱动方式 | 回答的问题 |
 |---|---|---|
-| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要>` 子进程；子进程重新经 doctor 找 guest、校验并运行负载，父进程计时到退出，等待有上限 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
-| `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
-| `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；逐次核对输出 | 并发调用延迟、从开始到各线程实际起跑的 `start_delay`、整批吞吐与尾延迟；当前没有 admission queue，故不把 start delay 改名成 queue delay |
+| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要>` 子进程；子进程重新经 doctor 找 guest、校验并运行负载，完成时冲刷一条协议行，父进程以收到该行为计时终点，再有界地等退出并收尸 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
+| `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载，返回时先停表再做输出校验；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
+| `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；逐次核对输出 | 并发调用延迟、整批吞吐与尾延迟 |
+| `python_start_delay` | 同上，每线程记录从本轮开始到屏障后实际起跑的时间，CSV 保留其 burst 轮次 | 起跑调度分布；当前没有 admission queue，故不把它改名成 queue delay |
 | `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程 | virtual 与 resident 的 before／peak／after；peak 是采样看到的下界，采样节拍数随行，不能补猜未观察到的峰值 |
 
 每个计时样本保留一行，索引从 1 开始，微秒仍由 `monitor::spread::micros` 转换：
 
 `python_sample row=<行名> index=<n> took_us=<n> guest=<64 位十六进制> script=<64 位十六进制>`
 
-汇总复用 `reading::row_line` 与 `Spread`，旁注依次带 `machine_class`、`os`、`arch`、两个摘要和场景参数；原始样本使后续同一机器的 interleaved A/B 可以计算中位相对变化的 bootstrap 区间，而不是只剩一个无法复核的 p50。`python_memory` 是字节读数，不套 duration 行，也不印假的 `floor_us=0`。可执行文件、包大小、构建时间与 startup-to-ready 继续分别由 `[release_binary]` 与 `bench-startup` 的既有行负责，本族不另造第二仪表。
+汇总复用 `reading::row_line` 与 `Spread`，旁注依次带 `machine_class`、`os`、`arch`、两个摘要和场景参数。同一组 `Sample` 还生成 `Report` 私有的原始 `Observation`，所以终端与 CSV 不会各自抄一份数。Main 把报告写到 `<CARGO_TARGET_DIR>/python-bench-<arm>-<pid>.csv`（未设变量时为 `target/`），不覆盖既有结果，经临时文件改名；写盘失败是 `E_STORAGE_FATAL`，且不打印成功报告。CSV 是长表，每行一个观测，字段依次为 `schema_version, build_blake3, workload, observation, round, cohort, arm, metric, value, unit, guest_blake3, script_blake3, machine_class, os, arch`；build 是当前 bench 可执行文件的 BLAKE3；duration 的单位是 `us`，内存是 `bytes`，派生汇总不另抄进表。
+
+后续变化报告按 `docs/performance.md` 做预注册的 DiD 与分布分析：CSV 的臂和轮次是分析输入，不把两个 P50 的差改名为 DiD。大型或横向测量另附人类可读、带分布图与 DiD 表的 HTML 或 LaTeX 报告；本族的原始 CSV 不冒充那份报告。`python_memory` 是字节读数，不套 duration 行，也不印假的 `floor_us=0`。可执行文件、包大小、构建时间与 startup-to-ready 继续分别由 `[release_binary]` 与 `bench-startup` 的既有行负责，本族不另造第二仪表。
 
 当前适配器没有 pre-warm 或阶段观察面，所以本切片不产 pre-warm awaited／racing、`instantiate` 或 `interpreter_initialization` 行；S1 的这些读数仍欠。冷／热之差不能冒充其中任何一项，WAT 正确性夹具也不能成为 CPython 计时。后续测量面须同时守住 roadmap 的「不新增 callback API」与计时采样点约束。
 
 D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：S2 的固定 guest 成为唯一工件后，路径解析可以删除，校验仍须确认实际运行的是该工件。
 
-Rust 检查：`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`；三者走默认测试套件，不需要本机装有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python` 触发，缺工件即非零拒绝。
+Rust 检查：`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`、`the_csv_report_keeps_raw_observations_in_long_form`；四条走默认测试套件，不要求测量环境已有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python [baseline|candidate]` 触发，缺工件即非零拒绝。
 -/
 
 /-!
