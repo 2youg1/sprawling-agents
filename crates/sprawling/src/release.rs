@@ -82,6 +82,7 @@ pub fn answer() -> ReleaseAnswer {
     }
 }
 
+mod nightly;
 mod registry;
 
 fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> ReleaseAnswer {
