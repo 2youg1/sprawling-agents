@@ -40,7 +40,7 @@ on:
         default: ""
         type: string
       sign:
-        description: Allow the Windows signing integration
+        description: Allow the Windows signing integration; a caller passes false, because a call receives no signing secrets
         required: false
         default: false
         type: boolean
@@ -55,8 +55,13 @@ env:
 jobs:
   # Same-commit validation, including the cache environment, belongs to CI.
   # D27 in tools/xtask/Spec.lean preserves the existing release blocking scope.
+  #
+  # `channel` exists only on the `workflow_call` interface, so it is absent
+  # exactly when a push or a dispatch started this run: a caller has already
+  # run CI on the same SHA, and `github.event_name` here is the caller's own
+  # event name, which cannot tell the two apart.
   verify:
-    if: github.event_name != 'workflow_call'
+    if: ${{ !inputs.channel }}
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
@@ -135,7 +140,7 @@ jobs:
       SPRAWLING_RELEASE_CHANNEL: ${{ inputs.channel == 'nightly' && 'nightly' || 'release' }}
       NIGHTLY_TAG: ${{ inputs.nightly-tag }}
       SOURCE_SHA: ${{ inputs.source-sha }}
-      SIGN_ARCHIVES: ${{ inputs.sign || github.event_name != 'workflow_call' }}
+      SIGN_ARCHIVES: ${{ !inputs.channel || inputs.sign }}
       LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -201,6 +206,17 @@ jobs:
         with:
           shared-key: release
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: the checkout is the commit a nightly names
+        if: env.RELEASE_CHANNEL == 'nightly'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NIGHTLY_TAG"
+          checked_out=$(git rev-parse HEAD)
+          test "$checked_out" = "$SOURCE_SHA" || {
+            echo "::error::this run names $SOURCE_SHA but checked out $checked_out"
+            exit 1
+          }
       - name: build the client and the binary
         shell: bash
         env:
@@ -402,7 +418,7 @@ jobs:
       - name: install and uninstall the archive through the Windows production installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence target/release-evidence -Tag "$LOOPBACK_RELEASE_TAG"
+        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence target/release-evidence -Tag "$env:LOOPBACK_RELEASE_TAG"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:

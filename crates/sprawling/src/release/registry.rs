@@ -107,6 +107,11 @@ pub(super) fn github_newest(url: &str) -> Result<GithubRelease, AxError> {
 }
 
 /// The newest published nightly, ordered by publication time rather than tag date.
+///
+/// An entry whose identity or publication time cannot be read is passed
+/// over: one malformed release must not hide a newer snapshot a person can
+/// actually install. The refusal below is for a list that holds no valid
+/// snapshot at all.
 pub(super) fn nightly_newest(url: &str) -> Result<NightlyBuild, AxError> {
     let body = manifest(&format!("{url}?per_page={RELEASE_PAGE_SIZE}"))?;
     let releases = body
@@ -124,15 +129,21 @@ pub(super) fn nightly_newest(url: &str) -> Result<NightlyBuild, AxError> {
         if !tag.starts_with("nightly-") {
             continue;
         }
-        let source = release
+        let Some(source) = release
             .get("target_commitish")
             .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| registry_refused(url, "a nightly release has no target_commitish"))?;
-        let build = NightlyBuild::new(tag, source)?;
-        let published = release
+        else {
+            continue;
+        };
+        let Ok(build) = NightlyBuild::new(tag, source) else {
+            continue;
+        };
+        let Some(published) = release
             .get("published_at")
             .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| registry_refused(url, "a nightly release has no published_at"))?;
+        else {
+            continue;
+        };
         let replace = newest.as_ref().is_none_or(|(current_at, current)| {
             (published, tag) > (current_at.as_str(), current.tag())
         });
@@ -146,12 +157,17 @@ pub(super) fn nightly_newest(url: &str) -> Result<NightlyBuild, AxError> {
 }
 
 /// GitHub's commit comparison, with divergence left unconfirmed rather than ordered.
+///
+/// The newest snapshot is the base and this build's source is the head, so
+/// the answer names this build: `behind` is the installed nightly falling
+/// short of the newest one. Swapping the operands would read every update
+/// backwards, which is why the test pins the requested path.
 pub(super) fn nightly_standing(
     url: &str,
     mine: &NightlyBuild,
     newest: &NightlyBuild,
 ) -> Result<Option<kernel::ReleaseVerdict>, AxError> {
-    let comparison = format!("{url}/{}...{}", mine.source_sha(), newest.source_sha());
+    let comparison = format!("{url}/{}...{}", newest.source_sha(), mine.source_sha());
     match manifest_field(&comparison, &["status"])?.as_str() {
         "identical" => Ok(Some(kernel::ReleaseVerdict::Current)),
         "behind" => Ok(Some(kernel::ReleaseVerdict::Behind)),

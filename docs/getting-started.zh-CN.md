@@ -582,7 +582,7 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell 安装器 | 停止城市后重跑原安装器；已安装的 nightly 继续使用 `SPRAWLING_RELEASE_CHANNEL=nightly` | 按前文把 `SPRAWLING_VERSION` 设为实际发布的完整 tag |
+| shell/PowerShell 安装器 | 停止城市后重跑原安装器，每次都要设 `SPRAWLING_RELEASE_CHANNEL=nightly`：二进制记住自己的通道，安装器不记住 | 按前文把 `SPRAWLING_VERSION` 设为实际发布的完整 tag |
 | 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令 | 保留或下载所选 tag 的归档 |
 | AUR sprawling-bin | 在原 checkout 里 `git pull --ff-only && makepkg -si` | 检查并构建所选发行对应的 PKGBUILD 修订 |
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行[用 Nix](#用-nix) 里的命令 | 使用原来那份固定的 checkout 和 lockfile；固定 commit 不会跟随新版 |

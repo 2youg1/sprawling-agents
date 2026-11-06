@@ -37,6 +37,14 @@ $ErrorActionPreference = 'Stop'
 $repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { '2youg1/sprawling-agents' }
 $api = if ($env:SPRAWLING_API) { $env:SPRAWLING_API } else { "https://api.github.com/repos/$repo/releases" }
 $releases = "https://github.com/$repo/releases"
+
+function Die($message) {
+    Write-Error "sprawling install: $message"
+    exit 1
+}
+
+# The channel is an environment decision, checked after `Die` exists:
+# a function is only callable after the line that defines it has run.
 $channel = if ($env:SPRAWLING_RELEASE_CHANNEL) { $env:SPRAWLING_RELEASE_CHANNEL } else { 'release' }
 if ($channel -notin @('release', 'nightly')) {
     Die "SPRAWLING_RELEASE_CHANNEL must be release or nightly, not $channel"
@@ -47,11 +55,6 @@ if ($env:SPRAWLING_VERSION) {
     if ($env:SPRAWLING_RELEASE_CHANNEL -and $inferred -and $inferred -ne $channel) {
         Die "SPRAWLING_VERSION names the $inferred channel but SPRAWLING_RELEASE_CHANNEL is $channel"
     }
-}
-
-function Die($message) {
-    Write-Error "sprawling install: $message"
-    exit 1
 }
 
 function Format-Megabytes($bytes) {

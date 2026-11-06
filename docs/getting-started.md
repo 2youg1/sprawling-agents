@@ -582,7 +582,7 @@ Then update through the original channel:
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell installer | stop the city and run the same installer again; an installed nightly keeps using `SPRAWLING_RELEASE_CHANNEL=nightly` | set `SPRAWLING_VERSION` to the exact published tag, as described above |
+| shell/PowerShell installer | stop the city and run the same installer again with `SPRAWLING_RELEASE_CHANNEL=nightly` set, every time: the installed binary remembers its channel, the installer does not | set `SPRAWLING_VERSION` to the exact published tag, as described above |
 | Manual archive | download and verify the selected archive; if you installed it before, run the `install` command of the binary inside it | keep or download the archive of the selected tag |
 | AUR sprawling-bin | in the original checkout, `git pull --ff-only && makepkg -si` | inspect and build the PKGBUILD revision for the selected release |
 | Repository Nix flake | check out the selected tag or commit and run the commands under [With Nix](#with-nix) | use the original pinned checkout and lockfile; a fixed commit does not follow newer releases |

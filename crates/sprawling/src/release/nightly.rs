@@ -83,8 +83,16 @@ mod tests {
     fn malformed_identities_are_refused() {
         for (tag, full) in [
             ("v0.0.15-Alpha-261102", SOURCE),
-            ("nightly-261300-bc930372", SOURCE),
-            ("nightly-261132-bc930372", SOURCE),
+            // A real month and day carry a full SHA, so the date bounds are
+            // the only thing wrong with these two.
+            (
+                "nightly-261300-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                SOURCE,
+            ),
+            (
+                "nightly-261132-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                SOURCE,
+            ),
             ("nightly-261106-bc93037", SOURCE),
             (
                 "nightly-261106-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",

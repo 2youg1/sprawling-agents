@@ -445,17 +445,29 @@ mod tests {
     use kernel::ReleaseVerdict;
     use std::io::{BufRead, BufReader, Write};
     use wire::{InstallChannel, ReleaseAnswer};
+
+    /// The source this build was cut from, and the newer one published
+    /// after it; a nightly test compares the two through GitHub.
+    const INSTALLED_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const NEWEST_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// A published nightly newer than the installed one, followed by the
+    /// curated release both curated queries read, so one fixture shows the
+    /// curated answer skipping nightlies.
+    const PUBLISHED: &str = r#"[{"tag_name":"nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","draft":false,"published_at":"2026-11-06T00:00:00Z","target_commitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},{"tag_name":"v0.0.8-Alpha-261006","draft":false}]"#;
     /// A loopback stand-in for both registries: `/npm` answers npm's
-    /// manifest, `/crates` crates.io's, every request closes its
-    /// connection, and the User-Agent of each request is sent back to the
-    /// test.
+    /// manifest, `/crates` crates.io's, `/github` the release list the
+    /// caller supplies, every request closes its connection, and the
+    /// User-Agent of each request is sent back to the test.
     fn registries(
         npm: &'static str,
         crates: &'static str,
+        published: &'static str,
     ) -> (String, std::sync::mpsc::Receiver<String>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let (agents, seen) = std::sync::mpsc::channel();
+        let compared = format!("GET /compare/{NEWEST_SHA}...{INSTALLED_SHA} ");
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
@@ -470,9 +482,18 @@ mod tests {
                     head.push(line);
                 }
                 let body = if head[0].contains("/github") {
-                    r#"[{"tag_name":"nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","draft":false,"published_at":"2026-11-06T00:00:00Z","target_commitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},{"tag_name":"v0.0.8-Alpha-261006","draft":false}]"#
+                    published
                 } else if head[0].contains("/compare") {
-                    r#"{"status":"behind"}"#
+                    // The path is the answer: the newest snapshot is the
+                    // base and this build's source the head, so `behind`
+                    // says the installed nightly is older. Any other
+                    // operand or order is `diverged`, which the caller
+                    // reads as unconfirmed rather than as an order.
+                    if head[0].starts_with(&compared) {
+                        r#"{"status":"behind"}"#
+                    } else {
+                        r#"{"status":"diverged"}"#
+                    }
                 } else if head[0].contains("/crates") {
                     crates
                 } else {
@@ -507,6 +528,7 @@ mod tests {
         let (base, seen) = registries(
             r#"{"version":"0.0.8-pre.261005"}"#,
             r#"{"crate":{"max_version":"0.0.8"}}"#,
+            PUBLISHED,
         );
         let npm = format!("{base}/npm");
         let crates = format!("{base}/crates");
@@ -558,6 +580,7 @@ mod tests {
         let (base, _seen) = registries(
             r#"{"version":"0.0.9-pre.261005"}"#,
             r#"{"crate":{"max_version":"1.0.0"}}"#,
+            PUBLISHED,
         );
         let at = Registries {
             npm: &format!("{base}/npm"),
@@ -644,6 +667,7 @@ mod tests {
         let (base, _seen) = registries(
             r#"{"version":"0.0.9-pre.261005"}"#,
             r#"{"crate":{"max_version":"1.0.0"}}"#,
+            PUBLISHED,
         );
         let at = Registries {
             npm: &format!("{base}/npm"),
@@ -652,17 +676,11 @@ mod tests {
             compare: &format!("{base}/compare"),
         };
         let mine = Built::Nightly(
-            super::NightlyBuild::new(
-                "nightly-261105-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            )
-            .unwrap(),
+            super::NightlyBuild::new(&format!("nightly-261105-{INSTALLED_SHA}"), INSTALLED_SHA)
+                .unwrap(),
         );
-        let newest = super::NightlyBuild::new(
-            "nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        )
-        .unwrap();
+        let newest =
+            super::NightlyBuild::new(&format!("nightly-261106-{NEWEST_SHA}"), NEWEST_SHA).unwrap();
         match judged(mine, InstallChannel::Archive, &at) {
             ReleaseAnswer::Stands {
                 verdict,
@@ -673,12 +691,39 @@ mod tests {
                 (verdict, found.version, update.command),
                 (
                     ReleaseVerdict::Behind,
-                    "nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                    format!("nightly-261106-{NEWEST_SHA}"),
                     Some(super::archive_command(super::ArchiveVersion::Nightly(
                         &newest
                     )))
                 )
             ),
+            other => panic!("not judged: {other:?}"),
+        }
+    }
+
+    /// An unreadable identity is not the newest snapshot: a malformed newer
+    /// entry must not hide the version a person can install.
+    #[test]
+    fn an_unreadable_nightly_does_not_hide_a_valid_older_one() {
+        let (base, _seen) = registries(
+            r#"{"version":"0.0.9-pre.261005"}"#,
+            r#"{"crate":{"max_version":"1.0.0"}}"#,
+            r#"[{"tag_name":"nightly-261107-bc930372","draft":false,"published_at":"2026-11-07T00:00:00Z","target_commitish":"bc930372"},{"tag_name":"nightly-261106-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","draft":false,"published_at":"2026-11-06T00:00:00Z","target_commitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]"#,
+        );
+        let at = Registries {
+            npm: &format!("{base}/npm"),
+            crates: &format!("{base}/crates"),
+            github: &format!("{base}/github"),
+            compare: &format!("{base}/compare"),
+        };
+        let mine = Built::Nightly(
+            super::NightlyBuild::new(&format!("nightly-261105-{INSTALLED_SHA}"), INSTALLED_SHA)
+                .unwrap(),
+        );
+        match judged(mine, InstallChannel::Archive, &at) {
+            ReleaseAnswer::Stands { newest, .. } => {
+                assert_eq!(newest.version, format!("nightly-261106-{NEWEST_SHA}"));
+            }
             other => panic!("not judged: {other:?}"),
         }
     }

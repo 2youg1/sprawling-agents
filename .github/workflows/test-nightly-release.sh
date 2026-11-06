@@ -101,7 +101,7 @@ for index, sha in enumerate(published.split(',')):
     if not sha:
         continue
     nightlies.append({
-        "tag_name": "nightly-2026110" + str(index + 1) + "-" + sha,
+        "tag_name": "nightly-26110" + str(index + 1) + "-" + sha,
         "draft": False,
         "published_at": "2026-11-0" + str(index + 1) + "T00:00:00Z",
         "target_commitish": sha,
@@ -119,7 +119,9 @@ PY
     export INPUT_PUBLISH=$requested
     : > "$GITHUB_OUTPUT"
     : > "$GITHUB_STEP_SUMMARY"
-    PATH="$root/bin:$PATH" GH_TOKEN=test sh "$root/prepare.sh"
+    # The prepare step runs with `shell: bash` in the workflow, so the
+    # extracted block runs under bash here too: a here-string is not POSIX.
+    PATH="$root/bin:$PATH" GH_TOKEN=test bash "$root/prepare.sh"
 
     check() {
         key=$1
@@ -140,12 +142,12 @@ PY
     fi
 }
 
-run_case new schedule '' behind "$other" true true false
-run_case same schedule '' behind "$source_sha" false true false
-run_case pending schedule '' behind "$other" false false false
-run_case stale schedule '' ahead "$other" false false false
-run_case dry-run workflow_dispatch '' behind "$source_sha" true false false
-run_case retention workflow_dispatch true behind "$other,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab,$source_sha" false true true
+run_case new schedule '' ahead "$other" true true false
+run_case same schedule '' ahead "$source_sha" false true false
+run_case pending schedule '' ahead "$other" false false false
+run_case stale schedule '' behind "$other" false false false
+run_case dry-run workflow_dispatch '' identical "$source_sha" true false false
+run_case retention workflow_dispatch true identical "$other,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab,$source_sha" false true true
 
 # The advisory parser accepts real advisory-shaped diagnostics, but a
 # cargo-deny error without an advisory remains a checker failure.
@@ -171,7 +173,7 @@ with contextlib.redirect_stdout(out):
     exec(compile(code, 'nightly-advisories', 'exec'), {'__name__': '__main__', 'sys': sys})
 (root / 'advisories.tsv').write_text(out.getvalue(), encoding='utf-8')
 assert len(out.getvalue().splitlines()) == 1
-(root / 'deny.json').write_text(json.dumps({'fields': {'level': 'ERROR', 'message': 'offline'}, 'type': 'log'}) + '\n', encoding='utf-8')
+(root / 'deny.json').write_text(json.dumps({'fields': {'severity': 'error', 'message': 'offline'}, 'type': 'diagnostic'}) + '\n', encoding='utf-8')
 try:
     exec(compile(code, 'nightly-advisories', 'exec'), {'__name__': '__main__', 'sys': sys})
 except SystemExit as error:

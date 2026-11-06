@@ -551,8 +551,9 @@ nightly 身份与发布状态由 `crates/sprawling/spec/Nightly.lean` D105 规�
 npm、crates.io 和 GitHub 发布列表的解码，沿用 gateway 的代理规则、请求耐心与
 分阶段网络拒绝；父模块拥有来源判定，适配器不切换注册表。GitHub API 和归档页面的
 repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
-正式 GitHub 查询跳过 nightly；nightly 查询读取发布说明里的完整 SHA 标记，并以 GitHub compare
-回答 Current/Behind/Ahead/Unconfirmed，不能拿 Cargo 裸版本号猜快照顺序。
+正式 GitHub 查询跳过 nightly；nightly 查询从 `target_commitish` 读完整 SHA（`Nightly.lean` D105），
+以该字段而不以发布说明或列表顺序认身份，并以 GitHub compare 回答 Current/Behind/Ahead/Unconfirmed，
+不能拿 Cargo 裸版本号猜快照顺序。
 只有 `status --check` 或人的检查按钮调用 `answer` 才出网，成功读数与拒绝一起返回；
 查询与手动命令选择不下载、不安装、不覆写二进制。
 

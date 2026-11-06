@@ -190,9 +190,13 @@ tag 只接受上述形状，日期为六位数字、月日范围有效，tag 末
 与 Release API 的 `target_commitish` 逐字相等；字段缺失或不符均拒绝。发布创建时以完整 SHA
 传给 `target`，因此 GitHub 的字段就是机器读数，不在 release notes 另造 source 标记。
 
-正式 GitHub 查询跳过 nightly，nightly 查询按 `published_at` 选择最新有效快照。
-更新检查调用 GitHub compare：`identical` 为 Current，`behind` 为 Behind，`ahead` 为 Ahead，
-`diverged` 为 Unconfirmed；网络或解码失败为 Refused，不能猜版本顺序。
+正式 GitHub 查询跳过 nightly，nightly 查询按 `published_at` 选择最新有效快照：身份或
+`published_at` 读不出的条目被跳过，一份坏条目不能让更新的好快照查不到；整张列表都没有
+有效快照时才拒绝。
+更新检查以最新快照为 base、正在运行的这份构建的 source 为 head 调用 GitHub compare：
+`identical` 为 Current，`behind` 为 Behind，`ahead` 为 Ahead，`diverged` 为 Unconfirmed；
+网络或解码失败为 Refused，不能猜版本顺序。base 与 head 的顺序由 verdict 的含义决定
+（`Behind` 说的是已安装的这份），所以换序会把更新方向整条读反。
 nightly 只经 Archive 更新，命令显式携带 `SPRAWLING_RELEASE_CHANNEL=nightly`。
 `status` 显示 Cargo 基准版本与 nightly tag，不把它说成正式 release。
 
@@ -200,4 +204,8 @@ nightly 只经 Archive 更新，命令显式携带 `SPRAWLING_RELEASE_CHANNEL=ni
 手动其他 ref 与 fork 仅 build-only；CI pending/red 不重造红色发布 run；
 同名 published 不重建，未公开 draft 可重建；发布失败后的重跑可只补 retention；
 GitHub Release 的创建通知与每日一次节奏保留，不发 npm、crates.io 或 AUR。
+归档只从身份命名的那个提交构建（checkout 的 `HEAD` 必须等于 `SOURCE_SHA`），
+因为 tag 与 `target_commitish` 说的是源码而字节来自工作树。
+公开前核对同名 tag 指向的提交：`gh release create --target` 不移动已存在的 tag，
+指向别处时归档会挂到另一棵树上，所以要拒绝而不是改写。
 -/

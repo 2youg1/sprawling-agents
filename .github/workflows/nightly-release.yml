@@ -112,12 +112,13 @@ jobs:
           fi
 
           # A stale retry or a rewritten history must never move the channel
-          # backwards. GitHub's `behind` means the current nightly is behind
-          # the candidate, exactly the ancestry relation publication needs.
+          # backwards. GitHub compares `base...head`, so asking with the
+          # current nightly as base and the candidate as head answers `ahead`
+          # exactly when the candidate extends what is published.
           if [ "$build" = true ] && [ -n "$previous_sha" ]; then
             comparison=$(gh api "repos/$GITHUB_REPOSITORY/compare/$previous_sha...$source_sha")
             standing=$(jq -r '.status' <<<"$comparison")
-            if [ "$standing" != behind ]; then
+            if [ "$standing" != ahead ]; then
               publish=false
               if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$INPUT_PUBLISH" = true ]; then
                 build=false
@@ -183,6 +184,30 @@ jobs:
           archives=(assets/*.zip)
           test -f "${archives[0]}"
           test "${#archives[@]}" -eq 3
+      - name: a tag of this name already names this commit
+        if: needs.prepare.outputs.build == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # `gh release create --target` does not move a tag that already
+          # exists, so a tag naming another commit would attach these
+          # archives to a different tree while the notes and the installer
+          # URLs name this one. Refuse before anything is attested.
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" \
+              --jq '.object.type + " " + .object.sha' 2>/dev/null); then
+            read -r kind existing <<<"$ref"
+            if [ "$kind" = tag ]; then
+              existing=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing" --jq '.object.sha')
+            fi
+            test "$existing" = "$SOURCE_SHA" || {
+              echo "::error::$TAG already points to $existing, not $SOURCE_SHA"
+              exit 1
+            }
+          fi
       # Attestation precedes draft creation, so every attached archive is
       # covered. The draft is published only after its assets are read back.
       - name: attest where each archive was built
@@ -232,8 +257,11 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
+          # The tag was verified against the source above, and `--cleanup-tag`
+          # removes it with the draft so `gh release create --target` below
+          # recreates it at the commit this run built.
           if gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx true; then
-            gh release delete "$TAG" --yes
+            gh release delete "$TAG" --yes --cleanup-tag
           fi
       - name: attach every archive to a draft prerelease
         if: needs.prepare.outputs.build == 'true'

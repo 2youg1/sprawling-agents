@@ -261,7 +261,9 @@ jobs:
               fields = json.loads(line).get("fields", {})
               advisory = fields.get("advisory")
               if not advisory:
-                  if fields.get("level") == "ERROR":
+                  # A diagnostic without an advisory carries `severity`, as a
+                  # yanked crate does; only a tracked advisory may pass.
+                  if fields.get("severity") == "error":
                       unrelated_errors = True
                   continue
               locked = fields["graphs"][0]["Krate"]["version"] if fields.get("graphs") else "?"
@@ -269,7 +271,7 @@ jobs:
               row = [advisory["id"], advisory["package"], locked, advisory["title"], solution, "https://rustsec.org/advisories/" + advisory["id"]]
               print(TAB.join(cell.replace(TAB, " ").replace(LINE, " ") for cell in row))
           if unrelated_errors:
-              sys.exit("cargo-deny reported an error beside its advisories; this is a checker failure, not only a tracked finding")
+              sys.exit("cargo-deny reported an error that carries no advisory; the run stays red rather than counting it as a tracked finding")
           PY
           if [ ! -s advisories.tsv ]; then
             echo "cargo-deny failed without an advisory; this is a checker failure, not a tracked finding" >&2
