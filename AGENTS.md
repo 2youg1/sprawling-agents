@@ -11,6 +11,7 @@ Read this file to the end before the first edit. Then read what the change touch
 | Change code | The touched crate's SPEC and the neighbouring modules, callers and tests; [docs/glossary.md](docs/glossary.md) for the words |
 | Change structure, the module map or a dependency edge | [ARCHITECTURE.md](docs/ARCHITECTURE.md), especially its depmap block and module map |
 | Run a check, or work through CI | [docs/verification.md](docs/verification.md) |
+| Measure performance, or claim that a change improves it | [docs/performance.md](docs/performance.md), then the [`gauge`](crates/city/skills/gauge/SKILL.md) skill and the affected bench SPEC |
 | Touch gate machinery (`tools/xtask/`, `justfile`, `.github/`, root manifests) | [docs/gates.md](docs/gates.md); the machinery change goes in a commit apart |
 | Write or judge tests | [docs/testing.md](docs/testing.md) |
 | Change a screen under `client/` | [client/README.md](client/README.md), [docs/frontend-method.md](docs/frontend-method.md) and [docs/ui-design.md](docs/ui-design.md) |
