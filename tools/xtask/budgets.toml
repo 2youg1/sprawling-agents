@@ -648,6 +648,34 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 #
 # Ratchet: under the registered fixture a reading only goes down. A
 # relaxed tier or a fattened fixture lands in a commit of its own.
+# The Python performance fixture is real CPython-WASI, selected through the
+# same doctor door as production. Raw `python_sample` lines are retained beside
+# every summary so an interleaved candidate comparison can be reproduced.
+[python_execution]
+what = "real CPython-WASI cold no-prewarm and warm calls, concurrent call latency and throughput, and virtual memory (Windows: private commit) plus resident memory before, during and after a separate concurrent burst"
+measured_by = "just bench, or cargo run --release -p citysim --bin bench -- python [baseline|candidate]; bench::python and bench::python::cold in tools/citysim/src/bin/bench/; executable, guest and script BLAKE3 digests on every CSV reading"
+guest_initialization_target_p50_us = 250000
+guest_initialization_target_p95_us = 500000
+minimum_worthwhile_relative_permille = 50
+minimum_worthwhile_latency_us = 1000
+minimum_worthwhile_throughput_calls_per_s = 1
+bootstrap_confidence_permille = 950
+bootstrap_resamples = 10000
+change_method = "pre-registered difference-in-differences (DiD), with distribution-first reporting and round-level dependence handling under docs/performance.md"
+status = "instrumented, not gated; no baseline is recorded yet. Missing, malformed and non-CPython guests fail with E_TOOL_UNAVAILABLE and no Python report. Prewarm awaited/racing and instantiate/interpreter-initialization rows remain uninstrumented, so S1 remains pending. Current fixed counts are pilot settings, not a precision-based final design. Before any candidate, pre-register an unaffected control and the full protocol named in change_method; adopt only when the entire DiD confidence interval, at the declared confidence with Holm correction across the declared primary metrics, excludes zero and lies strictly beyond both the applicable absolute and relative minimum improvements in the direction of benefit for each metric. Do not adopt if the interval still covers effects below either minimum. The guest-initialization figures are targets, not readings."
+
+# Declared before any pooling candidate. The S3 probe and any S4 campaign use
+# the comparison method and confidence declared by [python_execution].
+[python_pooling]
+what = "the adopt/reject boundary for a bench-only pooling probe and any later pooling campaign"
+measured_by = "just bench python_execution rows for baseline and candidate, then the S3 bench-only probe; the DiD design and distribution evidence follow docs/performance.md; no production pooling is enabled by this row"
+minimum_warm_p50_reduction_permille = 100
+minimum_concurrent_throughput_increase_permille = 50
+maximum_warm_p99_regression_permille = 50
+estimator = "warm p50 and p99 use a pre-registered quantile-DiD estimator; concurrent throughput uses log-scale DiD; docs/performance.md owns the protocol"
+after_drain_retention_bound = "bytes; a numeric bound must be declared from the S2 fixed guest and measured S4 product concurrency before a candidate run; an absent bound rejects the candidate"
+status = "declared before any candidate run, not gated. Adopt only when both the warm-p50 reduction and concurrent-throughput increase clear their minima with corrected bootstrap intervals at the declared confidence excluding zero, warm p99 stays within its declared regression allowance, and after-drain retention stays inside the explicit S4 pool bound derived from the fixed guest and product concurrency. Otherwise reject pooling; an undecided campaign is a rejection. No candidate has run."
+
 [local_latency]
 what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
 stage_one_p95_us = 16000

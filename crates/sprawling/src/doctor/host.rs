@@ -184,7 +184,7 @@ pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
 
 /// The CPython-WASI component a run may be handed: a present one, and
 /// never a broken one (`crates/accounting/Spec.lean` §8-11).
-pub(crate) fn usable_python_wasm() -> Option<PathBuf> {
+pub fn usable_python_wasm() -> Option<PathBuf> {
     usable_path(&python_wasm())
 }
 

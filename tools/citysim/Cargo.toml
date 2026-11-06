@@ -33,6 +33,9 @@ toml.workspace = true
 # is the archive format `cargo xtask package` writes.
 sha2.workspace = true
 zip.workspace = true
+# The CPython bench executes a private snapshot of the selected guest rather
+# than rereading a replaceable source path.
+tempfile.workspace = true
 
 # The launcher serve_grouped ties the city it starts to its own lifetime
 # through a job object (tools/adversary/Spec.lean D8).
@@ -40,7 +43,6 @@ zip.workspace = true
 win32job = { workspace = true }
 
 [dev-dependencies]
-tempfile.workspace = true
 zeroize.workspace = true
 
 [lints]

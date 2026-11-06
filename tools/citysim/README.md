@@ -16,10 +16,12 @@ The SPEC is [`Spec.lean`](Spec.lean), with its parts under [`spec/`](spec/); `AR
 just sim                         # every scenario: the package's test suite, `cargo test --package citysim`
 cargo nextest run -p citysim     # the same suite under nextest, as `just test` runs it
 lake build tools.citysim.Spec    # the SPEC's proofs; `just models` builds every specification
-just bench                       # the load scenarios and the product's timing instruments; measured, never gated
+just bench                       # the load scenarios, real CPython-WASI execution and the product's timing instruments; measured, never gated
 just bench-startup               # install, startup, raising a city and opening a session, on the release binary
 just provider <script> <record>  # the stand-in provider on a loopback port; prints SPRAWLING_PROVIDER=<url> first
 just mem long-turn               # the memory counters of the long turn, read at each of its pauses
 ```
+
+The Python bench uses the same external CPython-WASI guest as the production Python arm. Run it alone with `cargo run --release -p citysim --bin bench -- python [baseline|candidate]`. It writes raw observations as CSV beside the build output and prints their paths. A missing, malformed or non-CPython guest is a prerequisite error and produces no Python readings; hand-written WAT remains a correctness fixture, never a timing substitute. Change evaluation, DiD and report requirements live in [`docs/performance.md`](../../docs/performance.md).
 
 Two golden Ledgers under `tools/fixtures/` are rebuilt byte for byte by tests: `golden-s1` by `tests/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/interventions.rs` from a whole run, with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand.

@@ -45,6 +45,7 @@ mod version_file;
 mod visit;
 
 pub(crate) use family::Family;
+pub use host::usable_python_wasm;
 pub(crate) use pack::Pack;
 pub(crate) use pin::Pin;
 pub(crate) use presence::{Absence, Fault, Presence, Version};

@@ -128,6 +128,52 @@ The resource fields `seen_*` are what the sampled tree actually contained, and a
 
 Pin input digests and build settings, change one thing, then alternate before/after rounds on the same machine class. Report floor and p50 together, retain outliers, and state the background load. Use operation counts for regression gates where possible; shared-runner wall-clock thresholds can confuse contention with a code defect.
 
+## Evaluate a change without hiding its distribution
+
+This section governs published evaluations and optimization claims. A terminal's point summaries are useful while exploring, but they are not enough evidence for a change claim.
+
+### Pre-register the estimate, not the desired answer
+
+Before running a candidate, record the hypothesis, primary and secondary metrics, treated workload, unaffected control workload, direction of benefit, minimum worthwhile absolute and relative changes, confidence level, multiplicity family, exclusions, censoring rule and maximum resource cost. Select the control before seeing candidate results: it uses the same measurement unit and experiences the same machine and build effects, but the change under test cannot affect it. Declare any existing register thresholds at this point, not after inspecting the candidate.
+
+Choose sample size from a target confidence-interval width or a named power analysis. Pre-register any sequential stopping rule and its inference method. An interval wholly inside the declared no-benefit bounds supports equivalence; excluding zero alone does not establish a worthwhile improvement.
+
+### Show the whole distribution
+
+For each workload, build and cohort, retain raw observations and show an empirical cumulative distribution function (ECDF), with a density estimate when it adds shape information. State the kernel and bandwidth rule. Report sample count, range and nearest-rank quantiles with bootstrap intervals; keep cold observations and outliers visible.
+
+Use a named modality diagnostic, such as Hartigan's dip test with its calibration procedure, before calling a distribution multimodal. Forced two-cluster k-means is not such evidence. Report supported mixture centres and shares with their estimator and intervals. Identifying a second execution path requires tracing or profiling evidence.
+
+Report per-cohort ranges and a split-half or calibrated CUSUM/change-point reading. Pooling cohorts does not make correlated observations independent.
+
+### **Use difference-in-differences for a change claim**
+
+A published optimization result uses **difference-in-differences (DiD)**, not an uncontextualized before/after ratio. In the two-period, two-group design, `T` is the treated workload, `C` the pre-registered control, and `0`/`1` the baseline/candidate builds. With a consistent additive statistic `y`, report all four cells and
+
+```text
+DiD = (mean(y[T,1]) - mean(y[T,0])) - (mean(y[C,1]) - mean(y[C,0])).
+```
+
+The identifying assumption is parallel build-to-build change in `T` and `C` without the target change. Use balanced interleaving, baseline-only placebo contrasts and a control-sensitivity reading. Without an unaffected control and a credible identifying assumption, report only the raw contrast and mark DiD unavailable.
+
+For strictly positive metrics, also report DiD on `log(y)` and exponentiate it into a ratio of ratios. This is a geometric-mean change, not a P50 change. Use a named quantile-DiD estimator for quantile effects or changes-in-changes for a distributional counterfactual.
+
+Bootstrap whole interleaved rounds or another pre-registered independent unit. With few clusters, use a named small-cluster method such as wild cluster bootstrap or randomization inference. For staggered or multi-period changes with heterogeneous effects, use group-time treatment effects rather than an unexamined two-way-fixed-effects average. Correct the confirmatory family with Holm or another pre-registered procedure.
+
+### Keep failures, memory and exact measures in the right model
+
+Classify failures as infrastructure, capability or guard/timeout, and record missing cells and reasons. Treat a deadline hit as right-censored, not as a completed duration.
+
+For capacity and memory, use independent cohorts, phase-align or separate idle and active runs, and fix or model queue depth. A scaling claim reports slope, intercept, uncertainty and fit diagnostics with the counter source and adapter. Deterministic counts and byte sizes use exact comparison rather than a sampling interval.
+
+### Make every derived number reproducible
+
+Store raw measurement results as CSV with a schema version and the observation's build, arm, round, cohort, workload, metric, value and unit. A large measurement or a cross-project benchmark also ships a human-readable HTML or LaTeX report with ECDF/distribution charts and the DiD table; a self-contained HTML report loads no remote resource. Link the CSV and analysis code from the report rather than transcribing results into it.
+
+Publish analysis code, raw observations, manifest, toolchain, bootstrap unit, resampling count and seed or balanced-order schedule. The analyzer recomputes every exported statistic from the published subset. Historical artifacts stay unchanged.
+
+Method references: [Bertrand, Duflo and Mullainathan on serial correlation in DiD](https://www.nber.org/papers/w8841), [Athey and Imbens on nonlinear DiD and changes-in-changes](https://doi.org/10.1111/j.1468-0262.2006.00668.x), [Callaway and Sant'Anna on group-time effects for multiple periods](https://doi.org/10.1016/j.jeconom.2020.12.001), and [Hartigan and Hartigan's dip test](https://doi.org/10.1214/aos/1176346577).
+
 ## Reproduce repository workloads
 
 These are contributor commands from [justfile](../justfile). Run prerequisites first with `just prereqs`; the recipes build what they measure. Before `just mem` serves a city, run `just web-bundle` to prepare the real client: the memory recipe builds the binary but does not build its client. `just bench-startup` includes that prerequisite. Save build output separately from timed output, and use the product feature set and [release profile](../Cargo.toml). A debug build, a build with test-only features, or a binary without the real client is not the release workload. Record any `RUSTFLAGS`, target CPU setting or PGO profile rather than assuming the host's flags.

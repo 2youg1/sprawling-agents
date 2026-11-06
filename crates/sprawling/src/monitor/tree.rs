@@ -18,6 +18,13 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use super::counters::Reads;
 
+/// The shortest whole-process-table beat, in milliseconds. The command-line
+/// bound and other tree readers share this value because the table walk,
+/// rather than any one caller, is the expensive operation.
+pub const MINIMUM_BEAT_MS: u64 = 250;
+/// The same bound as a duration for callers that schedule reads.
+pub const MINIMUM_BEAT: Duration = Duration::from_millis(MINIMUM_BEAT_MS);
+
 /// The tree as one beat found it: every process still alive under the
 /// root, the root included, summed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

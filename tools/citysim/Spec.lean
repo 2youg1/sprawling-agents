@@ -38,7 +38,7 @@ import tools.citysim.spec.WireScript.Exchange
 | `sieving` | 场景里的 `exec` 结果经筛子打包（`SieveWorld`） | `spec/Executor.lean` |
 | `red_team` | 有无验证 run 两臂的结论质量（§8-7） | `spec/RedTeam.lean` |
 | `suite`、`score`、`metabolism`、`nesting`、`ablation` | 评估仪器（§8-8）；除 `suite` 外只在测试下编译 | `spec/Suite.lean`、`spec/Metabolism.lean`、`spec/Nesting.lean`、`spec/Ablation.lean` |
-| `bin/bench`、`fixture_digest` | 负载场景与读数行（§8-6），两族 bench 共用的夹具摘要 | `spec/Bench.lean` |
+| `bin/bench`、`fixture_digest` | 负载场景、CPython-WASI 基线与读数行（§8-6、§8-6-1），两族 bench 共用的夹具摘要 | `spec/Bench.lean` |
 | `bin/bench_startup` | 四个动作的冷启动测量与首字节（§8-5） | `spec/BenchStartup.lean` |
 | 吞吐台（仪表住 `sprawling-accounting`） | N 个并发 run 的吞吐与等待读数（§8-14） | `spec/Throughput.lean` |
 | `long_turn`、`bin/long_turn` | 长回合：一个 run 连续读一个在变的文件，逐次记下模型请求的字节上界；内存读数经 `just mem long-turn`（§8-9） | `spec/LongTurn.lean` |
@@ -152,6 +152,7 @@ D6 **评估仪器住在 citysim，不另立 crate。** 五件仪器（§8-8）�
 | 8-5 | `tools/citysim/spec/BenchStartup.lean` |
 | 8-5-1 | `tools/citysim/spec/BenchStartup.lean` |
 | 8-6 | `tools/citysim/spec/Bench.lean` |
+| 8-6-1 | `tools/citysim/spec/Bench.lean` |
 | 8-7 | `tools/citysim/spec/RedTeam.lean` |
 | 8-8 | `tools/citysim/spec/Suite.lean` |
 | 8-8-1 | `tools/citysim/spec/Suite.lean` |
@@ -171,7 +172,7 @@ D6 **评估仪器住在 citysim，不另立 crate。** 五件仪器（§8-8）�
 
 - 测试构造 drafts → MemLedger append → checker／conformance／对拍 JsonlLedger。
 - Scenario → `run_scenario` → `runtime::run::drive`（每次问时钟拿下一个计数，每个安全点问一次 `answer_at`，每次工具调用经 `ToolBench` 与信封）→ `ScenarioReport` → `check_chain` 加事件序断言。回合内与 run 的流程是 runtime 的模型（`crates/runtime/spec/Turn.lean`、`crates/runtime/spec/Run.lean`）。
-- `just bench`：`bin/bench` 先钉夹具（D8），再依次量负载场景并印读数行；`just bench-startup`：`bin/bench_startup` 先构建被测二进制，再量四个动作与首字节。
+- `just bench`：`bin/bench` 先钉夹具（D8），量负载场景，再经真实 CPython-WASI guest 量 Python 臂并印读数行与原始 CSV；`bench python [baseline|candidate]` 只量后一族并显式标记分析臂，`python-cold` 是它拉起冷进程的内部入口。Python 前置条件不满足时整族不交读数（D27）。`just bench-startup`：`bin/bench_startup` 先构建被测二进制，再量四个动作与首字节。
 - `just provider <script> <record>`：`bin/provider` 绑端口、印 `SPRAWLING_PROVIDER=<url>`，然后一条连接一条连接地回放（§8-10、§8-13）。
 - `just mem long-turn <steps>`：`bin/long_turn` 每走若干步停一次，让配方从外面读进程的内存（D10）。
 -/
@@ -194,7 +195,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 
 /-! ## 12 错误处理
 
-透传 kernel、replay 与产品公面的 `AxError`，不新增码。本 crate 自己的失败用既有码走三段式：时钟溢出与 bench 的零样本是 `E_INVALID_ARGS`；读不懂的替身脚本、接不上的重读是 `E_CONFIG_INVALID`（subject 是键路径）；替身的套接字失败是 `E_TOOL_UNAVAILABLE`；记录写不进去是 `E_STORAGE_FATAL`。替身对城的拒绝不是 `AxError`，是带稳定码的 HTTP 回答（§8-10、§8-13），状态码都不在城会重发的那一集里（`spec/WireScript.lean` §8-10）。
+透传 kernel、replay 与产品公面的 `AxError`，不新增码。本 crate 自己的失败用既有码走三段式：时钟溢出与 bench 的零样本是 `E_INVALID_ARGS`；读不懂的替身脚本、接不上的重读是 `E_CONFIG_INVALID`（subject 是键路径）；替身的套接字失败、Python bench 缺少或不能运行真实 CPython-WASI guest 是 `E_TOOL_UNAVAILABLE`；记录或测量 CSV 写不进去是 `E_STORAGE_FATAL`。替身对城的拒绝不是 `AxError`，是带稳定码的 HTTP 回答（§8-10、§8-13），状态码都不在城会重发的那一集里（`spec/WireScript.lean` §8-10）。
 
 决定的条目与它们住的地方：
 
@@ -223,6 +224,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 | D23 | 吞吐台住在 `sprawling-accounting` 的仪表里，本规格只规定它 | `tools/citysim/spec/Throughput.lean` §8-14 |
 | D24 | 这一段的等待从账本与仪表外侧读，生产代码不加测量点 | `tools/citysim/spec/Throughput.lean` §8-14 |
 | D25 | TP3 的协作场景经 `attend` 驱动一座真城，模型按 run 收到的任务认角色 | 本文件 §16 |
+| D27 | 真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数 | `tools/citysim/spec/Bench.lean` §8-6-1 |
 -/
 
 /-! ## 13 依赖选型
@@ -234,7 +236,7 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 
 /-! ## 14 硬编码声明
 
-策略常数只在仪器里（`metabolism` 的 `ASSET_IDLE_DAYS`、`ASSET_FLOOR_PER_MILLE`）与测量二进制里（`SAMPLES`、夹具规模、`PINNED_DRAFTS`、轮询间隔与单样本上限），各自注释点名它的理由；它们的值住 Rust，模型把用得到的那几个当参数（`spec/Metabolism.lean` 的 `Limits`），不抄第二份。长回合每一步读的文件长度 `STEP_BYTES` 与替身记录里凭据的写法 `REDACTED` 同理。登记夹具的摘要钉在 `REGISTERED.pinned`，改它的规矩是 D8。
+策略常数只在仪器里（`metabolism` 的 `ASSET_IDLE_DAYS`、`ASSET_FLOOR_PER_MILLE`）与测量二进制里（`SAMPLES`、夹具规模、`PINNED_DRAFTS`、Python 样本数／并发度／冷进程上限、轮询间隔与单样本上限），各自注释点名它的理由；它们的值住 Rust，模型把用得到的那几个当参数（`spec/Metabolism.lean` 的 `Limits`），不抄第二份。长回合每一步读的文件长度 `STEP_BYTES` 与替身记录里凭据的写法 `REDACTED` 同理。登记夹具的摘要钉在 `REGISTERED.pinned`，改它的规矩是 D8。
 -/
 
 /-! ## 15 影响面
@@ -256,7 +258,7 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 - 替身：`wire_script::tests` 的七条（同一请求逐字节同录且记录里没有凭据、用尽、两个 run 交错、追加的 run 被开启、改写了已在答的 run 的脚本被拒、读不懂的回复与分不清或到不了的 run 在解析时拒）。
 - 长回合：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time`。
 - 仪器：`red_team::tests`、`suite` 与 `tests/evaluation.rs`、`metabolism`、`score`、`nesting::tests`、`ablation::tests`。
-- bench：`bench::reading::tests`、`bench::scenarios::tests`（含 `the_registered_fixture_writes_the_bytes_its_digest_pins`）、`bench_startup::samples` 与 `footprint`、`actions` 的测试。
+- bench：`bench::reading::tests`、`bench::scenarios::tests`（含 `the_registered_fixture_writes_the_bytes_its_digest_pins`）、`bench::python::tests` 的三条前置条件负例与 CSV 长表字节夹具、`bench_startup::samples` 与 `footprint`、`actions` 的测试。
 
 只有节注释的分部（`spec/Nesting.lean`、`spec/Ablation.lean`、`spec/Bench.lean`）由穷尽枚举与各自的测试守住。挂钟读数不是任何断言的对象：它们入册不入门（D17）。
 

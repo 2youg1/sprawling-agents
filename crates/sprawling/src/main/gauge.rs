@@ -21,7 +21,7 @@ use std::time::Duration;
 use kernel::consts_policy::DEFAULT_AT;
 use kernel::{AxCode, AxError};
 use sprawling::audience::Audience;
-use sprawling::monitor::tree::{Seen, Tree};
+use sprawling::monitor::tree::{MINIMUM_BEAT_MS, Seen, Tree};
 use sprawling::serving::standing::monotonic_now;
 
 use super::exit::Exit;
@@ -210,7 +210,6 @@ fn count(given: &str) -> Result<NonZeroU32, Misread> {
 }
 
 impl Every {
-    const SHORTEST_MS: u64 = 250;
     const LONGEST_MS: u64 = 60_000;
     const USUAL: Every = Every(Duration::from_secs(1));
 
@@ -224,7 +223,7 @@ impl Every {
         given
             .parse::<u64>()
             .ok()
-            .filter(|ms| (Every::SHORTEST_MS..=Every::LONGEST_MS).contains(ms))
+            .filter(|ms| (MINIMUM_BEAT_MS..=Every::LONGEST_MS).contains(ms))
             .map(|ms| Every(Duration::from_millis(ms)))
             .ok_or_else(|| Misread::OutOfRange {
                 flag: "--every",
