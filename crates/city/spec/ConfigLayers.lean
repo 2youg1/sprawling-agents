@@ -491,6 +491,7 @@ settings-control McpSection.headers client/src/views/mcp/by_url.svelte
 settings-control McpSection.transport client/src/views/mcp/by_url.svelte
 settings-reason ConfigFile.model `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-reason ModelSection.name `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
+settings-reason ModelSection.endpoint `[model] endpoint` 与 `name` 一起标识会话冻结的模型引用，由 `write_session` 写入、`Forget` 清除；它是会话记录，设置里没有控件。
 settings-control ModelSection.effort client/src/views/settings/city_layer.svelte
 settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
