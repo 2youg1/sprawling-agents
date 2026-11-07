@@ -66,7 +66,7 @@ The User may want the city connected to dozens of outside applications — mail,
 
 The connection is **MCP**, not their SDK: a Composio session opened with its `mcp` option yields an MCP endpoint URL that any MCP client can reach. That choice has a direct consequence: **the MCP transports — `agent_protocols::mcp::stdio` and `agent_protocols::mcp::http` — never know what Composio is.** They reach any MCP server, and Composio is one URL among them. A User who does not trust it points at another, or runs their own, and not one line of the protocol changes.
 
-**Where the knowledge is allowed to live.** Composio is an OAuth broker standing in front of MCP, so the server module that knows about it, `agent_protocols::mcp::broker`, brokers OAuth and does nothing else. It makes four calls: `GET /api/v3/toolkits` for the directory, `GET /api/v3/auth_configs` to reuse an auth config the project already holds, `POST /api/v3/auth_configs` to create a Composio-managed one when it holds none, and `POST /api/v3/connected_accounts/link` for the consent redirect. It hands back a server URL and a connection to wait on. How its calls leave this machine is decided by `gateway::client_for`, like every other outbound call. There is one broker and therefore no trait; a second outsourced service is what would earn one. The client's MCP page also spells the broker's MCP base URL and its key header, in `client/src/views/mcp/composio.svelte`.
+**Where the knowledge is allowed to live.** Composio is an OAuth broker standing in front of MCP, so the server module that knows about it, `agent_protocols::mcp::broker`, brokers OAuth and does nothing else. It makes five calls: `GET /api/v3/toolkits` for the directory, `GET /api/v3/auth_configs` to reuse an auth config the project already holds, `POST /api/v3/auth_configs` to create a Composio-managed one when it holds none, `POST /api/v3/connected_accounts/link` for the consent redirect, and `GET /api/v3/connected_accounts` for where each application stands. It hands back a server URL and a connection to wait on. How its calls leave this machine is decided by `gateway::client_for`, like every other outbound call. There is one broker and therefore no trait; a second outsourced service is what would earn one. The client's MCP page also spells the broker's MCP base URL and its key header, in `client/src/views/mcp/composio.svelte`.
 
 **One-click connect is built on that module, for three reasons.** A Composio-managed auth config is created by one call, with no dashboard visit and no OAuth client of the User's own, so `auth_config_id` is a value this code obtains rather than one a person fetches. The consent redirect goes through `connected_accounts/link`, which is Composio's named replacement for the endpoint it is retiring for managed OAuth, so this code is written against the survivor. And the consent screen the redirect opens is Composio's own, so the User grants access to a third party knowingly, which is the guarantee the `link` flow exists to enforce. A connect request is recorded as `toolkit_link_opened`; where the application stands afterwards is asked of the broker each time, because a recorded standing would still read "connected" after the person revoked it.
 
@@ -90,7 +90,7 @@ Some outside work is neither bundled nor outsourced: the city calls a program th
 | Docker or Podman | the `container` sandbox arm | the arm answers that it is unavailable |
 | npm or PyPI, reached by `npx` or `uvx` when an ACP agent distributed that way starts | the agent's package, at the version its consent pinned | the agent does not start, and the refusal names the launch |
 
-The audit design is decided and its ledger kind exists; the code that asks either auditor is not built yet, so today every shelved skill shows as unaudited. An audit is advice and never a gate: what a building admits is still the User's `reading_room` in `RULES.toml`.
+Both auditors are asked by `city::library::audit::execution` after a skill lands, from the `sprawling-skill-audit` thread a city starts once (`crates/sprawling/src/assembly/skill_audit/`). The shelf's digest is checked on both sides of every call, so content that changes during an audit never receives a verdict for the old bytes, and a scanner that is not on the PATH writes no line rather than a failure. An audit is advice and never a gate: what a building admits is still the User's `reading_room` in `RULES.toml`.
 
 <!-- coderabbit-ai-generated:v1 -->
 
@@ -110,22 +110,27 @@ Two lists exist and they answer different questions, so both are kept and neithe
 |---|---|
 | [apple-native-keyring-store](https://crates.io/crates/apple-native-keyring-store) | MIT OR Apache-2.0 |
 | [argon2](https://crates.io/crates/argon2) | MIT OR Apache-2.0 |
+| [aws-lc-rs](https://crates.io/crates/aws-lc-rs) | ISC AND (Apache-2.0 OR ISC) |
 | [axum](https://crates.io/crates/axum) | MIT |
 | [base64](https://crates.io/crates/base64) | MIT OR Apache-2.0 |
 | [blake3](https://crates.io/crates/blake3) | CC0-1.0 OR Apache-2.0, or Apache-2.0 with the LLVM exception |
 | [cap-fs-ext](https://crates.io/crates/cap-fs-ext) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
+| [chrono](https://crates.io/crates/chrono) | MIT OR Apache-2.0 |
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
-| [csv](https://crates.io/crates/csv) | Unlicense OR MIT |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
+| [cssparser](https://crates.io/crates/cssparser) | MPL-2.0 |
+| [csv](https://crates.io/crates/csv) | Unlicense OR MIT |
 | [find-msvc-tools](https://crates.io/crates/find-msvc-tools) | MIT OR Apache-2.0 |
 | [flate2](https://crates.io/crates/flate2) | MIT OR Apache-2.0 |
 | [futures-util](https://crates.io/crates/futures-util) | MIT OR Apache-2.0 |
 | [getrandom](https://crates.io/crates/getrandom) | MIT OR Apache-2.0 |
 | [git2](https://crates.io/crates/git2) | MIT OR Apache-2.0 |
 | [globset](https://crates.io/crates/globset) | Unlicense OR MIT |
+| [html5ever](https://crates.io/crates/html5ever) | MIT OR Apache-2.0 |
+| [image](https://crates.io/crates/image) | MIT OR Apache-2.0 |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
 | [keyring-core](https://crates.io/crates/keyring-core) | MIT OR Apache-2.0 |
 | [linux-keyutils-keyring-store](https://crates.io/crates/linux-keyutils-keyring-store) | MIT OR Apache-2.0 |
@@ -134,8 +139,11 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [postcard](https://crates.io/crates/postcard) | MIT OR Apache-2.0 |
 | [proc-macro2](https://crates.io/crates/proc-macro2) | MIT OR Apache-2.0 |
 | [proptest](https://crates.io/crates/proptest) | MIT OR Apache-2.0 |
+| [qrcodegen](https://crates.io/crates/qrcodegen) | MIT |
 | [regex](https://crates.io/crates/regex) | MIT OR Apache-2.0 |
+| [regex-syntax](https://crates.io/crates/regex-syntax) | MIT OR Apache-2.0 |
 | [reqwest](https://crates.io/crates/reqwest) | MIT OR Apache-2.0 |
+| [rustfft](https://crates.io/crates/rustfft) | MIT OR Apache-2.0 |
 | [rustls](https://crates.io/crates/rustls) | Apache-2.0 OR ISC OR MIT |
 | [same-file](https://crates.io/crates/same-file) | Unlicense OR MIT |
 | [schemars](https://crates.io/crates/schemars) | MIT |
@@ -143,7 +151,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [self-replace](https://crates.io/crates/self-replace) | Apache-2.0 |
 | [serde](https://crates.io/crates/serde) | MIT OR Apache-2.0 |
 | [serde_json](https://crates.io/crates/serde_json) | MIT OR Apache-2.0 |
-| [rustfft](https://crates.io/crates/rustfft) | MIT OR Apache-2.0 |
 | [sha2](https://crates.io/crates/sha2) | MIT OR Apache-2.0 |
 | [statrs](https://crates.io/crates/statrs) | MIT |
 | [syn](https://crates.io/crates/syn) | MIT OR Apache-2.0 |
@@ -157,16 +164,25 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [toml](https://crates.io/crates/toml) | MIT OR Apache-2.0 |
 | [tower](https://crates.io/crates/tower) | MIT |
 | [trybuild](https://crates.io/crates/trybuild) | MIT OR Apache-2.0 |
+| [uiautomation](https://crates.io/crates/uiautomation) | Apache-2.0 |
+| [url](https://crates.io/crates/url) | MIT OR Apache-2.0 |
 | [uuid](https://crates.io/crates/uuid) | Apache-2.0 OR MIT |
+| [vt100](https://crates.io/crates/vt100) | MIT |
 | [wasmtime](https://crates.io/crates/wasmtime) | Apache-2.0 with the LLVM exception |
 | [wasmtime-wasi](https://crates.io/crates/wasmtime-wasi) | Apache-2.0 with the LLVM exception |
 | [wat](https://crates.io/crates/wat) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
+| [win32job](https://crates.io/crates/win32job) | MIT OR Apache-2.0 |
+| [winapi-util](https://crates.io/crates/winapi-util) | Unlicense OR MIT |
+| [windows](https://crates.io/crates/windows) | MIT OR Apache-2.0 |
 | [windows-native-keyring-store](https://crates.io/crates/windows-native-keyring-store) | MIT OR Apache-2.0 |
 | [winreg](https://crates.io/crates/winreg) | MIT |
+| [winresource](https://crates.io/crates/winresource) | MIT |
+| [winsafe](https://crates.io/crates/winsafe) | MIT |
+| [winx](https://crates.io/crates/winx) | Apache-2.0 with the LLVM exception |
 | [zeroize](https://crates.io/crates/zeroize) | Apache-2.0 OR MIT |
 | [zip](https://crates.io/crates/zip) | MIT |
 
-**Every licence above is permissive, and none of them is copyleft**, which is why an MPL-2.0 binary may be built from them. MPL-2.0 is file-level copyleft: it governs the files in this repository and asks nothing of the crates linked beside them. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; the Unlicense that `globset` and `same-file` offer is not on that list, and their MIT is.
+**Every licence above is one the allowlist in `deny.toml` admits, and all but one are permissive.** The exception is `cssparser`, which is MPL-2.0, the licence of this tree itself: file-level copyleft that governs the files it ships and asks nothing of a binary that links it. That is why an MPL-2.0 binary may be built from this list. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; the Unlicense that `globset`, `same-file` and `winapi-util` offer is not on that list, and their MIT is.
 
 **Two obligations travel with a release artifact rather than with this repository**, and this table discharges neither. Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked; MIT requires the copyright and licence notice to be kept. For the JavaScript the client bundles, both travel inside the binary (section 4). For the crates, the release archive carries the bill of materials but not yet the licence texts; `crates/xtask/Spec.lean` §8-23 records what is left.
 
