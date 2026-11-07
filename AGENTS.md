@@ -12,7 +12,7 @@ Read this file to the end before the first edit. Then read what the change touch
 | Change structure, the module map or a dependency edge | [ARCHITECTURE.md](docs/ARCHITECTURE.md), especially its depmap block and module map |
 | Run a check, or work through CI | [docs/verification.md](docs/verification.md) |
 | Measure performance, or claim that a change improves it | [docs/performance.md](docs/performance.md), then the [`gauge`](crates/city/skills/gauge/SKILL.md) skill and the affected bench SPEC |
-| Touch gate machinery (`tools/xtask/`, `justfile`, `.github/`, root manifests) | [docs/gates.md](docs/gates.md); the machinery change goes in a commit apart |
+| Touch gate machinery (`crates/xtask/`, `justfile`, `.github/`, root manifests) | [docs/gates.md](docs/gates.md); the machinery change goes in a commit apart |
 | Write or judge tests | [docs/testing.md](docs/testing.md) |
 | Change a screen under `client/` | [client/README.md](client/README.md), [docs/frontend-method.md](docs/frontend-method.md) and [docs/ui-design.md](docs/ui-design.md) |
 | Prepare a contribution | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
@@ -25,7 +25,7 @@ Before adopting an external project, tool or API, read its current official docu
 
 ## The loop
 
-`just check` is the whole check: fmt, gates, Lean specifications, clippy, features, nextest, client. [docs/verification.md](docs/verification.md) holds the full command table and the CI tiers. While iterating, run the narrowest command that can fail: `cargo nextest run -p <crate> -E '<filter>'`, `cargo clippy -p <crate> --all-targets --all-features -- -D warnings`, `cargo check -p <dependent>`, `cargo xtask gates <name>...`, `lake build <module>`, `cargo fmt --check`. Let a Rust command finish, and never kill it by PID; waiting on the build lock is expected. The machine gates are the array in `tools/xtask/src/gates.rs` (`cargo xtask gates --list`); what each holds, and the rules for loosening one, live in [docs/gates.md](docs/gates.md).
+`just check` is the whole check: fmt, gates, Lean specifications, clippy, features, nextest, client. [docs/verification.md](docs/verification.md) holds the full command table and the CI tiers. While iterating, run the narrowest command that can fail: `cargo nextest run -p <crate> -E '<filter>'`, `cargo clippy -p <crate> --all-targets --all-features -- -D warnings`, `cargo check -p <dependent>`, `cargo xtask gates <name>...`, `lake build <module>`, `cargo fmt --check`. Let a Rust command finish, and never kill it by PID; waiting on the build lock is expected. The machine gates are the array in `crates/xtask/src/gates.rs` (`cargo xtask gates --list`); what each holds, and the rules for loosening one, live in [docs/gates.md](docs/gates.md).
 
 ## One change, five steps
 
@@ -79,7 +79,7 @@ Test from the real scenarios first — what a person or an agent actually does, 
 
 ## The machine gates
 
-Gates live in `tools/xtask/src/gates.rs` (`cargo xtask gates --list` prints the roster); what each one holds lives in [docs/gates.md](docs/gates.md). A violation turns the check red naming the rule, the violation and an alternative: fix the cause. Loosening a gate in the change it is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer. A change to gate machinery goes in a commit apart from the source it judges. A rule that excludes an architecture carries the parameter that made it right, and re-argue the rule when the parameter moves; rules that exclude a defect carry no such condition.
+Gates live in `crates/xtask/src/gates.rs` (`cargo xtask gates --list` prints the roster); what each one holds lives in [docs/gates.md](docs/gates.md). A violation turns the check red naming the rule, the violation and an alternative: fix the cause. Loosening a gate in the change it is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer. A change to gate machinery goes in a commit apart from the source it judges. A rule that excludes an architecture carries the parameter that made it right, and re-argue the rule when the parameter moves; rules that exclude a defect carry no such condition.
 
 ## The view layer
 

@@ -95,7 +95,7 @@ on:
   pull_request:
     # `edited` belongs to `title-judge.yml`, which judges the title
     # alone: a description edit re-runs one short job, not this matrix.
-    # The title is judged with the commits (tools/xtask/Spec.lean
+    # The title is judged with the commits (crates/xtask/Spec.lean
     # §8-35) because a squash merge lands it on main as the subject.
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -145,8 +145,8 @@ jobs:
           filters: |
             proof:
               - 'crates/kernel/**'
-              - 'tools/xtask/src/proof.rs'
-              - 'tools/xtask/src/proof/**'
+              - 'crates/xtask/src/proof.rs'
+              - 'crates/xtask/src/proof/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
             nix:
@@ -161,8 +161,8 @@ jobs:
               - 'crates/sprawling/build.rs'
               - 'crates/sprawling/Cargo.toml'
               - 'crates/desktop/ffi/zig-version'
-              - 'tools/xtask/src/package/**'
-              - 'tools/xtask/src/bundle.rs'
+              - 'crates/xtask/src/package/**'
+              - 'crates/xtask/src/bundle.rs'
 
   # Evaluation catches a malformed flake input without paying for the full
   # build. The complete Nix build and its installation acceptance stay in
@@ -225,7 +225,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           PYTHONUTF8: "1"
-        run: python tools/xtask/src/channel/validate_test.py
+        run: python crates/xtask/src/channel/validate_test.py
       - name: fmt
         if: ${{ !cancelled() }}
         run: just fmt-check
@@ -237,7 +237,7 @@ jobs:
         run: sh .github/workflows/test-nightly-release.sh
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
-      # (tools/xtask/Spec.lean §8-35).
+      # (crates/xtask/Spec.lean §8-35).
       - name: commit messages
         if: ${{ !cancelled() }}
         uses: ./.github/actions/commit-messages
@@ -264,7 +264,7 @@ jobs:
 
   # Every replacement look under client/swap/ drawn in place of the
   # shipped one, and the client still typechecks, keeps its wiring tests
-  # and passes render (tools/xtask/Spec.lean section 8-13).
+  # and passes render (crates/xtask/Spec.lean section 8-13).
   #
   # A job of its own rather than a step of `gates`: its render opens the
   # five passes again, 159 s of a gates job that ended at 486 s, the
@@ -293,7 +293,7 @@ jobs:
       - name: the swap test
         run: just swap
 
-  # The Lean specifications. The checker in `tools/adversary/` is not built here:
+  # The Lean specifications. The checker in `crates/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
   models:
@@ -339,7 +339,7 @@ jobs:
       # Stable check is enough for that contract; nightly remains responsible
       # for the sanitizer instrumentation and the fresh random input.
       - name: compile the fuzz targets without running them
-        run: cargo check --manifest-path tools/fuzz/Cargo.toml --all-targets
+        run: cargo check --manifest-path crates/fuzz/Cargo.toml --all-targets
 
   # The suite, compiled once. The archive carries every test binary and
   # the workspace binaries they spawn; the slices below run it on
@@ -352,7 +352,7 @@ jobs:
   # and 194 s in two runs against 201 s with link.exe. This archive is a
   # test build that nobody downloads;
   # `release.yml` builds what ships with link.exe, so the linker of a
-  # released binary is not this one (`tools/xtask/Spec.lean` D27).
+  # released binary is not this one (`crates/xtask/Spec.lean` D27).
   #
   # The target directory starts warm: `./.github/actions/warm-target`
   # restores the one the newest push to main left and ages every input
@@ -656,11 +656,11 @@ jobs:
         run: cargo kani --version
       # `cargo xtask proof`, which is the whole of `just proof`, spelled
       # out because the `proof` gate reads this job for exactly that
-      # command (tools/xtask/src/proof.rs).
+      # command (crates/xtask/src/proof.rs).
       - name: the proofs
         run: cargo xtask proof
 
-  # D27 in tools/xtask/Spec.lean: skipped required work is not a green tree.
+  # D27 in crates/xtask/Spec.lean: skipped required work is not a green tree.
   # This is the shared verdict, so release has no second list of checks.
   validation:
     needs: [models, clippy, test, gates, swap, supply, client]

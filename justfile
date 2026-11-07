@@ -83,7 +83,7 @@ check-branch base="main":
     if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree is already green"; exit 0; fi
     changed=$(git diff --name-only "$mb" HEAD)
     touched() { printf '%s\n' "$changed" | grep -q "^$1/"; }
-    # Which package holds a path is cargo metadata's answer (tools/xtask/Spec.lean
+    # Which package holds a path is cargo metadata's answer (crates/xtask/Spec.lean
     # §8-39); the paths go through stdin, since a rename branch
     # lists more of them than one command line holds.
     packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
@@ -105,7 +105,7 @@ check-branch base="main":
     touched crates/console_ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
-    # (tools/xtask/Spec.lean §8-43).
+    # (crates/xtask/Spec.lean §8-43).
     printf '%s\n' "$changed" | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
         && step models just models
     [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
@@ -498,8 +498,8 @@ gates-artifacts: build-web
 # Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
 # which Lean reports as a warning, fails the build; an `axiom` raises no
 # warning at all, so the `spec` gate refuses it by its shape, where Lean is
-# not needed to see it (tools/xtask/Spec.lean §8-42). The checker under
-# `tools/adversary/` is not built here: it attacks the binary and stays out
+# not needed to see it (crates/xtask/Spec.lean §8-42). The checker under
+# `crates/adversary/` is not built here: it attacks the binary and stays out
 # of every required check.
 #
 # Lean is a required tool (`just prereqs`). Where `lake` is absent this
@@ -515,7 +515,7 @@ models:
     lake build Spec
 
 # Every commit subject and ruling trailer in a range of history
-# (tools/xtask/Spec.lean §8-35), and on a pull request its title, which
+# (crates/xtask/Spec.lean §8-35), and on a pull request its title, which
 # a squash merge of two or more commits turns into the subject main
 # receives. Not in `check`, because a tree has no
 # range: CI names it, and at a desk it is `just commits main..HEAD`.
@@ -614,7 +614,7 @@ client-checks:
 render:
     cargo xtask render
 
-# The swap test (tools/xtask/Spec.lean section 8-13): every look under
+# The swap test (crates/xtask/Spec.lean section 8-13): every look under
 # client/swap/ drawn in place of the look at the same path under
 # client/src/, and the client still holds. The replacement satisfies the
 # look's props type (typecheck), the wiring tests of each replaced part
@@ -663,7 +663,7 @@ proof:
 sim:
     cargo test --package citysim --locked
 
-# The stand-in provider (tools/citysim/Spec.lean section 8-10):
+# The stand-in provider (crates/citysim/Spec.lean section 8-10):
 # plays a wire script on a loopback port, appends every exchange to the
 # record, and prints `SPRAWLING_PROVIDER=<url>` before it answers, so the
 # check started beside it reads the URL from that line. `listen` is a
@@ -672,7 +672,7 @@ provider script record *listen:
     cargo run --package citysim --bin provider --locked -- {{script}} {{record}} {{listen}}
 
 # Every page of the client at 1440 and 1920, dark and light, as PNG files
-# and an index under target/shots (tools/xtask/Spec.lean
+# and an index under target/shots (crates/xtask/Spec.lean
 # §8-44). Not a gate: a person reads the pictures. `--origin <url>`
 # photographs a served city instead of the bundle.
 shots *args: build-web
@@ -689,23 +689,23 @@ walk *args: build-web
 
 # The half of the shots camera's check that needs an engine that draws
 # frames: a page whose state is written by the frame after the scroll
-# (tools/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
+# (crates/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
 # because a hosted runner's engine draws no frame at all inside a dump
 # run and the check was red on every CI run for it.
 shots-frames:
     cargo nextest run -p xtask --locked --run-ignored only -E 'test(a_frame_after_the_scroll)'
 
-# Create a crate's Spec.lean skeleton (tools/xtask/Spec.lean §8-41).
+# Create a crate's Spec.lean skeleton (crates/xtask/Spec.lean §8-41).
 spec crate:
     cargo xtask spec {{crate}}
 
 # Requires cargo-fuzz + nightly; `nightly.yml` runs the smoke batch.
 fuzz target:
-    cargo fuzz run {{target}} --fuzz-dir tools/fuzz
+    cargo fuzz run {{target}} --fuzz-dir crates/fuzz
 
 # Requires cargo-mutants. Every module held to a mutation score, run in one
 # shard and scored. The modules, their file globs and their thresholds are the
-# rows of tools/xtask/budgets.toml that carry `mutation_files`; they are
+# rows of crates/xtask/budgets.toml that carry `mutation_files`; they are
 # enforced here rather than in `just check` because a full mutation run is
 # hours, and a gate nobody waits for is a gate nobody runs. `on-demand.yml`
 # runs the same two recipes in eight shards (`-f job=mutants-modules`).
@@ -725,9 +725,9 @@ mutants-modules shard:
     #!/usr/bin/env bash
     set -euo pipefail
     py="$(command -v python || command -v python3)"
-    mapfile -t globs < <("$py" -c 'import tomllib; rows = tomllib.load(open("tools/xtask/budgets.toml", "rb")); [print(glob) for row in rows.values() if isinstance(row, dict) for glob in row.get("mutation_files", [])]' | tr -d '\r')
+    mapfile -t globs < <("$py" -c 'import tomllib; rows = tomllib.load(open("crates/xtask/budgets.toml", "rb")); [print(glob) for row in rows.values() if isinstance(row, dict) for glob in row.get("mutation_files", [])]' | tr -d '\r')
     if [ "${#globs[@]}" -eq 0 ]; then
-        echo "mutants-modules: no row of tools/xtask/budgets.toml carries mutation_files; add the module's file globs to its row" >&2
+        echo "mutants-modules: no row of crates/xtask/budgets.toml carries mutation_files; add the module's file globs to its row" >&2
         exit 2
     fi
     files=()
@@ -751,7 +751,7 @@ mutants-score dir="mutants.out":
     py="$(command -v python || command -v python3)"
     "$py" - '{{dir}}' <<'PY'
     import fnmatch, json, pathlib, sys, tomllib
-    register = tomllib.loads(pathlib.Path("tools/xtask/budgets.toml").read_text(encoding="utf-8"))
+    register = tomllib.loads(pathlib.Path("crates/xtask/budgets.toml").read_text(encoding="utf-8"))
     rows = {name: row for name, row in register.items() if isinstance(row, dict) and "mutation_files" in row}
     reports = sorted(pathlib.Path(sys.argv[1]).rglob("outcomes.json"))
     if not reports:
@@ -845,7 +845,7 @@ bench:
     cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture || status=$?; \
     exit "$status"
 
-# The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
+# The four-action pressure reading (crates/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
 #
 # `web-bundle` first: without the bundle the binary embeds a placeholder
@@ -909,7 +909,7 @@ replay log:
     cargo run -p sprawling --locked -- replay {{log}}
 
 # Private, peak private and working set, in this platform's own counters
-# (tools/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
+# (crates/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
 # [steps] [every]` reads the long-turn instrument at each of its pauses
 # (citysim D10). Anything else serves a city - a fresh
 # empty one, or `--city <dir>` - so the release binary is built first: a
@@ -933,9 +933,9 @@ mem-long-turn steps="500" every="100":
         esac
     done
 
-# The adversarial property checker in `tools/adversary/`, which lives outside the
+# The adversarial property checker in `crates/adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
-# (tools/adversary/Spec.lean section 2). It is never a gate: on a machine with
+# (crates/adversary/Spec.lean section 2). It is never a gate: on a machine with
 # no Lean toolchain this prints one line and succeeds, so `just check` behaves
 # exactly as it does where the directory is absent.
 #
@@ -966,7 +966,7 @@ adversary *args:
     SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
 # The usability walk a stranger takes with a release archive
-# (tools/adversary/Spec.lean section 9, step 6). The archive is
+# (crates/adversary/Spec.lean section 9, step 6). The archive is
 # unpacked into target/acceptance, the stand-in provider is started on the
 # script the acceptance world writes for the archive's skills, and the
 # archive's own binary is walked through a first day, a process killed in
@@ -974,7 +974,7 @@ adversary *args:
 # collaboration. The walk is handed the script as well as the record,
 # because one run of it names a branch only the city knows, and the walk
 # appends that run to the script once it has read the branch from the
-# history (tools/adversary/Spec.lean D7). The servings that are not the
+# history (crates/adversary/Spec.lean D7). The servings that are not the
 # crash end with SIGINT on macOS and Linux; on Windows each city is started
 # through the launcher `serve_grouped` in a process group of its own, which
 # the walk asks to send it Ctrl-Break. A city that does not exit within ten
@@ -990,7 +990,7 @@ adversary *args:
 # names an archive has asked for this walk.
 #
 # This recipe is the only place that starts the stand-in: the checker under
-# tools/adversary/ hosts no server (tools/adversary/Spec.lean section 13) and is
+# crates/adversary/ hosts no server (crates/adversary/Spec.lean section 13) and is
 # told the stand-in's URL, as it is told the binary's path.
 acceptance archive:
     #!/usr/bin/env bash
@@ -1023,7 +1023,7 @@ acceptance archive:
     [ -f "$provider" ] || provider="$provider.exe"
     # The launcher is named only on Windows, where a city closes in order
     # only on a Ctrl-Break to a process group of its own; macOS and Linux
-    # send SIGINT to the city itself (tools/adversary/Spec.lean D8).
+    # send SIGINT to the city itself (crates/adversary/Spec.lean D8).
     launcher=""
     # The paths are handed to programs that are not a shell; under Git Bash
     # they are `/c/...`, which only that shell resolves (see `adversary`).
@@ -1066,7 +1066,7 @@ acceptance archive:
 # servings in order, with SIGINT on macOS and Linux and through the
 # launcher's Ctrl-Break on Windows, so they write theirs; a serving that
 # had to be terminated instead is named by a `note` line of the walk
-# (tools/adversary/Spec.lean D8). The city of its own is closed in order
+# (crates/adversary/Spec.lean D8). The city of its own is closed in order
 # the same way, and the one-shot verbs exit normally. The held-out load below shares no
 # step with this one, so a gain it shows is not a gain on the training
 # script alone.
@@ -1100,7 +1100,7 @@ pgo-train archive:
     # walk's launcher `serve_grouped` (built by `acceptance` above) in a
     # process group of its own, and the line `close` on the launcher's stdin
     # has it send Ctrl-Break to that group; elsewhere SIGINT is the orderly
-    # close (tools/adversary/Spec.lean D8).
+    # close (crates/adversary/Spec.lean D8).
     at="127.0.0.1:{{pgo_port}}"
     taken() { grep -q 'commands are taken' "$city/../serve.err" 2>/dev/null; }
     if command -v cygpath >/dev/null 2>&1; then

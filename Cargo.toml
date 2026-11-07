@@ -18,9 +18,9 @@ members = [
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
-    "tools/xtask",
-    "tools/citysim",
-    "tools/benchstat",
+    "crates/xtask",
+    "crates/citysim",
+    "crates/benchstat",
 ]
 default-members = [
     "crates/kernel",
@@ -40,9 +40,9 @@ default-members = [
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
-    "tools/xtask",
-    "tools/citysim",
-    "tools/benchstat",
+    "crates/xtask",
+    "crates/citysim",
+    "crates/benchstat",
 ]
 
 # What every package says about itself on a registry, and the one place
@@ -50,7 +50,7 @@ default-members = [
 # own packages below to `=` this version, `xtask package` and `xtask
 # channel` read it, and the binary reports it. Every package may be
 # published unless its own manifest says `publish = false`, which the
-# two tools of this repository do (`crates/sprawling/Spec.lean` §8-157).
+# repository's development tools do (`crates/sprawling/Spec.lean` §8-157).
 [workspace.package]
 version = "0.0.15"
 description = "A local multi-agent harness for persistent agent teams: long-running project work, agent communication, and experiments in coordination and social simulation."

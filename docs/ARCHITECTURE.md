@@ -95,7 +95,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/wire/Cargo.toml`; `crates/sprawling/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`crates/wire/Spec.lean` §8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. The TLS backend is aws-lc-rs, installed once by `gateway::reach::tls`. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `tools/xtask/src/npm.rs`, each admitted under `client/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `crates/xtask/src/npm.rs`, each admitted under `client/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -680,7 +680,7 @@ the part worth knowing before starting, not after.
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
-| a gate itself | `tools/xtask/` + `tools/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| a gate itself | `crates/xtask/` + `crates/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 | how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
 
 Two documents sit beside this one rather than inside it: operating a
@@ -995,28 +995,28 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
 | V2 unit and property | a function wrong across a class of inputs | `#[test]` functions beside the code they judge, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `crates/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->10<!-- xtask:end --> scenario files, failures replayed from their script |
-| V7 mutation | tests that do not bite | `cargo-mutants` over the modules the `mutation_files` rows of `tools/xtask/budgets.toml` name, by `just mutants` locally and `on-demand.yml -f job=mutants-modules` on a runner |
-| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `tools/fixtures/` |
+| V7 mutation | tests that do not bite | `cargo-mutants` over the modules the `mutation_files` rows of `crates/xtask/budgets.toml` name, by `just mutants` locally and `on-demand.yml -f job=mutants-modules` on a runner |
+| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `crates/fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
-| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `tools/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
+| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `crates/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
 **V10 is deliberately not a gate.** §1 says the wire
-is the whole API and that a second client writes against it; `tools/adversary/`
+is the whole API and that a second client writes against it; `crates/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
 `just adversary` and by a schedule, never by `just check`,
 which builds none of the checker: what `just models` reads there is the
-checker's own specification, `tools/adversary/Spec.lean` and its parts,
+checker's own specification, `crates/adversary/Spec.lean` and its parts,
 proved like any crate's, and where Lean is absent `just adversary` prints
 one line and succeeds.
 What it buys that V2 cannot is quantification over traces: V2 proves that
 the paths we thought of hold, and V10 asks whether the door's stable error
 codes survive any prefix, one halt, and any suffix. What it has found, and
 what each finding cost to fix, is recorded in
-`tools/adversary/Spec.lean` section 4 — beside the mechanism rather than
+`crates/adversary/Spec.lean` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
 **Three gaps, named rather than hidden.** V9 needs a real city served by a
@@ -1046,22 +1046,17 @@ specifications of the checker, the simulator, the gates and the client.
 and `lake-manifest.json` sit at the root; they are the only Lean package
 and the only Lean version pin in the tree. The manifest lists no packages,
 so every import is this tree's or the toolchain's own. The package has
-four targets. The library `Spec` is every module under `crates/`, the
-checker's own specification, the simulator's, the gates' and the browser
-client's, and `just models` builds it inside
-`just check`. The library `Sprawling` (`tools/adversary/src`) and the
-executables `adversary` and `acceptance` (`tools/adversary/test`) are the
-checker, which only `just adversary`, `just acceptance` and the nightly
-schedule build. The library `Spec` reaches its modules by the glob
-`crates.+`, for the checker's specification by `tools.adversary.Spec` and
-`tools.adversary.spec.+`, for the simulator's by `tools.citysim.Spec` and
-`tools.citysim.spec.+`, for the gates' by `tools.xtask.Spec` and
-`tools.xtask.spec.+`, and for the client's by `client.Spec` and
-`client.spec.+`. A specification outside `crates/` is reached by exactly
-these two globs, `<dir>.Spec` and `<dir>.spec.+` with `<dir>` its path in
-dotted form, and never by a glob over a whole `tools` or `client` tree,
-because a `.+` glob walks every directory below it, build output and
-installed packages included. The client's parts are named after its
+four targets. The library `Spec` holds every product and development-tool
+specification, including the checker's own, and the browser client's;
+`just models` builds it inside `just check`. The library `Sprawling`
+(`crates/adversary/src`) and the executables `adversary` and `acceptance`
+(`crates/adversary/test`) are the checker, which only `just adversary`,
+`just acceptance` and the nightly schedule build. `Spec` reaches each
+specification through its explicit `<dir>.Spec` glob, plus `<dir>.spec.+`
+when the specification has parts, with `<dir>` its path in dotted form.
+There is no glob over a whole `crates` or `client` tree: a `.+` glob walks
+every directory below it, so one over `crates` would also build the
+checker's implementation and any generated Lean file below it. The client's parts are named after its
 TypeScript modules below `client/src/` the way a crate's are named after
 its Rust modules: `views/parts/segmented.ts` is specified by
 `client/spec/Views/Parts/Segmented.lean`. The client's specification holds
@@ -1084,7 +1079,7 @@ names its part, and the part names the Rust module.
 **One effective specification per crate.** A crate holds exactly one
 specification: its `Spec.lean`. No Markdown `<lib>-SPEC.md` remains in the
 tree; the `spec` gate still accepts one as a package's only specification,
-and refuses a package that holds both or neither (`tools/xtask/Spec.lean`
+and refuses a package that holds both or neither (`crates/xtask/Spec.lean`
 §8-42).
 
 **Imports follow §3.** A part imports the toolchain's libraries and the
@@ -1115,7 +1110,7 @@ one constructor per line in an `inductive`, one arm per line in a `def`,
 the `import` lines, and the words left once comments and strings are
 blanked. A Lean name and the Rust name it stands for are spelled the
 same, so a gate compares one spelling rather than converting between two.
-`tools/xtask/Spec.lean` §8-42 and §8-43 say which gate reads
+`crates/xtask/Spec.lean` §8-42 and §8-43 say which gate reads
 which shape; the `spec` gate holds a crate to one effective
 specification, the checker and the specifications to their imports, and
 every `.lean` to no `sorry`, `admit` or `axiom`.
@@ -1127,7 +1122,7 @@ before size: a bigger binary that answers faster is the better binary.
 Wall-clock figures are measured, reported with the machine
 that produced them, and never gated: a slow runner is not a defect, and a
 gate that says it is teaches people to ignore gates. **The full register is
-`tools/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
+`crates/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
 it, and the readings below are written here by `cargo xtask docnum` rather
 than typed. Every duration in the register is a whole number of
 microseconds, named by its `_us` field.
@@ -1173,7 +1168,7 @@ and names the recipe that retakes it.
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_us -->1,000<!-- xtask:end --> µs | `[prefix_assembly]`, with its machine class | no |
 | Runs driving at once | no lane count: a prepared run gets a lane at once, and `accounting::worker::pool` asks only for memory (`crates/sprawling/Spec.lean` D34) | one thread per run, one accounting thread taking every write, and each endpoint's `max_in_flight` permits (`gateway::concurrency`) | no: the one concurrency limit is the endpoint's, not a measurement |
 | Mutation score of each module a `mutation_files` row names | ≥90%, each row's `minimum_percent` | by `just mutants-score` over the outcomes of `just mutants-modules` | by that command, not by `just check` |
-| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
+| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `crates/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
 The four load scenarios — multi-run parallel, large-ledger fold,
 large-worktree placement, and long-session streaming forward — are re-measured
@@ -1181,13 +1176,13 @@ by `just bench`, one reading line per scenario and sub-metric, every line
 carrying its machine class. Multi-run parallel is read by
 `instrument_relay_round_trip`, which drives the accounting loop the city runs
 (`crates/sprawling/Spec.lean` §8-84); its readings and their machine class sit in
-`tools/xtask/budgets.toml` `[relay_round_trip]`. The other three are
+`crates/xtask/budgets.toml` `[relay_round_trip]`. The other three are
 citysim's bench scenarios. The large-ledger fold has a register row, quoted
 below; the large-worktree placement and long-session forwarding readings are
 printed by `just bench` and have no register row, so no figure for them is
 quoted here. The two
 latency tiers and the ratchet that governs these readings live in
-`tools/xtask/budgets.toml` `[local_latency]`; a reading under the registered load
+`crates/xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |

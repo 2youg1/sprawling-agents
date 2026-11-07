@@ -170,10 +170,10 @@
             (builtins.readFile ./crates/sprawling/build.rs)) 0;
         skillSource = builtins.elemAt
           (builtins.match ''.*const SKILLS_DIR: &str = "([^"]+)";.*''
-            (builtins.readFile ./tools/xtask/src/package/contents.rs)) 0;
+            (builtins.readFile ./crates/xtask/src/package/contents.rs)) 0;
         skillEntry = builtins.elemAt
           (builtins.match ''.*const SKILLS_ENTRY: &str = "([^"]+)";.*''
-            (builtins.readFile ./tools/xtask/src/package/contents.rs)) 0;
+            (builtins.readFile ./crates/xtask/src/package/contents.rs)) 0;
         applicationManifest = builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml);
         workspacePackage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package;
         applicationName = applicationManifest.package.name;

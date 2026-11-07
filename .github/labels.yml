@@ -24,7 +24,7 @@
   description: "The browser client under client/. 前端：client/ 下的浏览器客户端"
 - name: "area: backend"
   color: "0e8a16"
-  description: "The Rust binary, crates/ and tools/. 后端：Rust 二进制、crates/ 与 tools/"
+  description: "The Rust binary and crates/. 后端：Rust 二进制与 crates/"
 - name: "area: docs"
   color: "0075ca"
   description: "README, ARCHITECTURE.md, docs/ and SPEC text. 文档：README、ARCHITECTURE、docs/ 与 SPEC 文本"
