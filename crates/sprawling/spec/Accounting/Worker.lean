@@ -2012,12 +2012,12 @@ impl OutputRing {
 
 `Delegated.difficulty` 经 `hand_over_at_call` 原样进入子 `Assignment.difficulty`；其它入口填 `None`。`agree_to_work` 是唯一的选型点，在适配器构造与任何写入之前完成：
 
-1. 目标房间已有 `[model] name` 时只走旧冻结选择，本次难度不重路由；
+1. 目标 Session 已有 `[model] name` 时按冻结的 endpoint/model 完整引用选择（缺 endpoint 的旧记录走 ID 兼容路径），另开房间不继承原房间的冻结记录，本次难度不重路由；
 2. 新子 Session 所在楼写了 `[workspace_models]` 时，有难度取对应推荐，无难度取 `medium`，把推荐的 effort 写进这次 Assignment；
-3. 人显式给出 `Dispatch.model`／`effort` 时沿用原选择，再按该楼策略核对 allowed 与 max effort；
+3. 人显式给出 `Dispatch.model`／`effort` 时沿用原选择，再按该楼策略核对 allowed 与解析后的有效 effort（显式值优先，否则读取目标的配置阶梯）不超过 max effort；这些拒绝在写会话之前完成；
 4. 没有策略时逐字走旧 `tag_for`＋`EndpointBook::select` 路径。
 
-`EndpointBook::select_ref` 按完整 `(endpoint, model)` 找已登记选择，再调用既有 `select`，所以摘除端点、模型不再登记与 confidential 本地边界只有一个判定家。推荐与显式 effort 都经 `gateway::thinking_offer(...).admit`；任何失败原样成为 unstarted handback，不换模型、不降 effort。
+`EndpointBook::select_ref` 按完整 `(endpoint, model)` 找已登记选择，再调用既有 `select`，所以摘除端点、模型不再登记与 confidential 本地边界只有一个判定家。推荐与显式 effort 都经 `gateway::thinking_offer(...).admit`；推荐档位拒绝的恢复语指向 RULES.toml 对应 recommendations 难度表，并列出 provider 支持档位；任何失败成为 unstarted handback，不换模型、不降 effort。
 
 `Agreed.routing` 随 `Site` 进入 `RunPlan.routing`，由 `Charter::open` 写入 `run_started.routing`；`Site.config.effort` 仍只从这次 Assignment 与三层梯子解析，`run_started.effort` 是实际 effort 的唯一字段。已有 Session 的 `CallShape::verified_against` 继续负责形状漂移拒绝，策略修改不 retroactively 改它。
 

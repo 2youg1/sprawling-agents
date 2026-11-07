@@ -8,7 +8,7 @@
 //! The parent supplies only a difficulty. This module resolves the complete
 //! endpoint/model reference and exact effort before a child run starts, and
 //! validates the same policy when a person saves it. Existing sessions and
-//! buildings without a policy retain the previous tag-based path.
+//! new sessions in buildings without a policy retain the tag-based path.
 //! Specified by `crates/sprawling/spec/Accounting/Worker.lean` §8-173.
 
 use kernel::event::record::{ModelRouting, ModelSelectionSource};
@@ -29,7 +29,9 @@ impl RunWorker {
         rules: &city::BuildingRules,
         own: &city::ConfigLayer,
     ) -> Result<(gateway::Chosen<'_>, ModelRouting), AxError> {
-        let workspace = rules.workspace_models().filter(|_| own.model().is_none());
+        let opens = super::session::opens_a_room(&at.addr, at.session.as_ref());
+        let frozen = (!opens).then_some(own).filter(|own| own.model().is_some());
+        let workspace = rules.workspace_models().filter(|_| frozen.is_none());
         if let Some(policy) = workspace.filter(|_| at.parent.is_some() && at.model.is_none()) {
             let requested = at.difficulty;
             let difficulty = requested.unwrap_or(Difficulty::Medium);
@@ -38,8 +40,7 @@ impl RunWorker {
                 .credentials
                 .book
                 .select_ref(recommendation.model(), rules.policy())?;
-            gateway::thinking_offer(chosen.endpoint, &chosen.entry.id)
-                .admit(Some(recommendation.effort()), &chosen.entry.id)?;
+            admit_recommendation(&chosen, recommendation.effort(), difficulty)?;
             at.effort = Some(recommendation.effort());
             return Ok((
                 chosen,
@@ -56,13 +57,45 @@ impl RunWorker {
             ));
         }
 
-        let tag = self.tag_for(at.model.as_deref(), own.model())?;
-        let chosen = self.credentials.book.select(tag, rules.policy())?;
+        let chosen = if let Some(own) = frozen
+            && let (Some(endpoint), Some(model)) = (own.endpoint(), own.model())
+            && at.model.as_deref().is_none_or(|named| named == model)
+        {
+            self.credentials.book.select_ref(
+                &ModelRef {
+                    endpoint: endpoint.to_owned(),
+                    model: model.to_owned(),
+                },
+                rules.policy(),
+            ).map_err(|error| {
+                if *error.code() != AxCode::ConfigInvalid {
+                    return error;
+                }
+                AxError::failure(*error.code(), error.action(), format!("the model changed: {}", error.subject()))
+                    .with_recovery(format!("restore the frozen endpoint/model registration, or send this task to another address; {}", error.recovery()))
+            })?
+        } else {
+            let tag = self.tag_for(
+                at.model.as_deref(),
+                frozen.and_then(city::ConfigLayer::model),
+            )?;
+            self.credentials.book.select(tag, rules.policy())?
+        };
         let manually_named = at.model.is_some() || at.effort.is_some();
         let policy = if manually_named {
             workspace
                 .map(|policy| {
-                    admit_explicit(policy, &chosen, at.effort)?;
+                    let judged = if opens {
+                        city::Building::of(&at.addr)?.addr().clone()
+                    } else {
+                        at.addr.clone()
+                    };
+                    let effective = match at.effort {
+                        Some(effort) => Some(effort),
+                        None => city::settled_effort(&self.city_root, &judged)?
+                            .map(|(effort, _)| effort),
+                    };
+                    admit_explicit(policy, &chosen, effective)?;
                     policy.digest()
                 })
                 .transpose()?
@@ -90,13 +123,15 @@ impl RunWorker {
             return Ok(());
         };
         let recommendations = policy.recommendations();
-        for recommendation in recommendations {
+        for (difficulty, recommendation) in [Difficulty::Easy, Difficulty::Medium, Difficulty::Hard]
+            .into_iter()
+            .zip(recommendations)
+        {
             let chosen = self
                 .credentials
                 .book
                 .select_ref(recommendation.model(), rules.policy())?;
-            gateway::thinking_offer(chosen.endpoint, &chosen.entry.id)
-                .admit(Some(recommendation.effort()), &chosen.entry.id)?;
+            admit_recommendation(&chosen, recommendation.effort(), difficulty)?;
         }
         for allowed in policy.allowed() {
             if recommendations
@@ -166,4 +201,25 @@ fn routing(
         policy,
         source,
     }
+}
+
+/// Keeps provider admission authoritative while naming the policy a person can repair.
+fn admit_recommendation(
+    chosen: &gateway::Chosen<'_>,
+    effort: Effort,
+    difficulty: Difficulty,
+) -> Result<(), AxError> {
+    let offer = gateway::thinking_offer(chosen.endpoint, &chosen.entry.id);
+    offer.admit(Some(effort), &chosen.entry.id).map_err(|error| {
+        let difficulty = match difficulty {
+            Difficulty::Easy => "easy",
+            Difficulty::Medium => "medium",
+            Difficulty::Hard => "hard",
+        };
+        let levels = offer.levels.iter().map(Effort::as_str).collect::<Vec<_>>();
+        AxError::failure(*error.code(), error.action(), error.subject()).with_recovery(format!(
+            "correct [workspace_models.recommendations.{difficulty}] in this building's RULES.toml; provider supports effort levels: {}",
+            if levels.is_empty() { "none".to_owned() } else { levels.join(", ") }
+        ))
+    })
 }

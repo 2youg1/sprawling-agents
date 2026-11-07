@@ -243,6 +243,7 @@ pub fn migrate_skill_pin(
 pub(super) enum Change<'a> {
     Session {
         model: &'a str,
+        endpoint: Option<&'a str>,
         effort: Option<Effort>,
         generation: Option<&'a kernel::FrozenGeneration>,
     },
@@ -291,12 +292,21 @@ impl Change<'_> {
     fn state(&self, document: &mut toml::Table, file: &Path) -> Result<(), AxError> {
         match self {
             Change::Session {
+                endpoint,
                 model,
                 effort,
                 generation,
             } => {
                 let section = table(document, "model", file)?;
                 section.insert("name".to_owned(), toml::Value::String((*model).to_owned()));
+                if let Some(endpoint) = endpoint {
+                    section.insert(
+                        "endpoint".to_owned(),
+                        toml::Value::String((*endpoint).to_owned()),
+                    );
+                } else {
+                    section.remove("endpoint");
+                }
                 if let Some(effort) = effort {
                     section.insert("effort".to_owned(), spelled(*effort, file)?);
                 }
@@ -311,6 +321,7 @@ impl Change<'_> {
                 let emptied = match document.get_mut("model") {
                     Some(toml::Value::Table(section)) => {
                         section.remove("name");
+                        section.remove("endpoint");
                         section.remove("effort");
                         for key in GENERATION_KEYS {
                             section.remove(key);

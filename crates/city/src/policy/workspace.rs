@@ -66,7 +66,7 @@ impl ModelRecommendation {
 /// to an implicit fallback.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct WorkspaceRecommendations {
+pub struct WorkspaceRecommendations {
     easy: ModelRecommendation,
     medium: ModelRecommendation,
     hard: ModelRecommendation,

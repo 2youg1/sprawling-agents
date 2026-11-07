@@ -282,3 +282,5 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 - `docs/glossary.md` 的 Signal、Inbox、Workshop 等词条：词条改名时本文件与分部一起改。
 - `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；`crates/city/Spec.lean` §8-2 的 `review` 规则（D4）；`crates/sprawling/Spec.lean` §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
 -/
+
+/-! `delegate_tool` 的 difficulty 缺失时保持默认；存在但不是字符串（含 null）时以 E_INVALID_ARGS 拒绝，不投递；字符串仅接受 easy、medium、hard。 -/

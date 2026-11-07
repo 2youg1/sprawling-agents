@@ -316,11 +316,11 @@ impl Tool for DelegateTool {
                 .with_recovery("use `ephemeral` for one piece of work, or `resident`"));
             }
         };
-        let difficulty = match args.get("difficulty").and_then(Value::as_str) {
+        let difficulty = match args.get("difficulty") {
             None => None,
-            Some("easy") => Some(Difficulty::Easy),
-            Some("medium") => Some(Difficulty::Medium),
-            Some("hard") => Some(Difficulty::Hard),
+            Some(Value::String(word)) if word == "easy" => Some(Difficulty::Easy),
+            Some(Value::String(word)) if word == "medium" => Some(Difficulty::Medium),
+            Some(Value::String(word)) if word == "hard" => Some(Difficulty::Hard),
             Some(other) => {
                 return Err(AxError::failure(
                     AxCode::InvalidArgs,
@@ -416,13 +416,21 @@ mod tests {
             Some(Difficulty::Easy)
         );
 
-        args = request.args.as_map().clone();
-        args.insert("difficulty".to_owned(), Value::String("tiny".to_owned()));
-        request.args = Payload::new(args).unwrap();
-        assert_eq!(
-            tool.invoke(&request).unwrap_err().code(),
-            &AxCode::InvalidArgs
-        );
+        for invalid in [
+            Value::from(3),
+            Value::Null,
+            Value::Bool(true),
+            Value::String("tiny".to_owned()),
+        ] {
+            args = request.args.as_map().clone();
+            args.insert("difficulty".to_owned(), invalid);
+            request.args = Payload::new(args).unwrap();
+            assert_eq!(
+                tool.invoke(&request).unwrap_err().code(),
+                &AxCode::InvalidArgs
+            );
+        }
+        assert_eq!(desk.lock().unwrap().asked().len(), 1);
     }
 
     /// kernel D37, collab D17: a page draws a delegation as the room and

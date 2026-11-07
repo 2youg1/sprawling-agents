@@ -50,7 +50,7 @@ pub use evaluate::{
     write_rules_against_with,
 };
 pub use reach::DomainReach;
-pub use workspace::{ModelRecommendation, WorkspaceModelPolicy};
+pub use workspace::{ModelRecommendation, WorkspaceModelPolicy, WorkspaceRecommendations};
 
 /// What a building is and what it may do: the one file this module
 /// parses, and the one a resident is given.

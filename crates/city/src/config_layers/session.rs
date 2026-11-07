@@ -40,6 +40,7 @@ use super::{ConfigLayer, Layer, path};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionShape {
     pub model: String,
+    pub endpoint: Option<String>,
     pub effort: Option<Effort>,
     pub generation: Option<FrozenGeneration>,
 }
@@ -53,6 +54,7 @@ impl SessionShape {
     ) -> SessionShape {
         SessionShape {
             model: model.into(),
+            endpoint: None,
             effort,
             generation,
         }
@@ -106,6 +108,7 @@ pub fn write_session(
         Layer::Resident,
         Change::Session {
             model: &shape.model,
+            endpoint: shape.endpoint.as_deref(),
             effort: shape.effort,
             generation: shape.generation.as_ref(),
         },
