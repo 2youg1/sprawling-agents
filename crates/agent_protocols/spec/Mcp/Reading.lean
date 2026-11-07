@@ -39,7 +39,7 @@ inductive Outcome where
 
 /- D6 消息上限的四条决定。
 (a) 上限不是参数：签名是 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`，不由调用方传入。一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限；本模型把上限写成参数只为陈述对每一个上限都成立的性质。
-(b) 数值是推导来的：`IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]`。
+(b) 数值是推导来的：`IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `crates/xtask/budgets.toml` 的 `[mcp_message_ceiling]`。
 (c) 拒绝是终止性的，不是跳过一条：超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方恒不再从同一个 source 读，传输回收子进程（`the_reader_stops_at_its_first_refusal`；被否的「跳过一条接着读」见文末 `withoutStopping_reads_a_tail_as_a_message`）。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 (d) 读端不排队：读端每读一条都调 `read_one_message`，读到的交给 `sync_channel(0)`，等调用方取走这一条才读下一条，于是一条连接在内存里至多握着一条读完待取的消息与一条正在读的，上界是两倍 `MESSAGE_CEILING`；再往后的字节留在子进程的管道或 TCP 的接收窗口里，那是对侧的缓冲，不是本城的。被否：`sync_channel(N)`（N > 0）多买到的只是 reader 能先读 N 条，而一次调用只取一条答案，多读的那几条只会多占 N 倍上限的内存；无界的 `channel()` 在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态。 -/
 /-- `read_one_message`：`held` 是这条消息已读的字节，返回读出的结果与 source 里剩下的字节。

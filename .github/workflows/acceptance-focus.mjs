@@ -6,7 +6,7 @@
 // The keyboard walk through one native modal dialog, shared by the
 // settings acceptance (acceptance-ui.mjs) and the privacy acceptance
 // (privacy-ui.mjs); what it requires is written in
-// tools/adversary/spec/Acceptance.lean. The modal judged is the topmost
+// crates/adversary/spec/Acceptance.lean. The modal judged is the topmost
 // one: a dialog opened from inside another is later in document order,
 // so the last `dialog:modal` is the one the keyboard is held in.
 

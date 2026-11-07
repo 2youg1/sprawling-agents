@@ -19,7 +19,7 @@ import { finish } from "./handshake";
 import { halves, keyFrom, sign, verifies } from "./keys";
 import { opener, payloadBytes, payloadOf, sealer } from "./seal";
 
-const DIR = new URL("../../../../tools/fixtures/remote-handshake/", import.meta.url);
+const DIR = new URL("../../../../crates/fixtures/remote-handshake/", import.meta.url);
 
 type Fields = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 

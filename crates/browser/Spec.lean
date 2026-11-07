@@ -198,6 +198,6 @@ D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`crates/sprawling/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`crates/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`crates/sprawling/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

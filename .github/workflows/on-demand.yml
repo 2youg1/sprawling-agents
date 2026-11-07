@@ -7,7 +7,7 @@
 #             branch on origin, a tag or a commit, in sixteen shards
 #             (`just mutants-diff`)
 #   mutants-modules
-#             the mutants of every module `tools/xtask/budgets.toml`
+#             the mutants of every module `crates/xtask/budgets.toml`
 #             holds to a mutation score (the rows with `mutation_files`),
 #             in eight shards (`just mutants-modules`), then one job
 #             that adds the shards up per module and fails a module under

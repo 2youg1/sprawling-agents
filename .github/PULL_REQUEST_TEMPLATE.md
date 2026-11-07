@@ -16,7 +16,7 @@
 - [ ] **`just check` green** — the closing condition (CONTRIBUTING §0). Paste the last lines of your run:
   `1208 tests passed / all gates green`（照实填，不复制粘贴示例）
 - [ ] **`ci` green in your fork** — the run on your fork's branch, linked here (CONTRIBUTING §4.1):
-- [ ] **Does this touch a protected path?** — `tools/xtask/`, root `Cargo.toml`, `deny.toml`, `clippy.toml`, `lakefile.toml`, `lean-toolchain`, `justfile`, `.github/`, or a module-table row in `docs/ARCHITECTURE.md`. If yes, the **merge commit** carries a `Verdict:` trailer quoting the person's ruling (CONTRIBUTING §3, `xtask guard`). State that ruling here:
+- [ ] **Does this touch a protected path?** — `crates/xtask/`, root `Cargo.toml`, `deny.toml`, `clippy.toml`, `lakefile.toml`, `lean-toolchain`, `justfile`, `.github/`, or a module-table row in `docs/ARCHITECTURE.md`. If yes, the **merge commit** carries a `Verdict:` trailer quoting the person's ruling (CONTRIBUTING §3, `xtask guard`). State that ruling here:
 - [ ] **SPEC in step with the code** — the crate's SPEC (`Spec.lean` and its parts, or `<crate>-SPEC.md` until it migrates) updated in the same change-set as any interface change it describes.
 - [ ] **Module map in step** — a new production module registered in `architecture.toml` before or with it (`xtask modmap`); a test module needs no entry.
 - [ ] **Red-to-green visible** — for a defect fix, the failing test sits in the history before the fix (CONTRIBUTING §2 steps 3–4).

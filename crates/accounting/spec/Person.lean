@@ -34,7 +34,7 @@ pub fn machine_memory() -> Result<MachineMemory, AxError>; // 缺省 Auto；既�
 - **顶层 `memory` 是重活共用的机器预算**（`crates/runtime/spec/Reserve.lean` D104）：`"auto"` 或不写，由城按物理内存算（`crates/sprawling/spec/Serving/Memory.lean` §8-173「整台机器」）；一个非负整数是字节数，0 即一次只放行一件重活。它与 `[core] memory_bytes` 是两个数：后者是每个 run 的上限，前者是这些上限加起来不得超过的总数。放在顶层而不放进 `[core]`，是因为上一版的 `[core]` 拒不认识的键，而顶层的键它不读，所以写了 `memory` 的文件仍能被上一版打开，不必为它把 `format` 提一级。
 - **`format` 先判**：读整份之前先过 `city::admit_format`（`crates/city/Spec.lean` §8-42，city D28），比本 build 新的文件拒并点名升级；未动的文件不添 `format`。
 - **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
-- **不入账**：偏好不属于城的历史，UI 偏好不改变 run 的输入，core 性能配置在 serving 起动时采用。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
+- **不入账**：偏好不属于城的历史，UI 偏好不改变 run 的输入，core 性能配置在 serving 起动时采用。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`crates/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
 
 **本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`、`each_placement_spelling_reads_as_its_arm`（`accounting::person::tests`）。

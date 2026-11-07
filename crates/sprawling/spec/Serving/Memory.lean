@@ -77,7 +77,7 @@
 ### 测量计划
 
 * 内存节拍：默认每 100 ms 采一次私有字节（上面每个平台的那个数），报 p50、p99、max、高于 p50 的累计时长与每小时斜率，n 与读数绑定的条件随读数写下。
-* 一小时斜率：吞吐台（`tools/citysim/spec/Throughput.lean`）的负载（N 个并发 run，各自做读写与 exec）跑一小时，斜率按最小二乘对时间求；验收标准是斜率在两次空负载一小时读数的差以内。
+* 一小时斜率：吞吐台（`crates/citysim/spec/Throughput.lean`）的负载（N 个并发 run，各自做读写与 exec）跑一小时，斜率按最小二乘对时间求；验收标准是斜率在两次空负载一小时读数的差以内。
 * 盘读的延迟峰：在交互路径上（切换 session、打开信箱、滚动）读回被逐出的项时，那个交互的 p99 不超过 16 ms。
 * 分配器（已由 D102 决定）：musl 的发行件用 jemalloc，其余平台用各自的堆。D102 的吞吐读数来自一次临时探针，条件写在那节：16 线程、churn／json／map、5 轮中位数、一次没有真实 Linux 内核的兼容层上的运行。复核方式是在 Linux runner 上按同一负载重跑，并读私有字节的 p99 与一小时斜率。
 
@@ -86,10 +86,10 @@
 1. 内存节拍的统计：`bin::monitor::sampler` 已按 100 ms 的 `MEMORY_BEAT` 读私有字节，每秒的读数报这一秒的峰（`crates/sprawling/spec/Monitor.lean` §8-96）；p50／p99／max／高于 p50 的时长／每小时斜率还没有人算，它们由读监视帧的测量（`sprawling gauge` 或 TP1 台）在那一侧算，不在城的进程里攒一小时的点。
 2. 清点表里随城增长的三项（视图、墓碑、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。今天没有一项经过它：旁索引已是按列存的紧凑表（`storage::index::fold`），视图是许多小的按 run 摘要；把它们挪到盘上要一份盘上的索引格式与视图快照之外的按需读回，能定下先挪哪一项的是 TP1 负载下一小时私有字节里各项的占比。
 3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`crates/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`crates/accounting/Spec.lean` §3）。
-4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
+4. `crates/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 5. D102 的读数在 Linux runner 上复核：同一负载，读私有字节 p99 与一小时斜率，确认换分配器之后斜率仍在上限之内。
 6. 机器级预约还没有覆盖的部分：城起动的浏览器实例不预约；没有内存上限的 run 什么都不预约（D104 的理由与重开参数）；界面还不显示排队，只有结果里的 `memory_wait`；在等的调用不响应 halt，要等到被放行才看见 run 已停（等待的上界见 D104）。为什么不复用 gateway 的并发名额见 `crates/runtime/spec/Reserve.lean` D103。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
-7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `tools/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
+7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `crates/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
 8. 4 GB 剖面：TP1 的负载加两个并发编译，在内存上限 4 GB 的 Linux 容器（cgroup `memory.max`）里跑一小时，读有没有进程被杀（`memory.events` 的 `oom_kill`）、换页次数与工具调用 p99；Windows 上的 segment heap（应用清单的 `heapType`）与默认堆按私有字节与斜率对照。
 -/
 

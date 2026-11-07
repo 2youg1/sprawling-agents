@@ -204,7 +204,7 @@ impl Signature {
 
 /// The two sub-seeds a seed derives, Ed25519's first and ML-DSA-44's
 /// second. A browser derives the same two from the seed in
-/// `tools/fixtures/remote-handshake/keys.txt` (crates/remote_access/Spec.lean
+/// `crates/fixtures/remote-handshake/keys.txt` (crates/remote_access/Spec.lean
 /// §8-12), which is why the pair is readable inside the crate.
 pub(crate) fn halves(
     seed: &[u8; SEED_BYTES],

@@ -47,7 +47,7 @@ use std::path::{Path, PathBuf};
 /// stays here whatever `CARGO_TARGET_DIR` says. It is inside this package
 /// because a crates.io archive carries this package's directory and
 /// nothing else, and this is the only reader that has to work there and
-/// in the published tree, neither of which carries `tools/xtask/`; `xtask`
+/// in the published tree, neither of which carries `crates/xtask/`; `xtask`
 /// reads this constant out of this file, and its artifact gate refuses a
 /// client build script or a justfile that spells the path differently.
 const BUNDLE_DIR: &str = "web-dist";

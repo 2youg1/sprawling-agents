@@ -46,7 +46,7 @@ runs:
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
     # 6-7 s, and a `bun install` with no cache at all took 7 s, so the
-    # entry bought nothing there (`tools/xtask/Spec.lean` D27).
+    # entry bought nothing there (`crates/xtask/Spec.lean` D27).
     - name: bun's download directory on the work drive
       if: runner.os == 'Windows' && steps.bundle.outputs.cache-hit != 'true'
       shell: pwsh

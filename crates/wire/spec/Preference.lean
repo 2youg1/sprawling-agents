@@ -54,7 +54,7 @@
 
 /-! D51 正文字号的下限是类型 `BodyPx`，没有上限
 
-**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`crates/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `client/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`tools/xtask/Spec.lean` §8-36），外观组的字号框与 `client/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`client/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`crates/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `client/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`crates/xtask/Spec.lean` §8-36），外观组的字号框与 `client/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`client/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
 
 **理由**：区间原先只有页面在查，Rust 里没有一个读者：`[ui]` 写 11 照读，页面再把同一个数读成拒绝，两个家对一个数各说一句。下限做成类型之后，文件、帧与页面都由这一条规则判。上限由人的决定去掉：12px 已是给少数人的极端选项，往上没有一个尺寸是本 build 有理由替人拒绝的。12px 不另算对比度，颜色门读 `@theme` 里缺省的那一行字号并保持绿即可（人的决定）。
 

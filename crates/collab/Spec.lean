@@ -68,7 +68,7 @@ workshop 与 `spec/Workshop.lean` 的整段 trace 模型（性质 4–7，D14）
 
 /-! ## 6 命名统一
 
-Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitration、Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `tools/xtask/lexicon.toml`。模型里的声明名取同样的词：`Collab.Inbox.Signal`、`Collab.Fanin.Artifact`、`Collab.Workshop.handNext`。
+Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitration、Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `crates/xtask/lexicon.toml`。模型里的声明名取同样的词：`Collab.Inbox.Signal`、`Collab.Fanin.Artifact`、`Collab.Workshop.handNext`。
 -/
 
 /-! ## 7 模块边界
@@ -205,7 +205,7 @@ D4 谁来定一个 run 写在哪：楼的规则说了算（`RULES.toml` 的 `rev
 
 D5 三件工具还是一件多臂工具：每个机制一件。被否决的是一件 `collab` 工具带 action 枚举：它省两份 schema 的常驻字节（工具表在缓存前缀里，这是真成本），但把三件变更理由不同的东西绑成一个接口，disclosure 只能写成一句拉长的话；模型按名字选工具，一个叫 `collab` 的工具不告诉它任何事。多出的常驻字节是两份空 schema 的量级。
 
-D6 分一行计划要不要握着它：要，由桌子在调用时判，落地不再判。`ClaimDesk::split` 只分本次 drive 握着的那一行，没握着就以 `E_INVALID_ARGS` 拒绝，三段式的主体说这个 run 握着什么，恢复语叫它先认领那一行（`spec/Claim.lean` 的 `split_needs_hold`）；`still_true` 只问认领，不为拆分另判一个期待状态。理由有三条。其一，拆分于是走过认领，而认领在调用时由 `Booking` 对全城判、落地时对盘上那份判，所以从同一份计划派出的两个 run 不会把同一行各分一次（`split_of_moved_row_is_stale`）；不经认领的两次拆分都会落下，`kernel::spine::insert_children` 在已有子行之后接着编号，第二组子行不报错地长出来（`withoutHold_splits_twice`）。其二，拒绝在模型调用的那一刻到达，模型当场拿到下一步，而不是被告知分好了、落地时才被丢掉（`tools/adversary/Spec.lean` §4 第八个发现）。其三，`split` 本来就是一个干着活的 run 发现活更多时说的话（`collab::claim_tool` 的模块注释），握着那一行是它的前提。被否决的是让落地按桌子看到的状态判、允许分一行没人认领的计划：那样的拆分绕过 `Booking`，并发的两次拆分都按 `Not started` 落下；要挡住它就得给拆分另立一种预订，那是「谁在动这一行」的第二个权威。代价是一个只想分计划的 run 多付一次 `claim` 调用。重开参数：出现只分计划、不干那一行活的角色（例如市长把一件事分给几栋楼，G4），而 `Booking` 能为一次拆分预订那一行时，改由预订判，桌子不再要求握着。
+D6 分一行计划要不要握着它：要，由桌子在调用时判，落地不再判。`ClaimDesk::split` 只分本次 drive 握着的那一行，没握着就以 `E_INVALID_ARGS` 拒绝，三段式的主体说这个 run 握着什么，恢复语叫它先认领那一行（`spec/Claim.lean` 的 `split_needs_hold`）；`still_true` 只问认领，不为拆分另判一个期待状态。理由有三条。其一，拆分于是走过认领，而认领在调用时由 `Booking` 对全城判、落地时对盘上那份判，所以从同一份计划派出的两个 run 不会把同一行各分一次（`split_of_moved_row_is_stale`）；不经认领的两次拆分都会落下，`kernel::spine::insert_children` 在已有子行之后接着编号，第二组子行不报错地长出来（`withoutHold_splits_twice`）。其二，拒绝在模型调用的那一刻到达，模型当场拿到下一步，而不是被告知分好了、落地时才被丢掉（`crates/adversary/Spec.lean` §4 第八个发现）。其三，`split` 本来就是一个干着活的 run 发现活更多时说的话（`collab::claim_tool` 的模块注释），握着那一行是它的前提。被否决的是让落地按桌子看到的状态判、允许分一行没人认领的计划：那样的拆分绕过 `Booking`，并发的两次拆分都按 `Not started` 落下；要挡住它就得给拆分另立一种预订，那是「谁在动这一行」的第二个权威。代价是一个只想分计划的 run 多付一次 `claim` 调用。重开参数：出现只分计划、不干那一行活的角色（例如市长把一件事分给几栋楼，G4），而 `Booking` 能为一次拆分预订那一行时，改由预订判，桌子不再要求握着。
 
 D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在调用时写账（`signal_enqueued`，派活另有父的 `tool_called`），收信房间或子房间有 run 在跑，信在它下一个安全点（`runtime::turn` 的同一个 `consume_boundary`，`crates/runtime/spec/Turn.lean`）进它借来的队列：`steer` 类的信经 steer 那扇门落进下一次请求，其余由 `pull` 读到；没有 run 在跑，装配层当场敲门开 run；发信方接着做自己的事。这是人的 ruling：原本的设计意图就是「发一个 steer 出去」。被否决的是落定后投递：信留在发信方的桌上，发信 run 冻结之后才落账、投递、敲门。它把一段多步的对话变成一串串行的 run，每一步都要等上一个 run 整个跑完；它也让派出的子 run 在父冻结之后才开，父因此看不到自己派出的活在跑。模型证明的是：信不丢（`Collab.Delivery.no_loss`、`sent_grows`）、不被消费两次（`consumed_once`）、一个房间按 seq 取（`take_is_oldest`，同一发信方的信因此按发出次序到达），重放读账本按 seq 得同一次序（`seq_is_send_order`）。workshop 摆出的图同理在调用时登记给父房间，节点与父 run 谁先落地都行（`spec/Workshop.lean` 性质 4–7，父 run 被取消或失败时怎样见 D14）。投递只读注入的时钟与账本次序，与平台无关：Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：出现一种信，它在发信方的工作落定之前到达会让收信方读到不成立的事实（例如引用一个还没写盘的文件）；那种信另立一个「落定后投递」的 kind，而不是改回全体。
 

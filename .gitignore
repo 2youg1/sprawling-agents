@@ -12,7 +12,7 @@
 # `mlugg/setup-zig` points Zig's global cache at the workspace root, and
 # the leaf's build fills it with the system libraries it resolves. Build
 # output, like `target/`, and the same row `walk::SKIP_DIRS` carries so no
-# gate reads it (tools/xtask/Spec.lean §8).
+# gate reads it (crates/xtask/Spec.lean §8).
 /.zig-cache/
 # svelte-check's generated transpiled project (editor tooling writes it);
 # it is build output, and ESLint's flat config lints

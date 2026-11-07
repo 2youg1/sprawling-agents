@@ -452,7 +452,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 /-! ## 15 影响面
 
-storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `crates/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`tools/xtask/Spec.lean` §8-32）。
+storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `crates/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`crates/xtask/Spec.lean` §8-32）。
 
 改 `AccountRound` 的一种处置（`spec/AccountRecovery.lean`），同一个变更集改它的两个驱动方：模型路径的 `Watchdog` 与 `drive`（`crates/runtime/spec/Watchdog.lean` §8-9）与 accounting 的 `web_search` 工具；改 `AccountDisposition` 的一臂，同一个变更集改 gateway 的分类（`crates/gateway/spec/Endpoint/Failure.lean` D32）。
 
@@ -472,7 +472,7 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 形式化的义务由证明清偿：`lake build crates.kernel.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 种类与窗类、码与 carrier：`cargo xtask gates specalign` 把 `spec/Event/Kind.lean` 与 `spec/Error.lean` 的两张表、以及每一个同名的 `inductive`，与 kernel 编译出来的枚举逐项对账；`event::kind::tests` 与 `error::code` 的测试检查计数、拼写的往返与单射。
-- 地址与保留子树：`address::tests`（判例表 `tools/fixtures/address.jsonl`、`is_within` 的 proptest、任一段与 Windows 别名的保留判例、三类读者的读界矩阵）。
+- 地址与保留子树：`address::tests`（判例表 `crates/fixtures/address.jsonl`、`is_within` 的 proptest、任一段与 Windows 别名的保留判例、三类读者的读界矩阵）。
 - 布局：`layout::tests`（保留子树在每个写域之外、`of_ledger` 的往返与拒绝）。
 - 写域：`write_domain` 的测试（`reserved_target_is_outside_even_for_an_empty_domain`、`Documents` 的两种 `NotWritable`）与 `gate::tests` 里 `Create` 的拒与 `Full` 的放。
 - 可忽略性与版本：`storage::jsonl` 的 `an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained`、`consts_external` 的 `readable_log_v` 测试、`event::moment::tests`。
@@ -492,6 +492,6 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - `architecture.toml` 的模块图：kernel 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - xtask 的规格 §8-43（门读 Lean 的受限形状）：`specalign` 读本规格的哪几种形状；它改了，§8-1 与 §8-4 的两张表与同名的 `inductive` 一起重看。
-- `tools/adversary/Spec.lean` 第 5 节：检验器从门外判账本的链与错误码，不 import 本规格；`spec/Ledger.lean` 的单射假设在那里被记为一条环境假设。
+- `crates/adversary/Spec.lean` 第 5 节：检验器从门外判账本的链与错误码，不 import 本规格；`spec/Ledger.lean` 的单射假设在那里被记为一条环境假设。
 - 引本规格的其他规格与 rustdoc 写 `crates/kernel/Spec.lean §8-n` 或 `kernel D<n>`；一节换了分部，它的标签不变，引用不必改。kernel 的模块文档指向规定它的分部。
 -/

@@ -93,7 +93,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 ```
 
 - **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（crates/remote_access/Spec.lean §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（crates/remote_access/Spec.lean §7）。
-- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（tools/xtask/Spec.lean §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
+- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（crates/xtask/Spec.lean §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
 - 不改任何帧，不动 `WIRE_V`。
 -/
 
@@ -108,7 +108,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 
 namespace Wire.Command.Kind
 
-/-- 线上的每一个动词：`command::kind` 里 `enum Command` 的变体，一行一个，拼写与 Rust 相同（tools/xtask/Spec.lean §8-43）。次序照 §19-2 的表。 -/
+/-- 线上的每一个动词：`command::kind` 里 `enum Command` 的变体，一行一个，拼写与 Rust 相同（crates/xtask/Spec.lean §8-43）。次序照 §19-2 的表。 -/
 inductive Command where
   | Dispatch
   | ProbeEndpoint
@@ -176,7 +176,7 @@ inductive VerbClass where
   | LocalOnly
   deriving DecidableEq, Repr
 
-/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（tools/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `client/src` 的发出点对照。 -/
+/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（crates/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `client/src` 的发出点对照。 -/
 def Command.reach : Command → Reach
   -- 派活，产品的正面
   | .Dispatch => .client
@@ -285,10 +285,10 @@ def Command.reach : Command → Reach
 
 **被否**：①给 `wire::Command` 加一个 `class()` 方法：要么本 crate 依赖 `remote_access`，要么另立一个同值的枚举，两处定义同一组值；②在表里写类、中继在启动时解析 SPEC：二进制读一份 Markdown 做授权，文档的排版错误就成了门的漏洞；③不写表、只留匹配：一个动词能不能从城外做，是人要读到、要决定的事，藏在代码里没人看。
 
-**写法**：`class` 是下方 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 tools/xtask/Spec.lean §8-45 读它。**重开参数**：`command_class` 的一臂按帧的参数再分两类时，一行一臂写不下，表改由 Lean 侧导出（xtask D8、D11）。
+**写法**：`class` 是下方 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 crates/xtask/Spec.lean §8-45 读它。**重开参数**：`command_class` 的一臂按帧的参数再分两类时，一行一臂写不下，表改由 Lean 侧导出（xtask D8、D11）。
 -/
 
-/-- §19-2 的 class 列：一行一臂。`xtask wiring` 读这些臂，与 `bin::outside::verbs::command_class` 的穷尽匹配逐个动词对照（tools/xtask/Spec.lean §8-45）。 -/
+/-- §19-2 的 class 列：一行一臂。`xtask wiring` 读这些臂，与 `bin::outside::verbs::command_class` 的穷尽匹配逐个动词对照（crates/xtask/Spec.lean §8-45）。 -/
 def Command.verbClass : Command → VerbClass
   | .Dispatch => .Act
   | .ProbeEndpoint => .LocalOnly

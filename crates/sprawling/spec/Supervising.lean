@@ -226,7 +226,7 @@ pub(in crate::assembly) struct Flight {
 
 反方向是组装点应有的方向，保留：装配根用 serving 的 `open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`host`、`recipe_for`，用 `accounting::worker` 的 `RunWorker`、`CommandDesk`、`Hands`、`genesis::form` 与 `folds::start_served_views`。
 
-**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（tools/xtask/Spec.lean §8-33）。块里有三行：`accounting` 的 views 不写出 `crate::worker`；doctor 与 serving 不写出 `crate::assembly` 与 `accounting::worker`。读面与写者同住 `accounting` 之后，「写者知道读面、读面不知道写者」由第一行守；`accounting` 不依赖 `sprawling`，读面与写者指回装配根由编译器拒绝。城有没有历史由 `city::has_history` 回答（`crates/city/Spec.lean` §8-30），doctor 与写者都从那里取用。
+**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（crates/xtask/Spec.lean §8-33）。块里有三行：`accounting` 的 views 不写出 `crate::worker`；doctor 与 serving 不写出 `crate::assembly` 与 `accounting::worker`。读面与写者同住 `accounting` 之后，「写者知道读面、读面不知道写者」由第一行守；`accounting` 不依赖 `sprawling`，读面与写者指回装配根由编译器拒绝。城有没有历史由 `city::has_history` 回答（`crates/city/Spec.lean` §8-30），doctor 与写者都从那里取用。
 
 读面用到的五样东西各归其主，worker 从那里取用：
 
@@ -289,7 +289,7 @@ impl storage::Worktrees { pub fn stock(&self) -> Result<storage::FileWork, stora
 - **失败。** `stock` 的失败不改变 run 的结局：run 已经结束，补不上备树只让下一次放置退回全量检出。失败写一条 `Refuse` 诊断行，锚在 lane 的账本位置快照上，与 §8-113 lane 半段的诊断行同一个写端。
 - **试验借树（§8-133）的重开参数读的是这里。** D20「试验借一棵自己的树」以放置读数是否以秒计为重开条件：接管备树之后放置以毫秒计，那条决定的前提回到它被定下时的样子。
 
-当前状态：两半都已落地。storage 一半是 `crates/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`tools/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 §8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_after_its_run_comes_home`（`fly` 交回 `Flown` 时还没有备树，`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
+当前状态：两半都已落地。storage 一半是 `crates/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`crates/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 §8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_after_its_run_comes_home`（`fly` 交回 `Flown` 时还没有备树，`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
 ### 8-155 补树的界：一座城一次一条 lane 在补，补到一半进程死了由盘上的状态收回（`accounting::worker::dispatching::preparing`）
 
 ```rust

@@ -52,7 +52,7 @@ fn writing() -> bool {
 }
 
 pub(super) fn dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/fixtures/remote-handshake")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/fixtures/remote-handshake")
 }
 
 fn write(name: &str, fields: &Fields) {

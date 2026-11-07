@@ -7,7 +7,7 @@
 #
 # The judgment is reached through the same action `ci.yml` uses, so the
 # range, the pattern and the recovery keep one authority
-# (`tools/xtask/Spec.lean` section 8-35).
+# (`crates/xtask/Spec.lean` section 8-35).
 name: title-judge
 on:
   pull_request:

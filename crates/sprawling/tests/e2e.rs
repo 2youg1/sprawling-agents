@@ -27,7 +27,7 @@
 //! **It enters by `RunWorker::handle`, the door `wire::server` hands
 //! every frame to**, rather than by spawning the binary and opening a
 //! socket. The endpoint under test is the provider's, and the process
-//! boundary this repository judges from outside belongs to `tools/adversary/`
+//! boundary this repository judges from outside belongs to `crates/adversary/`
 //! (xtask boundary gate; `crates/sprawling/Spec.lean` §8-69).
 
 #![allow(

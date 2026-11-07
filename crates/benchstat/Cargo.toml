@@ -1,0 +1,38 @@
+[package]
+name = "sprawling-benchstat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+publish.workspace = true
+description = "Deterministic statistical analysis, verification and reports for sprawling benchmark rounds."
+keywords = ["benchmarking", "statistics", "reproducibility", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "benchstat"
+
+[[bin]]
+name = "benchstat"
+path = "src/main.rs"
+
+[package.metadata.sprawling]
+role = "tool"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+csv.workspace = true
+statrs.workspace = true
+rustfft.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

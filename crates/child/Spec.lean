@@ -30,7 +30,7 @@
 
 - **假设**：城的秘密只经这两种环境变量进到城的进程里。别的路（文件、命令行参数）不归本 crate。
 - **例外**：城的子进程里只有一类不走 `command`：守护进程起的那个子进程（它就是城，有意留在同一个控制台上），理由写在 `crates/sprawling/spec/Supervising.lean` 的「子进程的那一行」：子进程继承这个终端，终端的面属于它。CLI 交出终端给某个 agent 的登录流程还没有建成（`crates/agent_protocols/Spec.lean` §3）；建成时它是第二类，因为登录期间那个程序占着终端。浏览器与文件管理器不是例外：它们比城活得久，正因为如此才要去掉城的秘密，所以打开器与文件管理器都经 `command` 起，调用点再把三路 stdio 设成 null（`crates/sprawling/spec/Firstrun.lean` §8-8）。
-- **不是城的子进程的起点**：本二进制的 `gauge` 动词、`tools/` 下的开发工具、构建脚本与测试代码起的进程都不是城的子进程，D4 说它们为什么不走 `command`。`clippy.toml` 的禁令对它们同样生效，所以每一个这样的起点都在调用处看得见。
+- **不是城的子进程的起点**：本二进制的 `gauge` 动词、开发工具包、构建脚本与测试代码起的进程都不是城的子进程，D4 说它们为什么不走 `command`。`clippy.toml` 的禁令对它们同样生效，所以每一个这样的起点都在调用处看得见。
 -/
 
 /-! ## 4 现状分析
@@ -81,11 +81,11 @@ D4 `clippy.toml` 的 `disallowed-methods` 拒绝 `std::process::Command::new`，
 
 - 守护进程的子进程（§3 的例外）：`bin::supervising::children`。
 - `gauge` 量的命令：它在人的终端前台跑人给的命令，像 shell 那样。`command` 会把它放进自己的进程组、给它一个没有窗口的控制台，于是人按的 Ctrl+C 到不了它，`gauge` 退出后它成了孤儿。它不在城里跑，环境是人自己的。
-- `tools/` 下的开发工具（xtask、citysim）：它们起的 cargo、git、浏览器与被测的二进制属于开发者，不属于城，不持有城的秘密；开发工具要能用终端的 Ctrl+C 结束它们，要按进程树杀掉浏览器。`tools/` 不依赖本 crate。
+- 开发工具包（xtask、citysim、benchstat）：它们起的 cargo、git、浏览器与被测的二进制属于开发者，不属于城，不持有城的秘密；开发工具要能用终端的 Ctrl+C 结束它们，要按进程树杀掉浏览器。这些包不依赖本 crate。
 - 构建脚本（`crates/desktop/ffi/build.rs` 起 `zig`）：它在 cargo 里跑，不在城里。
 - 测试代码：测试起的是它自己的夹具进程。经生产入口（如 `runtime::Backlog`）交进去的 `Command` 也是夹具，生产调用点交进去的由 `command` 造。
 
-被否：给 `tools/` 一份自己的 `clippy.toml`（clippy 只读离 crate 最近的一份，于是时钟与 HTTP 客户端的禁令要复制一份）；crate 级的 `expect`（同一个 lint 名也管 `Instant::now` 与 `reqwest` 的禁令，crate 级的一条会把它们一起盖住）；测试也改走 `command`（Unix 上的进程组与 Windows 上的无窗口控制台会改变夹具进程与测试之间的控制台和信号关系，一个测试要的是它自己写下的那组标志）。重开条件：clippy 能按路径给出禁令的作用范围，或者测试需要验证的正是 `command` 的标志。
+被否：给开发工具包一份自己的 `clippy.toml`（clippy 只读离 crate 最近的一份，于是时钟与 HTTP 客户端的禁令要复制一份）；crate 级的 `expect`（同一个 lint 名也管 `Instant::now` 与 `reqwest` 的禁令，crate 级的一条会把它们一起盖住）；测试也改走 `command`（Unix 上的进程组与 Windows 上的无窗口控制台会改变夹具进程与测试之间的控制台和信号关系，一个测试要的是它自己写下的那组标志）。重开条件：clippy 能按路径给出禁令的作用范围，或者测试需要验证的正是 `command` 的标志。
 -/
 
 /-! ## 9 工作流程

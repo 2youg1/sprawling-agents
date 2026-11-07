@@ -50,7 +50,7 @@
  * **Each part is one contiguous piece of the cascade**, imported in the
  * order the rules were written in when this was one file, so the order
  * of the lines below is the cascade's order and has no other home
- * (tools/xtask/Spec.lean §8-8, D34). Tailwind inlines each import where
+ * (crates/xtask/Spec.lean §8-8, D34). Tailwind inlines each import where
  * it stands. The token parts each hold an `@theme` block; the light
  * block, the person's choices and the rules after them follow, and a
  * part a screen owns sits last, under the rules it may override. */

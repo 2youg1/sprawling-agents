@@ -6,7 +6,7 @@ The tools a resident calls for this work — `signal`, `delegate`, `workshop`, `
 
 ## Who uses it
 
-Three workspace packages depend on it: `sprawling`, the assembly root; `sprawling-accounting`, the city's writer; and `citysim`, the scenario runner in `tools/citysim`. The packages this one may name are its line in the `depmap` block of `ARCHITECTURE.md` section 3.
+Three workspace packages depend on it: `sprawling`, the assembly root; `sprawling-accounting`, the city's writer; and `citysim`, the scenario runner in `crates/citysim`. The packages this one may name are its line in the `depmap` block of `ARCHITECTURE.md` section 3.
 
 ## The specification
 

@@ -4,7 +4,7 @@
 #
 # `printWidth` is rustfmt's 100, so the TypeScript, CSS and Svelte next to
 # the Rust wrap where the Rust wraps. The default 80 re-wraps a third of the
-# client a second time and puts every line of `tools/xtask/src/channel/shim.js`
+# client a second time and puts every line of `crates/xtask/src/channel/shim.js`
 # on three.
 #
 # Markdown and TOML are written, not formatted: prose is line-broken where a

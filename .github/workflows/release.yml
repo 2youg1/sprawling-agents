@@ -54,7 +54,7 @@ env:
 
 jobs:
   # Same-commit validation, including the cache environment, belongs to CI.
-  # D27 in tools/xtask/Spec.lean preserves the existing release blocking scope.
+  # D27 in crates/xtask/Spec.lean preserves the existing release blocking scope.
   #
   # `channel` exists only on the `workflow_call` interface, so it is absent
   # exactly when a push or a dispatch started this run: a caller has already
@@ -185,7 +185,7 @@ jobs:
       # `just package`. Both take the triple the matrix names, and only the
       # justfile turns it into the `--target` that `cargo xtask package`
       # reads to find `target/<triple>/release` and name the archive
-      # (tools/xtask/Spec.lean §8-11). An empty triple is the host build,
+      # (crates/xtask/Spec.lean §8-11). An empty triple is the host build,
       # whose two archive names are what they always were.
       # Only main saves, and a tag push never runs on main, so the tag run
       # is warm only when a build-only dispatch of this workflow on main ran
@@ -452,10 +452,10 @@ jobs:
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
       - name: validate native payloads without decoding binaries
         if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
-        run: python3 tools/xtask/src/channel/validate_test.py
+        run: python3 crates/xtask/src/channel/validate_test.py
       - name: install the generated Arch package
         if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
-        run: python3 tools/xtask/src/channel/validate.py target/channels target/package
+        run: python3 crates/xtask/src/channel/validate.py target/channels target/package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: archive-${{ runner.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}

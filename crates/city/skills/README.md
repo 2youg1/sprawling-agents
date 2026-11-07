@@ -14,4 +14,4 @@ Agent skills that ship with sprawling. Each directory holds one skill, and its `
 | [`tutor`](tutor/SKILL.md) | Teaching one person a subject through dialogue until they can diagnose it |
 | [`why`](why/SKILL.md) | Why something is the way it is, answered from every source of evidence that can be reached |
 
-[`LICENSES.md`](LICENSES.md) gives each skill's licence and attribution. The release archive carries this directory exactly as it stands, this file included, because the archive walks it rather than listing skills (the `Skills` part in `tools/xtask/src/package/contents.rs`); a change here reaches people with the next release.
+[`LICENSES.md`](LICENSES.md) gives each skill's licence and attribution. The release archive carries this directory exactly as it stands, this file included, because the archive walks it rather than listing skills (the `Skills` part in `crates/xtask/src/package/contents.rs`); a change here reaches people with the next release.

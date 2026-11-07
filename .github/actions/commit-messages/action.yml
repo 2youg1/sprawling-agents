@@ -1,7 +1,7 @@
 # The commits check, in the one place its range is computed: a pull
 # request judges `base.sha..head.sha` and its title beside it, a push
 # judges `before..after`, and a hand-dispatched branch from where it
-# left main (`tools/xtask/Spec.lean` section 8-35).
+# left main (`crates/xtask/Spec.lean` section 8-35).
 #
 # Two callers share it: `ci.yml` runs it with the rest of the matrix on
 # a push and on a pull request's open, synchronize and reopen, and

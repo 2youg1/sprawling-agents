@@ -136,7 +136,7 @@ import crates.sprawling.spec.WireClient
 
 **被否**：①把车道数改成可配置：仍是一个与 provider 无关的闸，只是把选数的事交给人；②按 CPU 核数定车道：lane 的时间几乎都在等网络，核数不是它的约束。
 
-**重开参数**：吞吐台（`tools/citysim/spec/Throughput.lean`）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
+**重开参数**：吞吐台（`crates/citysim/spec/Throughput.lean`）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
 -/
 
 /-! D73 本 crate 起的子进程从 `child::command` 起，三类例外各有它们自己的一节

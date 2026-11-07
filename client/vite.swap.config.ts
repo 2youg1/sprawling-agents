@@ -11,7 +11,7 @@ import type { Plugin, UserConfig } from "vite";
 
 import shipped from "./vite.config";
 
-// The swap build (tools/xtask/Spec.lean §8-13, `just swap`): the shipped
+// The swap build (crates/xtask/Spec.lean §8-13, `just swap`): the shipped
 // client with every look under `swap/` drawn in place of the look at the
 // same path under `src/`. A seat imports its look as `./x.look.svelte`,
 // so the replacement is matched on the path the import resolves to, not
