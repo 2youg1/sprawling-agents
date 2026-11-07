@@ -613,10 +613,19 @@ fn kde(values: &[f64], bandwidth: f64) -> Result<(Vec<f64>, Vec<f64>), BenchErro
     }
     inverse.process(&mut bins);
     let scale = count(size)?;
-    let density = bins
+    let peak = bins
         .iter()
         .take(POINTS)
         .map(|value| (value.re / scale).max(0.0))
+        .fold(0.0_f64, f64::max);
+    let roundoff = peak * 1e-12;
+    let density = bins
+        .iter()
+        .take(POINTS)
+        .map(|value| {
+            let density = (value.re / scale).max(0.0);
+            if density <= roundoff { 0.0 } else { density }
+        })
         .collect::<Vec<_>>();
     Ok((grid, density))
 }
@@ -789,5 +798,41 @@ mod tests {
                 .iter()
                 .all(|value| value.is_finite() && *value >= 0.0)
         );
+        for (index, coordinate) in grid.iter().enumerate().step_by(257) {
+            let direct = values
+                .iter()
+                .map(|value| (-0.5 * ((coordinate - value) / bandwidth).powi(2)).exp())
+                .sum::<f64>()
+                / (f64::from(u32::try_from(values.len()).unwrap())
+                    * bandwidth
+                    * (2.0 * std::f64::consts::PI).sqrt());
+            let actual = density.get(index).unwrap();
+            let tolerance = 1e-6_f64.max(direct.abs() * 1e-3);
+            assert!((actual - direct).abs() <= tolerance);
+        }
+    }
+
+    #[test]
+    fn a_bimodal_cell_exports_modes_cuts_shares_and_support() {
+        let values = (0..40)
+            .map(|index| {
+                if index % 2 == 0 {
+                    1.0 + f64::from(index % 5) * 0.02
+                } else {
+                    5.0 + f64::from(index % 5) * 0.02
+                }
+            })
+            .collect::<Vec<_>>();
+        let bootstrap = BlockBootstrap::new(vec![values.clone()], true).unwrap();
+        let mut stream = SeedStream::new(&["fixture", "round", "cell", "shape"]).unwrap();
+        let shape = shape(&values, &bootstrap, 100, &mut stream).unwrap();
+        assert_eq!(shape.modes.len(), 2);
+        assert_eq!(shape.antimodes.len(), 1);
+        assert_eq!(shape.shares.len(), 2);
+        assert_eq!(shape.support.len(), 2);
+        assert!(shape.support.iter().all(|support| *support >= 0.95));
+        assert!((shape.shares.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        let cut = shape.antimodes.first().unwrap();
+        assert!(*cut > 1.0 && *cut < 5.0);
     }
 }
