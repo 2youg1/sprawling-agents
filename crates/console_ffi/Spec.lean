@@ -7,7 +7,7 @@
 
 `sprawling-console-ffi`（库名 `console_ffi`，目录 `crates/console_ffi`）是控制台的渲染器：一片 Zig 叶子（`crates/console_ffi/zig/leaf.zig`）把 Rust 写好的一份 scene 读成终端一帧的字节，Rust 一侧只借出 scene 与输出缓冲，读回帧长与光标所在的行。控制台本身（CLI 与安静宿主的生命周期、按键、会话、读记录）在 `crates/sprawling/spec/Console.lean` §8-11；那里决定屏上有什么，这里决定它长什么样。
 
-渲染是一个纯函数——同一份 scene、同一个宽度得到同样的字节——没有状态机。这里证明的是它排版的一条性质：写进一行的字恒不越过这一行剩下的列（§2），终端的最后一列因此从不被写（D6）。其余由 `console_ffi::tests` 守住：每一帧写进一个终端模拟器（`vt100`），比对整屏文字、光标位置与下一帧擦除的行数；Zig 一侧的单测由 `zig test crates/console_ffi/zig/leaf.zig` 跑。
+渲染是一个纯函数——同一份 scene、同一个宽度得到同样的字节——叶子本身没有状态机；Rust 缓冲重试由下列状态机刻画。这里也证明它排版的一条性质：写进一行的字恒不越过这一行剩下的列（§2），终端的最后一列因此从不被写（D6）。其余由 `console_ffi::tests` 守住：每一帧写进一个终端模拟器（`vt100`），比对整屏文字、光标位置与下一帧擦除的行数；Zig 一侧的单测由 `zig test crates/console_ffi/zig/leaf.zig` 跑。
 -/
 
 /-! ## 1 需求分解
@@ -85,9 +85,78 @@ theorem a_text_that_fits_is_written_whole (t : Text) (room : Nat) (h : width t �
   unfold fit
   simp [h, cut_keeps_what_fits t room h]
 
+/-- Rust 自动扩容阈值；不是调用方容量的上限。 -/
+def retryLimit : Nat := 64 * 1024 * 1024
+
+def initialCapacity (reserved : Nat) : Nat := max reserved (16 * 1024)
+
+inductive DrawStatus where
+  | drawn | full | malformed
+  deriving DecidableEq, Repr
+
+inductive DrawState where
+  | trying (capacity : Nat)
+  | drawn | malformed | tooLong
+  deriving DecidableEq, Repr
+
+/-- 一次叶子调用；终态不再调用叶子。Full 才能扩容。 -/
+def drawStep (state : DrawState) (status : DrawStatus) : DrawState :=
+  match state, status with
+  | .trying _, .drawn => .drawn
+  | .trying _, .malformed => .malformed
+  | .trying capacity, .full =>
+    if capacity < retryLimit then .trying (min (capacity * 2) retryLimit)
+    else .tooLong
+  | state, _ => state
+
+/-- 每次重试严格增长且不超过阈值，因此不能无限重试。 -/
+theorem retry_progress (capacity : Nat) (positive : 0 < capacity)
+    (below : capacity < retryLimit) :
+    capacity < min (capacity * 2) retryLimit ∧
+    min (capacity * 2) retryLimit ≤ retryLimit := by
+  omega
+
+/-- 沿连续 Full 调用逐次扩容，未到阈值不能拒绝。 -/
+theorem full_retries_below_limit (capacity : Nat) (below : capacity < retryLimit) :
+    drawStep (.trying capacity) .full = .trying (min (capacity * 2) retryLimit) := by
+  simp [drawStep, below]
+
+/-- 至少达到阈值且仍为 Full 才拒绝；该容量仍可以成功画出。 -/
+theorem refusal_boundary (capacity : Nat) :
+    (drawStep (.trying capacity) .full = .tooLong ↔ retryLimit ≤ capacity) ∧
+    drawStep (.trying capacity) .drawn = .drawn ∧
+    drawStep (.trying capacity) .malformed = .malformed := by
+  by_cases h : capacity < retryLimit <;> simp [drawStep, h] <;> omega
+
+/-- 调用方可以预留超过阈值的容量，第一轮照常使用。 -/
+theorem larger_reservation_is_used (reserved : Nat) (large : retryLimit ≤ reserved) :
+    initialCapacity reserved = reserved := by
+  unfold initialCapacity retryLimit at *
+  omega
+
+/-- 供 Rust 边界检查对照的容量轨迹；逐次翻倍，最后封顶。 -/
+def capacityTrace (capacity : Nat) : Nat → List DrawState
+  | 0 => [.trying capacity]
+  | n + 1 => .trying capacity ::
+    (match drawStep (.trying capacity) .full with
+    | .trying next => capacityTrace next n
+    | terminal => [terminal])
+
+#eval capacityTrace (initialCapacity 0) 13
+#eval capacityTrace (retryLimit - 1) 2
+#eval capacityTrace (retryLimit + 1) 1
+
 end ConsoleFfi
 
 /-! ## 8 接口
+
+`draw` 只在叶子返回 `Full` 且缓冲小于 64 MiB 时重试，每次至多翻倍并止于
+64 MiB；调用方预留的更大容量照常使用，因此这不是硬上限。`Malformed` 直接返回，
+不重试。容量至少 64 MiB 时仍返回 `Full` 才答 `TooLong`；用户文字及其转写可以
+正常触发此结果，提示应减少单帧文字。`Malformed` 提示报告缺陷，两者均不停止城市服务。`Screen::frame` 显示相应恢复提示，保留未显示的转写供下一帧重试；成功后才推进转写位置。连续相同拒绝只提示一次，避免每个事件重复刷屏。
+
+一致性检查：`lake build crates.console_ffi.Spec` 检查状态机性质并输出容量轨迹；将轨迹与 `src/leaf.rs` 的初始容量、Full 分支逐次对照。Rust 的 `tests/edges.rs` 通过真实叶子检查扩容、调用方大容量及 Malformed 清空输出；Zig 链接测试检查 URI 不带终端命令。
+
 
 ```rust
 // console_ffi
@@ -147,7 +216,7 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 /-! D5 记录里的控制字符到不了终端
 
-决定：每个 C0 与 C1 控制字符、DEL，以及每个不是 UTF-8 的字节，都画成 U+FFFD；换行只在 scene 的多行文字里作换行。
+决定：进入字符渲染器的 C0、C1、DEL 和无效 UTF-8 画成 U+FFFD；排版可先解释换行与空白。OSC 8 URI 在输出前删除这些控制字符和无效 UTF-8，正常 UTF-8 保留。
 
 理由：转写里是模型与人的字，其中一个 ESC 就是给终端的一条命令——清屏、改标题、写剪贴板。
 -/

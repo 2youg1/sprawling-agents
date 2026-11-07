@@ -19,7 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ORIGIN, phrase, prepareCity } from "./walk";
-import { FIGURED, PROBED, TYPED } from "../src/views/gallery/served";
+import { FIGURED } from "../src/views/gallery/served";
 import type { DevTools } from "./walk_devtools";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -437,9 +437,12 @@ async function visuals(tools: DevTools): Promise<void> {
       if (!target) return ["fixture missing"];
       const collisions = [];
       const rows = [...target.querySelectorAll("tbody tr")];
-      const expected = ${JSON.stringify([...PROBED.map((row) => row.id), TYPED])};
+      // The case leaves the text-only switch on, so the table draws the
+      // rows the city answers for and keeps a probed video row hidden.
+      // FIGURED is that set for this fixture; expecting every probed id
+      // would assert a row the case never draws.
+      const expected = ${JSON.stringify(FIGURED.map((row) => row.id))};
       if (rows.length !== expected.length || expected.some((id) => !rows.some((row) => row.textContent?.includes(id)))) return ["expected fixture rows missing"];
-      const expectedPairs = ${JSON.stringify(FIGURED.map((row) => row.id))};
       let measured = 0;
       for (const [rowIndex, row] of rows.entries()) {
         const cells = [...row.querySelectorAll("td")];
@@ -450,7 +453,7 @@ async function visuals(tools: DevTools): Promise<void> {
             (node) => node.getClientRects().length > 0,
           );
         });
-        if (!expectedPairs.some((id) => row.textContent?.includes(id))) continue;
+        if (!expected.some((id) => row.textContent?.includes(id))) continue;
         if (!groups[0]?.length || !groups[1]?.length) return ["missing visible source pair", rowIndex];
         for (const left of groups[0] || []) {
           for (const right of groups[1] || []) {

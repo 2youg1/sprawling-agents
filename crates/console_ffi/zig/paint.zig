@@ -121,10 +121,18 @@ pub const Painter = struct {
         try self.styled(.plain);
     }
 
-    /// A link a terminal may open (OSC 8) around `label`.
+    /// A link a terminal may open (OSC 8) around `label`. Control
+    /// characters and invalid UTF-8 in the URI never reach the terminal.
     pub fn link(self: *Painter, style: Style, uri: []const u8, label: []const u8) Error!void {
         try self.out.writeAll("\x1b]8;;");
-        try self.out.writeAll(uri);
+        var at: usize = 0;
+        while (at < uri.len) {
+            const c = text.char(uri, at);
+            if (std.mem.eql(u8, c.shown, uri[at .. at + c.len])) {
+                try self.out.writeAll(c.shown);
+            }
+            at += c.len;
+        }
         try self.out.writeAll("\x1b\\");
         try self.fit(style, label, self.room());
         try self.out.writeAll("\x1b]8;;\x1b\\");
@@ -138,4 +146,12 @@ test "a fitted text never runs past its room" {
     try p.fit(.plain, "a long subject", 6);
     try std.testing.expectEqual(@as(usize, 6), p.column);
     try std.testing.expect(std.mem.endsWith(u8, out.buffered(), "a lon…"));
+}
+
+test "link URI cannot terminate OSC or inject terminal commands" {
+    var buffer: [256]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = Painter.init(&out, 80);
+    try p.link(.plain, "https://example/\x07\x1b\\\x1b[2J\u{009c}\x7f\xff中文", "open");
+    try std.testing.expectEqualStrings("\x1b]8;;https://example/\\[2J中文\x1b\\open\x1b]8;;\x1b\\", out.buffered());
 }

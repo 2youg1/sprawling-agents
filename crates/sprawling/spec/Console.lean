@@ -67,6 +67,13 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **程序状态**（`bin::console::program_status`，模型、性质与取舍见 `Console/ProgramStatus.lean` D77）：CLI 与安静宿主两个面以 Program Status Protocol（OSC 7501）向终端报告整座城一条根记录：有请求待批是 `blocked`，有 run 在跑是 `working`，都没有时由最后一个结束的 run 决定 `done`、`error` 或 `idle`。UI 线程在开控制台、换面、读到 `run_started`、`run_frozen`、`approval_requested`、`approval_resolved` 时问一次 `Query::Metrics`，与终端存着的那条相同就不写，交还终端之前写 `state=clear`。报告只带计数，记录里的字到不了终端。`SPRAWLING_PROGRAM_STATUS=never` 关掉它；`Headless` 没有终端，不报告。
 
+-/
+
+/-! D106 拒绝帧不留队重试（`bin::console::screen`，adapter）：渲染器拒绝当前帧时，这一批转写全部丢弃，不复制、不保留到后续事件；`previous` 仍指向最后成功画出的转写。拒绝原因与「转写已丢弃、请到 WebUI 查看」一起印出；相同原因连续出现只报告一次，成功一帧后重新允许报告。后续事件只画自己的转写与当前活动区。取舍：不设等待队列，避免持续拒绝时内存与重复布局工作随历史增长；代价是缩放后不补画被拒绝的转写，正文仍可从 WebUI 的会话读取。相较只限条数的队列，这也避免一条超大答复一直阻塞后续帧。
+
+-/
+
+/-!
 **终端只有一个写者**（`bin::console::ui`）：一条 UI 线程拥有终端，每一帧经渲染器写成字节，包在一次同步更新（mode 2026）里——先擦掉上一帧的活动区，写下新的转写行，再画活动区并把光标放回 composer；不认 2026 的终端照样画出同样的字节。别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Cut)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
 
 **事件流与诊断行不再印到终端**（sprawling D44）。服务中的城每提交一行账本、每写一条诊断，终端零写入：诊断只进页面的 log 透镜（`serving::Journal` 的终端出口在控制台拥有终端时关掉），CLI 只印选中房间的记录。标准输入输出不是终端时（`Headless`），诊断照旧写标准错误，工装读它。**原因**：一条记录里有人打的字与模型的回复，终端会被旁人看到、被录屏、留在回滚里；CLI 印正文是因为人选了 CLI，这正是「正文只在人要时才印」本来的条件。**被否掉的做法**：保留默认每条记录一行的事件流——它在 CLI 里与答复抢屏，在安静宿主里违背「只有两行」，而 1024 条的广播通道订阅了却不读会让带正文的记录一直驻留。

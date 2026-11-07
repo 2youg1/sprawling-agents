@@ -46,7 +46,7 @@ import crates.adversary.spec.Model
 
 1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，本规格不抄。
 
-   **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
+   **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。`crates/sprawling/tests/from_adversary.rs` 中两个 provider 测试分别守住 endpoint 挂载 URL 的归一化与模型注册时带上限；它们不覆盖全部三条反例。原先失败的 probe 路径及因缺少上限而拒绝派活的路径仍由 Lean 检查。其他新反例按 §9 第 4 步另写 Rust 测试。
 2. `just check` 不构建或运行检验器；`xtask spec` 读取本规格的 Lean 文件，检查 `sorry`、`admit`、`axiom` 与不允许的 import。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。
@@ -415,7 +415,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 1. `just adversary` 先 `cargo build -p sprawling`，把二进制路径经 `SPRAWLING_BIN` 传给检查器。**唯一一处知道二进制在哪的地方是 justfile**。
 2. `lake exe adversary` 按树跑：先跑 U5 的渲染对拍（毫秒级，先失败先止损），再跑 U1 的门契约，再跑 U3 的随机轨迹，然后 U4 的定向场景，再是 U6 的历史自洽与磁盘敌意，最后是按缺陷命名的那一组与那一条。
 3. 反例出现时，报文给出种子、收缩次数、最小化后的轨迹与破掉的那条承诺。把种子经 `SPRAWLING_SEED` 传回去可以原样复现。
-4. 人把最小反例经 `SPRAWLING_ACCEPT=1` 渲染成 Rust 源码，提交到 `crates/sprawling/tests/`。**知识就此迁移到 Rust，本目录不保留它。**
+4. 人把最小反例写成 Rust 回归测试，提交到 `crates/sprawling/tests/`。`SPRAWLING_ACCEPT=1` 只从固定的 `remembered` 轨迹与渲染器内的其他固定案例重写 `from_adversary.rs`，不接收新发现的反例；不同的新反例另写在该目录的独立测试文件中，避免被重新生成覆盖。逐字节对拍只验证固定案例与渲染器一致，不证明新反例已保存。**知识就此迁移到 Rust，本目录不保留它。**
 5. `just adversary --select <文字>` 与 `--reject <文字>` 按检查的完整路径筛选。它们为红之后的那几分钟而存：单条检查几秒就重跑完，而整棵树要几分钟。定时任务不用它们——它把整棵树一次跑完，因为树里每一条都是**必须通过**的。
 6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <脚本> <记录> <清单>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完四段：
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
@@ -569,7 +569,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 
 /-! ## 15 影响面
 
-对 Rust 侧的影响**必须**恰好为零：不改 `Cargo.toml` 的 members，不进 `cargo deny` 的依赖图，不参与 `xtask length` 的行数，不进 `xtask modmap` 的模块表。唯一的交汇点是 `crates/sprawling/tests/from_adversary.rs`——它由本目录渲染、由 `cargo test` 编译，两侧任何一方漂移都会让某一侧变红。
+对 Rust 侧的影响**必须**恰好为零：不改 `Cargo.toml` 的 members，不进 `cargo deny` 的依赖图，不参与 `xtask length` 的行数，不进 `xtask modmap` 的模块表。生成案例的交汇点是 `crates/sprawling/tests/from_adversary.rs`——它由本目录渲染、由 `cargo test` 编译，两侧任何一方漂移都会让某一侧变红。新发现的其他反例由人另写在 `crates/sprawling/tests/` 中，不属于这个对拍范围。
 
 `xtask` 的扫描不进 `.lake`（`walk::SKIP_DIRS`），因为那是构建产物，而一道门为已提交的对象作证。`xtask release` 拒绝「引用了一台机器自己的文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头；本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
 -/

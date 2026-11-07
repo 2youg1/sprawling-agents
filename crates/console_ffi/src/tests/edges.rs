@@ -61,6 +61,7 @@ fn a_scene_cut_short_is_refused_rather_than_read_past() {
             crate::draw(&short, &mut into),
             Err(crate::Refused::Malformed)
         );
+        assert!(into.is_empty());
     }
 }
 
@@ -125,4 +126,26 @@ fn a_short_window_drops_the_transient_rather_than_cover_the_code() {
         shown,
         "                  http://127.0.0.1:7341/\n                  pairing code   K7M2QX9P"
     );
+}
+
+/// Real leaf calls cover automatic growth and capacity beyond the retry limit.
+#[test]
+fn growing_a_frame_preserves_the_complete_output() {
+    let entries = [Entry::Reply {
+        said: "hello world ".repeat(8192),
+    }];
+    let scene = Scene::inline(&Inline {
+        columns: 80,
+        rows: 24,
+        erase: 0,
+        previous: None,
+        entries: &entries,
+        live: None,
+    });
+    let mut grown = Vec::new();
+    let frame = crate::draw(&scene, &mut grown).unwrap();
+    assert!(grown.len() > 16 * 1024);
+    let mut reserved = Vec::with_capacity(64 * 1024 * 1024 + 1);
+    assert_eq!(crate::draw(&scene, &mut reserved), Ok(frame));
+    assert_eq!(reserved, grown);
 }
