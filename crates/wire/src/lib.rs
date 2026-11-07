@@ -124,7 +124,9 @@ pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, M
 pub use preference::{BODY_PX_MIN, BodyPx, PreferencePatch, PreferencesAnswer};
 pub use preference::{CorePlacement, CorePreferences, CorePriority};
 pub use preference::{Glass, ReadingFace, ThemeOverride, Tier};
+pub use preference::{LINE_HEIGHT_MIN, LineHeight, TRACKING_MIN, Tracking};
 pub use preference::{SessionTags, TAG_MAX, Tag};
+pub use preference::{TypeFeature, Weight};
 pub use privacy::{PrivacyAction, PrivacyOutcome, PrivacyRequest, PrivacyResult};
 pub use privacy::{PrivacyAnswer, PrivacyControlEntry, PrivacyCurrent, PrivacyEditions};
 pub use privacy::{PrivacyBuildEffect, PrivacyCategory, PrivacyEdition, PrivacyEditionFit};

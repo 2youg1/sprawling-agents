@@ -392,7 +392,10 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
 | D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `crates/wire/spec/Preference.lean` |
 | D62 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
-| D63 | 内置界面字体是 Maple Mono，旧偏好中的 `geist` 只作读取别名 | `crates/wire/spec/Preference.lean` |
+| D123 | 内置字体是 Paper Mono，`maple` 指仍随包的 Maple Mono，`geist` 不留别名 | `crates/wire/spec/Preference.lean` |
+| D124 | 缺字的回退链是 `Appearance.fallbacks`：至多两个家族名，按顺序试 | `crates/wire/spec/Preference.lean` |
+| D125 | 随包字体的六项特性是 `Appearance.features`，闭集 `TypeFeature` | `crates/wire/spec/Preference.lean` |
+| D126 | 排布的三件：行高、字距、字重，各有下限与域 | `crates/wire/spec/Preference.lean` |
 | D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
 | D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
 | D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |

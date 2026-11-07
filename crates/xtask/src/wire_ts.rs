@@ -39,6 +39,13 @@ pub(super) struct Constants {
     /// admits; the appearance page's box reads this floor rather than a
     /// copy of its own.
     pub(super) body_px_min: u32,
+    /// `wire::LINE_HEIGHT_MIN`, the smallest line box `wire::LineHeight`
+    /// admits, in thousandths of the font size, and
+    /// `wire::TRACKING_MIN`, the tightest spacing `wire::Tracking`
+    /// admits, in thousandths of an em. The two boxes beside the body
+    /// size's read these floors rather than copies of their own.
+    pub(super) line_height_min: u32,
+    pub(super) tracking_min: i32,
     /// `kernel::consts_policy::DEFAULT_EFFORT` as the wire spells it: the
     /// level a request uses when nobody stated one the model offers. The
     /// picker marks the level a request would use, and a copy of its own
@@ -62,6 +69,8 @@ fn render() -> Result<String, XtaskError> {
         hash: wire::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
         body_px_min: wire::BODY_PX_MIN,
+        line_height_min: wire::LINE_HEIGHT_MIN,
+        tracking_min: wire::TRACKING_MIN,
         default_effort: kernel::consts_policy::DEFAULT_EFFORT.as_str(),
         slash: wire::Slash::ALL
             .into_iter()

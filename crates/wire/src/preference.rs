@@ -33,6 +33,12 @@ pub use core::{CorePlacement, CorePreferences, CorePriority};
 mod body;
 pub use body::{BODY_PX_MIN, BodyPx};
 
+mod leading;
+pub use leading::{LINE_HEIGHT_MIN, LineHeight};
+
+mod tracking;
+pub use tracking::{TRACKING_MIN, Tracking};
+
 mod tag;
 pub use tag::{SessionTags, TAG_MAX, Tag};
 
@@ -64,14 +70,55 @@ pub enum Lighting {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Face {
-    /// The family this build ships. `geist` remains accepted only so
-    /// preferences written before Maple Mono still read (D63).
-    #[serde(alias = "geist")]
+    /// Paper Mono, the family this build ships first
+    /// (`client/src/fonts/PaperMono[wght].woff2`, wire D123).
+    Paper,
+    /// Maple Mono, also shipped, and the family the doctor's NF CN build
+    /// extends with Han glyphs and Nerd Font icons.
     Maple,
     /// Whatever this machine calls its interface font.
     System,
     /// The stack the person wrote out.
     Custom,
+}
+
+/// One of the shipped face's own OpenType features, spelled as that
+/// face's name table spells it (`crates/wire/spec/Preference.lean`
+/// D125).
+///
+/// The six are Paper Mono's, whose `ss01`, `ss02`, `ss03`, `ss04`,
+/// `cv01` and `zero` carry these names; another bundled face spells the
+/// same intents with its own tags, and the stylesheet is where the two
+/// are held together. The spelling here is what a person's file holds
+/// and what the page's `data-features` attribute carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum TypeFeature {
+    /// `ss01`: draw `--`, `->` and the rest as the ligatures they name.
+    CodingLigatures,
+    /// `ss02`: the narrow `M`, `W`, `m`, `w` and their kin.
+    Duospace,
+    /// `ss03`: a word space narrower than the normal one.
+    NarrowSpace,
+    /// `ss04`: arrows a little smaller than the ones the face draws.
+    SmallArrows,
+    /// `cv01`: the `a` without its upper arm.
+    SingleStoryA,
+    /// `zero`: a zero that cannot be read as an `O`.
+    SlashedZero,
+}
+
+/// How heavy running text stands: three postures, and the strong steps
+/// of the type ladder stand two hundred above whichever holds
+/// (`crates/wire/spec/Preference.lean` D126).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Weight {
+    Light,
+    Regular,
+    Medium,
 }
 
 /// Which face reading text is drawn in: the messages of a conversation,
@@ -166,6 +213,36 @@ pub struct Appearance {
     /// different statement from any number this build could pick for
     /// them.
     pub body_px: Option<BodyPx>,
+    /// The families a face is followed by for the glyphs it lacks, in
+    /// the order they are tried: at most two names, empty by default
+    /// (`crates/wire/spec/Preference.lean` D124).
+    ///
+    /// The city stores what the person wrote and does not parse it: the
+    /// page owns the name grammar and the stacks that read it, as it
+    /// owns the stacks beside them.
+    #[serde(default)]
+    pub fallbacks: Vec<String>,
+    /// The shipped face's own features the person turned on, in the
+    /// order this crate declares them (`crates/wire/spec/Preference.lean`
+    /// D125). Empty by default, and a feature no build offers is refused
+    /// where it is read rather than dropped.
+    #[serde(default)]
+    pub features: Vec<TypeFeature>,
+    /// The height of one line of running text in thousandths of the
+    /// font size, at least [`LINE_HEIGHT_MIN`]. Absent means the person
+    /// stated none and the stylesheet's own is drawn
+    /// (`crates/wire/spec/Preference.lean` D126).
+    #[serde(default)]
+    pub line_height: Option<LineHeight>,
+    /// The space between letters in thousandths of an em, at least
+    /// [`TRACKING_MIN`]. Absent means the person stated none and the
+    /// page draws its own, which differs by language.
+    #[serde(default)]
+    pub letter_spacing: Option<Tracking>,
+    /// How heavy running text stands. Absent means the person stated no
+    /// opinion and the page draws `regular`.
+    #[serde(default)]
+    pub weight: Option<Weight>,
     pub density: Density,
     pub chroma: Chroma,
     pub motion: Motion,
@@ -292,12 +369,17 @@ impl Default for Appearance {
     fn default() -> Self {
         Appearance {
             lighting: Lighting::System,
-            sans: Face::Maple,
-            mono: Face::Maple,
+            sans: Face::Paper,
+            mono: Face::Paper,
             sans_stack: String::new(),
             mono_stack: String::new(),
             reading: None,
             body_px: None,
+            fallbacks: Vec::new(),
+            features: Vec::new(),
+            line_height: None,
+            letter_spacing: None,
+            weight: None,
             density: Density::Comfortable,
             chroma: Chroma::Full,
             motion: Motion::System,
@@ -436,25 +518,169 @@ mod tests {
         assert_eq!(held.appearance, Appearance::default());
     }
 
-    /// The built-in face has a new name, while a person's old file still
-    /// reads: the alias is accepted on input only, and new output uses
-    /// Maple Mono (`crates/wire/spec/Preference.lean` D63).
+    /// An appearance section with `fields` laid over the postures a file
+    /// that states nothing else holds. One spelling of the section, so a
+    /// test that adds a fact states only that fact.
+    fn appearance(fields: serde_json::Value) -> serde_json::Value {
+        let mut stated = serde_json::json!({
+            "lighting": "dark", "sans": "paper", "mono": "paper",
+            "sans_stack": "", "mono_stack": "", "body_px": null,
+            "density": "compact", "chroma": "full", "motion": "system",
+        });
+        if let (serde_json::Value::Object(extra), serde_json::Value::Object(stated)) =
+            (fields, &mut stated)
+        {
+            stated.extend(extra);
+        }
+        serde_json::json!({ "appearance": stated })
+    }
+
+    /// The built-in face is Paper Mono, and neither a word of the face
+    /// that left the bundle nor the word of the face that stayed is read
+    /// as it: `maple` is Maple Mono, which still ships
+    /// (`crates/wire/spec/Preference.lean` D123).
     #[test]
-    fn the_shipped_face_is_maple_and_an_old_geist_file_still_reads() {
-        let old = r#"{"appearance":{"lighting":"dark","sans":"geist","mono":"geist","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#;
-        let held: PreferencesAnswer = serde_json::from_str(old).unwrap();
+    fn the_shipped_face_is_paper_and_no_old_name_reads() {
+        let held = serde_json::to_value(PreferencesAnswer::default())
+            .unwrap()
+            .pointer("/appearance")
+            .cloned()
+            .unwrap();
         assert_eq!(
-            serde_json::to_value(&held)
-                .unwrap()
-                .pointer("/appearance/sans"),
-            Some(&serde_json::json!("maple"))
+            (held.get("sans"), held.get("mono")),
+            (
+                Some(&serde_json::json!("paper")),
+                Some(&serde_json::json!("paper"))
+            )
         );
+        assert!(
+            serde_json::from_value::<PreferencesAnswer>(appearance(
+                serde_json::json!({ "sans": "geist" })
+            ))
+            .is_err()
+        );
+        let maple: PreferencesAnswer =
+            serde_json::from_value(appearance(serde_json::json!({ "sans": "maple" }))).unwrap();
+        assert_eq!(maple.appearance.sans, Face::Maple);
+    }
+
+    /// The fallback chain reads back as written, in its order, and a
+    /// section written before it existed reads back as none: the city
+    /// stores the names and does not parse them
+    /// (`crates/wire/spec/Preference.lean` D124).
+    #[test]
+    fn the_fallback_chain_reads_back_in_its_order_and_absent_as_none() {
+        let read_back = |fallbacks: Option<serde_json::Value>| {
+            let mut stated = serde_json::json!({});
+            if let (Some(names), serde_json::Value::Object(stated)) = (fallbacks, &mut stated) {
+                stated.insert("fallbacks".to_owned(), names);
+            }
+            let held: PreferencesAnswer = serde_json::from_value(appearance(stated)).unwrap();
+            held.appearance.fallbacks
+        };
         assert_eq!(
-            serde_json::to_value(PreferencesAnswer::default())
-                .unwrap()
-                .pointer("/appearance/mono"),
-            Some(&serde_json::json!("maple"))
+            read_back(Some(serde_json::json!([
+                "Maple Mono NF CN",
+                "Noto Sans SC"
+            ]))),
+            vec!["Maple Mono NF CN".to_owned(), "Noto Sans SC".to_owned()]
         );
+        assert_eq!(read_back(None), Vec::<String>::new());
+    }
+
+    /// The six features read back as stated and a seventh word is
+    /// refused rather than dropped (`crates/wire/spec/Preference.lean`
+    /// D125).
+    #[test]
+    fn the_six_features_read_back_and_a_word_no_bundle_offers_is_refused() {
+        let held: PreferencesAnswer = serde_json::from_value(appearance(serde_json::json!({
+            "features": ["duospace", "single_story_a", "slashed_zero"],
+        })))
+        .unwrap();
+        assert_eq!(
+            held.appearance.features,
+            vec![
+                TypeFeature::Duospace,
+                TypeFeature::SingleStoryA,
+                TypeFeature::SlashedZero,
+            ]
+        );
+        assert!(
+            serde_json::from_value::<PreferencesAnswer>(appearance(serde_json::json!({
+                "features": ["kerning"],
+            })))
+            .is_err()
+        );
+        assert_eq!(Appearance::default().features, Vec::new());
+    }
+
+    /// A line box under the floor is refused where it is read, and any
+    /// taller one reads back as the number it was
+    /// (`crates/wire/spec/Preference.lean` D126).
+    #[test]
+    fn a_line_box_under_the_floor_is_refused_and_any_taller_one_reads() {
+        let read_back = |height: u32| {
+            serde_json::from_value::<PreferencesAnswer>(appearance(
+                serde_json::json!({ "line_height": height }),
+            ))
+            .map(|held| held.appearance.line_height)
+        };
+        assert!(read_back(1199).is_err());
+        assert_eq!(
+            [1200, 1625, 3000]
+                .into_iter()
+                .map(|height| read_back(height).unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                Some(LineHeight::new(1200).unwrap()),
+                Some(LineHeight::new(1625).unwrap()),
+                Some(LineHeight::new(3000).unwrap()),
+            ]
+        );
+        assert_eq!(Appearance::default().line_height, None);
+    }
+
+    /// A tracking under the floor is refused where it is read, and any
+    /// looser one reads back as the number it was.
+    #[test]
+    fn a_tracking_under_the_floor_is_refused_and_any_looser_one_reads() {
+        let read_back = |spacing: i32| {
+            serde_json::from_value::<PreferencesAnswer>(appearance(
+                serde_json::json!({ "letter_spacing": spacing }),
+            ))
+            .map(|held| held.appearance.letter_spacing)
+        };
+        assert!(read_back(-51).is_err());
+        assert_eq!(
+            [-50, 0, 12, 40]
+                .into_iter()
+                .map(|spacing| read_back(spacing).unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                Some(Tracking::new(-50).unwrap()),
+                Some(Tracking::new(0).unwrap()),
+                Some(Tracking::new(12).unwrap()),
+                Some(Tracking::new(40).unwrap()),
+            ]
+        );
+        assert_eq!(Appearance::default().letter_spacing, None);
+    }
+
+    /// The weight is the person's to state and absent until they do.
+    #[test]
+    fn the_weight_reads_back_as_stated_and_absent_as_never_said() {
+        let read_back = |weight: &str| {
+            serde_json::from_value::<PreferencesAnswer>(appearance(
+                serde_json::json!({ "weight": weight }),
+            ))
+            .map(|held| held.appearance.weight)
+        };
+        assert_eq!(
+            [read_back("light").unwrap(), read_back("medium").unwrap(),],
+            [Some(Weight::Light), Some(Weight::Medium)]
+        );
+        assert!(read_back("bold").is_err());
+        assert_eq!(Appearance::default().weight, None);
     }
 
     /// A section written before the page's glass, blend opacity and
@@ -463,16 +689,26 @@ mod tests {
     #[test]
     fn an_appearance_written_before_glass_and_blend_still_reads() {
         let held: PreferencesAnswer = serde_json::from_str(
-            r#"{"appearance":{"lighting":"dark","sans":"geist","mono":"geist","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#,
+            r#"{"appearance":{"lighting":"dark","sans":"maple","mono":"maple","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#,
         )
         .unwrap();
         assert_eq!(
             (
                 held.tier,
                 held.appearance.glass,
-                held.appearance.blend_percent
+                held.appearance.blend_percent,
+                held.appearance.line_height,
+                held.appearance.letter_spacing,
+                held.appearance.weight,
             ),
-            (None, None, None)
+            (None, None, None, None, None, None)
+        );
+        assert_eq!(
+            (
+                held.appearance.fallbacks.len(),
+                held.appearance.features.len(),
+            ),
+            (0, 0)
         );
         let mut chosen = held;
         chosen.apply(PreferencePatch::Tier(Tier::Panorama));
@@ -485,22 +721,15 @@ mod tests {
     /// and any size above it reads back as the number it was.
     #[test]
     fn a_body_size_under_the_floor_is_refused_and_any_size_above_it_reads() {
-        let appearance = |px: u32| {
-            serde_json::json!({ "appearance": {
-                "lighting": "dark", "sans": "maple", "mono": "maple",
-                "sans_stack": "", "mono_stack": "", "body_px": px,
-                "density": "compact", "chroma": "full", "motion": "system",
-            }})
+        let read_back = |px: u32| {
+            serde_json::from_value::<PreferencesAnswer>(appearance(
+                serde_json::json!({ "body_px": px }),
+            ))
+            .map(|held| held.appearance.body_px)
         };
-        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(11)).is_err());
+        assert!(read_back(11).is_err());
         for px in [12, 24, 96] {
-            let held: PreferencesAnswer = serde_json::from_value(appearance(px)).unwrap();
-            assert_eq!(
-                serde_json::to_value(&held)
-                    .unwrap()
-                    .pointer("/appearance/body_px"),
-                Some(&serde_json::json!(px))
-            );
+            assert_eq!(read_back(px).unwrap(), Some(BodyPx::new(px).unwrap()));
         }
     }
 
@@ -510,37 +739,27 @@ mod tests {
     /// field existed reads back as never stated.
     #[test]
     fn the_reading_face_reads_back_as_stated_and_absent_as_never_said() {
-        let appearance = |reading: Option<&str>| {
-            let mut stated = serde_json::json!({
-                "lighting": "dark", "sans": "maple", "mono": "maple",
-                "sans_stack": "", "mono_stack": "", "body_px": null,
-                "density": "compact", "chroma": "full", "motion": "system",
-            });
-            if let (Some(face), Some(fields)) = (reading, stated.as_object_mut()) {
+        let read_back = |reading: Option<&str>| {
+            let mut fields = serde_json::json!({});
+            if let (Some(face), serde_json::Value::Object(fields)) = (reading, &mut fields) {
                 fields.insert("reading".to_owned(), serde_json::json!(face));
             }
-            serde_json::json!({ "appearance": stated })
-        };
-        let read_back = |reading: Option<&str>| {
-            let held: PreferencesAnswer = serde_json::from_value(appearance(reading)).unwrap();
-            serde_json::to_value(&held)
-                .unwrap()
-                .pointer("/appearance/reading")
-                .cloned()
+            serde_json::from_value::<PreferencesAnswer>(appearance(fields))
+                .map(|held| held.appearance.reading)
         };
         assert_eq!(
             [
-                read_back(Some("libron")),
-                read_back(Some("interface")),
-                read_back(None)
+                read_back(Some("libron")).unwrap(),
+                read_back(Some("interface")).unwrap(),
+                read_back(None).unwrap(),
             ],
             [
-                Some(serde_json::json!("libron")),
-                Some(serde_json::json!("interface")),
-                Some(serde_json::Value::Null),
+                Some(ReadingFace::Libron),
+                Some(ReadingFace::Interface),
+                None,
             ]
         );
-        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(Some("georgia"))).is_err());
+        assert!(read_back(Some("georgia")).is_err());
     }
 
     /// A key this build does not read is refused where it is written.
