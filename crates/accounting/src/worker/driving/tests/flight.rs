@@ -23,6 +23,7 @@ pub(super) fn asked(addr: &str) -> Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
         effort: None,
+        difficulty: None,
         model: None,
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         parent: None,

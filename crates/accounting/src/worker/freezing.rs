@@ -332,6 +332,7 @@ impl Freezing<'_> {
             parent: at.parent,
             predecessor: at.predecessor(),
             dispatched_by: at.dispatched_by.clone(),
+            routing: Some(site.routing.clone()),
             run_policy: workbench.take_policy()?,
             inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {

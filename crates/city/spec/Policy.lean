@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import crates.kernel.spec.Delegation
 import crates.kernel.spec.Layout
 
 /-!
@@ -24,8 +25,20 @@ impl UserBrowserEndpoint {
     pub fn url(&self) -> &str;
     pub fn host(&self) -> &str;
 }
-pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、review、browser、usersbrowser、desktop、reading_room、harness_minutes —— 私有 */ }
+pub struct WorkspaceModelPolicy { /* allowed、max_effort、recommendations —— 私有 */ }
+pub struct ModelRecommendation { /* model: ModelRef、effort: Effort —— 私有 */ }
+pub struct WorkspaceRecommendations { /* easy、medium、hard —— 私有 */ }
+impl WorkspaceModelPolicy {
+    pub fn recommendation(&self, difficulty: Difficulty) -> &ModelRecommendation;
+    pub fn digest(&self) -> Result<B3Hash, AxError>;       // 规范 JSON 字节的 BLAKE3，run_started 钉这一版
+}
+impl ModelRecommendation {
+    pub fn model(&self) -> &ModelRef;
+    pub fn effort(&self) -> Effort;
+}
+pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、review、browser、usersbrowser、desktop、reading_room、harness_minutes、workspace_models —— 私有 */ }
 impl BuildingRules {
+    pub fn workspace_models(&self) -> Option<&WorkspaceModelPolicy>; // 没写这一节即 None，旧路径不变
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
     pub fn addr(&self) -> &Address;
     pub fn egress(&self) -> Option<&EgressAllowlist>; // `None`：楼没写这一键，不限主机（D27）；confidential 楼恒 `Some(空表)`，它声明的表在 evaluate 处即拒
@@ -139,6 +152,9 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 ```rust
 pub fn write_rules_against(city_root: &Path, addr: &Address, base: &str, text: &str) -> Result<BuildingRules, AxError>;
+pub struct RulesEdit<'a> { pub base: &'a str, pub text: &'a str }   // 页面提议的正文与它先读到的那一版
+pub fn write_rules_against_with(city_root: &Path, addr: &Address, edit: RulesEdit<'_>,
+    validate: impl FnOnce(&BuildingRules) -> Result<(), AxError>) -> Result<BuildingRules, AxError>; // 同一次求值后先过端点簿，再守 base 并落盘
 pub enum CitySetting<'a> { KeepWarm(KeepWarm), Effort(Effort), Catalog(&'a ExposureTable) }   // [catalog] 见 ConfigLayers §8-4g
 pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<(), AxError>;
 ```
@@ -146,6 +162,50 @@ pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<
 - **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。它是楼规唯一的写门（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）；`rules` 工具只读，没有写面（§8-2b，D23），所以「盘上的楼规永远读得懂」只有一条规则。
 - **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
 - 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
+-/
+
+/-! ### 8-35 `RULES.toml` 的工作区模型策略（`policy::workspace`，形状 1 判定＋形状 2 值类型）
+
+真实场景：人在 `shop` 工作区允许本地、普通、强三个已登记模型，把 `easy / medium / hard` 分别指到普通＋low、普通＋medium、强＋high；父 Session 只给 `delegate.difficulty`，城市在子 Session 第一次派活时选型。没有 `[workspace_models]` 的楼完全走旧 `main` 路径。
+
+```toml
+[workspace_models]
+allowed = [{ endpoint = "house", model = "ordinary" }, { endpoint = "house", model = "strong" }]
+max_effort = "high"
+[workspace_models.recommendations.easy]
+endpoint = "house"
+model = "ordinary"
+effort = "low"
+[workspace_models.recommendations.medium]
+endpoint = "house"
+model = "ordinary"
+effort = "medium"
+[workspace_models.recommendations.hard]
+endpoint = "house"
+model = "strong"
+effort = "high"
+```
+
+- **一个 ModelRef 同时携 `(endpoint, model)`**，同名模型跨 provider 不合并。`allowed` 非空；三档推荐都必须在其中；`max_effort` 与三档 `effort` 都是真实档位，旧账本兼容词 `none` 在这里拒绝；每档都不高于 `max_effort`。这些结构不变量在 `evaluate` 一次性判完，失败不落任何字节。
+- **页面保存还要过端点簿**：`PutRules` 与携自定义规则的 `CreateBuilding` 在现有写门之前，用同一本 `EndpointBook` 拒掉未接入、未登记或不存在的引用，以及已知不提供推荐 effort 的模型。文件已有并发改动仍由 `base` 拒；任一拒绝都不留下半份策略。
+- **策略只管城市原生模型居民**：harness 自己选模型，`agree_to_work` 的 harness 臂不读这张表。confidential 的本地边界仍由 `EndpointBook::select` 在选型时判，策略不能放宽它。
+- **只在新 Session 的委派路径上推荐**：已有房间记录时忽略本次难度，继续走冻结形状；新子 Session 有难度取对应推荐，没难度取 `medium`。人显式给出的 `Dispatch.model`／`effort` 优先，但仍受 allowed／max effort 与 provider offer 约束。推荐端点被摘除、模型不再登记、effort offer 改变或 confidential 不允许时拒绝，不降档、不另换模型。
+- **版本随子 run 入账**：策略的规范 JSON 字节摘要进入 `run_started.routing.policy`；实际 `ModelRef`、请求难度与选择来源同在这条记录，实际 effort 沿用已有的 `run_started.effort`，不写第二份。重放只读这些行，不重新评估任务。
+- **新楼的模板带一段注释占位**：`crates/city/templates/RULES.toml` 末尾把 `allowed`、`max_effort` 与三档推荐写成注释，每档给 `endpoint`（provider 名）、`model`、`effort` 三栏。注释即不启用，人揭开并改掉示例值就生效；占位符本身由 `the_template_hands_a_building_a_working_routing_placeholder` 钉住——模板照读是 `None`，揭开后是本读者接受的策略。
+- **本版不加结构化表单**：另立一帧与一棵 TOML 写者，会让同一个键有两种写法，而现有规则页已经带着基线、求值与端点簿校验三道守卫；占位符解决“不知道写什么”，结构化编辑器留给真有批量改法需求的那天（D90 的重开参数）。
+
+验收：city 的解析与结构拒绝测试、Lean 的 `route_existing_session`／`route_without_policy`／`route_recommendation_allowed`／`route_recommendation_within_max`；accounting 经真实 `delegate` 覆盖三档、无难度缺省、已有 Session 不换模型、无策略旧行为与开始前拒绝。
+-/
+
+/-! D90 工作区策略追加进 RULES.toml，而不是另建模型默认值
+
+**决定**：`[workspace_models]` 是楼规的可选末节，复用整份楼规的求值、基线写门与治理摘要；不把推荐写进 `[model] name`，也不改全城 `main`。
+
+**理由**：工作区允许什么与三档推荐是一张必须原子校验、原子保存的策略；楼规已有这条写路径。另建文件会让楼规与策略各自留下版本和失败路径，改全城 `main` 则会把一次子任务的选择泄漏给无关 Session。
+
+**被否**：给 `delegate` 再加 model／effort 参数——父 Session 就会同时回答难度、模型与价格，和城市策略形成三套可能矛盾的答案；房间级策略——第一版没有房间级场景，Session 冻结与人工 `Dispatch` 已覆盖单次指定；为这张表另立结构化帧与第二棵 TOML 写者——同一个键有了两种写法，而模板里的注释占位已经回答了“不知道写什么”。
+
+**重开参数**：人要求在页面上一次改三档而不碰其余楼规文本，且规则页的基于求值的拒词已不足以给出下一步时，再议结构化帧，且它只能经 `write_rules_against` 这一扇门落盘。
 -/
 
 /-! D2 定规：读界在调用时按目标所在楼现读规则
@@ -372,3 +432,82 @@ theorem kept_rules_answer_what_a_read_would {S R E : Type} [DecidableEq S] (read
       all_goals exact sound held rules rfl
 
 end City.Policy
+
+/-! 工作区路由的纯模型；Rust 的 `policy::workspace` 与 `agree_to_work` 共用这里的判定语义。 -/
+namespace City.Policy.Workspace
+
+open Kernel.Delegation
+
+/-- 同一 provider 上的同一模型；两个字段合起来才是身份。 -/
+structure ModelRef where
+  endpoint : String
+  model : String
+  deriving DecidableEq, Repr
+
+/-- 一档推荐；`effort` 在模型中是可比较的档位序号，不包含旧账本兼容词 `none`。 -/
+structure Recommendation where
+  model : ModelRef
+  effort : Nat
+  deriving Repr
+
+/-- 三档齐全的一张工作区策略。 -/
+structure Policy where
+  allowed : List ModelRef
+  maxEffort : Nat
+  easy : Recommendation
+  medium : Recommendation
+  hard : Recommendation
+  deriving Repr
+
+/-- 父 Session 给出的难度命中哪一档；未给难度是 `medium`，不是另一次判断。 -/
+def recommendation (policy : Policy) (difficulty : Difficulty) : Recommendation :=
+  match difficulty with
+  | .Easy => policy.easy
+  | .Medium => policy.medium
+  | .Hard => policy.hard
+
+/-- `evaluate` 与端点簿校验共同建立、路由依赖的结构前提。 -/
+def Valid (policy : Policy) : Prop :=
+  policy.allowed ≠ [] ∧ ∀ difficulty,
+    (recommendation policy difficulty).model ∈ policy.allowed ∧
+      (recommendation policy difficulty).effort ≤ policy.maxEffort
+
+/-- `none` 是继续走旧冻结／`main` 路径；`some` 才是城市替一次新子 Session 作出的推荐。 -/
+def route (existingSession : Bool) (policy : Option Policy) (requested : Option Difficulty) :
+    Option Recommendation :=
+  match existingSession, policy with
+  | true, _ | _, none => none
+  | false, some policy => some (recommendation policy (requested.getD .Medium))
+
+/-- 已有 Session 不受这次难度影响。 -/
+theorem route_existing_session (policy : Option Policy) (requested : Option Difficulty) :
+    route true policy requested = none := by
+  cases policy <;> rfl
+
+/-- 无策略时线上行为保持原样。 -/
+theorem route_without_policy (requested : Option Difficulty) :
+    route false none requested = none :=
+  rfl
+
+/-- 有效策略选出的模型一定在 allowed 中。 -/
+theorem route_recommendation_allowed (policy : Policy) (requested : Option Difficulty)
+    (valid : Valid policy) :
+    ∃ selected, route false (some policy) requested = some selected ∧
+      selected.model ∈ policy.allowed := by
+  refine ⟨recommendation policy (requested.getD .Medium), rfl, ?_⟩
+  exact (valid.2 (requested.getD .Medium)).1
+
+/-- 有效策略选出的 effort 一定不高于 max_effort。 -/
+theorem route_recommendation_within_max (policy : Policy) (requested : Option Difficulty)
+    (valid : Valid policy) :
+    ∃ selected, route false (some policy) requested = some selected ∧
+      selected.effort ≤ policy.maxEffort := by
+  refine ⟨recommendation policy (requested.getD .Medium), rfl, ?_⟩
+  exact (valid.2 (requested.getD .Medium)).2
+
+/-- 不写难度不是空路由：配置了策略的新子 Session 落到 medium 推荐。 -/
+theorem route_defaults_to_medium (policy : Policy) :
+    route false (some policy) none = some policy.medium :=
+  rfl
+
+end City.Policy.Workspace

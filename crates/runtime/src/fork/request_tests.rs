@@ -245,6 +245,7 @@ fn plan(run: RunId, task: &str, inherited: Vec<ChatMessage>) -> RunPlan {
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
+        routing: None,
         inherited,
         shape: CallShape {
             model: "script".to_owned(),

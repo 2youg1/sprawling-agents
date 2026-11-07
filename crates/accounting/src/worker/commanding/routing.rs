@@ -164,6 +164,7 @@ impl RunWorker {
                     addr,
                     session,
                     effort,
+                    difficulty: None,
                     model,
                     parent: None,
                     succession: None,

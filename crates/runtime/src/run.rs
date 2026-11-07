@@ -66,6 +66,9 @@ pub struct RunPlan {
     /// author is always the city's desk, so only the dispatch site
     /// knows whether the person, the city or a resident sent it.
     pub dispatched_by: kernel::event::Who,
+    /// The actual model reference and the decision that selected it,
+    /// recorded verbatim by `run_started`; harness runs have none.
+    pub routing: Option<kernel::event::record::ModelRouting>,
     /// The run policy this run was dispatched under, written into
     /// `run_started` as it was chosen (`crates/kernel/Spec.lean` §8-77), and
     /// the cell that holds it while the run goes: the one value here

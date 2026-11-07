@@ -121,6 +121,7 @@ impl Chartered {
             // generation froze.
             effort: None,
             generation: None,
+            routing: None,
             // The agent is known once its session opened; the drive fills
             // it in then.
             agent: None,

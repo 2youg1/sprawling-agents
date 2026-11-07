@@ -42,6 +42,9 @@ pub(super) struct Assignment {
     /// caller said. It is written into the room's own configuration
     /// layer, so it cannot be answered before the room exists.
     pub(super) effort: Option<kernel::Effort>,
+    /// The parent's difficulty judgement for delegated work. It never
+    /// carries a model or effort of its own.
+    pub(super) difficulty: Option<kernel::Difficulty>,
     /// The registered model this dispatch named by id, when it named
     /// one; `None` runs on the `main` tag's model. Spent by agreeing,
     /// which finds the tag that registered it (`crates/sprawling/Spec.lean` §8-10).
@@ -174,6 +177,8 @@ pub(super) struct Agreed {
     pub(super) building: city::Building,
     pub(super) rules: city::BuildingRules,
     pub(super) model: gateway::ModelEntry,
+    /// Why this run selected the model, recorded in `run_started`.
+    pub(super) routing: kernel::event::record::ModelRouting,
     /// The name of the endpoint the model is reached through, which is
     /// the provider a model's note is filed under (`crates/sprawling/Spec.lean` §8-85).
     pub(super) provider: String,
@@ -244,6 +249,7 @@ pub(super) mod handback;
 pub(super) mod harness;
 pub(super) mod heavy_landing;
 pub(super) mod preparing;
+pub(super) mod routing;
 pub(super) mod running;
 pub(super) mod session;
 pub(super) mod session_shape;

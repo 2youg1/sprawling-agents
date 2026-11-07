@@ -85,6 +85,7 @@ fn a_settled_landing_says_where_each_letter_landed() {
         succession: None,
         session: None,
         effort: None,
+        difficulty: None,
         model: None,
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         taint: kernel::TaintSet::empty(),

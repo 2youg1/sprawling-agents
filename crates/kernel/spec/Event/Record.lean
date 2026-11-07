@@ -25,9 +25,16 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
     pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
     pub policy: Option<RunPolicy>,      // 这次 run 的运行策略（§8-77）；缺键即这一行早于策略入账
-    pub effort: Option<Effort>,         // §8-85
+    pub effort: Option<Effort>,         // §8-85；也是路由后的实际 effort，不在 routing 里重抄
+    pub generation: Option<FrozenGeneration>,
+    pub routing: Option<ModelRouting>,  // §8-89：模型 run 的实际 ModelRef、难度、策略摘要与来源
     pub agent: Option<AgentRunIdentity>, // §8-87：harness run 由哪一个 ACP agent 接手
 }
+pub struct ModelRef { pub endpoint: String, pub model: String }
+pub struct ModelRouting { pub difficulty: Option<Difficulty>, pub model: ModelRef,
+                          pub policy: Option<B3Hash>, pub source: ModelSelectionSource }
+#[serde(rename_all = "snake_case")]
+pub enum ModelSelectionSource { Manual, Difficulty, MediumDefault, Main }
 pub struct AgentRunIdentity { pub id: String, pub version: Option<String>, pub launch_digest: B3Hash }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64,
@@ -421,6 +428,14 @@ pub struct RunStarted {
 - **被否：读这次 run 的第一个提交的 `effort`**（`CommitAttribution`）。还没提交过的 run 说不出强度，而提交上的那个值写的是 `Effort::None` 兼指「没说」，读回来分不清。**被否：读 `model_selected`**：那是房间的选择，后来的派活可以在帧上另带强度，房间的选择不等于这次 run 用的那一个。
 - 验收：`record::run` 的 `a_run_started_line_records_the_effort_it_froze`（写出、读回、缺席不写）。
 - **同一条还记 `generation: Option<FrozenGeneration>`**：采样文本、实发 `max_tokens` 与最后应用的原始 overrides 从 `RunPlan.shape` 照录。分支从母亲这一行恢复，页面从这一行展示冻下的事实，重放不读当前模型默认值。旧行与 harness run 缺席；没有新设置的新行也保留 `max_tokens`，因为那是这次请求实际采用的输出上限。
+-/
+
+/-!
+### 8-89 `run_started` 记下工作区模型路由（`kernel::event::record::run`，形状 2 值类型）
+
+`routing` 只出现在本城驱动的模型 run：实际 `(endpoint, model)` 是 `ModelRef`，`difficulty` 是父调用这次带来的词，`policy` 是实际命中的工作区策略摘要，`source` 穷尽为 `manual`／`difficulty`／`medium_default`／`main`。实际 effort 读同一行的 `effort`，不在 `ModelRouting` 里复制；没有命中策略或已有 Session 继续冻结形状时 `policy` 缺席。旧行与 harness run 的整个 `routing` 缺席。
+
+这条记录是重放的事实来源：重放不要求父 Session 再评一次难度，也不调用分类模型。选择失败发生在子 `run_started` 之前，经既有 unstarted handback 回到父房间。
 -/
 
 /-!

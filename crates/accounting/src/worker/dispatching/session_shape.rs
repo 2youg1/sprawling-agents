@@ -54,7 +54,8 @@ impl RunWorker {
     /// between two levels.
     ///
     /// A model registered twice under two tags is one model: the book's
-    /// entry for it is found by id, and the ceiling and the window are
+    /// entry for it is found by the frozen endpoint and id (by id alone
+    /// for legacy records), and the ceiling and the window are
     /// read from that entry rather than recorded here. They are
     /// properties of the model, so a copy of them in this file would be
     /// a second answer to what the book already answers.
@@ -93,18 +94,16 @@ impl RunWorker {
         };
         let own = city::own_layer(&self.city_root, &at.addr)?;
         let Some(frozen_model) = own.model() else {
-            city::write_session(
-                &self.city_root,
-                &at.addr,
-                &city::SessionShape::new(&model.id, at.effort, Some(generation.clone())),
-            )?;
+            let mut shape = city::SessionShape::new(&model.id, at.effort, Some(generation.clone()));
+            shape.endpoint = Some(provider.to_owned());
+            city::write_session(&self.city_root, &at.addr, &shape)?;
             return Ok(generation);
         };
         // What the session froze. The effort is the ladder's answer at
         // this address, which is the value the run that opened the
         // session froze and the value this one would freeze.
         let settled = city::settled_effort(&self.city_root, &at.addr)?.map(|(effort, _)| effort);
-        let mut frozen = self.frozen_shape(frozen_model, settled, own.generation());
+        let mut frozen = self.frozen_shape(frozen_model, own.endpoint(), settled, own.generation());
         let moved = CallShape {
             model: model.id.clone(),
             effort: at.effort.or(settled),
@@ -133,6 +132,7 @@ impl RunWorker {
     fn frozen_shape(
         &self,
         model: &str,
+        endpoint: Option<&str>,
         effort: Option<Effort>,
         generation: Option<&kernel::FrozenGeneration>,
     ) -> CallShape {
@@ -140,7 +140,9 @@ impl RunWorker {
             .credentials
             .book
             .choices()
-            .find(|(_, _, entry)| entry.id == model)
+            .find(|(_, provider, entry)| {
+                entry.id == model && endpoint.is_none_or(|held| held == *provider)
+            })
             .map(|(_, _, entry)| entry);
         CallShape {
             model: model.to_owned(),

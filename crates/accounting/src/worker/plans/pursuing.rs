@@ -121,6 +121,7 @@ impl RunWorker {
                     addr: addr.clone(),
                     session: None,
                     effort: None,
+                    difficulty: None,
                     model: None,
                     policy: kernel::RunPolicy::of(kernel::Mode::Work),
                     parent: None,

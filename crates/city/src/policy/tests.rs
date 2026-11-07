@@ -123,6 +123,119 @@ fn a_key_this_version_does_not_know_is_refused_rather_than_skipped() {
     assert!(err.subject().contains("desktopp"), "{}", err.subject());
 }
 
+/// The commented TOML block a person uncovers to route delegated work:
+/// from the commented `[workspace_models]` header to the last commented
+/// line after it. The prose above it stays commented.
+fn placeholder(lines: &[&str]) -> Option<(usize, usize)> {
+    let header = lines.iter().position(|line| {
+        line.strip_prefix("# ")
+            .is_some_and(|text| text.starts_with("[workspace_models]"))
+    })?;
+    let end = lines[header..]
+        .iter()
+        .position(|line| !line.starts_with('#'))
+        .map_or(lines.len(), |stop| header.saturating_add(stop));
+    Some((header, end))
+}
+
+/// The same template with the placeholder uncovered, as a person leaves
+/// it once they have filled in a provider, a model and an effort.
+fn uncovered(template: &str) -> Option<String> {
+    let lines: Vec<&str> = template.lines().collect();
+    let (start, end) = placeholder(&lines)?;
+    let mut out = lines[..start].to_vec();
+    out.extend(
+        lines[start..end]
+            .iter()
+            .map(|line| line.strip_prefix("# ").unwrap_or(line)),
+    );
+    out.extend(lines[end..].iter().copied());
+    Some(out.join("\n"))
+}
+
+/// A building laid out by the city arrives with the routing table written
+/// out as a placeholder: commented, so nothing is enabled until a person
+/// fills in a provider, a model and an effort for each difficulty, and
+/// accepted by this reader the moment they uncover it.
+#[test]
+fn the_template_hands_a_building_a_working_routing_placeholder() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = addr("lab");
+    crate::building::create(dir.path(), &lab, crate::BuildingTemplate::Minimal).unwrap();
+    let template = std::fs::read_to_string(rules_path(dir.path(), &lab)).unwrap();
+    let quiet = evaluate(&lab, &template).unwrap();
+    assert!(
+        quiet.workspace_models().is_none(),
+        "a placeholder must not enable routing on its own"
+    );
+
+    let filled = uncovered(&template).expect("the template carries no routing placeholder");
+    let placed = evaluate(&lab, &filled)
+        .unwrap_or_else(|err| panic!("the placeholder is not a policy this reader accepts: {err}"));
+    let policy = placed
+        .workspace_models()
+        .expect("an uncovered placeholder is a policy");
+    assert!(!policy.allowed().is_empty());
+    assert_eq!(policy.recommendations().len(), 3);
+}
+
+fn workspace_rules() -> String {
+    ordinary(
+        r#"[workspace_models]
+allowed = [{ endpoint = "house", model = "ordinary" }, { endpoint = "house", model = "strong" }]
+max_effort = "high"
+[workspace_models.recommendations.easy]
+endpoint = "house"
+model = "ordinary"
+effort = "low"
+[workspace_models.recommendations.medium]
+endpoint = "house"
+model = "ordinary"
+effort = "medium"
+[workspace_models.recommendations.hard]
+endpoint = "house"
+model = "strong"
+effort = "high"
+"#,
+    )
+}
+
+/// A workspace names whole endpoint/model pairs and all three difficulty
+/// recommendations in the same rules document the city already enforces.
+#[test]
+fn a_workspace_model_policy_is_read_from_the_rules() {
+    let rules = evaluate(&addr("shop"), &workspace_rules()).unwrap();
+    let policy = rules.workspace_models().unwrap();
+    assert_eq!(policy.allowed().len(), 2);
+    assert_eq!(
+        policy.recommendation(kernel::Difficulty::Hard).model(),
+        &kernel::ModelRef {
+            endpoint: "house".to_owned(),
+            model: "strong".to_owned(),
+        }
+    );
+    assert_eq!(policy.digest().unwrap(), policy.digest().unwrap());
+}
+
+#[test]
+fn a_workspace_policy_rejects_an_empty_pool_an_outside_model_and_an_effort_above_the_cap() {
+    for text in [
+        workspace_rules().replace(
+            "allowed = [{ endpoint = \"house\", model = \"ordinary\" }, { endpoint = \"house\", model = \"strong\" }]",
+            "allowed = []",
+        ),
+        workspace_rules().replace("model = \"strong\"\neffort = \"high\"", "model = \"other\"\neffort = \"high\""),
+        workspace_rules().replace("max_effort = \"high\"", "max_effort = \"low\""),
+        workspace_rules().replace("effort = \"low\"", "effort = \"none\""),
+    ] {
+        assert_eq!(
+            evaluate(&addr("shop"), &text).unwrap_err().code(),
+            &AxCode::ConfigInvalid,
+            "{text}"
+        );
+    }
+}
+
 /// The prose keys are part of the schema, so a person who misspells one
 /// is told rather than left writing a paragraph nothing keeps.
 #[test]

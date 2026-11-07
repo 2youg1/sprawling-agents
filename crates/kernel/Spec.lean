@@ -242,6 +242,7 @@ gate ──▶ 上述全部（组合面）＋idem
 | 8-85 | `crates/kernel/spec/Event/Record.lean` |
 | 8-87 | `crates/kernel/spec/Event/Record.lean` |
 | 8-88 | `crates/kernel/spec/Event/Record.lean` |
+| 8-89 | `crates/kernel/spec/Event/Record.lean` |
 | 8-5 | `crates/kernel/spec/Version.lean` |
 | 8-6 | `crates/kernel/spec/Idem.lean` |
 | 8-7 | `crates/kernel/spec/ConstsExternal.lean` |

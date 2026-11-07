@@ -255,7 +255,15 @@ impl RunWorker {
     /// that will not take the line.
     pub(in crate::worker) fn put_rules(&mut self, write: &wire::RulesWrite) -> Result<(), AxError> {
         let building = city::Building::of(&write.building)?;
-        city::write_rules_against(&self.city_root, building.addr(), &write.base, &write.body)?;
+        city::write_rules_against_with(
+            &self.city_root,
+            building.addr(),
+            city::RulesEdit {
+                base: &write.base,
+                text: &write.body,
+            },
+            |rules| self.validate_workspace_models(rules),
+        )?;
         self.book_document(
             Scope::Building(building.addr().clone()),
             GoverningDocument::Rules,

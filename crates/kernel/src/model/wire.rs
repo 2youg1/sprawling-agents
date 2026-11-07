@@ -17,6 +17,23 @@ use crate::event::Payload;
 use crate::model::image::ImageRef;
 use crate::model::usage::ModelUsage;
 use crate::tool::ToolName;
+/// One model at one registered endpoint. The endpoint is part of the
+/// identity: the same model id at two providers can have different facts,
+/// prices and request capabilities.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ModelRef {
+    pub endpoint: String,
+    pub model: String,
+}
+
+impl std::fmt::Display for ModelRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.endpoint, self.model)
+    }
+}
+
 /// Building-level constraints riding along the call. It carries the one
 /// load-bearing bit; further fields only grow, and each one is
 /// added at every construction site the compiler names.

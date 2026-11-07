@@ -34,14 +34,12 @@ fn a_session_record_is_read_back_exactly_as_it_was_written() {
     let room = addr("lab/refactor");
     assert_eq!(own_layer(dir.path(), &room).unwrap().model(), None);
 
-    write_session(
-        dir.path(),
-        &room,
-        &crate::SessionShape::new("m-local", Some(Effort::High), None),
-    )
-    .unwrap();
+    let mut shape = crate::SessionShape::new("m-local", Some(Effort::High), None);
+    shape.endpoint = Some("house".to_owned());
+    write_session(dir.path(), &room, &shape).unwrap();
     let recorded = own_layer(dir.path(), &room).unwrap();
     assert_eq!(recorded.model(), Some("m-local"));
+    assert_eq!(recorded.endpoint(), Some("house"));
     assert_eq!(recorded.effort(), Some(Effort::High));
     assert_eq!(
         settled_effort(dir.path(), &room).unwrap().map(|(e, _)| e),

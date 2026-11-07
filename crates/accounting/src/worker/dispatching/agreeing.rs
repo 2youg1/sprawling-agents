@@ -120,7 +120,7 @@ impl RunWorker {
     /// names a model; otherwise a tag with no model behind it, an
     /// endpoint that is no longer attached, and a confidential building
     /// whose model would leave this machine.
-    pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Seat, AxError> {
+    pub(super) fn agree_to_work(&mut self, at: &mut Assignment) -> Result<Seat, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
             return Err(AxError::failure(
@@ -145,11 +145,11 @@ impl RunWorker {
             } => (building, rules, judged),
         };
         let own = city::own_layer(&self.city_root, addr)?;
-        let tag = self.tag_for(at.model.as_deref(), own.model())?;
-        let chosen = self.credentials.book.select(tag, rules.policy())?;
+        let (chosen, routing) = self.route_model(at, &rules, &own)?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
         let adapter = self.models.build(&chosen, self.redemption()?)?;
+        let retries = chosen.endpoint.tuning.request_max_retries;
         // Every request the run sends goes through the keep-warm door,
         // so a landed run can have its prefix renewed (`crates/sprawling/Spec.lean`
         // §8-112); under the default setting the door only forwards.
@@ -160,11 +160,11 @@ impl RunWorker {
             Box::new(move || clock.now()),
             self.warm.lead_of(&provider),
         );
-        let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Seat::Model(Agreed {
             building,
             rules,
             model,
+            routing,
             provider,
             adapter,
             retries,
@@ -262,7 +262,7 @@ impl RunWorker {
     ///
     /// # Errors
     /// Refuses a named id no tag registered, before anything is written.
-    fn tag_for(
+    pub(super) fn tag_for(
         &self,
         named: Option<&str>,
         frozen: Option<&str>,
