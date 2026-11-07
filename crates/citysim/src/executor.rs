@@ -232,6 +232,7 @@ pub fn run_scenario_on(
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
+        routing: None,
         run_policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
         naming: None,
         // A simulated run is nobody's branch: it is a scenario's own

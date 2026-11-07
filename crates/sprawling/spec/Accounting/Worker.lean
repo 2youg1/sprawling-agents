@@ -2007,6 +2007,23 @@ impl OutputRing {
 **本节接口的当前状态。** `Sample` 余下的核心健康字段仍读作 0：`relay_p50_nanos` 与 `event_to_screen_p50_nanos` 要一个按次记录往返时间的直方图，属主分别是 relay 与 socket 的发送一侧，都还没有；`queued_runs` 没有一处权威的计数——计划行在 `Flight::full` 为真时停在 `pursue` 的循环外，没有被数进任何队列，人派的 run 在满时的去向见 §8-46-3。S5.9M 的降级状态没有 `Sample` 字段。
 -/
 
+/-!
+## 8-173 工作区难度路由（`accounting::worker::dispatching::agreeing`、`waking::handing`）
+
+`Delegated.difficulty` 经 `hand_over_at_call` 原样进入子 `Assignment.difficulty`；其它入口填 `None`。`agree_to_work` 是唯一的选型点，在适配器构造与任何写入之前完成：
+
+1. 目标 Session 已有 `[model] name` 时按冻结的 endpoint/model 完整引用选择（缺 endpoint 的旧记录走 ID 兼容路径），另开房间不继承原房间的冻结记录，本次难度不重路由；
+2. 新子 Session 所在楼写了 `[workspace_models]` 时，有难度取对应推荐，无难度取 `medium`，把推荐的 effort 写进这次 Assignment；
+3. 人显式给出 `Dispatch.model`／`effort` 时沿用原选择，再按该楼策略核对 allowed 与解析后的有效 effort（显式值优先，否则读取目标的配置阶梯）不超过 max effort；这些拒绝在写会话之前完成；
+4. 没有策略时逐字走旧 `tag_for`＋`EndpointBook::select` 路径。
+
+`EndpointBook::select_ref` 按完整 `(endpoint, model)` 找已登记选择，再调用既有 `select`，所以摘除端点、模型不再登记与 confidential 本地边界只有一个判定家。推荐与显式 effort 都经 `gateway::thinking_offer(...).admit`；推荐档位拒绝的恢复语指向 RULES.toml 对应 recommendations 难度表，并列出 provider 支持档位；任何失败成为 unstarted handback，不换模型、不降 effort。
+
+`Agreed.routing` 随 `Site` 进入 `RunPlan.routing`，由 `Charter::open` 写入 `run_started.routing`；`Site.config.effort` 仍只从这次 Assignment 与三层梯子解析，`run_started.effort` 是实际 effort 的唯一字段。已有 Session 的 `CallShape::verified_against` 继续负责形状漂移拒绝，策略修改不 retroactively 改它。
+
+验收经 `accounting::worker::waking::delegating_tests` 的真实父子派活：三档模型与 effort、medium 缺省、无策略不变、已有 Session 不换、推荐失效时子 run 未开始而父房间收到可读恢复语。保存侧由 `commanding` 测试证明引用／offer 拒绝与 base 冲突都不落盘。
+-/
+
 /-! D7 城的工具读别楼的文件与 `cas:` 块，只经 runtime 的一扇门（§8-131、§8-142，`crates/runtime/Spec.lean` §8-59、runtime D16）
 
 `ocr` 与 `transcribe` 的字节都由 `runtime::BoundReader` 读：它把 `read` 的那一份判定（换成城里的拼写、文法、reserved subtree、读界、解开链接再判、打开后核对）公开成一个调用，交回一个 `Read` 与字节的来处。`transcribe` 原先只收本楼的文件，用 `Address::is_within`、`is_reserved` 与 `WriteTarget::within` 自己判，那是这份判定在 accounting 里的替身，门落地后删去。**被否掉的**：两件工具各自在 accounting 里判（两份判定，一份跟着 `read` 变，一份不跟）；只为 `cas:` 另开一条路、文件仍只收本楼（连接器存下的截图与录音能读，读界之内别楼的文件却不能，同一个读界有两个答案）。

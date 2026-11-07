@@ -96,6 +96,8 @@ pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
+pub use policy::{ModelRecommendation, WorkspaceModelPolicy, WorkspaceRecommendations};
+pub use policy::{RulesEdit, write_rules_against_with};
 pub use policy::{UserBrowser, UserBrowserEndpoint};
 pub use policy::{agents_path, city_agents_path, evaluate, load, room_agents_paths, rules_path};
 pub use policy::{check_reading_room, write_reading_room, write_rules_against};

@@ -233,7 +233,7 @@ how = "core"
 ### 8-14 一次会话选一次：模型、思考强度与有效生成配置
 
 ```rust
-pub struct SessionShape { pub model: String, pub effort: Option<Effort>,
+pub struct SessionShape { pub model: String, pub endpoint: Option<String>, pub effort: Option<Effort>,
                           pub generation: Option<FrozenGeneration> }
 pub fn write_session(city_root: &Path, addr: &Address, shape: &SessionShape) -> Result<(), AxError>;
 impl ConfigLayer { pub fn generation(&self) -> Option<&FrozenGeneration>; }
@@ -241,7 +241,7 @@ impl ConfigLayer { pub fn generation(&self) -> Option<&FrozenGeneration>; }
 
 思考强度放在派活按钮旁边，因为一次会话反正只选一次；而会话选定的模型也写进同一份文件，因为供应的 prompt 缓存对着的正是这两个值。
 
-- **一次写下一个会话冻下的整份形状**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。`generation` 在场时再写 `temperature`、`top_p`、`top_k` 的文本、`max_tokens` 的实发整数与 `overrides` 的字符串对；空值省略，空串不读成零。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
+- **一次写下一个会话冻下的整份形状**：`write_session` 落 `[model] name` 与可选 `endpoint`（共同标识完整模型引用；旧记录缺 endpoint 时保留 ID 兼容路径），Forget 同时清除两者，分支从 `run_started.routing.model.endpoint` 恢复端点。人选了强度时落 `[model] effort`。`generation` 在场时再写 `temperature`、`top_p`、`top_k` 的文本、`max_tokens` 的实发整数与 `overrides` 的字符串对；空值省略，空串不读成零。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
 settings-control ModelSection.temperature client/src/views/setup/providers/generation.svelte
 settings-control ModelSection.top_p client/src/views/setup/providers/generation.svelte
 settings-control ModelSection.top_k client/src/views/setup/providers/generation.svelte
@@ -491,6 +491,7 @@ settings-control McpSection.headers client/src/views/mcp/by_url.svelte
 settings-control McpSection.transport client/src/views/mcp/by_url.svelte
 settings-reason ConfigFile.model `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-reason ModelSection.name `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
+settings-reason ModelSection.endpoint `[model] endpoint` 与 `name` 一起标识会话冻结的模型引用，由 `write_session` 写入、`Forget` 清除；它是会话记录，设置里没有控件。
 settings-control ModelSection.effort client/src/views/settings/city_layer.svelte
 settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。

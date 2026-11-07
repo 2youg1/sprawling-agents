@@ -27,8 +27,8 @@
 //! already holds twice.
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, DelegateKind, Depth, Effect, GateOutcome, Payload,
-    RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, DelegateKind, Depth, Difficulty, Effect, GateOutcome,
+    Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 use std::sync::Arc;
@@ -44,6 +44,9 @@ pub struct Delegated {
     pub task: String,
     pub goal: String,
     pub kind: DelegateKind,
+    /// The parent's task judgement; the city maps it through the
+    /// workspace policy instead of letting the parent name a model.
+    pub difficulty: Option<Difficulty>,
 }
 
 /// Whether the city could start delegated work in a room, judged at the
@@ -214,6 +217,29 @@ impl DelegateTool {
             );
             properties.insert(field.to_owned(), Value::Object(spec));
         }
+        properties.insert(
+            "difficulty".to_owned(),
+            Value::Object(Map::from_iter([
+                ("type".to_owned(), Value::String("string".to_owned())),
+                (
+                    "enum".to_owned(),
+                    Value::Array(
+                        ["easy", "medium", "hard"]
+                            .into_iter()
+                            .map(|word| Value::String(word.to_owned()))
+                            .collect(),
+                    ),
+                ),
+                (
+                    "description".to_owned(),
+                    Value::String(
+                        "how difficult this subtask is: easy, medium or hard; the city chooses \
+                         the model and effort from the workspace policy"
+                            .to_owned(),
+                    ),
+                ),
+            ])),
+        );
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         params.insert("properties".to_owned(), Value::Object(properties));
@@ -290,11 +316,26 @@ impl Tool for DelegateTool {
                 .with_recovery("use `ephemeral` for one piece of work, or `resident`"));
             }
         };
+        let difficulty = match args.get("difficulty") {
+            None => None,
+            Some(Value::String(word)) if word == "easy" => Some(Difficulty::Easy),
+            Some(Value::String(word)) if word == "medium" => Some(Difficulty::Medium),
+            Some(Value::String(word)) if word == "hard" => Some(Difficulty::Hard),
+            Some(other) => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "delegate work",
+                    format!("no such task difficulty: {other}"),
+                )
+                .with_recovery("pass difficulty as `easy`, `medium` or `hard`, or omit it"));
+            }
+        };
         let work = Delegated {
             room,
             task: arg(args, "task")?.to_owned(),
             goal: arg(args, "goal")?.to_owned(),
             kind,
+            difficulty,
         };
         let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
@@ -359,6 +400,37 @@ mod tests {
             name: ToolName::parse("delegate").unwrap(),
             args: Payload::new(args).unwrap(),
         }
+    }
+
+    #[test]
+    fn the_parent_supplies_only_a_closed_task_difficulty() {
+        let desk = desk(Depth::Root);
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let mut request = call("lab/helper", None);
+        let mut args = request.args.as_map().clone();
+        args.insert("difficulty".to_owned(), Value::String("easy".to_owned()));
+        request.args = Payload::new(args).unwrap();
+        tool.invoke(&request).unwrap();
+        assert_eq!(
+            desk.lock().unwrap().asked()[0].difficulty,
+            Some(Difficulty::Easy)
+        );
+
+        for invalid in [
+            Value::from(3),
+            Value::Null,
+            Value::Bool(true),
+            Value::String("tiny".to_owned()),
+        ] {
+            args = request.args.as_map().clone();
+            args.insert("difficulty".to_owned(), invalid);
+            request.args = Payload::new(args).unwrap();
+            assert_eq!(
+                tool.invoke(&request).unwrap_err().code(),
+                &AxCode::InvalidArgs
+            );
+        }
+        assert_eq!(desk.lock().unwrap().asked().len(), 1);
     }
 
     /// kernel D37, collab D17: a page draws a delegation as the room and

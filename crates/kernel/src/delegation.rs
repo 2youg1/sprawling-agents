@@ -13,6 +13,18 @@
 
 use serde::{Deserialize, Serialize};
 
+/// How difficult the parent Session judges one delegated task. The city
+/// turns this closed vocabulary into a model and effort; the parent never
+/// names either of those itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Difficulty {
+    Easy,
+    Medium,
+    Hard,
+}
+
 /// Resident delegates join society and answer for output; Ephemerals are
 /// tools — one clarification channel up, nothing else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

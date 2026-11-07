@@ -183,6 +183,7 @@ pub(super) fn run_plan() -> crate::run::RunPlan {
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
+        routing: None,
         run_policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
         naming: None,
         inherited: Vec::new(),

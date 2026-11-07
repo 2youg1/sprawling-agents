@@ -246,6 +246,7 @@ impl RunWorker {
                     addr: addr.clone(),
                     session: None,
                     effort: None,
+                    difficulty: None,
                     model: None,
                     policy: at.policy,
                     origin: None,

@@ -105,8 +105,9 @@ pub use remote::{
 pub use renewal::{CacheRenewed, RenewalOutcome};
 pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{
-    AgentRunIdentity, EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen,
-    RunPolicyChanged, RunStarted, SessionNamed, SessionOpened, SkillPin,
+    AgentRunIdentity, EvalRun, EvidenceCite, FreezeCause, ModelRouting, ModelSelectionSource,
+    Opening, RunForked, RunFrozen, RunPolicyChanged, RunStarted, SessionNamed, SessionOpened,
+    SkillPin,
 };
 pub use skill::{AuditSource, AuditVerdict, ShelvedFrom, SkillAudited, SkillShelved};
 pub use tool::{Rendering, ToolAnswer, ToolCalled, ToolResult};

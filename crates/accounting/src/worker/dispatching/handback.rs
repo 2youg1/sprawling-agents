@@ -250,6 +250,7 @@ recovery: {}
                     addr: work.room,
                     session: None,
                     effort: None,
+                    difficulty: work.difficulty,
                     model: None,
                     policy: sibling.policy,
                     origin: None,

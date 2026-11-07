@@ -408,3 +408,39 @@ fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() 
         (kept, before.saturating_add(1))
     );
 }
+
+/// Registry-dependent policy validation happens before the existing rules
+/// write door: an unknown reference leaves the old file byte for byte.
+#[test]
+fn a_workspace_policy_save_checks_the_registry_before_landing() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let lab = Address::parse("lab").unwrap();
+    city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local-thinks"], Vec::new());
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local-thinks").unwrap();
+    let path = city::rules_path(dir.path(), &lab);
+    let base = std::fs::read_to_string(&path).unwrap();
+    let policy = |model: &str| {
+        format!(
+            "{base}[workspace_models]\nallowed = [{{ endpoint = \"house\", model = \"{model}\" }}]\nmax_effort = \"high\"\n[workspace_models.recommendations.easy]\nendpoint = \"house\"\nmodel = \"{model}\"\neffort = \"low\"\n[workspace_models.recommendations.medium]\nendpoint = \"house\"\nmodel = \"{model}\"\neffort = \"medium\"\n[workspace_models.recommendations.hard]\nendpoint = \"house\"\nmodel = \"{model}\"\neffort = \"high\"\n"
+        )
+    };
+    let put = |worker: &mut RunWorker, body: String, tag: &[u8]| {
+        worker.handle(wire::Command::PutRules(wire::RulesWrite {
+            building: lab.clone(),
+            base: base.clone(),
+            body,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
+        }))
+    };
+
+    let refused = put(&mut worker, policy("not-registered"), b"unknown").unwrap_err();
+    assert_eq!(refused.code(), &AxCode::ConfigInvalid);
+    assert!(refused.recovery().contains("workspace policy"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), base);
+
+    let accepted = policy("m-local-thinks");
+    put(&mut worker, accepted.clone(), b"known").unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), accepted);
+}

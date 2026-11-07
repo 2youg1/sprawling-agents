@@ -74,6 +74,7 @@ fn charter(owned: &Owned) -> Charter<'_> {
         parent: None,
         predecessor: None,
         dispatched_by: &owned.by,
+        routing: None,
         skills: &[],
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         naming: None,

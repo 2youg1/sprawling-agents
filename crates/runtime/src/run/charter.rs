@@ -53,6 +53,8 @@ pub struct Charter<'a> {
     pub effort: Option<kernel::Effort>,
     /// The effective generation `run_started` records for a model run.
     pub generation: Option<&'a kernel::FrozenGeneration>,
+    /// The native model routing this run recorded; `None` for a harness.
+    pub routing: Option<&'a kernel::event::record::ModelRouting>,
     /// The ACP agent `run_started` records for a harness run
     /// (`crates/kernel/spec/Event/Record.lean` §8-87); `None` for a run this
     /// city's own model loop drives.
@@ -79,6 +81,7 @@ impl RunPlan {
             opening: Some(self.opening),
             effort: self.shape.effort,
             generation: Some(&self.shape.generation),
+            routing: self.routing.as_ref(),
             agent: None,
         }
     }
@@ -121,6 +124,7 @@ impl Charter<'_> {
             opening: self.opening,
             effort: self.effort,
             generation: self.generation.cloned(),
+            routing: self.routing.cloned(),
             agent: self.agent.cloned(),
         };
         ledger.append(EventDraft {

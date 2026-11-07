@@ -28,7 +28,9 @@ use serde::Deserialize;
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist};
 
 use super::reach::DomainReach;
-use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint, rules_path};
+use super::{
+    BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint, WorkspaceModelPolicy, rules_path,
+};
 
 /// Replaces a building's rules with a page's whole text, evaluated
 /// first, and only if the file still holds `base`: a page left open
@@ -50,7 +52,33 @@ pub fn write_rules_against(
     base: &str,
     text: &str,
 ) -> Result<BuildingRules, AxError> {
+    write_rules_against_with(city_root, addr, RulesEdit { base, text }, |_written| Ok(()))
+}
+
+/// The text a page proposes, and the version it read first. One value
+/// because a write that named only one of them could land over an edit
+/// nobody saw, and both are always supplied together.
+pub struct RulesEdit<'a> {
+    pub base: &'a str,
+    pub text: &'a str,
+}
+
+/// Writes rules after both structural evaluation and one caller-supplied
+/// registry check. The check runs before the baseline comparison and write,
+/// so neither kind of refusal leaves a partial policy behind.
+///
+/// # Errors
+/// The evaluation's refusal, the validator's own refusal, and
+/// `E_VERSION_CONFLICT` for a file that is no longer `base`.
+pub fn write_rules_against_with(
+    city_root: &Path,
+    addr: &Address,
+    edit: RulesEdit<'_>,
+    validate: impl FnOnce(&BuildingRules) -> Result<(), AxError>,
+) -> Result<BuildingRules, AxError> {
+    let RulesEdit { base, text } = edit;
     let rules = evaluate(addr, text)?;
+    validate(&rules)?;
     crate::document::edit_against(
         &rules_path(city_root, addr),
         base.as_bytes(),
@@ -171,6 +199,9 @@ pub(crate) struct Written {
     /// refused by the type (city D8 (b)).
     #[serde(default)]
     harness_minutes: Option<std::num::NonZeroU32>,
+    /// Optional native-model routing for delegated work in this workspace.
+    #[serde(default)]
+    workspace_models: Option<WorkspaceModelPolicy>,
 }
 
 /// What `usersbrowser` may say: off, on with no address declared yet,
@@ -264,6 +295,9 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
              building whose data does not leave",
         ));
     }
+    if let Some(policy) = &written.workspace_models {
+        policy.validate()?;
+    }
     Ok(BuildingRules {
         addr: addr.clone(),
         policy: BuildingPolicy::new(confidential),
@@ -280,6 +314,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         desktop: written.desktop,
         reading_room: written.reading_room,
         harness_minutes: written.harness_minutes,
+        workspace_models: written.workspace_models,
     })
 }
 

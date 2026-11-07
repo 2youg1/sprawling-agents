@@ -93,6 +93,7 @@ pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, A
 pub struct ConfigLayer {
     /// The model a scope froze, written once when a session opens.
     model: Option<String>,
+    endpoint: Option<String>,
     /// The harness this scope names as the resident of its rooms, as written.
     harness: Option<String>,
     effort: Option<Effort>,
@@ -219,6 +220,7 @@ impl ConfigLayer {
             .map(|section| SecondThreshold::parse(section.second_threshold))
             .transpose()?;
         Ok(ConfigLayer {
+            endpoint: file.model.endpoint,
             model,
             harness,
             effort: file.model.effort,
@@ -243,6 +245,12 @@ impl ConfigLayer {
             agents: file.agent.map(agents::rows).transpose()?,
             catalog: file.catalog.map(catalog::stated).transpose()?,
         })
+    }
+
+    /// The endpoint this session froze; absent in legacy records.
+    #[must_use]
+    pub fn endpoint(&self) -> Option<&str> {
+        self.endpoint.as_deref()
     }
 
     /// The model this scope froze, as written.
@@ -485,6 +493,8 @@ struct SandboxSection {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ModelSection {
+    #[serde(default)]
+    endpoint: Option<String>,
     /// What a session calls, kept for every run after its first.
     #[serde(default)]
     name: Option<String>,

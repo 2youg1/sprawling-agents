@@ -105,6 +105,7 @@ fn laid_out(
         addr: parent,
         session: None,
         effort: None,
+        difficulty: None,
         model: None,
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         origin: None,

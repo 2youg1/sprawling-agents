@@ -88,11 +88,10 @@ impl RunWorker {
         if let Some(origin) = from
             && let Some(shape) = self.origin_shape(origin)?
         {
-            city::write_session(
-                &self.city_root,
-                addr,
-                &city::SessionShape::new(&shape.model, shape.effort, shape.generation.clone()),
-            )?;
+            let mut frozen =
+                city::SessionShape::new(&shape.model, shape.effort, shape.generation.clone());
+            frozen.endpoint = shape.endpoint;
+            city::write_session(&self.city_root, addr, &frozen)?;
             if let Some(naming) = shape.naming {
                 city::freeze_naming(&self.city_root, addr, naming)?;
             }
@@ -168,6 +167,7 @@ impl RunWorker {
 }
 
 struct SessionShape {
+    endpoint: Option<String>,
     model: String,
     effort: Option<kernel::Effort>,
     generation: Option<kernel::FrozenGeneration>,
@@ -198,6 +198,7 @@ impl RunWorker {
                 } else if record.kind() == EventKind::RunStarted {
                     let started = record.data().read::<RunStarted>()?;
                     return Ok(model.map(|model| SessionShape {
+                        endpoint: started.routing.map(|routing| routing.model.endpoint),
                         model,
                         effort: started.effort,
                         generation: started.generation,

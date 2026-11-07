@@ -39,13 +39,18 @@ mod cache;
 mod desktop;
 mod evaluate;
 mod reach;
+mod workspace;
 
 pub use cache::RulesCache;
 pub use desktop::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 /// The shape `evaluate` reads, for `check` to locate a refusal in.
 pub(crate) use evaluate::Written as RulesShape;
-pub use evaluate::{check_reading_room, evaluate, write_reading_room, write_rules_against};
+pub use evaluate::{
+    RulesEdit, check_reading_room, evaluate, write_reading_room, write_rules_against,
+    write_rules_against_with,
+};
 pub use reach::DomainReach;
+pub use workspace::{ModelRecommendation, WorkspaceModelPolicy, WorkspaceRecommendations};
 
 /// What a building is and what it may do: the one file this module
 /// parses, and the one a resident is given.
@@ -96,6 +101,8 @@ pub struct BuildingRules {
     reading_room: Vec<String>,
     /// How long a harness run here may take, when the file says.
     harness_minutes: Option<std::num::NonZeroU32>,
+    /// How delegated work in this building chooses a native model.
+    workspace_models: Option<WorkspaceModelPolicy>,
 }
 
 impl BuildingRules {
@@ -206,6 +213,13 @@ impl BuildingRules {
     pub fn harness_minutes(&self) -> u32 {
         self.harness_minutes
             .map_or(HARNESS_MINUTES_DEFAULT, std::num::NonZeroU32::get)
+    }
+
+    /// The workspace's native-model routing policy, or `None` for the
+    /// unchanged room-frozen / `main` behaviour.
+    #[must_use]
+    pub fn workspace_models(&self) -> Option<&WorkspaceModelPolicy> {
+        self.workspace_models.as_ref()
     }
 
     /// What this building's residents may write inside their prefixes.
@@ -398,6 +412,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
                     desktop: false,
                     reading_room: Vec::new(),
                     harness_minutes: None,
+                    workspace_models: None,
                 }),
             }
         }

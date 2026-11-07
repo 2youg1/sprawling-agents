@@ -176,6 +176,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         addr: Address::parse("lab/room1").unwrap(),
         session: None,
         effort: None,
+        difficulty: None,
         model: None,
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         parent: None,
