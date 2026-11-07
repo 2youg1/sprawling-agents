@@ -650,24 +650,21 @@ fn kde(values: &[f64], bandwidth: f64) -> Result<(Vec<f64>, Vec<f64>), BenchErro
     }
     inverse.process(&mut bins);
     let scale = count(size)?;
-    let peak = bins
-        .iter()
-        .take(POINTS)
-        .map(|value| (value.re / scale).max(0.0))
-        .fold(0.0_f64, f64::max);
-    let roundoff = peak * 1e-12;
     let density = bins
         .iter()
         .take(POINTS)
-        .map(|value| {
-            let density = (value.re / scale).max(0.0);
-            if density <= roundoff { 0.0 } else { density }
-        })
+        .map(|value| (value.re / scale).max(0.0))
         .collect::<Vec<_>>();
     Ok((grid, density))
 }
 
+/// Ignore FFT roundoff only for peak detection, preserving valley depths for cuts.
 fn maxima(grid: &[f64], density: &[f64]) -> Result<Vec<f64>, BenchError> {
+    let roundoff = density.iter().copied().fold(0.0_f64, f64::max) * 1e-12;
+    let density = density
+        .iter()
+        .map(|value| if *value <= roundoff { 0.0 } else { *value })
+        .collect::<Vec<_>>();
     let mut modes = Vec::new();
     let mut index = 1_usize;
     while index
@@ -871,6 +868,19 @@ mod tests {
             let tolerance = 1e-6_f64.max(direct.abs() * 1e-3);
             assert!((actual - direct).abs() <= tolerance);
         }
+    }
+
+    #[test]
+    fn a_deep_kde_valley_keeps_small_densities_and_its_minimum() {
+        let (grid, density) = kde(&[0.0, 16.0], 1.0).unwrap();
+        let midpoint = grid.iter().position(|value| *value == 8.0).unwrap();
+        let actual = *density.get(midpoint).unwrap();
+        let direct = (-32.0_f64).exp() / (2.0 * std::f64::consts::PI).sqrt();
+        assert!((actual / direct - 1.0).abs() < 0.02);
+        let modes = maxima(&grid, &density).unwrap();
+        assert_eq!(modes.len(), 2);
+        let cuts = antimodes(&grid, &density, &modes).unwrap();
+        assert!((cuts.first().unwrap() - 8.0).abs() < 0.05);
     }
 
     #[test]
