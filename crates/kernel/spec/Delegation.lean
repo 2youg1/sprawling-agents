@@ -15,6 +15,8 @@
 ```rust
 pub enum DelegateKind { Resident, Ephemeral }
 impl DelegateKind { pub fn as_str(self) -> &'static str; }   // 一个词一个权威（工具解析与 status 打印同源）
+#[serde(rename_all = "snake_case")]
+pub enum Difficulty { Easy, Medium, Hard }               // 父 Session 对子任务的唯一选型输入
 /// Depth-zero position; the only type with a delegate method.
 pub struct Delegator(/* 私有单元 */);
 impl Delegator { pub fn root() -> Delegator;                     // 铸造点：装配/citysim
@@ -33,6 +35,13 @@ pub fn admit(parent: Depth, kind: &DelegateKind) -> DelegationVerdict;   // Dele
 -/
 
 namespace Kernel.Delegation
+
+/-- 父 Session 对子任务难度的封闭判断；模型与 effort 由城市按工作区策略回答。 -/
+inductive Difficulty where
+  | Easy
+  | Medium
+  | Hard
+  deriving DecidableEq, Repr
 
 /-- 一次委派派出的是什么，与 `kernel::DelegateKind` 逐变体同名。 -/
 inductive DelegateKind where

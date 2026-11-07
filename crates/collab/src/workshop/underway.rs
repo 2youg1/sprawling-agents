@@ -92,6 +92,7 @@ impl Underway {
                 task: contract.job_text(),
                 goal: contract.done_check().to_owned(),
                 kind: DelegateKind::Ephemeral,
+                difficulty: None,
             })?;
         }
         Ok(())

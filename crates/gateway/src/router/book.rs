@@ -265,6 +265,40 @@ impl EndpointBook {
         })
     }
 
+    /// The registered model for one complete endpoint/model reference.
+    ///
+    /// This deliberately re-enters [`Self::select`] after finding the tag,
+    /// so endpoint removal and the confidential local boundary keep their
+    /// one implementation. A model that is attached but never registered
+    /// under a tag has no resolved figures and is not selectable yet.
+    ///
+    /// # Errors
+    /// Refuses a reference with no registered choice, then propagates the
+    /// ordinary tag selection's failures.
+    pub fn select_ref(
+        &self,
+        reference: &kernel::ModelRef,
+        policy: &BuildingPolicy,
+    ) -> Result<Chosen<'_>, AxError> {
+        let tag = self
+            .choices()
+            .find_map(|(tag, endpoint, entry)| {
+                (endpoint == reference.endpoint && entry.id == reference.model).then_some(tag)
+            })
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "choose a workspace model",
+                    format!("{reference} is not registered on an attached endpoint"),
+                )
+                .with_recovery(
+                    "register this endpoint/model pair under a tag on the settings page, or \
+                     correct the workspace policy",
+                )
+            })?;
+        self.select(tag, policy)
+    }
+
     /// One warm-up for every attached endpoint, each sharing that
     /// endpoint's client slot, so the connection it opens is the one the
     /// endpoint's first call takes (`crates/gateway/spec/Endpoint/Transport.lean` D26).

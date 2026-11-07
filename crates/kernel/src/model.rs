@@ -28,8 +28,8 @@ pub use usage::{CacheCount, ModelUsage};
 pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    Effort, Increment, MessageBreakpoint, ModelTag, Role, SharedPrefix, StopReason, SystemBlock,
-    ToolDef,
+    Effort, Increment, MessageBreakpoint, ModelRef, ModelTag, Role, SharedPrefix, StopReason,
+    SystemBlock, ToolDef,
 };
 
 use crate::error::AxError;

@@ -8,11 +8,12 @@
 use serde::{Deserialize, Serialize};
 
 use crate::completion::Completion;
+use crate::delegation::Difficulty;
 use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
 use crate::event::who::Who;
 use crate::locator::{B3Hash, Locator};
-use crate::model::{Effort, RunPolicy};
+use crate::model::{Effort, ModelRef, RunPolicy};
 use crate::origin::Origin;
 
 /// One skill a run was dispatched with, pinned to the bytes it read.
@@ -25,6 +26,38 @@ pub struct SkillPin {
     pub name: String,
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub hash: B3Hash,
+}
+
+/// Why one model run reached its frozen model, with the policy version
+/// that answered when a workspace recommendation was used.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ModelRouting {
+    /// The difficulty the parent supplied, including when an existing
+    /// session kept its frozen model instead of re-routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<Difficulty>,
+    pub model: ModelRef,
+    /// The digest of the workspace policy that constrained this choice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub policy: Option<B3Hash>,
+    pub source: ModelSelectionSource,
+}
+
+/// The one decision that selected a model run's model and effort.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ModelSelectionSource {
+    /// A person explicitly named Dispatch.model or effort.
+    Manual,
+    /// A workspace recommendation matched the supplied difficulty.
+    Difficulty,
+    /// A configured workspace used its medium recommendation by default.
+    MediumDefault,
+    /// The existing session or the city-wide main tag answered as before.
+    Main,
 }
 
 /// `run_started`: the work a run was given, and where it came from.
@@ -99,6 +132,9 @@ pub struct RunStarted {
     /// model run froze; absent on old records and harness runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generation: Option<crate::FrozenGeneration>,
+    /// The actual endpoint/model and why this run selected them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub routing: Option<ModelRouting>,
     /// The ACP agent that took this harness run (`crates/kernel/spec/Event/Record.lean`
     /// §8-87). Absent on a run this city's own model loop drives, and in a
     /// record written before the key existed.

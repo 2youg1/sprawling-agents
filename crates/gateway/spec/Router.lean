@@ -37,6 +37,7 @@ impl EndpointBook {
     pub fn session_account(&self, addr: &Address, provider: &str) -> Option<&ServerLabel>;
     pub fn absorb(&mut self, kind: EventKind, run: RunId, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
+    pub fn select_ref(&self, reference: &ModelRef, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>; // 完整 (endpoint, model) 找到登记它的 tag，再进同一个 select
     pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
         -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;

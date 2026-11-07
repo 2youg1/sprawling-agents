@@ -154,6 +154,135 @@ fn delegating_to(room: &str, id: &str) -> String {
     )
 }
 
+/// A real parent delegates every difficulty and one call with none. The
+/// workspace, not the parent, turns those words into model and effort.
+#[test]
+fn workspace_policy_routes_every_difficulty_and_defaults_to_medium() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("lab").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    lay_rules(
+        dir.path(),
+        "lab",
+        &ordinary_rules(
+            r#"[workspace_models]
+allowed = [
+  { endpoint = "house", model = "m-easy-thinks" },
+  { endpoint = "house", model = "m-medium-thinks" },
+  { endpoint = "house", model = "m-hard-thinks" },
+]
+max_effort = "high"
+[workspace_models.recommendations.easy]
+endpoint = "house"
+model = "m-easy-thinks"
+effort = "low"
+[workspace_models.recommendations.medium]
+endpoint = "house"
+model = "m-medium-thinks"
+effort = "medium"
+[workspace_models.recommendations.hard]
+endpoint = "house"
+model = "m-hard-thinks"
+effort = "high"
+"#,
+        ),
+    );
+    move_in(dir.path(), "lab/lead");
+    let calls = [
+        ("lab/easy", "easy-result", Some("easy")),
+        ("lab/medium", "medium-result", Some("medium")),
+        ("lab/hard", "hard-result", Some("hard")),
+        ("lab/default", "default-result", None),
+        // The same room already froze easy; a later hard request keeps it.
+        ("lab/easy", "existing-result", Some("hard")),
+    ];
+    let mut parent = Vec::new();
+    for (index, (room, goal, difficulty)) in calls.iter().enumerate() {
+        let mut args = serde_json::json!({
+            "room": room,
+            "task": "measure the thing",
+            "goal": goal,
+        });
+        if let Some(difficulty) = difficulty {
+            args["difficulty"] = serde_json::Value::String((*difficulty).to_owned());
+        }
+        parent.push(tool_completion(
+            "handing it down",
+            &format!("tu_{index}"),
+            "delegate",
+            args,
+        ));
+    }
+    parent.push(completion("all handed down", None));
+    let routes = calls
+        .iter()
+        .map(|(_, goal, _)| (*goal, vec![completion("child finished", None)]));
+    let (base_url, _provider) = fake_openai_routed_with(
+        &["m-easy-thinks", "m-medium-thinks", "m-hard-thinks"],
+        routes.collect(),
+        parent,
+        FirstChat::Answered,
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-easy-thinks").unwrap();
+    for (tag, model) in [
+        (kernel::ModelTag::Digest, "m-medium-thinks"),
+        (kernel::ModelTag::Ocr, "m-hard-thinks"),
+    ] {
+        worker
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("house").unwrap(),
+                model: model.to_owned(),
+                tag,
+                context_tokens: kernel::Window::new(32_768),
+                max_output_tokens: kernel::Ceiling::new(4_096),
+                input: None,
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, model.as_bytes()),
+            })
+            .unwrap();
+    }
+    worker.handle(dispatch_lead(None)).unwrap();
+    worker.land_the_rest().unwrap();
+
+    let lines = ledger_lines(&report.ledger_dir);
+    for (room, goal, difficulty) in calls {
+        let started = lines
+            .iter()
+            .find(|line| {
+                line["kind"] == "run_started"
+                    && line["addr"] == room
+                    && line["data"]["goal"] == goal
+            })
+            .unwrap_or_else(|| panic!("no child started in {room}"));
+        let data = &started["data"];
+        let expected = match difficulty {
+            _ if goal == "existing-result" => ("m-easy-thinks", "low", "main"),
+            Some("easy") => ("m-easy-thinks", "low", "difficulty"),
+            Some("medium") => ("m-medium-thinks", "medium", "difficulty"),
+            Some("hard") => ("m-hard-thinks", "high", "difficulty"),
+            _ => ("m-medium-thinks", "medium", "medium_default"),
+        };
+        assert_eq!(data["routing"]["model"]["endpoint"], "house", "{room}");
+        assert_eq!(data["routing"]["model"]["model"], expected.0, "{room}");
+        assert_eq!(data["effort"], expected.1, "{room}");
+        assert_eq!(data["routing"]["source"], expected.2, "{room}");
+        assert_eq!(
+            data["routing"]["difficulty"].as_str(),
+            difficulty.map(str::to_owned).as_deref(),
+            "{room}"
+        );
+        if expected.2 == "main" {
+            assert!(data["routing"]["policy"].is_null(), "{room}");
+        } else {
+            assert!(data["routing"]["policy"].is_string(), "{room}");
+        }
+    }
+}
+
 /// collab D19, accounting D54: the parent runs on a model registered
 /// under `digest`, and no model is chosen for `main`, the tag a child
 /// that names no model runs on. The room's files admit the child, so

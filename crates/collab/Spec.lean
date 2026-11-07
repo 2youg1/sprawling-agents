@@ -123,10 +123,10 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 检测进 kernel，仲裁不进：`kernel::goal::detect_conflict` 只答撞没撞，本模块答谁来仲裁。判序固定（机械在前、读在后），同一对目标恒落同一级，重放才可比。
 - 机械可判的只有一种形状：双方都 claim 路径，且常设性一高一低，常设的先走。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
 
-**`collab::delegate_tool`**（形状 4 适配器）。`Delegated { room, task, goal, kind }`；`DelegateDesk::new(depth, building)`、`beside`（同一 depth 与 building、未派任何活：图在 run 结束后派的节点过同样两道门）、`ask`（门在这里被叫）、`asked`（`status.children` 的真值，含已交出的）、`hand_over`（装配层在展示调用写下的行时取走上次以来新增的请求）、`take`（图自己的桌子用：清空，没人从它报数）。
+**`collab::delegate_tool`**（形状 4 适配器）。`Delegated { room, task, goal, kind, difficulty }`；`difficulty: Option<kernel::Difficulty>` 是父 Session 给城市选型的唯一新输入，不含 model／effort。`DelegateDesk::new(depth, building)`、`beside`（同一 depth 与 building、未派任何活：图在 run 结束后派的节点过同样两道门）、`ask`（门在这里被叫）、`asked`（`status.children` 的真值，含已交出的）、`hand_over`（装配层在展示调用写下的行时取走上次以来新增的请求）、`take`（图自己的桌子用：清空，没人从它报数）。
 
 - 本模块是 `kernel::gate::spawn` 的生产调用者，一层深不是本模块的判定；拒绝文字是门自己的三段式。判决按 `GateOutcome` 的三臂（`Allow`、`Deny`、`Ask`）穷尽匹配，门多一种答复时编译器当场找到这里；派生门今天不答 `Ask`，若答，这次请求按待决处理，以门给的那个问题拒绝，而不是放行。
-- 面向模型的那句话不提人：`disclosure` 说「要么给出房间，要么被拒」，`workshop` 的那一句同样。
+- 面向模型的那句话不提人：`disclosure` 说「要么给出房间，要么被拒」，`workshop` 的那一句同样。`difficulty` 的 JSON schema 只收 `easy`／`medium`／`hard`，描述要求按子任务判断难度，不要求父 Session 了解端点、价格或 effort；未知词以 `E_INVALID_ARGS` 拒绝，不近似成另一档。
 - 深度是被携入的，不是推算的：一个自己推算深度的 run，错一次就是一个孙代理。
 - 一次请求不是一个 run：工具答的是在哪个房间开，派活在调用时生效：记账线程展示这次调用写下的行时就为子房间开 run，不等父回合落定（D7）；开的是一个带着 task、goal 与父 run 的派活，而不是敲门，因为敲门开的 run 只读到「有人给你来信」，读不到它要做的事，也不带一层深要的 `parent`；子 run 的 `run_started` 携着那个房间。不新增 EventKind：父的 `tool_called{name:"delegate"}` 与子的 `run_started{addr}` 已经记了两遍。
 - 代理不出楼：房间必须 `is_within` 父的楼，否则 `E_CROSS_BUILDING_DENIED`，并告知跨楼的正路是 `signal`。回程归 `handback`。

@@ -155,6 +155,7 @@ impl RunWorker {
                         addr: work.room,
                         session: None,
                         effort: None,
+                        difficulty: work.difficulty,
                         model: None,
                         policy,
                         origin: None,

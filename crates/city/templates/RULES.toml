@@ -66,3 +66,32 @@ desktop = false
 # Which skills this building admits into its catalog, by name. Name
 # them: a list of names is checkable and "as needed" is not.
 reading_room = []
+
+# Which model a delegated task runs on, chosen here rather than by the
+# parent run: the parent names only the difficulty, and the city reads
+# this table. Each recommendation is one provider (the attached
+# endpoint's name), one model id that endpoint serves, and one thinking
+# effort. Every recommended pair must appear in `allowed`, and no effort
+# may be above `max_effort`. Leave the whole table commented out and
+# every run keeps the model its room froze, or `main` for a new room.
+#
+# [workspace_models]
+# allowed = [
+#   { endpoint = "house", model = "your-model" },
+# ]
+# max_effort = "high"
+#
+# [workspace_models.recommendations.easy]
+# endpoint = "house"
+# model = "your-model"
+# effort = "low"
+#
+# [workspace_models.recommendations.medium]
+# endpoint = "house"
+# model = "your-model"
+# effort = "medium"
+#
+# [workspace_models.recommendations.hard]
+# endpoint = "house"
+# model = "your-model"
+# effort = "high"

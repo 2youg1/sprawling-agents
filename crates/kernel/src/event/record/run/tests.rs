@@ -76,6 +76,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         opening: None,
         effort: None,
         generation: None,
+        routing: None,
         agent: None,
         skills: vec![
             SkillPin {
@@ -88,6 +89,31 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
             },
         ],
     }
+}
+
+#[test]
+fn a_run_started_line_records_the_workspace_route_it_took() {
+    let mut started = typed_started(None, None);
+    started.routing = Some(ModelRouting {
+        difficulty: Some(crate::Difficulty::Hard),
+        model: crate::ModelRef {
+            endpoint: "house".to_owned(),
+            model: "strong".to_owned(),
+        },
+        policy: Some(B3Hash::digest(b"policy")),
+        source: ModelSelectionSource::Difficulty,
+    });
+    let written = Payload::of(&started).unwrap();
+    let read: RunStarted = written.read().unwrap();
+    assert_eq!(read.routing, started.routing);
+    assert!(read.routing.is_some());
+    assert!(
+        !Payload::of(&typed_started(None, None))
+            .unwrap()
+            .as_map()
+            .contains_key("routing"),
+        "a harness run and an old record leave the key out"
+    );
 }
 
 #[test]
