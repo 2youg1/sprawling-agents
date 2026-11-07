@@ -91,12 +91,17 @@ fail to compile.
 
 ## Constraints
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:5bdb2517c6c895367c8bc0c23f1aa37439c41fbef1078d4183848c00e527580d -->
+
 - **Features.** `wasm` is off in this crate and on in the product: `sprawling`
   turns it on through its default `sandbox` feature, which is `runtime/wasm`,
   because `cargo install sprawling` must produce a binary that can execute code.
   Without it, `AbsentSandbox` refuses tool execution and names the feature in its
   recovery. `conformance` turns on `kernel/conformance`, so the kernel's port
-  suites run against this crate's adapters; only `--all-features` reaches it.
+  suites run against this crate's adapters. Select it with `--features conformance`;
+  neither `--all-features` nor `wasm` is required.
 - **The clock and identity.** Time arrives through `run`'s `now` hook and
   `ClockReading` for a tool face; ids arrive from the caller, which is what makes
   a scripted replay byte-identical.
@@ -117,6 +122,8 @@ fail to compile.
   tool only reads it. `runtime D7`: a run's opening and closing belong to
   `Charter`, and a harness run does not borrow `RunPlan`. `runtime D111`: the
   tool table is fixed from the `[catalog]` tables and frozen at the run's start.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Who uses it
 

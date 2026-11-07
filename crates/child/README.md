@@ -2,7 +2,13 @@
 
 The one place the city configures a child process, and the one place that decides which environment keys a child never inherits. `child::command(program)` returns a `std::process::Command` ready for arguments, stdio and `spawn`: off the city's console on Windows (`CREATE_NO_WINDOW`), in a process group of its own on Unix (`process_group(0)`), and with every one of the city's secret keys removed from its environment.
 
-What a caller receives is a configuration, not a running process. The arguments, the three standard streams and the `spawn` call stay with the call site. What the package decides on the call site's behalf is that a child of the city cannot read the screen a pairing code is printed on, the keys a person types into the CLI, or a secret key in the environment; each of those is a property of how a process is created rather than of what it does.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:3ec4b92e0f767c29bfb96a04645ea48d4cf552915eb5db34a23dd592ec975f09 -->
+
+What a caller receives is a configuration, not a running process. The arguments, the three standard streams and the `spawn` call stay with the call site. What the package decides on the call site's behalf is that a child of the city cannot read the screen a pairing code is printed on or a secret key in the environment; each of those is a property of how a process is created rather than of what it does. `process_group(0)` does not isolate standard input. The call site must configure the child's standard input itself to prevent it from reading keys typed into the CLI.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Package `sprawling-child`, library `child`. The empty row for `child` in the `depmap` block of [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) §3 is the point of it: it names nothing, so every unit that starts a process may name it.
 

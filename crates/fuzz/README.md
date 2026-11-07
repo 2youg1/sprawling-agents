@@ -6,14 +6,20 @@ This directory is a Cargo workspace of its own — the empty `[workspace]` table
 
 ## The targets
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:667a9b0a1d0703327f78b97f525498ec235c9b06e39cfdf51ffa85269378de6b -->
+
 | Target | What it feeds | What it asserts beyond "no panic" |
 | --- | --- | --- |
 | `fuzz_address` | `kernel::Address::parse` with any UTF-8 text | An accepted address reads back byte for byte, is not empty, and smuggles no banned component through: no leading `/`, no `\`, no `:`, and no empty, `.` or `..` segment. |
 | `fuzz_locator` | `kernel::Locator::parse` with any UTF-8 text | An accepted locator prints as the bytes it was read from, `secret:` never parses, and every refusal carries `AxCode::LocatorInvalid`. |
 | `fuzz_jsonl_tail` | one ledger segment of arbitrary bytes, read through `storage::JsonlLedger::open` | When the segment opens, a second open is clean — tail recovery is idempotent and truncates nothing further — and reads back the same lines. A refusal is a legal outcome. |
-| `fuzz_wire_frame` | the bytes of one inbound `wire::ClientFrame` | A frame that decodes re-encodes and decodes to an equal frame, so the auth check and the dispatch cannot see two different commands; a present `Hello` pairing token is never an empty string. |
+| `fuzz_wire_frame` | the bytes of one inbound `wire::ClientFrame` | A frame that decodes re-encodes and decodes to an equal frame; a present `Hello` pairing token is never an empty string. |
 | `fuzz_config_toml` | the text of one `CONFIG.toml`, through `city::ConfigLayer::parse` | One file text states one configuration; no sandbox mount reaches into the city's own subtree; two MCP servers never share a label. |
 | `fuzz_mcp_stdio` | one line an MCP child wrote to its stdout, through `agent_protocols::Rpc::read` | A line carrying an `error` object is never read as a result, and a `tools/list` result that is admitted names every tool under that server's label prefix. |
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 The comment at the top of each file under [`fuzz_targets/`](fuzz_targets/) states the property that file checks; this table is a reading of those comments, and they are what a change is made against.
 

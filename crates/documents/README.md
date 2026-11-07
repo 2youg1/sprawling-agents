@@ -99,15 +99,22 @@ wire-ts` reads; the product binary is built without it. `just test` runs the wor
 No `unsafe`: the workspace lint table at the root `Cargo.toml` forbids it. No clock, no random
 source and no global state.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c714d3d859b1b94387b77b960060de200c54d241f6cd98f7331cc5b279bc711e -->
+
 Three decisions change how a caller must use the package. `documents D1`: the wire carries these
 types directly, so changing the shape of `Span`, `Format`, `Encoding`, `Window` or `Preview` moves
-the wire schema and regenerates `client/src/wire.ts`. `documents D3`: a version's identity is the
+the wire schema. Run `cargo xtask wire-ts --write` to regenerate `client/src/wire.ts`;
+`cargo xtask wire-ts` without `--write` only checks it. `documents D3`: a version's identity is the
 digest of its whole bytes, so a save is judged against a version and never against a timestamp;
 `save` compares the digest of the bytes it is handed with the baseline itself, so a caller passes
 the bytes it read and the version it believes them to be. `documents D20` and `D22`: the Markdown
 grammar is comrak's CommonMark and GFM implementations, and this package only chooses the
 extensions, reads the resulting tree and judges the link protocols — so a preview cannot be fixed by
 patching a parser here.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Two limits are product decisions rather than tunables: `WINDOW_BYTES_MAX`, the most one window
 answer carries, and `EXPORT_BYTES_MAX`, the largest version one export reads. Section 14 of the SPEC
@@ -143,9 +150,15 @@ lake build crates.documents.Spec           # this package's Lean proofs
 cargo xtask gates spec lexicon             # the SPEC and the words it uses
 ```
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:409b752a9ddec17cb3c140e83eb1dbce27ba680ee1923b06ca4e1ba146a545dc -->
+
 The two Markdown corpora live in the tests rather than in the model: the `markdown::lowering` tests
 carry the CommonMark cases migrated from the client's former TypeScript prose reader, and the
 `layout` tests carry the block spans of RefRain's regression corpus, whose bytes were checked
 against that corpus's own SHA-256 list. `crates/documents/Spec.lean` section 2 names every
-acceptance with the test that settles it. `just test` and `just models` run every check of the
-workspace.
+acceptance with the test that settles it. `just check` runs every check of the workspace.
+
+
+<!-- /coderabbit-ai-generated:v1 -->

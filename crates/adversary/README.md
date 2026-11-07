@@ -43,11 +43,17 @@ Nothing in the workspace depends on it: it is not a Cargo package, so it appears
 
 ## What a person does with a finding
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:73c6cbea8b5d39808b1dbc62dcc667a3deffea27e4474760e50cbd9ee28542a8 -->
+
 1. Rerun with the seed the failure printed, until the trace is the same twice.
 2. Read the minimized trace and the promise it broke.
-3. Render it into `crates/sprawling/tests/from_adversary.rs` by running with `SPRAWLING_ACCEPT=1`. The checker compares that file with what it renders byte for byte, so the trace and the test cannot drift apart.
+3. Save the minimized counterexample as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
 4. Fix the defect in Rust. This directory keeps no copy of the case.
 5. When the wire changes, update [`src/Sprawling/Door.lean`](src/Sprawling/Door.lean) and the renderer in [`src/Sprawling/Regression.lean`](src/Sprawling/Regression.lean) in the same change, as the *Tests* section of [`AGENTS.md`](../../AGENTS.md) requires.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Specification
 

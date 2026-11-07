@@ -9,13 +9,20 @@ and the traits the outer crates implement are defined here once. Every other cra
 builds on those definitions rather than keeping a second copy. Rust code names the crate `kernel`;
 `cargo -p` takes `sprawling-kernel`.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:a68357f5dfca3f60db1ae12f85345c51f1ebe50e000ba392921c805c59cd29df -->
+
 What it deliberately does not do. It opens no file: `Address::parse` judges a relative path and
 never asks whether it exists, and `layout` derives paths without touching them. It samples no clock
 and draws no randomness, because a run id, a timestamp and a seed arrive as arguments, and `uuid` is
 compiled without its generation features. It implements no port — the Ledger, tool and model traits
-are declared here and implemented outside. It holds no plaintext credential: `secret::Sealed` has no
-`Serialize`, so a credential cannot reach a ledger line or the wire. It knows nothing of colour or
+are declared here and implemented outside. `secret::Sealed` has no `Serialize`, so its wrapped value cannot be serialized directly.
+Callers must keep plaintext credentials out of event payloads and error messages; `Sealed` cannot
+prevent those plaintext copies from leaking. It knows nothing of colour or
 of Markdown, each of which belongs to the module that owns its effect.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Shape
 

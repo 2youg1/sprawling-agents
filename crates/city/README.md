@@ -90,13 +90,21 @@ not match its digest, `E_GATE_DENIED` for a read or write the building's rules r
 section 12 answers whether each code can be defined away by a type, and each module's SPEC section
 names the recovery it writes.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c3fb9fbb290da4b5c4175ddefae39ac282333e3db67505eaee2f1f27c743d814 -->
+
 Refused rather than attempted, with the file untouched afterwards: a `RULES.toml` that does not
 state `confidential` and `write`, or a write prefix outside a confidential building; a write to the
-rules, the desktop scope or a governed document; a second birth of a building that exists; a
+rules, the desktop scope or a governed document through a resident write domain; a second birth of a building that exists; a
 building under the reserved subtree, or a room address used as a building; a configuration table
 written into a layer that cannot reach it; a skill package reached through a symlink, one over the
 package size limit, or one whose source changed between the decision and the landing; and two saves
 from one version, where the first stands and the second is told to reread.
+`write_governed` can save a governed document when the identity area is readable and the baseline
+has not changed.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Constraints a reader acts on
 

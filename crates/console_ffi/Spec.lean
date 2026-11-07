@@ -89,6 +89,12 @@ end ConsoleFfi
 
 /-! ## 8 接口
 
+`draw` 只在叶子返回 `Full` 且缓冲小于 64 MiB 时重试，每次至多翻倍并止于
+64 MiB；调用方预留的更大容量照常使用，因此这不是硬上限。`Malformed` 直接返回，
+不重试。容量至少 64 MiB 时仍返回 `Full` 才答 `TooLong`；用户文字及其转写可以
+正常触发此结果，提示应减少单帧文字。`Malformed` 提示报告缺陷，两者均不停止城市服务。
+
+
 ```rust
 // console_ffi
 pub fn draw(scene: &Scene, into: &mut Vec<u8>) -> Result<Frame, Refused>;

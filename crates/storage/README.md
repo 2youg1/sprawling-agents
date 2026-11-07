@@ -16,7 +16,13 @@ Three of those touch the disk, and none of them may be believed. A proof record 
 
 **The rest reads or writes git.** `checkpoint` commits a base, a pre-wave and a post-wave checkpoint and refuses a wave whose staged content matches a credential shape; `worktree` gives one node one tree with objects shared and files not; `changes`, `hunks`, `blob` and `status` answer what moved, one file's patch text, one file's bytes at a commit, and what is not committed yet. `reserved` and `alias` are the two policies the write faces share: which bytes belong to a person, and that a junction, symlink or hard link is refused whole.
 
-**One seam.** Every file this crate touches goes through `vfs`, a `pub(crate)` trait with two adapters: `real_fs` over `std::fs`, holding the handle it is appending through, and `fault_fs`, a deterministic power-loss model. The seam stays inner because what a city stores its history on is not a decision this crate delegates outward; [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 4 records it as an inner seam that does not rise to a real one.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:55e5dc2b6535a6661a8196e0390c0111b0f3e04c6ad137cd1da7a02baf75ec2e -->
+
+**One seam.** File operations routed through `vfs` use a `pub(crate)` trait with two adapters: `real_fs` over `std::fs`, holding the handle it is appending through, and `fault_fs`, a deterministic power-loss model. Git operations use `git2` directly, and operations that call `std::fs` directly also bypass this seam; `fault_fs` injects faults only into operations routed through `vfs`, so those exceptions are outside its power-loss tests. The seam stays inner because what a city stores its history on is not a decision this crate delegates outward; [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 4 records it as an inner seam that does not rise to a real one.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## When a call fails
 

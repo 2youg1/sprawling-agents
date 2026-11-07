@@ -8,7 +8,8 @@
 //!
 //! The leaf reads the scene and writes the frame into a buffer this
 //! module lends; a frame longer than the buffer answers `Full`, and the
-//! buffer is lent again twice as long, up to [`LONGEST`].
+//! buffer grows at most twice as long, up to [`LONGEST`]. Larger caller
+//! capacities are used as supplied; `Malformed` never retries.
 
 use std::fmt;
 
@@ -41,9 +42,8 @@ unsafe extern "C" {
 /// The buffer a frame is first written into.
 const FIRST: usize = 16 * 1024;
 
-/// The longest frame the leaf is lent room for. A frame is a screenful
-/// of transcript and a live region, so a frame past this is a scene
-/// carrying something no screen shows.
+/// The automatic buffer growth limit. Larger caller-provided capacities
+/// are used as supplied; user text and its transcript can exceed this limit.
 const LONGEST: usize = 64 * 1024 * 1024;
 
 /// What a frame left on the screen that the next frame needs.
@@ -53,13 +53,13 @@ pub struct Frame {
     pub cursor_row: u16,
 }
 
-/// Why a frame was not drawn. Either is a defect in the console, not a
-/// state a person can reach, so the recovery is a report.
+/// Why a frame was not drawn. Report a malformed scene; reduce the text
+/// rendered in one frame when the output buffer is full at the growth limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refused {
     /// The leaf could not read the scene.
     Malformed,
-    /// The frame did not fit in [`LONGEST`] bytes.
+    /// The leaf returned `Full` with a buffer of at least [`LONGEST`] bytes.
     TooLong,
 }
 
@@ -67,12 +67,13 @@ impl fmt::Display for Refused {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let what = match self {
             Refused::Malformed => "the console's renderer could not read the scene it was given",
-            Refused::TooLong => "the console's frame grew past the longest the renderer is lent",
+            Refused::TooLong => "the console's frame did not fit in the output buffer",
         };
-        write!(
-            f,
-            "{what}; the city keeps serving, and this is worth reporting against crates/console_ffi"
-        )
+        let recovery = match self {
+            Refused::Malformed => "report this against crates/console_ffi",
+            Refused::TooLong => "reduce the text rendered in one frame",
+        };
+        write!(f, "{what}; the city keeps serving; {recovery}")
     }
 }
 
@@ -81,10 +82,14 @@ impl std::error::Error for Refused {}
 /// Draws `scene` into `into`, which holds exactly the frame's bytes
 /// afterwards. `into` keeps its capacity between frames, so a console
 /// that reuses it allocates only when a frame is longer than any before.
+/// Only `Full` retries, at most doubling the buffer up to [`LONGEST`].
+/// This limits automatic growth; larger caller capacities are used unchanged.
+/// `Malformed` returns immediately without retrying.
 ///
 /// # Errors
 /// [`Refused::Malformed`] for a scene the leaf cannot read, and
-/// [`Refused::TooLong`] for a frame past [`LONGEST`] bytes.
+/// [`Refused::TooLong`] when the leaf returns `Full` with a buffer of at
+/// least [`LONGEST`] bytes, including for large user text and transcripts.
 pub fn draw(scene: &Scene, into: &mut Vec<u8>) -> Result<Frame, Refused> {
     let bytes = scene.bytes();
     let mut capacity = into.capacity().max(FIRST);

@@ -6,11 +6,17 @@ It does not write to a terminal, hold a screen, or decide which frame comes next
 
 ## How it is shaped
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:32db9fcb103384d86c55c0833ec025502209ec3e4dadbe41c6a40fb8dcb9da06 -->
+
 - `console_ffi` — the package's face: `draw`, `Frame` and `Refused`, re-exported from `leaf`.
-- `leaf` — the leaf's one export, declared once, and the safe function around it. A frame longer than the buffer is drawn again into a buffer twice as long, and this repeats only while the buffer is shorter than the longest the leaf is ever lent.
+- `leaf` — the leaf's one export, declared once, and the safe function around it. Only a `Full` result retries, while the buffer is below 64 MiB, with a buffer at most twice as long and capped at 64 MiB. This is an automatic growth limit, not a hard maximum: a caller-provided capacity above 64 MiB is used as supplied.
 - `part` — the words a scene is written in: the kind of frame, the kind of transcript line, the rows of the live area, the outcome of a tool call and of a run, the answer to a request, and the leaf's return status. This file is the only definition; `build.rs` reads the same file.
 - `scene` — what a frame is drawn from, and the bytes the leaf reads it as. It is the one writer of a scene, and it says what is on the screen without laying any of it out: a tool call and how long it took, the characters being typed and where the cursor stands among them.
 - `zig/leaf.zig` and its neighbours each hold one decision: `scene.zig` reads a scene with every read bounded by its own length, `text.zig` gives a character's column width and draws a control character as U+FFFD, `paint.zig` is the one writer of the frame's bytes, `flow.zig` lays running text into a column, `format.zig` spells a time of day, a duration and a count, `grid.zig` fixes the columns, `transcript.zig` writes the lines that enter the scrollback once, `live.zig` draws the rows redrawn each frame, `quiet.zig` draws the quiet host, `frame.zig` wraps one frame as a synchronized update, and `part.zig` repeats the words the build holds it to.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 This is the adapter of the seven shapes in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 9, and the humble object: the hard-to-test end is a byte writer, and the tests judge it through a terminal emulator instead of reading escape sequences.
 
@@ -20,14 +26,20 @@ A main-screen frame erases the live region from the row the last frame left the 
 
 `draw` answers `Result<Frame, Refused>`, and `Refused` has two variants:
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:78b465fd735d6115572ec14cd9e5022cc86923302d754f41a6a76fa93e66fcd4 -->
+
 | Variant | When | What a caller does |
 |---|---|---|
 | `Malformed` | The leaf could not read the scene it was given | Report it. A scene is produced by the console in the same city, so a scene the leaf cannot read is a defect in the console, not an input a person can supply. |
-| `TooLong` | The frame did not fit in the longest buffer the leaf is lent | Report it, for the same reason: a frame past that size is a scene carrying something no screen shows. |
+| `TooLong` | The leaf returned `Full` with a buffer of at least 64 MiB | Reduce the text rendered in one frame. User text and its rendered transcript can legitimately exceed 64 MiB; this need not be an internal defect. |
 
-`Refused` implements `Display` and `Error`, and its message ends by saying that the city keeps serving and that the value is worth reporting against `crates/console_ffi`. There is no `AxCode` in this package: it renders, and every refusal it can make is a defect rather than a state.
+`Refused` implements `Display` and `Error`. Its message says the city keeps serving: `Malformed` asks for a report against `crates/console_ffi`, while `TooLong` asks the caller to reduce the text rendered in one frame. There is no `AxCode` in this package.
 
-Two refusals happen instead of a partial drawing. A frame past the longest buffer is never written partially, and a scene the leaf cannot read is never drawn as far as it reads. Both come after the buffer has been lent again at twice the size, so a frame that merely outgrew its first buffer is drawn rather than refused.
+Two refusals happen instead of a partial drawing. A frame past the longest buffer is never written partially, and a scene the leaf cannot read is never drawn as far as it reads. Only `Full` retries while the buffer is below the automatic growth limit, at most doubling its length up to that limit. `Malformed` returns immediately without retrying.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Where `unsafe` lives
 
