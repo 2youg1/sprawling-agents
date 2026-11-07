@@ -1484,6 +1484,16 @@ module = [
   { name = "citysim::wire_script::tests", file = "tools/citysim/src/wire_script/tests.rs", owns = "the same request recorded byte for byte alike, a used-up script refused with its code, and a reply the city could not read refused when the script is read", shape = "test", since = "V0.0.8", status = "built", spec = "tools.citysim.spec.WireScript" },
   { name = "citysim::provider (main)", file = "tools/citysim/src/bin/provider.rs", owns = "the stand-in provider as a process: a loopback port, its URL printed, then the script replayed", shape = "adapter", since = "V0.0.8", status = "built", spec = "tools.citysim.spec.WireScript" },
   { name = "citysim::serve_grouped (main)", file = "tools/citysim/src/bin/serve_grouped.rs", owns = "a served city in a process group of its own, closed in order on a line from stdin, so the acceptance walk and pgo-train close their Windows cities the way a User would", shape = "adapter", since = "V0.0.9", status = "built", spec = "tools.citysim.Spec" },
+  { name = "benchstat::main", file = "tools/benchstat/src/main.rs", owns = "the three commands and the filesystem boundary", shape = "adapter", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::round", file = "tools/benchstat/src/round.rs", owns = "the round-directory adapter and atomic artifact publication", shape = "adapter", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::error", file = "tools/benchstat/src/error.rs", owns = "stable error codes, recovery and exit severity", shape = "value", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::manifest", file = "tools/benchstat/src/manifest.rs", owns = "the round manifest, design registry and pre-registered cell plans", shape = "value", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::observation", file = "tools/benchstat/src/observation.rs", owns = "the observation schema and cell identity", shape = "value", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::estimators", file = "tools/benchstat/src/estimators.rs", owns = "pure descriptive statistics, outcome intervals and change-point tests", shape = "decision", since = "S16", status = "built", spec = "tools.benchstat.spec.Estimators" },
+  { name = "benchstat::resampling", file = "tools/benchstat/src/resampling.rs", owns = "deterministic streams, automatic block lengths, BCa and jackknife", shape = "decision", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::shape", file = "tools/benchstat/src/shape.rs", owns = "the dip statistic and reproducible KDE shape summaries", shape = "decision", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::analysis", file = "tools/benchstat/src/analysis.rs", owns = "the whole-round projection from validated observations to exports", shape = "projection", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
+  { name = "benchstat::report", file = "tools/benchstat/src/report.rs", owns = "canonical exports and the generated Markdown section", shape = "projection", since = "S16", status = "built", spec = "tools.benchstat.Spec" },
 ]
 
 # What each family of modules is for. Keyed by the prefix its module
@@ -1542,3 +1552,6 @@ duty = "the console's renderer: a Zig leaf that turns a scene into the bytes of 
 
 [family.citysim]
 duty = "out of product: scripted scenarios on a counted clock, and the benches that time the product"
+
+[family.benchstat]
+duty = "out of product: deterministic validation, statistics and reports for a benchmark round"

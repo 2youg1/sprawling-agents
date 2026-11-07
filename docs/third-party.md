@@ -92,14 +92,20 @@ Some outside work is neither bundled nor outsourced: the city calls a program th
 
 The audit design is decided and its ledger kind exists; the code that asks either auditor is not built yet, so today every shelved skill shows as unaudited. An audit is advice and never a gate: what a building admits is still the User's `reading_room` in `RULES.toml`.
 
-## 3 The code this binary is built from
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:ec29103b97acd0495defbfe8a1774d6ece4de72659a89a0240ed8b01b7d07e44 -->
+
+## 3 The code resolved for this workspace
 
 Two lists exist and they answer different questions, so both are kept and neither is a copy of the other.
 
 **What this repository chose** is the table below: every crate named in the `Cargo.toml` of a workspace member, with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this. The version each is pinned at is in the manifests, and the version it resolves to is in `Cargo.lock`; neither is repeated here.
 
-**What ends up in the binary** is <!-- xtask:begin dependency_count -->472<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->483<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
+
+<!-- /coderabbit-ai-generated:v1 -->
 | Crate | Licence |
 |---|---|
 | [apple-native-keyring-store](https://crates.io/crates/apple-native-keyring-store) | MIT OR Apache-2.0 |
@@ -111,6 +117,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
+| [csv](https://crates.io/crates/csv) | Unlicense OR MIT |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
 | [find-msvc-tools](https://crates.io/crates/find-msvc-tools) | MIT OR Apache-2.0 |
@@ -136,7 +143,9 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [self-replace](https://crates.io/crates/self-replace) | Apache-2.0 |
 | [serde](https://crates.io/crates/serde) | MIT OR Apache-2.0 |
 | [serde_json](https://crates.io/crates/serde_json) | MIT OR Apache-2.0 |
+| [rustfft](https://crates.io/crates/rustfft) | MIT OR Apache-2.0 |
 | [sha2](https://crates.io/crates/sha2) | MIT OR Apache-2.0 |
+| [statrs](https://crates.io/crates/statrs) | MIT |
 | [syn](https://crates.io/crates/syn) | MIT OR Apache-2.0 |
 | [sysinfo](https://crates.io/crates/sysinfo) | MIT |
 | [tempfile](https://crates.io/crates/tempfile) | MIT OR Apache-2.0 |
