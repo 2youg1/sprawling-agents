@@ -85,11 +85,12 @@ export const BLEND_PERCENT = { min: 30, max: 90, step: 5 } as const;
 // repaired, it is refused, and the field says so.
 export const STACK_SHAPE = /^[\p{L}\p{N} ,'"_-]{1,120}$/u;
 
-// What one family name may hold: the characters a name is made of and
-// nothing that could close the declaration it lands in. A fallback slot
-// is one name, so no comma is allowed in it: a comma would splice a
-// second family into a slot that says it holds one.
-export const FAMILY_SHAPE = /^[\p{L}\p{N} '"_.-]{1,64}$/u;
+// What one family name may hold: the letters, digits, spaces, `-`, `_` and
+// `.` a name is made of, and nothing that could close the declaration it
+// lands in. No quote and no comma: the page adds the quotes itself, and a
+// comma would splice a second family into a slot that holds one
+// (`crates/wire/spec/Preference.lean` D124 states the same grammar).
+export const FAMILY_SHAPE = /^[\p{L}\p{N} _.-]{1,64}$/u;
 
 // The features a bundled face declares for itself
 // (`crates/wire/spec/Preference.lean` D125). Paper Mono's name table

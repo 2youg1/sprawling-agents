@@ -25,12 +25,20 @@ export type Measured =
   // says so and the page holds the ratio it already has.
   | { readonly kind: "refused" };
 
+// The widest thousandths of an em the wire holds: `wire::Tracking` is an
+// i32 and `wire::LineHeight` a u32, so a box that accepted more would send
+// the city a number it refuses to decode, and the whole appearance would
+// come back refused instead of this one figure.
+const WIDEST = 2_147_483_647;
+
 // Thousandths of the em a ratio is worth, or nothing when the text is
-// not a ratio with at most three decimals: `1.625`, `1.6`, `2`, `-0.01`.
+// not a ratio with at most three decimals, or when it is one no integer
+// the wire carries could state: `1.625`, `1.6`, `2`, `-0.01`.
 function perMilleOf(text: string): number | null {
   const trimmed = text.trim();
   if (!/^-?[0-9]+(\.[0-9]{1,3})?$/.test(trimmed)) return null;
-  return Math.round(Number(trimmed) * 1000);
+  const perMille = Math.round(Number(trimmed) * 1000);
+  return Number.isSafeInteger(perMille) && Math.abs(perMille) <= WIDEST ? perMille : null;
 }
 
 // What a box says about a ratio whose floor is `floor`. One function

@@ -34,6 +34,9 @@ test("a tracking is signed, read in thousandths, and anything under the floor is
   expect(ratioOf("-0.051", TRACKING_FLOOR)).toEqual({ kind: "refused" });
   expect(ratioOf("-0.05", TRACKING_FLOOR)).toEqual({ kind: "set", perMille: -50 });
   expect(ratioOf("--1", TRACKING_FLOOR)).toEqual({ kind: "refused" });
+  // More than the integer the wire holds is refused here rather than left
+  // for the city to refuse the whole appearance over.
+  expect(ratioOf("99999999999", LINE_HEIGHT_FLOOR)).toEqual({ kind: "refused" });
 });
 
 test("a ratio is spelled back with at most three decimals, and the round trip holds", () => {

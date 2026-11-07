@@ -11715,6 +11715,10 @@
     "en": "medium",
     "zh": "偏粗"
   },
+  "appearance_weight_note": {
+    "en": "a face that ships no such weight draws the nearest one it has",
+    "zh": "字体没有这一档字重时，取它最近的一档"
+  },
   "appearance_features": {
     "en": "type features",
     "zh": "字体特性"

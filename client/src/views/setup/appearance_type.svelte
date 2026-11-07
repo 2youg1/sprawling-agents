@@ -143,7 +143,13 @@
     else slot2 = typed;
     const both = [slot === 0 ? typed : slot1, slot === 1 ? typed : slot2];
     if (!both.every((name) => name === "" || FAMILY_SHAPE.test(name))) return;
-    write({ ...look, fallbacks: both.filter((name) => name !== "") }, "fallbacks");
+    const chain = both.filter((name) => name !== "");
+    write({ ...look, fallbacks: chain }, "fallbacks");
+    // A chain has no gaps, so emptying the first slot moves the second
+    // name up: the boxes follow the record rather than showing a name in
+    // a slot the record no longer keeps it in.
+    slot1 = chain[0] ?? "";
+    slot2 = chain[1] ?? "";
   };
 
   // The two ratio boxes, read the way the size box is: only a value at or
@@ -437,6 +443,7 @@
           write({ ...look, weight }, "metrics");
         }}
       />
+      <p class="text-note text-text-faint">{say($lang, "appearance_weight_note")}</p>
     </div>
   </div>
 </Card>

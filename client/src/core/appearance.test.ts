@@ -153,7 +153,11 @@ describe("the fallback chain", () => {
     expect(get(loadPreferences(rows, "en").held).appearance.fallbacks).toEqual([]);
     expect(FAMILY_SHAPE.test("思源宋体")).toBe(true);
     expect(FAMILY_SHAPE.test("Maple Mono NF CN")).toBe(true);
+    expect(FAMILY_SHAPE.test("LXGW WenKai")).toBe(true);
+    // A comma would splice a second family in, and the page writes the
+    // quotes itself, so neither belongs in a name.
     expect(FAMILY_SHAPE.test("A, B")).toBe(false);
+    expect(FAMILY_SHAPE.test('"Maple Mono"')).toBe(false);
   });
 });
 

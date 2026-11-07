@@ -107,11 +107,14 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     // does not carry them is an older city rather than a new blank: the
     // browser's stand, as they do for glass and the opacity. A name the
     // page cannot write is dropped here, and one past the two slots too.
-    fallbacks: (stated.fallbacks ?? []).filter((name) => FAMILY_SHAPE.test(name)).slice(0, 2),
+    fallbacks:
+      stated.fallbacks === undefined
+        ? held.fallbacks
+        : stated.fallbacks.filter((name) => FAMILY_SHAPE.test(name)).slice(0, 2),
     features: stated.features ?? held.features,
     body: stated.body_px ?? null,
-    lineHeight: stated.line_height ?? null,
-    tracking: stated.letter_spacing ?? null,
+    lineHeight: stated.line_height === undefined ? held.lineHeight : stated.line_height,
+    tracking: stated.letter_spacing === undefined ? held.tracking : stated.letter_spacing,
     weight: stated.weight ?? held.weight,
     density: stated.density,
     chroma: stated.chroma,
