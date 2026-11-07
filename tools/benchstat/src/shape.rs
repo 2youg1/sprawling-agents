@@ -415,7 +415,12 @@ pub fn shape(
         modes,
         antimodes,
         shares,
-    } = supported_basins(values, &grid, &density, &original_modes, &support)?;
+    } = supported_basins(
+        values,
+        &grid,
+        &density,
+        original_modes.iter().copied().zip(support.iter().copied()),
+    )?;
     Ok(Shape {
         original_modes,
         bandwidth,
@@ -440,18 +445,19 @@ struct Basins {
 }
 
 /// Retain only supported peaks; no retained peak means no basin summary.
+///
+/// A centre and its support travel together because the threshold decides
+/// whether the centre is a mode at all, so pairing them here keeps that rule
+/// in one place instead of on every caller.
 fn supported_basins(
     values: &[f64],
     grid: &[f64],
     density: &[f64],
-    original_modes: &[f64],
-    support: &[f64],
+    peaks: impl Iterator<Item = (f64, f64)>,
 ) -> Result<Basins, BenchError> {
-    let modes = original_modes
-        .iter()
-        .zip(support)
-        .filter(|(_, support)| **support >= 0.95)
-        .map(|(mode, _)| *mode)
+    let modes = peaks
+        .filter(|(_, support)| *support >= 0.95)
+        .map(|(mode, _)| mode)
         .collect::<Vec<_>>();
     let (antimodes, shares) = if modes.is_empty() {
         (Vec::new(), Vec::new())
@@ -827,8 +833,10 @@ mod tests {
             &values,
             &grid,
             &density,
-            &original,
-            &vec![0.94; original.len()],
+            original
+                .iter()
+                .copied()
+                .zip(std::iter::repeat_n(0.94, original.len())),
         )
         .unwrap();
         assert!(modes.is_empty());
