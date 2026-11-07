@@ -11,9 +11,18 @@ use sha2::{Digest, Sha256};
 
 const HEADER: &str = "schema_version,observation_id,task_attempt_id,request_id,span_start,span_end,round,build,arm,agent,series,workload,case,cohort,state,sessions,metric,unit,index,value,failure_class,missing_reason,censored,usage_complete,selected,in_flight,counter_source,condition";
 const REQUIRED: [&str; 12] = [
-    "startup", "first_pairing", "cold_boot_gui", "local_tool", "request_latency",
-    "task_wall", "task_requests", "task_tokens", "task_outcomes", "session_memory",
-    "sustained_memory", "real_model_capacity",
+    "startup",
+    "first_pairing",
+    "cold_boot_gui",
+    "local_tool",
+    "request_latency",
+    "task_wall",
+    "task_requests",
+    "task_tokens",
+    "task_outcomes",
+    "session_memory",
+    "sustained_memory",
+    "real_model_capacity",
 ];
 
 fn fixture() -> tempfile::TempDir {
@@ -61,12 +70,33 @@ fn a_round_exports_nearest_rank_statistics_and_rewrites_markdown() {
     let dir = fixture();
     let computed = benchstat::export(dir.path()).unwrap();
     let exports: serde_json::Value = serde_json::from_str(&computed.exports).unwrap();
-    let cells = exports["cells"].as_object().unwrap();
+    let cells = exports
+        .get("cells")
+        .and_then(serde_json::Value::as_object)
+        .unwrap();
     let cell = cells.values().next().unwrap();
-    assert_eq!(cell["n"], 4);
-    assert_eq!(cell["p50"], 2.0);
-    assert_eq!(cell["p95"], 100.0);
-    assert_eq!(cell["max"], 100.0);
+    assert_eq!(cell.get("n").and_then(serde_json::Value::as_u64), Some(4));
+    assert_eq!(
+        cell.get("p50").and_then(serde_json::Value::as_f64),
+        Some(2.0)
+    );
+    assert_eq!(
+        cell.get("p95").and_then(serde_json::Value::as_f64),
+        Some(100.0)
+    );
+    assert_eq!(
+        cell.get("max").and_then(serde_json::Value::as_f64),
+        Some(100.0)
+    );
     assert!(computed.markdown.contains("deferred"));
-    assert!(!computed.markdown.contains("old"));
+
+    benchstat::export_write(dir.path()).unwrap();
+    benchstat::verify(dir.path()).unwrap();
+    let readme = std::fs::read_to_string(dir.path().join("README.md")).unwrap();
+    assert!(!readme.contains("\nold\n"));
+
+    let tampered = readme.replace("P50 (95% BCa)", "P50 (95% BCa) 0");
+    std::fs::write(dir.path().join("README.md"), tampered).unwrap();
+    let error = benchstat::verify(dir.path()).unwrap_err();
+    assert_eq!(error.code, "E_VERIFY_MISMATCH");
 }

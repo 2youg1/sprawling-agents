@@ -21,7 +21,7 @@ def nextPilotSize (n cohort : Nat) : Nat :=
 theorem nearest_rank_is_positive (n ceiling : Nat) (hn : 0 < n) :
     0 < nearestRankIndex n ceiling := by
   unfold nearestRankIndex
-  exact Nat.lt_of_lt_of_le (Nat.le_max_left 1 ceiling) (Nat.min_le_left _ _)
+  exact Nat.le_min.mpr ⟨hn, Nat.le_max_left _ _⟩
 
 theorem nearest_rank_does_not_exceed_the_sample (n ceiling : Nat) :
     nearestRankIndex n ceiling ≤ n := by
@@ -30,7 +30,7 @@ theorem nearest_rank_does_not_exceed_the_sample (n ceiling : Nat) :
 theorem block_length_is_positive (n selected : Nat) (hn : 0 < n) :
     0 < boundedBlockLength n selected := by
   unfold boundedBlockLength
-  exact Nat.lt_of_lt_of_le (Nat.le_max_left 1 selected) (Nat.min_le_left _ _)
+  exact Nat.le_min.mpr ⟨hn, Nat.le_max_left _ _⟩
 
 theorem block_length_does_not_exceed_the_sample (n selected : Nat) :
     boundedBlockLength n selected ≤ n := by

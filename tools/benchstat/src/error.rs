@@ -33,7 +33,15 @@ pub struct BenchError {
 impl BenchError {
     /// Reject malformed or inconsistent round input.
     pub(crate) fn input(action: &str, subject: String, recovery: &str) -> Self {
-        Self::new("E_INVALID_INPUT", action, subject, recovery, Severity::Rejected)
+        Self::new(
+            "E_INVALID_INPUT",
+            action,
+            subject,
+            Recovery {
+                text: recovery.to_owned(),
+                severity: Severity::Rejected,
+            },
+        )
     }
 
     /// Report a difference between published and recomputed artifacts.
@@ -42,19 +50,23 @@ impl BenchError {
             "E_VERIFY_MISMATCH",
             "verify benchmark round",
             subject,
-            "regenerate the round with `benchstat export <round> --write`, then review the diff",
-            Severity::Rejected,
+            Recovery {
+                text: "regenerate the round with `benchstat export <round> --write`, then review the diff".to_owned(),
+                severity: Severity::Rejected,
+            },
         )
     }
 
     /// Reject a command line that names no valid operation.
-    pub(crate) fn usage(subject: String) -> Self {
+    pub fn usage(subject: String) -> Self {
         Self::new(
             "E_USAGE",
             "parse command line",
             subject,
-            "use `benchstat export|verify|report <round-dir> [--write]`",
-            Severity::Broken,
+            Recovery {
+                text: "use `benchstat export|verify|report <round-dir> [--write]`".to_owned(),
+                severity: Severity::Broken,
+            },
         )
     }
 
@@ -64,29 +76,38 @@ impl BenchError {
             "E_IO",
             action,
             format!("{subject}: {source}"),
-            "check the path and its permissions, then retry",
-            Severity::Broken,
+            Recovery {
+                text: "check the path and its permissions, then retry".to_owned(),
+                severity: Severity::Broken,
+            },
         )
     }
 
     /// Report an estimator that cannot produce a finite answer.
     pub(crate) fn numeric(action: &str, subject: String, recovery: &str) -> Self {
-        Self::new("E_NUMERIC", action, subject, recovery, Severity::Broken)
+        Self::new(
+            "E_NUMERIC",
+            action,
+            subject,
+            Recovery {
+                text: recovery.to_owned(),
+                severity: Severity::Broken,
+            },
+        )
     }
 
-    fn new(
-        code: &'static str,
-        action: &str,
-        subject: String,
-        recovery: &str,
-        severity: Severity,
-    ) -> Self {
+    fn new(code: &'static str, action: &str, subject: String, recovery: Recovery) -> Self {
         Self {
             code,
             action: action.to_owned(),
             subject,
-            recovery: recovery.to_owned(),
-            severity,
+            recovery: recovery.text,
+            severity: recovery.severity,
         }
     }
+}
+
+struct Recovery {
+    text: String,
+    severity: Severity,
 }

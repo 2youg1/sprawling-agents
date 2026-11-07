@@ -22,7 +22,8 @@ import tools.benchstat.spec.Estimators
 | `resampling` | SHA-256 派生随机流、Politis–White 块长、moving-block bootstrap、BCa 与 jackknife |
 | `analysis` | 按显式 cell key 分组，生成每项统计及其状态、估计器、参数和 seed；不可校准项明确 unavailable |
 | `report` | canonical JSON 与 Markdown 受管区段；报告只读导出值 |
-| `main` | `export`、`verify`、`report` 三条命令和退出码；唯一的文件系统入口 |
+| `round` | round 目录读取、摘要校验、原子发布与 verify 字节比较 |
+| `main` | `export`、`verify`、`report` 三条命令和退出码；不持分析逻辑 |
 -/
 
 /-! ## 2 验收标准
@@ -44,6 +45,8 @@ import tools.benchstat.spec.Estimators
 - 预注册 cell plan 以 `key` 关联分析器生成的 cell key；缺 plan 的 cell 可描述，但没有定样或排名资格。
 - 自适应 pilot 后合并区间的名义覆盖率不作额外保证；报告必须保留这一限制。
 - 本轮没有 HTML 产物。HTML 是后续独立派生物，不是发布或验证条件。
+- 没有 calibrated dip p-value 时，KDE 仅作未标记描述：导出 support，中心/切点/share 区间为 not applicable；
+  一旦 cell 被标记或预注册要求描述区间，就必须执行完整 shape-vector BCa 或明确失败原因。
 -/
 
 /-! ## 4 现状分析
@@ -70,7 +73,7 @@ Lean 的 `nearestRankIndex`、`boundedBlockLength`、`nextPilotSize` 对应 Rust
 /-! ## 7 模块边界
 
 估计器与 resampling 不读文件、时钟、环境变量或网络；输入输出只经调用方给的 slice 和值。
-`analysis` 只组合纯值；`report` 只做文本投影；`main` 负责路径、读写与进程退出。
+`analysis` 只组合纯值；`report` 只做文本投影；`round` 负责路径与读写，`main` 只负责进程退出。
 包不依赖任何产品 crate，不启动线程或子进程，不保留跨调用缓存。
 -/
 
@@ -92,7 +95,8 @@ manifest 顶层必填：`schema_version`、`analysis_revision`、`method_version
 `seed_string`、`resamples`、`confidence`、`alpha`、`power`、`bootstrap_unit`、`input_hashes`、
 `coverage`、`claims`、`cell_plans`。coverage 使用 `series/status/reason/reopen_when/measured_by/reading`；
 cell plan 使用 `key/headline/target_half_width/observations_per_cohort/resource_ceiling/independent_unpaired`，
-另可含 `absolute_target`、`s0`、`h_abs`。
+另可含 `absolute_target`、`s0`、`h_abs`，以及独立非配对结局定样所需的
+`assumed_first`、`assumed_second`、`family_size`；这些比例只适用于该设计，重复或配对尝试不得使用。
 
 exports 是排序键 JSON，整数保持整数，浮点使用 serde_json 的最短 round-trip 十进制，LF 结尾，无时间戳。
 固定六位小数不再作为机器导出格式，因为它会把小斜率写成零。README 的受管标记恰为
