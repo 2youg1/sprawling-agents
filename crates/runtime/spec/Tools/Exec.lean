@@ -369,7 +369,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 | （不收） | microVM（Firecracker） | Linux | 要 KVM（`/dev/kvm`） | 保 | 保 | 保 | 保 | 保 | 能 | 要内核镜像与根文件系统的供给；桌面与 CI 主机常没有 `/dev/kvm` |
 | `native` | Seatbelt（`sandbox-exec` 配置） | macOS | macOS 26.6.2 runner 上无需提权；缺席或策略拒绝时拒开 | 保（写入只落副本；读取不受限） | 保（TCP／UDP，fork／exec 后代同受策略约束） | 不保 | 不保 | 不保 | 不适用：当前只放 exec，关网不能直接装要连 provider 的居民 | 系统 `sandbox-exec(1)` 已标 DEPRECATED；平台继承假设与支持边界见 `crates/runtime/spec/Tools/Exec/NativeMacos.lean` |
 | （不收） | NVIDIA OpenShell | 三个平台 | 它的 Support Matrix：沙箱靠 Landlock 与 seccomp，网络按策略放行，要一个跑在 Docker、Podman、Kubernetes 或 MicroVM 上的 gateway；Windows 上只在 WSL 2 加 Docker Desktop 下，标为 Experimental | —— | —— | —— | —— | —— | —— | 它的隔离来自上面已经各成一行的机制，再加一个 gateway 进程与它自己的策略层；本调研没有重新取它的页面 |
-| `python` | wasip1 里的 Python（§8-13） | 三个平台 | 否 | 保（只够得到 preopen） | 保（wasip1 没有获得 socket 的途径） | 保（wasip1 没有起进程的接口） | 不保 | 条件：CPU 由 fuel 限，内存没有另设上限 | 不能：只跑 Python | `wasm` feature 里的 wasmtime 48 |
+| `python` | wasip1 里的 Python（§8-13） | 三个平台 | 否 | 保（只够得到 preopen） | 保（wasip1 没有获得 socket 的途径） | 保（wasip1 没有起进程的接口） | 不保 | 条件：CPU 由 fuel 限，内存没有另设上限 | 不能：只跑 Python | `wasm` feature 里的 wasmtime 50 |
 
 **每条命令的起动开销**（暂定读数，取于一台负载很重的 Windows 11 x86_64 笔记本，别的构建同时在跑；登记的读数归之后的测量）：`cmd /c exit 0` 起动并等它退出，各 200 次——直接起动 p50 33.9 ms、p99 60.7 ms；起动后装进一个 job p50 32.0 ms、p99 55.2 ms，这个次数下看不出装 job 的开销。`copied_tree` 的开销是同步副本的开销，见 D10。其余的臂在取读数的那一类电脑上没有，读数归 SB1 第 8 条的实跑。
 
