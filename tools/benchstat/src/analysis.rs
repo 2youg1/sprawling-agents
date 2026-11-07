@@ -87,6 +87,27 @@ pub fn analyze(manifest: &Manifest, rows: &[Observation]) -> Result<Value, Bench
                 .coverage
                 .iter()
                 .any(|row| row.series == claim.series && row.status == "measured");
+            let evidence = rows
+                .iter()
+                .filter(|row| {
+                    row.series == claim.series
+                        && row.metric == claim.primary_metric
+                        && row.unit == claim.unit
+                        && row.quantitative().is_some()
+                })
+                .map(|row| json!({
+                    "observation_id": row.observation_id,
+                    "cell": CellKey::of(row).id(),
+                    "value": row.value,
+                }))
+                .collect::<Vec<_>>();
+            let reason = if !measured {
+                "required coverage is not measured"
+            } else if evidence.is_empty() {
+                "no eligible primary metric observations in the registered unit"
+            } else {
+                "claim has no executable cell contrast or falsification rule; free-text conditions require explicit evaluation"
+            };
             Ok(json!({
                 "id": claim.id,
                 "series": claim.series,
@@ -95,15 +116,8 @@ pub fn analyze(manifest: &Manifest, rows: &[Observation]) -> Result<Value, Bench
                 "direction": claim.direction,
                 "minimum_worthwhile_change": claim.minimum_worthwhile_change,
                 "falsification_condition": claim.falsification_condition,
-                "evidence": rows.iter().filter(|row| row.series == claim.series
-                    && row.metric == claim.primary_metric && row.unit == claim.unit
-                    && row.quantitative().is_some()).map(|row| json!({
-                        "observation_id": row.observation_id, "cell": CellKey::of(row).id(), "value": row.value
-                    })).collect::<Vec<_>>(),
-                "reason": if !measured { "required coverage is not measured" }
-                    else if !rows.iter().any(|row| row.series == claim.series && row.metric == claim.primary_metric
-                        && row.unit == claim.unit && row.quantitative().is_some()) { "no eligible primary metric observations in the registered unit" }
-                    else { "claim has no executable cell contrast or falsification rule; free-text conditions require explicit evaluation" },
+                "evidence": evidence,
+                "reason": reason,
                 "estimator": "pre_registered_claim_ladder",
             }))
         })
@@ -140,39 +154,40 @@ struct QuantitativeContext<'a> {
 }
 
 fn decompositions(rows: &[Observation]) -> Result<Value, BenchError> {
-    let attempts = rows
-        .iter()
-        .filter_map(|row| row.task_attempt_id.clone())
-        .collect::<BTreeSet<_>>();
+    let mut attempts = BTreeMap::<&str, Vec<&Observation>>::new();
+    for row in rows {
+        if let Some(attempt) = row.task_attempt_id.as_deref() {
+            attempts.entry(attempt).or_default().push(row);
+        }
+    }
     let mut output = Map::new();
-    for attempt in attempts {
-        let wall = rows.iter().find(|row| {
-            row.task_attempt_id.as_deref() == Some(&attempt) && row.metric == "wall" && row.selected
-        });
+    for (attempt, rows) in attempts {
+        let wall = rows.iter().find(|row| row.metric == "wall" && row.selected);
         let Some(wall) = wall else {
-            output.insert(attempt, unavailable("no task wall span")?);
+            output.insert(attempt.to_owned(), unavailable("no task wall span")?);
             continue;
         };
         let spans = rows
             .iter()
             .filter(|row| {
-                row.task_attempt_id.as_deref() == Some(&attempt)
-                    && matches!(
-                        row.metric.as_str(),
-                        "model_latency" | "tool_latency" | "queue_latency"
-                    )
-                    && row.selected
+                matches!(
+                    row.metric.as_str(),
+                    "model_latency" | "tool_latency" | "queue_latency"
+                ) && row.selected
             })
             .collect::<Vec<_>>();
         if spans.is_empty() {
             output.insert(
-                attempt,
+                attempt.to_owned(),
                 unavailable("no request spans; decomposition is unavailable")?,
             );
             continue;
         }
         let (Some(wall_start), Some(wall_end)) = (wall.span_start, wall.span_end) else {
-            output.insert(attempt, unavailable("task wall endpoints are missing")?);
+            output.insert(
+                attempt.to_owned(),
+                unavailable("task wall endpoints are missing")?,
+            );
             continue;
         };
         let wall_duration = wall_end - wall_start;
@@ -186,7 +201,7 @@ fn decompositions(rows: &[Observation]) -> Result<Value, BenchError> {
                     (Some(start), Some(end)) => Ok((start, end)),
                     _ => Err(BenchError::input(
                         "decompose task wall",
-                        attempt.clone(),
+                        attempt.to_owned(),
                         "publish both endpoints for every request span",
                     )),
                 })
@@ -203,7 +218,7 @@ fn decompositions(rows: &[Observation]) -> Result<Value, BenchError> {
         }
         let (covered, total) = span_coverage(&all)?;
         output.insert(
-            attempt,
+            attempt.to_owned(),
             json!({
                 "status": if wall.censored { "censored" } else { "analyzed" },
                 "estimator": "union_of_request_spans_with_uncovered_residual",
@@ -333,11 +348,10 @@ fn quantitative_cell(
         )?;
         output.insert(statistic, interval_json(interval, manifest.confidence)?);
     }
-    if let Some(cv) = coefficient_of_variation(&values) {
-        output.insert("cv".to_owned(), number(cv)?);
-    } else {
-        output.insert("cv".to_owned(), Value::Null);
-    }
+    output.insert(
+        "cv".to_owned(),
+        optional_number(coefficient_of_variation(&values))?,
+    );
     if let Some((ratio, over2, over5)) = tail_counts(&values) {
         output.insert("max_over_p99".to_owned(), number(ratio)?);
         output.insert("over_2x_p99".to_owned(), json!(over2));
@@ -928,22 +942,16 @@ fn segments(rows: &[Observation], ordered: bool) -> Vec<Vec<f64>> {
     if !ordered {
         return vec![rows.iter().filter_map(Observation::quantitative).collect()];
     }
-    let mut groups = BTreeMap::<(String, String), Vec<&Observation>>::new();
+    let mut groups = BTreeMap::<(&str, &str), Vec<f64>>::new();
     for row in rows {
-        groups
-            .entry((row.round.clone(), row.cohort.clone()))
-            .or_default()
-            .push(row);
+        if let Some(value) = row.quantitative() {
+            groups
+                .entry((&row.round, &row.cohort))
+                .or_default()
+                .push(value);
+        }
     }
-    groups
-        .into_values()
-        .map(|rows| {
-            rows.iter()
-                .filter_map(|row| row.quantitative())
-                .collect::<Vec<_>>()
-        })
-        .filter(|values| !values.is_empty())
-        .collect()
+    groups.into_values().collect()
 }
 
 fn cohort_range(rows: &[Observation]) -> Result<Option<f64>, BenchError> {
