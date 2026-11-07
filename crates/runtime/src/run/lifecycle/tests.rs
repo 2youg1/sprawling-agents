@@ -94,8 +94,11 @@ fn plan() -> RunPlan {
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
-            max_tokens: Ceiling::new(4096),
             effort: None,
+            generation: kernel::FrozenGeneration {
+                max_tokens: Ceiling::new(4096),
+                ..kernel::FrozenGeneration::default()
+            },
             context_tokens: 0,
         },
         second_threshold: None,

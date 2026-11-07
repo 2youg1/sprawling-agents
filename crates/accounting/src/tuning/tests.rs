@@ -92,6 +92,7 @@ prop_compose! {
             proxying,
             max_in_flight,
             account_retries,
+            generation: Vec::new(),
         }
     }
 }

@@ -230,15 +230,25 @@ how = "core"
 -/
 
 /-!
-### 8-14 一次会话选一次：模型与思考强度
+### 8-14 一次会话选一次：模型、思考强度与有效生成配置
 
 ```rust
-pub fn write_session(city_root: &Path, addr: &Address, model: &str, effort: Option<Effort>) -> Result<(), AxError>;
+pub struct SessionShape { pub model: String, pub effort: Option<Effort>,
+                          pub generation: Option<FrozenGeneration> }
+pub fn write_session(city_root: &Path, addr: &Address, shape: &SessionShape) -> Result<(), AxError>;
+impl ConfigLayer { pub fn generation(&self) -> Option<&FrozenGeneration>; }
 ```
 
 思考强度放在派活按钮旁边，因为一次会话反正只选一次；而会话选定的模型也写进同一份文件，因为供应的 prompt 缓存对着的正是这两个值。
 
-- **一次写下一个会话冻下的两样东西**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
+- **一次写下一个会话冻下的整份形状**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。`generation` 在场时再写 `temperature`、`top_p`、`top_k` 的文本、`max_tokens` 的实发整数与 `overrides` 的字符串对；空值省略，空串不读成零。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
+settings-control ModelSection.temperature client/src/views/setup/providers/generation.svelte
+settings-control ModelSection.top_p client/src/views/setup/providers/generation.svelte
+settings-control ModelSection.top_k client/src/views/setup/providers/generation.svelte
+settings-control ModelSection.max_tokens client/src/views/setup/providers/generation.svelte
+settings-control ModelSection.overrides client/src/views/setup/providers/generation.svelte
+
+- **旧会话没有这些键**：`generation()` 答 `None` 时保持旧比较路径，不凭当前设置补写历史；一旦当前类型化生成配置与旧的空设置不同，dispatch 拒绝并指向 `/new`。新会话总是写下有效值，`/new` 与 `Forget` 同时移除这些键，分支则从母亲 `run_started.generation` 恢复。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
 - **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`crates/sprawling/Spec.lean` §8-79`）。
 - **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与其余写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
@@ -262,6 +272,12 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`crates/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（`crates/sprawling/Spec.lean` §8-125）。
 -/
+
+/-! D115 `[model]` 同时冻结有效生成配置，仍走同一个读改写门
+
+决定：Session 的实发采样、输出上限与原始 overrides 住在地址自己的 `[model]` 记录里，不另开文件；`write_session` 一次写下，`Forget` 一次移除。浮点继续以文本保存，顶层 `max_tokens` 是实际发送值而不是模型硬上限。
+
+理由：模型编辑器后来改动只能影响新 Session；另一个文件或只存内存都会让重启与分支失去这条边界。被否：每次 dispatch 重读端点当前默认值——那正是会静默移动旧 Session 的做法。 -/
 
 /-! D6 定规：`[resident] harness` 上梯子，会话记录压过它
 

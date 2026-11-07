@@ -82,6 +82,7 @@ impl Endpoint {
                 breakpoint: MessageBreakpoint::Unmarked,
                 shared: req.chat.shared,
                 effort: req.chat.effort,
+                generation: req.chat.generation.clone(),
             },
         };
         let body = self.prewarm_body(&request)?;

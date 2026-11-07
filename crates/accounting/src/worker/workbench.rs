@@ -251,6 +251,8 @@ pub(super) struct Site {
     /// The Reading Room names this session froze, independent of later edits.
     pub(super) reading_room: Vec<String>,
     pub(super) model: gateway::ModelEntry,
+    /// The effective generation this session's requests carry.
+    pub(super) generation: kernel::FrozenGeneration,
     /// The endpoint the model is reached through (`crates/sprawling/Spec.lean` §8-85).
     pub(super) provider: String,
     pub(super) adapter: Option<super::keeping_warm::Door>,

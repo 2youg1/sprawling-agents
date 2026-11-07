@@ -117,8 +117,10 @@ impl Chartered {
             // session; the city writes it no first message to record
             // (`crates/kernel/Spec.lean` §8-82-1).
             opening: None,
-            // Nor does it send this city's requests, so no effort froze.
+            // Nor does it send this city's requests, so no effort or
+            // generation froze.
             effort: None,
+            generation: None,
             // The agent is known once its session opened; the drive fills
             // it in then.
             agent: None,

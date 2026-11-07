@@ -9,6 +9,7 @@
 //! `city::policy` — dependency inversion, same as the ledger seam.
 //! The part `crates/kernel/spec/Model.lean` specifies this module.
 
+mod generation;
 mod image;
 mod mode;
 mod seam;
@@ -16,6 +17,10 @@ mod usage;
 mod window;
 mod wire;
 
+pub use generation::{
+    FrozenGeneration, GenerationSettings, GenerationSupport, ModelGeneration, ParameterSource,
+    ParameterSupport,
+};
 pub use image::{ImageRef, ImageType};
 pub use mode::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy};
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload};

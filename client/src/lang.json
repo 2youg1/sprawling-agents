@@ -4475,6 +4475,78 @@
     "en": "gallery",
     "zh": "画廊"
   },
+  "frozen_generation_value": {
+    "en": "{field}={value}",
+    "zh": "{field}={value}"
+  },
+  "generation_clear_value": {
+    "en": "clear {field}",
+    "zh": "清空 {field}"
+  },
+  "generation_from_person": {
+    "en": "you",
+    "zh": "你的纠正"
+  },
+  "generation_from_preset": {
+    "en": "provider documentation",
+    "zh": "供应方文档"
+  },
+  "generation_from_upstream": {
+    "en": "provider model list",
+    "zh": "供应方模型列表"
+  },
+  "generation_integer": {
+    "en": "{field} must be a non-negative integer",
+    "zh": "{field} 必须是非负整数"
+  },
+  "generation_new_sessions": {
+    "en": "These defaults apply to new sessions; an existing session keeps the generation it froze.",
+    "zh": "这些默认值只影响新会话；已有会话继续使用它冻下的生成配置。"
+  },
+  "generation_number": {
+    "en": "{field} must be a JSON number",
+    "zh": "{field} 必须是 JSON 数字"
+  },
+  "generation_output": {
+    "en": "session output ceiling",
+    "zh": "会话输出上限"
+  },
+  "generation_output_too_high": {
+    "en": "output preference {wanted} exceeds the model's stated ceiling {ceiling}",
+    "zh": "会话输出偏好 {wanted} 高于模型声明的上限 {ceiling}"
+  },
+  "generation_override": {
+    "en": "endpoint override wins: {pointer}",
+    "zh": "端点覆盖正在生效：{pointer}"
+  },
+  "generation_positive_integer": {
+    "en": "output_tokens must be a positive integer",
+    "zh": "output_tokens 必须是正整数"
+  },
+  "generation_support": {
+    "en": "support: {field}",
+    "zh": "支持情况：{field}"
+  },
+  "generation_supported": {
+    "en": "supported",
+    "zh": "支持"
+  },
+  "generation_toggle": {
+    "en": "generation · {model}",
+    "zh": "生成设置 · {model}"
+  },
+  "generation_unknown": {
+    "en": "unknown",
+    "zh": "未知"
+  },
+  "generation_unsupported": {
+    "en": "unsupported",
+    "zh": "不支持"
+  },
+  "generation_unsupported_value": {
+    "en": "clear {field}, or correct its support statement first",
+    "zh": "请先清空 {field}，或先纠正它的支持情况"
+  },
   "git_branch": {
     "en": "branch",
     "zh": "分支"

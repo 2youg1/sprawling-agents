@@ -22,6 +22,7 @@ import type {
   InputKinds,
   ModelTag,
 } from "../../../wire";
+import type { BodyOverride, ModelGeneration } from "../../../wire";
 import type { ButtonProps } from "../../parts/button";
 import { chosenRows, freshTable, setTick } from "../model_rows";
 import type { TableState } from "../model_rows";
@@ -29,6 +30,8 @@ import { roleKey } from "../model_table";
 import type { ModelRow } from "../models";
 import { begin, end } from "./flight";
 import type { Flight, FlightState } from "./flight";
+import { freshGeneration, generationFrames, generationProblem, sameGeneration } from "./generation";
+import type { GenerationDrafts } from "./generation";
 
 export interface Hands {
   readonly answer: () => EndpointsAnswer;
@@ -49,6 +52,8 @@ interface RolePick {
 interface Expectation {
   readonly models: readonly string[];
   readonly roles: readonly RolePick[];
+  readonly generation: readonly ModelGeneration[];
+  readonly overrides: readonly BodyOverride[];
 }
 
 export interface ModelEditor {
@@ -57,6 +62,9 @@ export interface ModelEditor {
   readonly table: TableState;
   served: readonly ModelFact[];
   chosen: readonly ModelRow[];
+  accepted: readonly RolePick[];
+  generation: GenerationDrafts;
+  overrides: BodyOverride[];
   probing: { readonly before: Probed | null; readonly operation: Flight } | null;
   saving: {
     readonly against: string;
@@ -74,6 +82,9 @@ export interface SavePlan {
   readonly admission: Admission;
   readonly expected: Expectation;
   readonly dirty: boolean;
+  readonly generation: readonly ModelGeneration[];
+  readonly overrides: readonly BodyOverride[];
+  readonly invalid: string | null;
   readonly empty: boolean;
   readonly missingRole: ModelTag | null;
 }
@@ -136,12 +147,16 @@ export function freshModelEditor(
       summary?.models.filter((model) => model.listing === "named").map((model) => model.id) ?? [],
     roles: rolesOf(answer, name),
   });
+  const chosen = chosenRows(table, served);
   return {
     name,
     flight,
     table,
     served,
-    chosen: chosenRows(table, served),
+    chosen,
+    accepted: [...draftRoles(chosen).values()],
+    generation: summary === undefined ? {} : freshGeneration(summary),
+    overrides: summary?.tuning.overrides.map((row) => ({ ...row })) ?? [],
     probing: null,
     saving: null,
     report: null,
@@ -161,6 +176,18 @@ export function choose(editor: ModelEditor, rows: readonly ModelRow[]): void {
 
 export function awaiting(editor: ModelEditor): boolean {
   return editor.probing !== null || editor.saving !== null;
+}
+
+function sameStated(left: RolePick["stated"], right: RolePick["stated"]): boolean {
+  return (
+    left.contextTokens === right.contextTokens &&
+    left.maxOutputTokens === right.maxOutputTokens &&
+    left.input === right.input
+  );
+}
+
+function sameRole(left: RolePick, right: RolePick): boolean {
+  return left.id === right.id && left.tag === right.tag && sameStated(left.stated, right.stated);
 }
 
 function draftRoles(rows: readonly ModelRow[]): Map<ModelTag, RolePick> {
@@ -184,11 +211,30 @@ export function savePlan(editor: ModelEditor, answer: EndpointsAnswer): SavePlan
     const picked = draft.get(tag);
     if (picked === undefined) {
       if (current.has(tag)) missingRole = tag;
-    } else if (current.get(tag) !== picked.id) roles.push(picked);
+    } else {
+      const accepted = editor.accepted.find((role) => role.tag === tag);
+      if (
+        current.get(tag) !== picked.id ||
+        accepted === undefined ||
+        !sameStated(accepted.stated, picked.stated)
+      )
+        roles.push(picked);
+    }
   }
-  const models = editor.chosen.map((row) => row.id);
-  const listed = new Set(editor.served.map((row) => row.id));
   const summary = summaryOf(answer, editor.name);
+  const models = editor.chosen.map((row) => row.id);
+  const generation = generationFrames(editor.generation, models);
+  const overrides = normalizedOverrides(editor.overrides);
+  const invalid =
+    summary?.models.find((model) => {
+      const draft = editor.generation[model.id];
+      return (
+        models.includes(model.id) &&
+        draft !== undefined &&
+        generationProblem(model, draft, "en") !== undefined
+      );
+    })?.id ?? null;
+  const listed = new Set(editor.served.map((row) => row.id));
   const changedIds =
     summary === undefined ||
     !sameIds(
@@ -200,11 +246,28 @@ export function savePlan(editor: ModelEditor, answer: EndpointsAnswer): SavePlan
       listed: models.filter((id) => listed.has(id)),
       named: models.filter((id) => !listed.has(id)),
     },
-    expected: { models, roles },
-    dirty: changedIds || roles.length > 0,
+    expected: { models, roles, generation, overrides },
+    generation,
+    overrides,
+    invalid,
+    dirty:
+      changedIds ||
+      roles.length > 0 ||
+      !sameGeneration(generation, summary.tuning.generation) ||
+      !sameOverrides(overrides, summary.tuning.overrides),
     empty: models.length === 0,
     missingRole,
   };
+}
+
+function normalizedOverrides(rows: readonly BodyOverride[]): BodyOverride[] {
+  return rows
+    .filter((row) => row.pointer.trim().startsWith("/"))
+    .map((row) => ({ pointer: row.pointer.trim(), value: row.value }));
+}
+
+function sameOverrides(left: readonly BodyOverride[], right: readonly BodyOverride[]): boolean {
+  return JSON.stringify(normalizedOverrides(left)) === JSON.stringify(normalizedOverrides(right));
 }
 
 function unsent(editor: ModelEditor, operation: Flight): void {
@@ -234,7 +297,7 @@ export function save(editor: ModelEditor, hands: Hands): void {
   const summary = summaryOf(answer, editor.name);
   if (summary === undefined) return;
   const plan = savePlan(editor, answer);
-  if (!plan.dirty || plan.empty || plan.missingRole !== null) return;
+  if (!plan.dirty || plan.empty || plan.missingRole !== null || plan.invalid !== null) return;
   const operation = begin(editor.flight, "models");
   if (operation === null) return;
   editor.report = null;
@@ -242,7 +305,7 @@ export function save(editor: ModelEditor, hands: Hands): void {
   editor.saved = null;
   editor.notSent = false;
   const frames = [
-    saveModels(summary, plan.admission),
+    saveModels(summary, plan.admission, plan.generation, plan.overrides),
     ...plan.expected.roles.map((role) => selectModel(summary.name, role.id, role.tag, role.stated)),
   ];
   if (!frames.every((command) => hands.send(command))) {
@@ -292,15 +355,41 @@ export function settleAnswer(editor: ModelEditor, answer: EndpointsAnswer): void
         (chosen) =>
           chosen.endpoint === editor.name && chosen.tag === role.tag && chosen.model === role.id,
       ),
-    )
+    ) ||
+    !sameGeneration(summary.tuning.generation ?? [], pending.expected.generation) ||
+    !sameOverrides(summary.tuning.overrides, pending.expected.overrides)
   )
     return;
   end(editor.flight, pending.operation);
   editor.saving = null;
   editor.saved = pending.expected.models;
+  const current = draftRoles(editor.chosen);
+  const settled = pending.expected.roles.filter((role) => {
+    const now = current.get(role.tag);
+    return now !== undefined && sameRole(now, role);
+  });
+  editor.accepted = [
+    ...editor.accepted.filter(
+      (role) => !pending.expected.roles.some((settledRole) => settledRole.tag === role.tag),
+    ),
+    ...settled,
+  ];
+  if (
+    sameGeneration(
+      generationFrames(
+        editor.generation,
+        editor.chosen.map((row) => row.id),
+      ),
+      pending.expected.generation,
+    )
+  )
+    editor.generation = freshGeneration(summary);
+  if (sameOverrides(editor.overrides, pending.expected.overrides))
+    editor.overrides = summary.tuning.overrides.map((row) => ({ ...row }));
   editor.served = factsOf(summary);
-  editor.table.heldRole = rolesOf(answer, editor.name);
-  editor.table.role = { ...editor.table.heldRole };
+  const heldRole = rolesOf(answer, editor.name);
+  editor.table.heldRole = heldRole;
+  for (const role of settled) editor.table.role[role.id] = heldRole[role.id] ?? role.tag;
   editor.table.refusal = null;
   editor.focusSummary = true;
 }
@@ -345,7 +434,17 @@ function alertOf(editor: ModelEditor, answer: EndpointsAnswer, lang: Lang): Aler
   return undefined;
 }
 
-function saveWhy(plan: SavePlan, lang: Lang): string | undefined {
+function saveWhy(
+  editor: ModelEditor,
+  plan: SavePlan,
+  answer: EndpointsAnswer,
+  lang: Lang,
+): string | undefined {
+  if (plan.invalid !== null) {
+    const model = summaryOf(answer, editor.name)?.models.find((row) => row.id === plan.invalid);
+    const draft = editor.generation[plan.invalid];
+    if (model !== undefined && draft !== undefined) return generationProblem(model, draft, lang);
+  }
   if (plan.empty) return say(lang, "setup_models_empty");
   if (plan.missingRole !== null)
     return fill(say(lang, "setup_models_role_required"), {
@@ -374,7 +473,7 @@ export function lookOf(editor: ModelEditor, hands: Hands, lang: Lang): ModelEdit
   const unavailable =
     current !== null && editor.saving === null
       ? say(lang, "setup_endpoint_busy")
-      : saveWhy(plan, lang);
+      : saveWhy(editor, plan, answer, lang);
   return {
     summary: fill(say(lang, "setup_models_toggle"), { n: String(summary?.models.length ?? 0) }),
     busy: busy === null ? undefined : say(lang, busy),

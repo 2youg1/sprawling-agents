@@ -148,7 +148,8 @@ pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u6
                             pub proxying: Option<Proxying>,        // 默认值省略
                             pub max_in_flight: Option<u32>,        // 没人定过就省略；1 到 256 之外读作未设
                             pub account_retries: Option<AccountRetries>, // 同一账号上再发几次（one｜two，§8-86）；没人定过就省略
-                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
+                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)>,
+                            #[serde(default)] pub generation: Vec<ModelGeneration> } // 每个模型的人设与能力纠正；空即省略
 // AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
 // EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
 // 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
@@ -160,6 +161,7 @@ pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max
                         pub input_modalities: Vec<String>, pub input_price: Option<String>,
                         pub output_price: Option<String>,        // 缺席写 null，行没说就是没说
                         pub thinking: Option<ThinkingStatement>, // 缺席即省略：列表没说思考档
+                        pub generation: Option<GenerationSupport>, // 机器可读的参数能力声明；缺席即没说
                         pub canonical: Option<String>,           // 上游自己的规范 id；缺席即省略
                         pub listing: Listing }                   // 这一行从哪里来（D63）；listed 即省略
 pub enum Listing { Listed, Named }   // 线上 snake_case；缺键读作 listed
@@ -409,6 +411,8 @@ pub struct RunStarted {
     // …既有字段…
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,     // 这次 run 的请求冻下的强度（`runtime::CallShape.effort`）；缺席即没有说，由提供方自定
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<FrozenGeneration>, // 实发采样、输出上限与原始 overrides；旧行与 harness 缺席
 }
 ```
 
@@ -416,6 +420,7 @@ pub struct RunStarted {
 - **缺席有两种来历，读法相同。** 一是这次派活没有说强度，提供方自定——这与 `Effort::None`（请它不思考）是两件事，所以不写成 `none`；二是这一行早于这个键。页面两种都不画强度，不猜。harness run 没有本城的请求，恒缺席。
 - **被否：读这次 run 的第一个提交的 `effort`**（`CommitAttribution`）。还没提交过的 run 说不出强度，而提交上的那个值写的是 `Effort::None` 兼指「没说」，读回来分不清。**被否：读 `model_selected`**：那是房间的选择，后来的派活可以在帧上另带强度，房间的选择不等于这次 run 用的那一个。
 - 验收：`record::run` 的 `a_run_started_line_records_the_effort_it_froze`（写出、读回、缺席不写）。
+- **同一条还记 `generation: Option<FrozenGeneration>`**：采样文本、实发 `max_tokens` 与最后应用的原始 overrides 从 `RunPlan.shape` 照录。分支从母亲这一行恢复，页面从这一行展示冻下的事实，重放不读当前模型默认值。旧行与 harness run 缺席；没有新设置的新行也保留 `max_tokens`，因为那是这次请求实际采用的输出上限。
 -/
 
 /-!

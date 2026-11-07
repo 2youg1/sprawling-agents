@@ -119,7 +119,7 @@ impl RunWorker {
         // changed. A dispatch that would move it is refused here,
         // before the brief is written, so a refusal leaves the session
         // exactly as it was.
-        self.choose_shape(&at, &agreed.model, &agreed.provider)?;
+        let generation = self.choose_shape(&at, &agreed.model, &agreed.provider)?;
         let given = self.give(&at, task, goal)?;
         // Kept for the post-drive sweep: an escalation names the work it
         // interrupted, and by then the plan has consumed the original.
@@ -129,7 +129,7 @@ impl RunWorker {
         // two values, both carried whole rather than taken apart into a
         // row of locals every phase below would then have to be handed
         // one at a time.
-        let mut site = self.stand_up(agreed, &at, &given)?;
+        let mut site = self.stand_up(agreed, &at, &given, generation)?;
         // The run id is derived from the job locator, so the brief's
         // origin can only be recorded once the run stands; the bytes are
         // already durable and this put adds the origin record alone.

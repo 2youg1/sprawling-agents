@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// — runs where the call is made, and a summary that had already
 /// climbed it would be a second answer to which figure won.
 ///
-/// The last three fields are the city's own, each from its one
+/// The remaining fields are the city's own, each from its one
 /// authority: `thinking` names the rung it came from, `canonical` is
 /// `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92),
 /// and `listing` is what the attach recorded about where the row came
@@ -50,6 +50,9 @@ pub struct ModelFactsSummary {
     /// The thinking levels this (Endpoint, model) offers, and the rung of
     /// the gateway's thinking ladder that said so.
     pub thinking: super::ThinkingOffer,
+    /// The person's defaults for new sessions and the resolved support
+    /// of each sampling parameter.
+    pub generation: GenerationAnswer,
     /// This model's identity across providers: two rows are one model
     /// exactly when these are equal.
     pub canonical: String,
@@ -58,4 +61,27 @@ pub struct ModelFactsSummary {
     /// else because nobody asked the provider, which is different from
     /// a provider that said nothing.
     pub listing: Listing,
+}
+
+/// The resolved support of one generation parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ParameterAnswer {
+    pub support: kernel::ParameterSupport,
+    /// Absent when nobody has stated the capability.
+    pub source: Option<kernel::ParameterSource>,
+}
+
+/// One model's editable generation defaults and their support facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GenerationAnswer {
+    pub settings: kernel::GenerationSettings,
+    /// The session output preference, not the model's hard ceiling.
+    pub output_tokens: Option<Ceiling>,
+    pub temperature: ParameterAnswer,
+    pub top_p: ParameterAnswer,
+    pub top_k: ParameterAnswer,
+    /// The raw override path that wins over `output_tokens` on this face.
+    pub output_pointer: String,
 }

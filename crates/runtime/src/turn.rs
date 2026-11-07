@@ -156,13 +156,14 @@ impl<'h> Turn<'h, Assembling> {
         }
         let chat = ChatRequest {
             model: shape.model.clone(),
-            max_tokens: shape.max_tokens,
+            max_tokens: shape.generation.max_tokens,
             system: prompt.prefix.system_blocks()?,
             messages: Cow::Borrowed(conversation.messages()),
             tools: Cow::Borrowed(tools),
             breakpoint: plan.message_breakpoint(),
             shared: prompt.prefix.shared_part(),
             effort: shape.effort,
+            generation: shape.generation.settings.clone(),
         };
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,

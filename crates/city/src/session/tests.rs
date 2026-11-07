@@ -30,7 +30,12 @@ fn addr(raw: &str) -> Address {
 /// A room whose first session froze a shape, with a key a person typed
 /// beside it.
 fn room_with_a_frozen_shape(city_root: &Path, room: &Address) -> String {
-    write_session(city_root, room, "m-local", Some(Effort::High)).unwrap();
+    write_session(
+        city_root,
+        room,
+        &crate::SessionShape::new("m-local", Some(Effort::High), None),
+    )
+    .unwrap();
     let file = path(city_root, room, Layer::Resident).unwrap();
     let mut held = std::fs::read_to_string(&file).unwrap();
     // A key in the same file that no session wrote: the sandbox is the

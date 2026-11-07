@@ -121,12 +121,19 @@ impl Conversation { pub fn new() -> Conversation;
     pub fn mark_sent(&mut self);                                     // §8-47
     pub fn messages(&self) -> &[ChatMessage]; }
 
-pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort>,
+pub struct CallShape { pub model: String, pub effort: Option<Effort>,
+                       pub generation: FrozenGeneration,             // 采样文本、实发 max_tokens、最后应用的 raw overrides
                        pub context_tokens: u64 }   // 窗口大小；只喂本地提醒、不上线（§8-3）
 impl CallShape { pub fn verified_against(&self, frozen: &CallShape) -> Result<(), AxError>; }   // 冻结判定（§8-3）
-                    // 三个上线字段全部来自选型点，无一项在调用处手写。model 与 max_tokens 解自
-                    // 模型目录行（gateway::market::ModelEntry）；effort 解自 kernel::FrozenConfig，
+                    // 上线字段全部来自选型点，无一项在调用处手写。model 解自目录行，generation 由
+                    // gateway::provider::generation 解出并随 Session 冻结；effort 解自 kernel::FrozenConfig，
                     // Run 内恒不变——改它就换缓存前缀（理由与出处在 `crates/kernel/Spec.lean` §8-22）
+/-! D123 生成配置是 CallShape 的一部分，与模型和 effort 同时比较
+
+决定：`CallShape.verified_against` 除 model、effort 外，还比较 `FrozenGeneration` 的采样文本、实发输出上限与原始 overrides；任一变化都在新模型调用前拒绝。`Turn::assemble` 把采样文本放进 canonical `ChatRequest`，实发上限仍只进 `max_tokens`。
+
+理由：这些值都会进入请求体，设置页后来改动不能改变已有 Session 的缓存形状。被否：只冻结模型与 effort，或让 raw overrides 绕过比较；两者都会让同一会话后半段发出另一种请求。 -/
+
 impl Turn<Assembling> {
     pub fn assemble<'c>(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>,
                     conversation: &'c Conversation, tools: &'c [ToolDef], shape: &CallShape)

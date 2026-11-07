@@ -25,7 +25,8 @@ fn listed_model_facts_and_a_harness_agent_read_back_from_the_views_snapshot() {
         r#""input_modalities":["text"],"input_price":null,"max_output_tokens":null,"#,
         r#""output_price":null,"thinking":{"default":"medium","levels":["low","medium","high"]}},"#,
         r#"{"context_tokens":null,"id":"m-switch","input_modalities":[],"input_price":null,"#,
-        r#""max_output_tokens":null,"output_price":null,"thinking":{"on":true}}]"#,
+        r#""generation":{"top_k":"unsupported"},"max_output_tokens":null,"#,
+        r#""output_price":null,"thinking":{"on":true}}]"#,
     );
     let blob = storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
         .unwrap()
@@ -52,7 +53,11 @@ fn listed_model_facts_and_a_harness_agent_read_back_from_the_views_snapshot() {
             EventKind::EndpointAttached,
             serde_json::json!({
                 "base_url": "https://api.example.test/v2", "dialect": "open_ai",
-                "facts_blob": blob.to_string(), "models": ["m-new", "m-switch"], "name": "new"
+                "facts_blob": blob.to_string(), "models": ["m-new", "m-switch"], "name": "new",
+                "tuning": {"generation": [{
+                    "model": "m-new", "settings": {"temperature": "0.2"},
+                    "support": {"top_k": "unsupported"}, "output_tokens": 1024
+                }]}
             }),
         ),
         (

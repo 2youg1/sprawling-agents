@@ -88,6 +88,7 @@ pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
                     input_price: row.input_price.clone(),
                     output_price: row.output_price.clone(),
                     thinking: thinking_summary(gateway::thinking_offer(endpoint, &row.id)),
+                    generation: generation_summary(gateway::generation_answer(endpoint, &row.id)),
                     canonical: gateway::canonical_model(row),
                     listing: row.listing,
                 })
@@ -108,6 +109,25 @@ pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
         })
         .collect();
     wire::EndpointsAnswer { endpoints, chosen }
+}
+
+fn parameter_summary(answer: gateway::ParameterAnswer) -> wire::ParameterAnswer {
+    wire::ParameterAnswer {
+        support: answer.support,
+        source: answer.source,
+    }
+}
+
+/// The gateway's resolved generation answer, renamed for the wire.
+fn generation_summary(answer: gateway::GenerationAnswer) -> wire::GenerationAnswer {
+    wire::GenerationAnswer {
+        settings: answer.settings,
+        output_tokens: answer.output_tokens,
+        temperature: parameter_summary(answer.temperature),
+        top_p: parameter_summary(answer.top_p),
+        top_k: parameter_summary(answer.top_k),
+        output_pointer: answer.output_pointer.to_owned(),
+    }
 }
 
 /// The gateway's offer as the wire spells it: the ladder is climbed

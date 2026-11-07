@@ -69,6 +69,7 @@ pub(crate) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
             .map(gateway::MaxInFlight::try_from)
             .transpose()?,
         account_retries: wire.account_retries,
+        generation: wire.generation,
     })
 }
 
@@ -106,6 +107,7 @@ pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::Endp
         proxying: Some(tuning.proxying),
         max_in_flight: tuning.max_in_flight.map(gateway::MaxInFlight::get),
         account_retries: tuning.account_retries,
+        generation: tuning.generation.clone(),
     }
 }
 

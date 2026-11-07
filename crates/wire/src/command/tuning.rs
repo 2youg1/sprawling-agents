@@ -97,4 +97,8 @@ pub struct EndpointTuning {
     /// endpoint lists two accounts or more.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_retries: Option<kernel::account_recovery::AccountRetries>,
+    /// Complete per-model generation drafts, keyed by the model id in
+    /// each row and saved through the existing attach door.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub generation: Vec<kernel::ModelGeneration>,
 }

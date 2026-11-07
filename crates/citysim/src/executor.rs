@@ -239,7 +239,10 @@ pub fn run_scenario_on(
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
-            max_tokens: kernel::Ceiling::new(4096),
+            generation: kernel::FrozenGeneration {
+                max_tokens: kernel::Ceiling::new(4096),
+                ..kernel::FrozenGeneration::default()
+            },
             effort: None,
             context_tokens: 0,
         },

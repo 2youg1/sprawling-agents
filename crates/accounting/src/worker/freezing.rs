@@ -336,14 +336,10 @@ impl Freezing<'_> {
             inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
-                // The model's own ceiling, not a number chosen here.
-                // With thinking enabled this covers reasoning and answer
-                // together, so a hand-picked value truncates runs for a
-                // reason that appears nowhere in the account.
-                max_tokens: site.model.max_output_tokens,
                 // Stated in CONFIG.toml, resolved down the three-layer
                 // ladder, and frozen with the run.
                 effort: site.config.effort,
+                generation: site.generation.clone(),
                 // The window the reminder measures against: the book's
                 // figure, which is what `status` already reports.
                 context_tokens: site.model.context_tokens,

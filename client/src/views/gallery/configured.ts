@@ -40,6 +40,13 @@ export const ACCOUNTED: EndpointSummary = {
       canonical: "fable",
       listing: "listed",
       thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+      generation: {
+        output_pointer: "/max_tokens",
+        settings: {},
+        temperature: { support: "unknown" },
+        top_p: { support: "unknown" },
+        top_k: { support: "unknown" },
+      },
     },
   ],
   name: "example",

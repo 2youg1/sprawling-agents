@@ -106,7 +106,7 @@ pub use layers::{
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use metrics::MetricsAnswer;
-pub use model_facts::ModelFactsSummary;
+pub use model_facts::{GenerationAnswer, ModelFactsSummary, ParameterAnswer};
 pub use model_figures::{
     CeilingLine, FigureFrom, FiguresAsked, FiguresLine, ModelFiguresAnswer, WindowLine,
 };

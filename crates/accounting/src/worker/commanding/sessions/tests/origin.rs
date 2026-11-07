@@ -78,7 +78,12 @@ fn a_branch_restores_the_mothers_shape() {
     let dir = tempfile::tempdir().unwrap();
     let (mut worker, started, _provider) = a_mother_ran(dir.path());
     let room = addr("lab/room2");
-    city::write_session(dir.path(), &room, "m-other", Some(kernel::Effort::Low)).unwrap();
+    city::write_session(
+        dir.path(),
+        &room,
+        &city::SessionShape::new("m-other", Some(kernel::Effort::Low), None),
+    )
+    .unwrap();
 
     worker
         .open_session(&room, wire::Carry::Nothing, Some(started))

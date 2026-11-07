@@ -6,7 +6,7 @@
 //! What a completed turn hands the run loop, and the frozen `[model]`
 //! section the call is shaped by.
 
-use kernel::{AxCode, AxError, Ceiling, ContentBlock, ModelUsage, StopReason};
+use kernel::{AxCode, AxError, ContentBlock, ModelUsage, StopReason};
 
 use super::Entry;
 
@@ -77,11 +77,10 @@ impl TurnReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallShape {
     pub model: String,
-    /// The model's own ceiling, from the endpoint book. `None` when no
-    /// catalogue row states one: the request then carries no ceiling and
-    /// the wire that requires one refuses the call.
-    pub max_tokens: Option<Ceiling>,
     pub effort: Option<kernel::Effort>,
+    /// Sampling values, effective output ceiling and raw overrides frozen
+    /// with the session.
+    pub generation: kernel::FrozenGeneration,
     /// The model's window, from the endpoint book. Zero when the book
     /// does not say, in which case the context reminder stays silent.
     pub context_tokens: u64,
@@ -117,8 +116,14 @@ impl CallShape {
                 frozen.effort, self.effort
             )));
         }
-        if self.max_tokens != frozen.max_tokens {
+        if self.generation.max_tokens != frozen.generation.max_tokens {
             return Err(shape_moved("the output ceiling changed".to_owned()));
+        }
+        if self.generation.settings != frozen.generation.settings {
+            return Err(shape_moved("the sampling settings changed".to_owned()));
+        }
+        if self.generation.overrides != frozen.generation.overrides {
+            return Err(shape_moved("the raw request overrides changed".to_owned()));
         }
         Ok(())
     }

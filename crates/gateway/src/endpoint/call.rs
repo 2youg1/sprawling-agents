@@ -321,6 +321,16 @@ impl Endpoint {
                 root.insert(field.to_owned(), value);
             }
         }
+        // Typed sampling stays text in configuration and the Ledger; this
+        // request boundary is where it becomes JSON numbers. Raw
+        // overrides still run afterwards and win on the same path.
+        if let Value::Object(root) = &mut wire {
+            for (field, value) in
+                crate::provider::generation::request_values(&self.config.model, &chat.generation)?
+            {
+                root.insert(field.to_owned(), value);
+            }
+        }
         // Before the overrides, so a person who named this path wins.
         if let Some(field) = self.cache_key_field() {
             apply_override(
@@ -495,6 +505,30 @@ mod tests {
             .expect("the fixture puts one picture in the chat");
         let err = endpoint.wire_request(&request).unwrap_err();
         assert_eq!(err, IMAGE_MAX_BYTES.admit(&at, 3_000_000).unwrap_err());
+    }
+
+    #[test]
+    fn typed_generation_is_numeric_and_a_raw_override_still_wins() {
+        let mut configured = config("http://127.0.0.1:1/v1/messages");
+        configured
+            .overrides
+            .push(("/temperature".to_owned(), serde_json::json!(0.8)));
+        let endpoint = Endpoint::new(configured, redemption()).unwrap();
+        let mut called = request();
+        called.chat.generation = kernel::GenerationSettings {
+            temperature: Some("0.2".to_owned()),
+            top_p: Some("0.9".to_owned()),
+            top_k: Some("40".to_owned()),
+        };
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(wire["temperature"], serde_json::json!(0.8));
+        assert_eq!(wire["top_p"], serde_json::json!(0.9));
+        assert_eq!(wire["top_k"], serde_json::json!(40));
+        called.chat.generation.temperature = Some("not-a-number".to_owned());
+        assert_eq!(
+            *endpoint.wire_request(&called).unwrap_err().code(),
+            AxCode::ConfigInvalid
+        );
     }
 
     #[test]

@@ -114,6 +114,7 @@ fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
                 landing: kernel::LandingPolicy::Experiment,
             }),
             effort: Some(kernel::Effort::High),
+            generation: None,
             names: Some(wire::FrozenNames {
                 mayor: Some("Cat".to_owned()),
             }),

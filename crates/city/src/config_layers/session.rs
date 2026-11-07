@@ -31,10 +31,33 @@
 
 use std::path::Path;
 
-use kernel::{Address, AxError, B3Hash, Effort};
+use kernel::{Address, AxError, B3Hash, Effort, FrozenGeneration};
 
 use super::write::{Change, change};
 use super::{ConfigLayer, Layer, path};
+
+/// The model, effort and effective generation one session freezes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionShape {
+    pub model: String,
+    pub effort: Option<Effort>,
+    pub generation: Option<FrozenGeneration>,
+}
+
+impl SessionShape {
+    /// Gather the values that must be written or cleared together.
+    pub fn new(
+        model: impl Into<String>,
+        effort: Option<Effort>,
+        generation: Option<FrozenGeneration>,
+    ) -> SessionShape {
+        SessionShape {
+            model: model.into(),
+            effort,
+            generation,
+        }
+    }
+}
 
 /// What the configuration at `addr` itself states, with the ladder
 /// above it left out.
@@ -75,14 +98,17 @@ pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxErro
 pub fn write_session(
     city_root: &Path,
     addr: &Address,
-    model: &str,
-    effort: Option<Effort>,
+    shape: &SessionShape,
 ) -> Result<(), AxError> {
     change(
         city_root,
         addr,
         Layer::Resident,
-        Change::Session { model, effort },
+        Change::Session {
+            model: &shape.model,
+            effort: shape.effort,
+            generation: shape.generation.as_ref(),
+        },
     )
 }
 

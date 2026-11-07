@@ -128,7 +128,12 @@ mod tests {
             "the nearest rung names the harness, and says which rung it is"
         );
 
-        write_session(dir.path(), &room, "m-local", None).unwrap();
+        write_session(
+            dir.path(),
+            &room,
+            &crate::SessionShape::new("m-local", None, None),
+        )
+        .unwrap();
         assert_eq!(
             settled_harness(dir.path(), &room).unwrap(),
             None,

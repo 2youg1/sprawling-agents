@@ -129,6 +129,7 @@ impl AdviserClient {
                 breakpoint: kernel::MessageBreakpoint::Unmarked,
                 shared: kernel::SharedPrefix::Unshared,
                 effort: None,
+                generation: kernel::GenerationSettings::default(),
             },
         };
         let returned = self.model.call(&request).map_err(|err| {

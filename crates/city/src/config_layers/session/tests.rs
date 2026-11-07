@@ -34,7 +34,12 @@ fn a_session_record_is_read_back_exactly_as_it_was_written() {
     let room = addr("lab/refactor");
     assert_eq!(own_layer(dir.path(), &room).unwrap().model(), None);
 
-    write_session(dir.path(), &room, "m-local", Some(Effort::High)).unwrap();
+    write_session(
+        dir.path(),
+        &room,
+        &crate::SessionShape::new("m-local", Some(Effort::High), None),
+    )
+    .unwrap();
     let recorded = own_layer(dir.path(), &room).unwrap();
     assert_eq!(recorded.model(), Some("m-local"));
     assert_eq!(recorded.effort(), Some(Effort::High));
@@ -48,7 +53,12 @@ fn a_session_record_is_read_back_exactly_as_it_was_written() {
     // room whose person chose none keeps the key out, and the ladder
     // goes on answering nothing for it.
     let fresh = addr("lab/fresh");
-    write_session(dir.path(), &fresh, "m-local", None).unwrap();
+    write_session(
+        dir.path(),
+        &fresh,
+        &crate::SessionShape::new("m-local", None, None),
+    )
+    .unwrap();
     let stated =
         std::fs::read_to_string(path(dir.path(), &fresh, Layer::Resident).unwrap()).unwrap();
     assert!(

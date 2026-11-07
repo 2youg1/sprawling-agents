@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 74 as const;
+export const WIRE_V = 75 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "aa2e307bd8b94906f470d0a2980832dc481260f94118862edba51bb878545726" as const;
+export const WIRE_HASH = "d5b62816c11a76d8ad63cd0a0d7186addd424fb05ba74fece28d2e7cca9fa6e7" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -2106,6 +2106,51 @@ export const HeaderPair = Schema.Struct({
 export type HeaderPair = typeof HeaderPair.Type;
 
 /**
+ * Sampling defaults for new sessions. Every number remains the exact
+ * text the person entered; absence is never zero.
+ */
+export const GenerationSettings = Schema.Struct({
+  temperature: Schema.optional(Schema.NullOr(Schema.String)),
+  top_k: Schema.optional(Schema.NullOr(Schema.String)),
+  top_p: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "GenerationSettings" });
+export type GenerationSettings = typeof GenerationSettings.Type;
+
+/**
+ * Whether one generation parameter is known to be accepted.
+ */
+export const ParameterSupport = Schema.Union([
+  Schema.Literal("unknown"),
+  Schema.Literal("supported"),
+  Schema.Literal("unsupported"),
+]).annotate({ identifier: "ParameterSupport" });
+export type ParameterSupport = typeof ParameterSupport.Type;
+
+/**
+ * The person's corrections to three sampling capabilities. An absent
+ * field leaves the upstream and preset rungs free to answer.
+ */
+export const GenerationSupport = Schema.Struct({
+  temperature: Schema.optional(Schema.NullOr(ParameterSupport)),
+  top_k: Schema.optional(Schema.NullOr(ParameterSupport)),
+  top_p: Schema.optional(Schema.NullOr(ParameterSupport)),
+}).annotate({ identifier: "GenerationSupport" });
+export type GenerationSupport = typeof GenerationSupport.Type;
+
+/**
+ * One model's generation editor contents at one endpoint. `support`
+ * holds only the person's statements; resolved answers also carry their
+ * source on the wire.
+ */
+export const ModelGeneration = Schema.Struct({
+  model: Schema.String,
+  output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  settings: Schema.optional(GenerationSettings),
+  support: Schema.optional(GenerationSupport),
+}).annotate({ identifier: "ModelGeneration" });
+export type ModelGeneration = typeof ModelGeneration.Type;
+
+/**
  * Everything a person settles about one endpoint beyond its address.
  * 
  * `Default` is "nothing was settled", which is what a form that never
@@ -2115,6 +2160,7 @@ export type HeaderPair = typeof HeaderPair.Type;
 export const EndpointTuning = Schema.Struct({
   account_retries: Schema.optional(Schema.NullOr(AccountRetries)),
   accounts: Schema.optional(Schema.NullOr(Schema.Array(ProviderAccount))),
+  generation: Schema.optional(Schema.Array(ModelGeneration)),
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),
   max_in_flight: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
@@ -2125,6 +2171,38 @@ export const EndpointTuning = Schema.Struct({
   timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 }).annotate({ identifier: "EndpointTuning" });
 export type EndpointTuning = typeof EndpointTuning.Type;
+
+/**
+ * Who stated a parameter's support.
+ */
+export const ParameterSource = Schema.Union([
+  Schema.Literal("person"),
+  Schema.Literal("upstream"),
+  Schema.Literal("preset"),
+]).annotate({ identifier: "ParameterSource" });
+export type ParameterSource = typeof ParameterSource.Type;
+
+/**
+ * The resolved support of one generation parameter.
+ */
+export const ParameterAnswer = Schema.Struct({
+  source: Schema.optional(Schema.NullOr(ParameterSource)),
+  support: ParameterSupport,
+}).annotate({ identifier: "ParameterAnswer" });
+export type ParameterAnswer = typeof ParameterAnswer.Type;
+
+/**
+ * One model's editable generation defaults and their support facts.
+ */
+export const GenerationAnswer = Schema.Struct({
+  output_pointer: Schema.String,
+  output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  settings: GenerationSettings,
+  temperature: ParameterAnswer,
+  top_k: ParameterAnswer,
+  top_p: ParameterAnswer,
+}).annotate({ identifier: "GenerationAnswer" });
+export type GenerationAnswer = typeof GenerationAnswer.Type;
 
 /**
  * Where one registered model row came from (kernel D63).
@@ -2216,7 +2294,7 @@ export type Window = typeof Window.Type;
  * — runs where the call is made, and a summary that had already
  * climbed it would be a second answer to which figure won.
  * 
- * The last three fields are the city's own, each from its one
+ * The remaining fields are the city's own, each from its one
  * authority: `thinking` names the rung it came from, `canonical` is
  * `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92),
  * and `listing` is what the attach recorded about where the row came
@@ -2225,6 +2303,7 @@ export type Window = typeof Window.Type;
 export const ModelFactsSummary = Schema.Struct({
   canonical: Schema.String,
   context_tokens: Schema.optional(Schema.NullOr(Window)),
+  generation: GenerationAnswer,
   id: Schema.String,
   input_modalities: Schema.Array(Schema.String),
   input_price: Schema.optional(Schema.NullOr(Schema.String)),
@@ -4187,6 +4266,17 @@ export const Closing = Schema.Struct({
 export type Closing = typeof Closing.Type;
 
 /**
+ * The generation a session actually froze: typed sampling text, the
+ * effective output ceiling, and the raw request overrides applied last.
+ */
+export const FrozenGeneration = Schema.Struct({
+  max_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  overrides: Schema.optional(Schema.Array(Schema.Tuple([Schema.String, Schema.String]))),
+  settings: Schema.optional(GenerationSettings),
+}).annotate({ identifier: "FrozenGeneration" });
+export type FrozenGeneration = typeof FrozenGeneration.Type;
+
+/**
  * The names a session froze, as a page draws them.
  */
 export const FrozenNames = Schema.Struct({
@@ -4261,6 +4351,7 @@ export const Opening = Schema.Struct({
   at: TimeMs,
   dispatched_by: Schema.optional(Schema.NullOr(Schema.String)),
   effort: Schema.optional(Schema.NullOr(Effort)),
+  generation: Schema.optional(Schema.NullOr(FrozenGeneration)),
   goal: Schema.String,
   names: Schema.optional(Schema.NullOr(FrozenNames)),
   parent: Schema.optional(Schema.NullOr(RunId)),

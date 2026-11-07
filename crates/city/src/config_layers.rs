@@ -65,7 +65,7 @@ pub use resident::settled_harness;
 pub use search::{city_search, default_search_supplier};
 pub use search::{search_supplier, settled_search, write_search};
 pub(crate) use session::forget as forget_session;
-pub use session::{freeze_naming, own_layer, write_session};
+pub use session::{SessionShape, freeze_naming, own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
@@ -96,6 +96,9 @@ pub struct ConfigLayer {
     /// The harness this scope names as the resident of its rooms, as written.
     harness: Option<String>,
     effort: Option<Effort>,
+    /// The effective generation this session froze; absent on a layer
+    /// written before these keys existed.
+    generation: Option<kernel::FrozenGeneration>,
     sandbox: Option<SandboxLimits>,
     mcp: Option<McpLayer>,
     /// Which supplier `web_search` reaches (§8-4c); refused on a room's rung.
@@ -194,6 +197,20 @@ impl ConfigLayer {
         };
         let search = file.search.map(search::stated).transpose()?;
         let model = resident::stated_name(file.model.name, resident::MODEL_NAME_KEY)?;
+        let generation = (file.model.temperature.is_some()
+            || file.model.top_p.is_some()
+            || file.model.top_k.is_some()
+            || file.model.max_tokens.is_some()
+            || !file.model.overrides.is_empty())
+        .then_some(kernel::FrozenGeneration {
+            settings: kernel::GenerationSettings {
+                temperature: file.model.temperature,
+                top_p: file.model.top_p,
+                top_k: file.model.top_k,
+            },
+            max_tokens: file.model.max_tokens,
+            overrides: file.model.overrides,
+        });
         let harness = file.resident.and_then(|section| section.harness);
         let harness = resident::stated_name(harness, resident::HARNESS_KEY)?;
         resident::one_resident(model.as_deref(), harness.as_deref())?;
@@ -205,6 +222,7 @@ impl ConfigLayer {
             model,
             harness,
             effort: file.model.effort,
+            generation,
             sandbox,
             mcp,
             search,
@@ -236,6 +254,13 @@ impl ConfigLayer {
     #[must_use]
     pub fn effort(&self) -> Option<Effort> {
         self.effort
+    }
+
+    /// The effective generation this session recorded, absent on a
+    /// legacy session whose file predates these keys.
+    #[must_use]
+    pub fn generation(&self) -> Option<&kernel::FrozenGeneration> {
+        self.generation.as_ref()
     }
 
     /// The second context-reminder rung this layer states. Taken
@@ -465,6 +490,17 @@ struct ModelSection {
     name: Option<String>,
     #[serde(default)]
     effort: Option<Effort>,
+    #[serde(default)]
+    temperature: Option<String>,
+    #[serde(default)]
+    top_p: Option<String>,
+    #[serde(default)]
+    top_k: Option<String>,
+    /// The effective request ceiling, not the model's hard fact.
+    #[serde(default)]
+    max_tokens: Option<kernel::Ceiling>,
+    #[serde(default)]
+    overrides: Vec<(String, String)>,
 }
 
 #[cfg(test)]

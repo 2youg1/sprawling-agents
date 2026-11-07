@@ -19,6 +19,7 @@ import crates.gateway.spec.Market
 import crates.gateway.spec.Ocr
 import crates.gateway.spec.Provider
 import crates.gateway.spec.Provider.Ceiling
+import crates.gateway.spec.Provider.Generation
 import crates.gateway.spec.Provider.Identity
 import crates.gateway.spec.Provider.Input
 import crates.gateway.spec.Provider.Preset
@@ -185,6 +186,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 | 8-38 | `crates/gateway/spec/Provider/Identity.lean` |
 | 8-39 | `crates/gateway/spec/Provider/Thinking.lean` |
 | 8-40 | `crates/gateway/spec/Concurrency.lean` |
+| 8-41 | `crates/gateway/spec/Provider/Generation.lean` |
 
 §8-36 不用。下面四节不属于任何一个模块：两件本 crate 不做的事，目录化的形状，以及重试上限住在哪里。
 -/
@@ -374,6 +376,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`crates/gateway/spec/Endpoint/Models.lean`
 - D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`crates/gateway/spec/Endpoint/Models.lean`
 - D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`crates/gateway/spec/Router.lean`
+- D64 生成参数的支持情况按 Person → Upstream → Preset 作答，输出偏好与硬上限分开，raw overrides 最后生效：`crates/gateway/spec/Provider/Generation.lean`
 -/
 
 /-! ## 13 依赖选型
@@ -407,6 +410,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 - 输出上限的梯子：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 与测试（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling`、`an_unknown_model_at_an_unknown_host_is_still_callable`）。
 - 收得下什么：`provider::input` 的 `the_first_rung_that_states_a_fact_answers` 与 `every_answer_is_a_stated_fact_or_text_on_every_combination`（27 种组合），与 accounting 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`（选型点的生产路径）。
 - 思考档：`provider::thinking` 的 proptest `the_ladder_keeps_the_lean_properties`；读上游陈述的是 `endpoint::models` 的 `recorded_listings_are_read_into_offers`（OpenRouter、Anthropic、DeepSeek、xAI 与 Ollama 各一份记录下来的列表，经梯子读成 offer）。
+- 生成设置：`provider::generation` 的 proptest `the_support_ladder_keeps_the_lean_properties`，以及输出偏好、非法数值、已知不支持参数和 raw override 次序的行为检查；Session 冻结由 accounting 的 `session_shape` 测试守住。
 - 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
 - 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。
