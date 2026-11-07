@@ -192,7 +192,7 @@ fn instrument_read_after_write_ab() {
     );
 }
 
-/// The ceiling CI holds (`tools/xtask/budgets.toml` `[read_handle_ratio]`):
+/// The ceiling CI holds (`crates/xtask/budgets.toml` `[read_handle_ratio]`):
 /// the handle read of a 20 KiB file, where the fixed cost of resolving
 /// and opening dominates, stays within this many resolved reads of it.
 #[cfg(any(windows, target_os = "linux"))]

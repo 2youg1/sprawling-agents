@@ -40,7 +40,7 @@
 
   /* The two checkpoints on the context ring, and the only colours off
    * the axis: green where the first reminder sounds, red where the
-   * handoff reminder does (docs/frontend-method.md §7J, tools/xtask/Spec.lean 8-8b).
+   * handoff reminder does (docs/frontend-method.md §7J, crates/xtask/Spec.lean 8-8b).
    * Nothing else may take either hue. */
   --color-reminder-first: oklch(0.800 calc(0.154 * var(--chroma)) 150);
   --color-reminder-second: oklch(0.680 calc(0.187 * var(--chroma)) 25);

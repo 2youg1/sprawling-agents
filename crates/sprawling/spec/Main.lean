@@ -46,7 +46,7 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 - **楼自己写了 `label = "desktop"` 的 `[[mcp]]`，就用它那一条**：两台 server 用一个标签，同一个工具名就指向两个进程（city 对同层重名的拒绝是同一个理由）。人明写的那一条优先，自带的这台不起，诊断里留一条 `Decide`（诊断的级别里没有「提醒」一级，`Decide` 说的正是一个判定为什么取了这个值）：要用自带的，删掉那一行。
 - **装配层不按平台分支**：非 Windows 的机器上这台 server 照样起，每次调用答 `E_TOOL_UNAVAILABLE` 并报出平台名（`crates/desktop/Spec.lean` §10 设计四）。在这里再判一次平台，这条规则就有了第二个家。
 - **confidential 楼够不着它**：`city::policy` 解析时就拒绝 `confidential` 与 `desktop` 同真，`mcp_tools` 对 confidential 楼也不起任何进程。这里不判第三次。
-- **体积**：把 `crates/desktop/` 链进来使 release 二进制变大多少，读数只记在 `tools/xtask/budgets.toml` 的 `[release_binary]`。增量来自 `crates/desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
+- **体积**：把 `crates/desktop/` 链进来使 release 二进制变大多少，读数只记在 `crates/xtask/budgets.toml` 的 `[release_binary]`。增量来自 `crates/desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
 - **不内置任何模型（定规）**：桌面给模型的文字反馈先取 accessibility tree；OCR 与 ASR 都经人接入的端点，二进制里不带任何模型的权重。`crates/desktop/Spec.lean` §15.2 记着这条线后面还欠的东西。
 - **被否的两条路**：①照旧另发一个 `sprawling-desktop` 可执行文件，由人放上搜索路径再手写 `[[mcp]]`：一件功能成了两个制品，版本要对齐，人还得知道那一行怎么写；②把单独编出的桌面可执行文件的字节嵌进本二进制，运行时写到盘上再起：运行时往盘上写可执行文件，std 也多带一份。**重开参数**：`crates/desktop/` 使 release 二进制增大超过 1 MiB（`[release_binary]` 的 slack），就回到第一条路重新比较。
 
@@ -346,7 +346,7 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 `crates/city/skills/gauge/SKILL.md`，许可 MPL-2.0，列进 `crates/city/skills/README.md` 的表与 `crates/city/skills/LICENSES.md`；发行包按目录收 `skills/`，不必另列。它教 agent 按这个次序做：
 
 1. 先把负载钉住：同一份输入、同一个构建（产品的 feature 集，citysim D9）；输入是文件时记下它的摘要，两条读数只在摘要相同时可比（citysim D8）。
-2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（`tools/citysim/Spec.lean` §8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。
+2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（`crates/citysim/Spec.lean` §8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。
 3. 一次只改一处，取 after；前后交替跑几轮（一轮先 before 后 after），只在同一机器等级上比较 floor 与 p50。
 4. 回退门用确定性计数，墙钟只记录：找一个随规模增长的计数（读过的字节、核对的行数、文件操作数），在 N 与 2N 两种规模下断言它。
 5. 资源：长命令看 `run` 行的 `seen_*` 与 `child_peak_*`；一个已在跑的进程用 `--pid`；一座服务中的城用 `gauge --at <地址> > 文件` 在后台记录。`city` 行里的 0 可能是「没读到」（§8-96），其余行里没读到的是 `null`。

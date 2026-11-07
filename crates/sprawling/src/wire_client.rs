@@ -429,7 +429,7 @@ mod tests {
     /// promised 1 means "the city refused". An agent branching on the
     /// exit code read a refusal it never received as a success - which
     /// the out-of-tree checker measured against a real city
-    /// (`tools/adversary/Spec.lean` section 4).
+    /// (`crates/adversary/Spec.lean` section 4).
     /// The key file answers only for a host on this machine: a loopback
     /// literal, with or without brackets, or `localhost` in any case. A
     /// name that only starts like one is another machine, and so is a

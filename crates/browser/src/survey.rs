@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The grid instrument: what a page turns out to be once it has been
-//! laid out (tools/xtask/Spec.lean §8-26).
+//! laid out (crates/xtask/Spec.lean §8-26).
 //!
 //! **It measures only what layout brings into existence.** Whether a
 //! gap is on the scale and whether a colour is a token are decidable

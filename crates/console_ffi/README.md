@@ -1,6 +1,6 @@
 # sprawling-console-ffi
 
-The console's renderer. Rust writes a scene — the lines of the transcript, the live area, the composer and where its cursor stands — and a Zig leaf, `crates/console_ffi/zig/leaf.zig`, turns it into the bytes of one terminal frame. What the console shows is decided in `crates/sprawling` (`crates/sprawling/spec/Console.lean` §8-11); this package decides how it looks. Rendering is a pure function: the same scene at the same width gives the same bytes, and the leaf reads no clock, opens no file and keeps no state.
+The console's renderer. Rust writes a scene — the lines of the transcript, the live area, the composer and where its cursor stands — and a Zig leaf, `crates/console_ffi/zig/leaf.zig`, turns it into the bytes of one terminal frame. What the console shows is decided in `crates/sprawling` (`crates/sprawling/spec/Console.lean` §8-11); this package decides how it looks. Rendering is a pure function: the same scene at the same width and window height gives the same bytes, and the leaf reads no clock, opens no file and keeps no state.
 
 ## Where `unsafe` lives
 

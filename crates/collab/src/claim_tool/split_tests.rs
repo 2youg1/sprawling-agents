@@ -53,7 +53,7 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
     assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapSplit));
 }
 
-/// The eighth finding of `tools/adversary/Spec.lean`: a split of a row
+/// The eighth finding of `crates/adversary/Spec.lean`: a split of a row
 /// nobody held was answered as done and then dropped at landing. The
 /// desk now refuses it at the call (collab D6), queues nothing and leaves
 /// the plan as the claim left it, and the refusal names what the run

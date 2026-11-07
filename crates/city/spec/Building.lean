@@ -131,7 +131,7 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 * `create` 收下的地址恰是一栋楼的地址（`a_created_building_governs_itself`）；房间（`a_room_is_not_a_building`）与二次出生（`a_second_birth_is_refused`）各拒一次。
 * 移走的楼落在城的保留子树里（`a_removed_building_is_out_of_every_write_domain`）：它不再是楼，居民也改不动它。
 
-模型不说段的字符级文法：那是 `Address::parse` 的，判例表在 `tools/fixtures/address.jsonl`。
+模型不说段的字符级文法：那是 `Address::parse` 的，判例表在 `crates/fixtures/address.jsonl`。
 -/
 
 namespace City.Building

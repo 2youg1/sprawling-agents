@@ -49,7 +49,7 @@ Name another project only when the issue or the pull request cannot be understoo
 A change that borrows from another project states which of the two cases holds:
 
 - **A borrowed fact** — an interface shape, a protocol, a value read from upstream — is cited, and [`third-party.md`](third-party.md) is updated in the same change: its [§1 table](third-party.md#1-where-the-intelligence-comes-from), with the path followed and the commit read, because `upstream-watch.yml` reads that table and the tracked commit is written nowhere else. Keep a quotation to the short excerpt the citation needs.
-- **Borrowed code** is not pasted in. This repository vendors no upstream code, because every `.rs` file carries the MPL-2.0 notice and a file from another project cannot wear it ([`third-party.md`](third-party.md) §7). Re-implement from the documented facts, or bring the work in as a dependency through the gates: `cargo deny` against the licence allowlist in `deny.toml`, or the client's `RUNTIME` list in `tools/xtask/src/npm.rs`. Copyleft work, GPL-family code among it, is not copied in at all.
+- **Borrowed code** is not pasted in. This repository vendors no upstream code, because every `.rs` file carries the MPL-2.0 notice and a file from another project cannot wear it ([`third-party.md`](third-party.md) §7). Re-implement from the documented facts, or bring the work in as a dependency through the gates: `cargo deny` against the licence allowlist in `deny.toml`, or the client's `RUNTIME` list in `crates/xtask/src/npm.rs`. Copyleft work, GPL-family code among it, is not copied in at all.
 
 If neither case holds, the project is not mentioned. If which case holds is unclear, ask in the issue before opening the pull request.
 
@@ -84,7 +84,7 @@ Use [The loop](verification.md#the-loop) for build-lock and slow-build handling.
 Every label — its name, colour and description — has one authority, [`.github/labels.yml`](../.github/labels.yml), and the live set is synchronized from that file; the command is at the end of this section. The labels divide along four axes:
 
 - `type:` — what the issue is, exactly one: `bug`, `enhancement` or `feature`. The forms apply it: [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml), [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml). An issue about documentation is still one of the three, with `area: docs` naming where it lands.
-- `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary, `crates/` and `tools/`), `docs`.
+- `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary and `crates/`), `docs`.
 - `aspect:` — a cross-cutting concern, zero or more: `performance`, `security`, `accessibility`. A security bug is `type: bug` plus `aspect: security`, reported through [SECURITY.md](SECURITY.md) rather than a public issue.
 - `status:` — the triage state, below.
 - `help wanted` and `good first issue` — the contribution labels, below.

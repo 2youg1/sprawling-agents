@@ -56,7 +56,7 @@ structure Accounts where
 
 **被否**：①整个 `land` 搬进 lane：房间队列、认领簿与派活表就有了第二个写者；②把清扫留在记账线程、只搬 transcript：清扫的 diff 随 run 写过的文件数增长，是两步里更重的那一步。
 
-**重开参数**：吞吐台（`tools/citysim/spec/Throughput.lean`）在 relay 排队的 p99 里仍量到落 run 的一段时，逐步给留下的步骤计时，再议哪一步搬走。
+**重开参数**：吞吐台（`crates/citysim/spec/Throughput.lean`）在 relay 排队的 p99 里仍量到落 run 的一段时，逐步给留下的步骤计时，再议哪一步搬走。
 -/
 
 /-- 服务一条消息：追加它的记录；回家的 run 在它的记录追加之后才记成已冻结，两者是同一步。 -/

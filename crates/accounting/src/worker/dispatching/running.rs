@@ -60,7 +60,7 @@ impl RunWorker {
         task: String,
         goal: String,
     ) -> Result<(Staged, Continuation), AxError> {
-        // The reading `tools/xtask/budgets.toml [prepare_dispatch]` states:
+        // The reading `crates/xtask/budgets.toml [prepare_dispatch]` states:
         // what a dispatch spends on the accounting thread before a lane
         // takes it. Read from the monotonic clock rather than from a
         // profiler, because the figure that matters is the one taken on

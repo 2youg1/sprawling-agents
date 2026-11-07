@@ -1,0 +1,16 @@
+# Development tools
+
+These directories under `crates/` hold what checks, simulates, fuzzes, attacks and analyzes the product. None of it enters a release build: no tool is a dependency of the `sprawling` binary, and the release archive carries only the entries the table `ARCHIVE` in `crates/xtask/src/package/contents.rs` names. The `artifact` gate holds the first half, by refusing test scaffolding inside the binary.
+
+| Directory | What it is |
+|---|---|
+| [`crates/xtask/`](./xtask/) | The machine gates and the build and release commands, run as `cargo xtask <command>`. `cargo xtask gates --list` prints every gate; [`Spec.lean`](./xtask/Spec.lean) says what each one judges. |
+| [`crates/citysim/`](./citysim/) | Fixed scenario scripts on a counted clock, with no random source, so a failure replays byte for byte from its scenario; and the benches that time the product. |
+| [`crates/benchstat/`](./benchstat/) | The benchmark analyzer for the rounds under [`docs/benchmarks/`](../docs/benchmarks/README.md): it validates a round's manifest and observations, publishes the canonical `exports.json`, renders the report's generated section from it, and verifies both byte for byte. It depends on no product crate and publishes nothing. |
+| [`crates/fuzz/`](./fuzz/) | The cargo-fuzz targets for the parsers that read outside input: addresses, locators, a ledger's tail, wire frames, the configuration file and what an MCP server writes back. It is a workspace of its own and needs a nightly toolchain and cargo-fuzz. |
+| [`crates/adversary/`](./adversary/) | A black-box checker in Lean that starts the built binary and attacks it through the wire from outside; it is never a gate. What a Rust module must hold is specified under its crate's `spec/` and proved by `just models`. The checker is two targets of the Lean package at the repository root, whose `lean-toolchain` the product binary also embeds, which is why the pin lives at the repository root. |
+| [`crates/fixtures/`](./fixtures/) | Data whose bytes are the assertion: `address.jsonl`, the address spellings with their verdicts, read by the kernel's tests and the client's; `golden-p0` and `golden-s1`, ledgers that citysim rebuilds byte for byte; `ledger-ahead`, a ledger from a newer version that storage must refuse; `remote-handshake`, the vectors and the one-way fixture the browser's remote door must reproduce, written by the `remote_access` tests and read by them and the client's (section 8-12 of `crates/remote_access/Spec.lean`). Regenerate a golden ledger by running its citysim test with `GOLDEN_WRITE=1`, and `remote-handshake` by running the `remote_access` tests named `vector` or `fixture` the same way, not by editing either. |
+
+`HotKeyE2E.ts` is a script rather than a package: it is the keyboard-only acceptance of the client's main flows, driven through DevTools key events on the same throwaway city and stand-in provider as `client/scripts/walk.ts`, and it writes its captures under `target/hotkey-e2e`.
+
+Most of the commands that run these tools are recipes in the root `justfile`, and `just --list` prints them with what each one does. `benchstat` has no recipe of its own: [`crates/benchstat/README.md`](./benchstat/README.md) names its build and analysis commands.

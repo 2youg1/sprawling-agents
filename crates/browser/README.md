@@ -4,7 +4,7 @@ What a resident may see of a web page and do to it, decided for a browser the ci
 
 The package holds the decisions and the value types and none of the I/O. It starts no browser process, holds no socket and downloads no driver; it has no `async` and no file handle. In `crates/sprawling`, `browser_bidi` starts or attaches to the browser, holds the socket and implements this package's `BrowserPort`, and `browser_tool` turns the actions into the `browser` and `usersbrowser` tools. Whether a building may use a browser at all is decided by `city::policy`, and page text is tainted by `kernel::taint` like any other tool result.
 
-The `survey` module reads a drawn page and reports where its boxes went wrong. The `render` gate in `tools/xtask` uses it on this repository's gallery, and the `browser` tool uses it on a page a resident opened.
+The `survey` module reads a drawn page and reports where its boxes went wrong. The `render` gate in `crates/xtask` uses it on this repository's gallery, and the `browser` tool uses it on a page a resident opened.
 
 ## Who uses it
 

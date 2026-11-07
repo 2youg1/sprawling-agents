@@ -80,7 +80,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 - `JsonlLedger` 过 kernel conformance 六断言（含确定性双灌对拍）。
 - proptest：任意 draft 序列落盘后，尾部任意字节级破坏（截断/追加垃圾）→ 重开＝最长合法前缀＋一条 `log_truncated`，链续可验，续写不断链。
-- 读 `tools/fixtures/ledger-ahead/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
+- 读 `crates/fixtures/ledger-ahead/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
 - 断电于 EventRecord 落账与断电于 CAS rename 各恢复一次（FaultFs 点阵驱动）。
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
 - 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
@@ -341,7 +341,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 - `architecture.toml` 的模块图：storage 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/Spec.lean`）：事件表、错误码、`Ledger` 端口与 `chain_hash` 的权威；`crates/kernel/spec/Ledger.lean`：链规则与摘要单射的假设，`spec/Jsonl/Verify.lean` import 它。它们改了，这里的逐行检查与 §8-1、§8-14 一起重看。
-- sprawling 的规格（`crates/sprawling/Spec.lean`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`tools/xtask/budgets.toml`：本 crate 的读数与预算。
+- sprawling 的规格（`crates/sprawling/Spec.lean`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`crates/xtask/budgets.toml`：本 crate 的读数与预算。
 - runtime 的规格（`crates/runtime/Spec.lean` §8-1、§8-13-2）：`replay` 与本 crate 共用 `LineCheck`，沙箱副本与本 crate 共用 `FileWork`。
 - 引本规格的其他规格与 rustdoc 写 `crates/storage/Spec.lean §8-n` 或 `storage D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

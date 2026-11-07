@@ -282,7 +282,7 @@ pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 1. **字节不动。** 字段名即旧写方用的键；旧写方省略的键写 `skip_serializing_if`，
    旧写方无条件写出的键（含空数组）无条件写出。键序由 `serde_json` 的 BTreeMap 定，
    与此处声明序无关。每族一组逐字节对拍测试守住这条。
-2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`tools/fixtures/golden-s1`
+2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`crates/fixtures/golden-s1`
    里就有一条 `data` 为 `{}` 的 `run_started`；未知键忽略而不拒。
 3. **值保留 kernel 类型。** run 是 `RunId` 而非 `String`，job 是 `Locator`；
    手写 `Serialize` 的类型挂 `schemars(with = "String")` 说明其 wire 形状。

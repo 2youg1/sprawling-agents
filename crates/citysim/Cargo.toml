@@ -1,0 +1,49 @@
+[package]
+name = "citysim"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+# A tool of this repository, never sent to a registry.
+publish = false
+
+# The simulator is a tool of this repository, not part of the product:
+# the members reader keeps a tool out of the crate graph, and `boundary`
+# reads every line of it as a check (crates/xtask/Spec.lean §8-39 and
+# xtask D4). Its modules are still registered in the module map, as a
+# product's are (xtask D9).
+[package.metadata.sprawling]
+role = "tool"
+
+[dependencies]
+kernel = { workspace = true, features = ["conformance"] }
+storage = { workspace = true }
+runtime = { workspace = true }
+gateway = { workspace = true }
+collab = { workspace = true }
+wire = { workspace = true, features = ["server"] }
+sprawling = { workspace = true }
+# The bench times the production rebuild through accounting::views::ask.
+accounting = { workspace = true }
+serde_json.workspace = true
+# The nesting instrument reads the TOML shape it grades (crates/citysim/Spec.lean §8-8).
+toml.workspace = true
+# The install action prices the release archive's digest and its unpack
+# (crates/citysim/Spec.lean §8-5): sha2 is the digest the release publishes, zip
+# is the archive format `cargo xtask package` writes.
+sha2.workspace = true
+zip.workspace = true
+# The CPython bench executes a private snapshot of the selected guest rather
+# than rereading a replaceable source path.
+tempfile.workspace = true
+
+# The launcher serve_grouped ties the city it starts to its own lifetime
+# through a job object (crates/adversary/Spec.lean D8).
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
+
+[dev-dependencies]
+zeroize.workspace = true
+
+[lints]
+workspace = true

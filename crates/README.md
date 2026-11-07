@@ -2,6 +2,8 @@
 
 Every Rust package of the product lives in this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../docs/ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
 
+Development-only packages and fixtures also live here; [Development tools](development-tools.md) lists them. Their manifests keep them outside the product graph, and none enters the `sprawling` binary or a release archive.
+
 ## The crates
 
 `cargo xtask docnum --write` generates the table below from three sources: `cargo metadata` gives the directory, the package name and the lib name; the `depmap` block in `ARCHITECTURE.md` gives the crates each one may depend on; and the `[family.<name>]` duties in [`architecture.toml`](../architecture.toml) give what each one owns. The `docnum` gate turns red when the table and its sources disagree, so change a source and run the command rather than editing a row. The package name is the one `cargo -p` takes, and it carries the `sprawling-` prefix because a name on crates.io is global; the lib name is the one Rust code writes in a path.
@@ -28,7 +30,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/Spec.lean` |
 <!-- xtask:end -->
 
-Two crates have a lint table of their own, the desktop's FFI seam `crates/desktop/ffi` and the console's renderer `crates/console_ffi`, each the workspace's table with `unsafe_code` at `deny`, because the declaration of a crate's Zig leaf exports and each call into them relax the lint at that one item or statement; `LEAVES` in `tools/xtask/src/guard/wall.rs` names both, and `xtask guard` refuses any other crate that stops inheriting the workspace's table.
+Two crates have a lint table of their own, the desktop's FFI seam `crates/desktop/ffi` and the console's renderer `crates/console_ffi`, each the workspace's table with `unsafe_code` at `deny`, because the declaration of a crate's Zig leaf exports and each call into them relax the lint at that one item or statement; `LEAVES` in `crates/xtask/src/guard/wall.rs` names both, and `xtask guard` refuses any other crate that stops inheriting the workspace's table.
 
 ## Adding a crate
 

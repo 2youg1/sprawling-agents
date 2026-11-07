@@ -243,7 +243,7 @@ The manifest's coverage entries use the exact fields and status rules above. It 
 
 ## Reproduce a published round
 
-The round's analyzer is one Rust workspace package named `benchstat` under `tools/benchstat/`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. Its generality, audit importance and size justify a package separate from `xtask`; it remains `publish = false` until a consumer outside this tree exists.
+The round's analyzer is one Rust workspace package named `benchstat` under `crates/benchstat/`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. Its generality, audit importance and size justify a package separate from `xtask`; it remains `publish = false` until a consumer outside this tree exists.
 
 To reproduce a future round, read `analysis_revision` from its manifest, run `git worktree add --detach <analysis-checkout> <analysis_revision>`, and build there with `cargo build --locked -p benchstat`, using that revision's recorded toolchain. Run its `target/debug/benchstat` with the commands below against an absolute path to a copy of the published round. The analysis revision must be an ancestor available in repository history; record round input digests separately so the analyzer commit need not contain its own SHA. Never use the latest analyzer as a substitute.
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The throughput bench (`tools/citysim/spec/Throughput.lean` §8-14): N
+//! The throughput bench (`crates/citysim/spec/Throughput.lean` §8-14): N
 //! runs dispatched at once into N rooms of one building, each taking M
 //! tool calls that alternate a read and a write, against a loopback
 //! provider that holds every model call for the latency arm's time.

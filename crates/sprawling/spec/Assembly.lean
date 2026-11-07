@@ -54,7 +54,7 @@ impl Listening {
 - **`install` 与 `wire_client` 留在 bin**：前者把二进制放上 PATH，后者从终端连一座已服务的城并从 stdin 读 enrolment——两者都是关于命令行的，不是关于城的。
 - **`Cargo.toml` 不分 target 配置**：Cargo 对同一 package 自动发现 `src/lib.rs` 与 `src/main.rs` 两个 target，OUT_DIR 对两者相同，`include!(client_embed.rs)` 与 `DEPENDENCIES` 因此留在 `main.rs`。
 - **门禁**：`header` 要求 `lib.rs` 带 MPL 通告；`modmap` 对 `*/lib.rs` 按索引文件判定，只准 `mod`／`use`／`pub use`／注释／属性。
-- **citysim 不是第二个装配层**：`tools/citysim/Cargo.toml` 不依赖 sprawling，`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`；装配层可被依赖，但 citysim 不依赖它。
+- **citysim 不是第二个装配层**：`crates/citysim/Cargo.toml` 不依赖 sprawling，`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`；装配层可被依赖，但 citysim 不依赖它。
 -/
 
 /-!
@@ -235,7 +235,7 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 
 /-! D18 远程门的端到端测试用 Rust 写，起真二进制（§8-151）
 
-黑盒检查按 `xtask boundary` 归 `tools/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `crates/sprawling/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`tools/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
+黑盒检查按 `xtask boundary` 归 `crates/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `crates/sprawling/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`crates/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
 -/
 
 /-!

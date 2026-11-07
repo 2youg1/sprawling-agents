@@ -202,7 +202,7 @@ fn a_run_started_line_records_the_effort_it_froze() {
 
 #[test]
 fn an_empty_payload_reads_as_a_run_that_said_nothing() {
-    // `tools/fixtures/golden-s1` holds exactly this line. A reader that
+    // `crates/fixtures/golden-s1` holds exactly this line. A reader that
     // refused it would refuse a ledger this repository ships.
     let read: RunStarted = Payload::empty().read().unwrap();
     assert_eq!(read, RunStarted::default());

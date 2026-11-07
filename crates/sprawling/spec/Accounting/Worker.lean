@@ -449,7 +449,7 @@ struct BlockedJob { addr: Address, run: RunId }
 
 **性能以结构收口而不以计时收口**：一次审批应答从「验链一遍加解析两遍全史」变为一次 `BTreeMap` 查找；`blocked_job` 连同它的两个循环一并删除，因此这不是一个快了多少的问题——那条路径不存在了。
 
-**影面**：`runtime` 公开面增一字段（`RunPlan.budget`），基线与 `crates/runtime/Spec.lean` 同提交；`RunPlan` 的三个构造点（assembly、citysim、runtime 集成测）各加一行；`tools/fixtures/golden-p0` 重生。
+**影面**：`runtime` 公开面增一字段（`RunPlan.budget`），基线与 `crates/runtime/Spec.lean` 同提交；`RunPlan` 的三个构造点（assembly、citysim、runtime 集成测）各加一行；`crates/fixtures/golden-p0` 重生。
 -/
 
 /-!
@@ -498,7 +498,7 @@ fn city_segment(city_root: &Path) -> Result<Vec<u8>, AxError>;  // NotFound → 
 let key = match call.action() { Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action), Err(e) => return Admitted::Answered(Err(e)) };
 ```
 
-**这里不修 `bin::assembly` 的缺陷，因为这里没有缺陷**。被修的是 citysim（`tools/citysim/Spec.lean` §8-4、citysim D20）；本文件变的是「谁来回答动作字节」。原先这六行把 name 与 `serde_json::to_string(&call.args)` 拼起来，是全库两份实现中对的那一份；对的那一份待在装配层，正是另一份能静静漂走的原因。`crates/kernel/Spec.lean` §8-6 早写着这条规则「属 S2 工具面」，而它一处也不在那里。现在它在（`ToolCall::action`，`crates/kernel/Spec.lean` §8-23），本文件改为问它。
+**这里不修 `bin::assembly` 的缺陷，因为这里没有缺陷**。被修的是 citysim（`crates/citysim/Spec.lean` §8-4、citysim D20）；本文件变的是「谁来回答动作字节」。原先这六行把 name 与 `serde_json::to_string(&call.args)` 拼起来，是全库两份实现中对的那一份；对的那一份待在装配层，正是另一份能静静漂走的原因。`crates/kernel/Spec.lean` §8-6 早写着这条规则「属 S2 工具面」，而它一处也不在那里。现在它在（`ToolCall::action`，`crates/kernel/Spec.lean` §8-23），本文件改为问它。
 
 **字节逐字不变**：`action()` 内部就是搬过去的同一句（name 字节接 args 的 JSON 字节），位次是 `Placing` 在放行时按调用序数出的计数器。唯一的行为差异是 `unwrap_or_default()` 换成 `?`：一个序列化失败以前产空串（于是两次参数不同的调用得同一把键），现在上报。`Payload` 拒浮点且键恒为字符串，故这一臂今天不可达。
 
@@ -903,8 +903,8 @@ before、after 与字节数，恒不携正文；`before` 缺席即开账行，�
 停摆答 `E_GATE_DENIED` 而不是 `E_CONFIG_INVALID`（否则会把一个能自己解除的停摆说成要去接 provider），
 保留地址答 `E_INVALID_ARGS`。派活到没立过的楼仍答 `E_CONFIG_INVALID`——
 **这一条是刻意保下来的**：轨道二的模型把「楼在不在这里不问」记为一件量出来的产品事实
-（`tools/adversary/src/Sprawling/Model.lean` 的 `refusal`），改码等于要那份模型跟着改，
-而这里不碰 `tools/adversary/`。加一道「楼必须存在」的前置判断会正好破坏它——这是不选那个修法的第二个理由，
+（`crates/adversary/src/Sprawling/Model.lean` 的 `refusal`），改码等于要那份模型跟着改，
+而这里不碰 `crates/adversary/`。加一道「楼必须存在」的前置判断会正好破坏它——这是不选那个修法的第二个理由，
 第一个理由是它只修一半（`acme` 真在而没挂 provider 时 `<city>/acme/one/JOB.md` 照旧留下）。
 
 ### CAS 那一次 `put` 留在原位，理由写在这里
@@ -1416,7 +1416,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 ### 验收
 
 1. **红转绿（`driving/tests/sieving`）**：一次真实派活，`exec` 打印一份超过 2 KiB 的输出；模型收到的工具结果含 `[sieve:` 页脚且短于原文；账本 `tool_result` 载荷的 `sieve[0].original` 是 `cas:b3-` 且能从 CAS 读回原文，`rest_path` 在磁盘上。
-2. `tools/citysim/tests/sieve.rs` 的 `the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
+2. `crates/citysim/tests/sieve.rs` 的 `the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
 3. 同种子 citysim 逐字节重放不变（`the_same_seed_and_table_replay_a_byte_identical_window`）。
 
 **留给 gitignore 的一句**：`.rest/` 住房间里，楼的 `.gitignore`（`crates/city/Spec.lean` §8-21）应忽略它，否则检查点提交会把一份 rest 文件收进历史。那份文件不在本节范围内。
@@ -1463,7 +1463,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 - **一条派活不再有回合上限**，`runtime::run::drive` 循环到这次跑自己结束为止：一回合作出结论、一次带 carrier 的失败、或一个安全点送到的中断。停一件正在跑的事仍是 `Cancel`，停一片仍是 `Halt`——后者现在真的会终止那片里的后台成员。
 - **`assembly/freezing/tests/ceilings.rs` 删去两条断言**（派下去的活与被批准接着跑的活各自「在派它的上限下」跑）。它们检验的性质不存在了，留着就是在检验一个没有主语的句子；文件保留 effort 那一条，模块头写明删了什么、为什么。
 - **golden-p0 账本随之重生**（`GOLDEN_WRITE=1`）：`run_started` 少两个整数键。V8 跨版本字节夹具本来就为这种形状变更而存在。
-- **公开面变动**：kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，wire 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`；下游 crate 随之编译，是公开面变更唯一的守门（`tools/xtask/Spec.lean` §8-32）。
+- **公开面变动**：kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，wire 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`；下游 crate 随之编译，是公开面变更唯一的守门（`crates/xtask/Spec.lean` §8-32）。
 
 ### 8-169 治理两帧的执行与答
 
@@ -1734,7 +1734,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 1. **红转绿**：`crates/accounting/src/worker/plans/tests/graph.rs` 的 `three_ready_nodes_drive_three_runs_at_once`——
    三个 ready 节点、一个 pursuit，假 provider 记下同时在飞的请求峰值。串行时峰值为 1，红就红在这里。
-2. **红转绿**：`tools/citysim/tests/scenario.rs` 的 `two_runs_interleaved_on_one_ledger_replay_byte_identically`。
+2. **红转绿**：`crates/citysim/tests/scenario.rs` 的 `two_runs_interleaved_on_one_ledger_replay_byte_identically`。
 3. **红转绿**：`accounting::worker::driving::tests::flight::two_dispatches_from_the_desk_drive_at_once`——
    两次派活各自进一条车道，主循环接它们回家；账本 `seq` 单调、`prev` 成链，
    每一轮活的 `run_started` 排在它自己的 `model_called` 之前，且第一轮冻结之前两轮都已开始。
@@ -2019,7 +2019,7 @@ impl OutputRing {
 
 /-! D13 崩溃验收在盘上造死亡，不在进程里杀（§8-127）
 
-一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
+一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `crates/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 -/
 
 /-! D14 死掉的 run 在重开时冻结，验收比它的整行状态（§8-127）

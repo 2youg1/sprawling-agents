@@ -151,7 +151,7 @@ wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）�
 
 Command／Query／Event（三分的原名，不译）；命令与查询的原名逐字取 `COMMAND_NAMES`／`QUERY_NAMES`，两张表由 `named_frames!` 从变体表生成（§8-38），本文不另列；control surface（不译）；配对令牌＝pairing token；握手＝handshake。
 
-Lean 里的名字与 Rust 的对应（门比的是同一个拼写，tools/xtask/Spec.lean §8-43）：
+Lean 里的名字与 Rust 的对应（门比的是同一个拼写，crates/xtask/Spec.lean §8-43）：
 
 - `Wire.Command.Kind.Command` 的构造子 ↔ `command::kind` 里 `enum Command` 的变体，逐字相同；`Reach` 的四个取值 ↔ §19-1 的 `client`／`push`／`handshake`／`sealed`；`VerbClass` ↔ `remote_access::door::VerbClass`；`Command.reach`、`Command.verbClass` ↔ §19-2 的两列。
 - `Wire.Command.Carrying` ↔ `Command<Secret>`，`WireCommand` ↔ `Command<NoSecret>`（`NoSecret` 在模型里是 `Empty`），`fromWire` ↔ `impl From<WireCommand> for Command`。
@@ -468,9 +468,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 wire 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §7「The wire」与 §8 的「a new `Command` or `Query` frame」一行引 D1。
 - `architecture.toml` 的模块图：wire 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
-- tools/xtask/Spec.lean §8-43、§8-45：`xtask wiring` 读 `spec/Command/Kind.lean` 里 `Command.reach` 与 `Command.verbClass` 的受限形状；改那两个 `def` 的写法就是改门读到的东西。
+- crates/xtask/Spec.lean §8-43、§8-45：`xtask wiring` 读 `spec/Command/Kind.lean` 里 `Command.reach` 与 `Command.verbClass` 的受限形状；改那两个 `def` 的写法就是改门读到的东西。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/Spec.lean`）：线上携带的 kernel 类型、事件种类、错误码与装载期白名单的权威；remote_access 的规格（`crates/remote_access/Spec.lean`）：`VerbClass` 与远程门的权限；documents 的规格（`crates/documents/Spec.lean`）：线上直接携带的 `Span`、`Window`、`Preview`、`Laid` 等的权威。
-- `tools/adversary/src/Sprawling/Door.lean` 与 `Regression.lean`：从外面说这条线的检查器，线上改形时同一个变更集改它们（AGENTS.md）。
+- `crates/adversary/src/Sprawling/Door.lean` 与 `Regression.lean`：从外面说这条线的检查器，线上改形时同一个变更集改它们（AGENTS.md）。
 - 引本规格的其他规格与 rustdoc 写 `crates/wire/Spec.lean §8-n` 或 `wire D<n>`，本 crate 的源码引它自己的分部；一节换了分部，它的标签不变，引用不必改。
 -/

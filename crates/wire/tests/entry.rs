@@ -11,7 +11,7 @@
 //! Driven in process through `tower::ServiceExt::oneshot`, as the other
 //! route tests are: this judges the router's own table, and a test that
 //! raised the product's server and spoke HTTP from outside would be
-//! `tools/adversary/`'s ground (`xtask boundary`).
+//! `crates/adversary/`'s ground (`xtask boundary`).
 
 #![cfg(feature = "server")]
 #![allow(

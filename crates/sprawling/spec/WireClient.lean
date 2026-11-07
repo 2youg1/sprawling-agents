@@ -58,13 +58,13 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 /-!
 ## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（`bin::wire_client`、`accounting::worker::commanding::entrance`）
 
-仓外的对抗性检验器（`tools/adversary/Spec.lean` §4）留了两条未修的发现。两条都只在**门外**可观测，
+仓外的对抗性检验器（`crates/adversary/Spec.lean` §4）留了两条未修的发现。两条都只在**门外**可观测，
 两条都伤同一类调用方——一个拿退出码分支、拿重试兜底的 agent。本节一次答完，因为它们是同一个承诺的两半：
 **门说出口的话必须等于门做的事**。
 
 ### 发现一：静默不是接受，故它不是 0
 
-**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（`tools/adversary/Spec.lean` §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
+**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（`crates/adversary/Spec.lean` §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
 
 **依据**：`call` 与 `dispatch` 有四种结局。
 
@@ -166,7 +166,7 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §12 增 `accounting::worker::commanding::entrance` 与两个测试文件的行；
-kernel D1 记下 `gate::dedup` 由 `idem::claim` 与 `IdemGuard` 接替；`tools/adversary/Spec.lean` §4 两条发现标注已修。
+kernel D1 记下 `gate::dedup` 由 `idem::claim` 与 `IdemGuard` 接替；`crates/adversary/Spec.lean` §4 两条发现标注已修。
 `docs/operating.md` 增退出码表。公开面：`bin::wire_client` 与 `bin::assembly` 都是二进制内部（`pub(crate)`
 以下），`RunWorker::handle` 的签名不变。
 -/

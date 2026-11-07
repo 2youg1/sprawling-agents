@@ -294,7 +294,7 @@ end Wire.Frames
 
 /-! D22 V0.0.9 的线上改形一次进位，由一个变更集落地
 
-**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `tools/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `crates/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
 
 **理由**：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关（§8-39），分十次就付十次，而且十条车道同时改帧表会在合并时十次冲突。先把形状写定、再一次实现，是 V0.0.9 的执行规则（接口先定）。
 
@@ -353,7 +353,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
 
-**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `tools/adversary/src/Sprawling/Door.lean` 的帧与 `tools/adversary/src/Sprawling/Regression.lean` 的渲染。
+**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `crates/adversary/src/Sprawling/Door.lean` 的帧与 `crates/adversary/src/Sprawling/Regression.lean` 的渲染。
 
 **理由**：`admit` 的定义是「这个端点供应的模型里城收哪些」；人打的 id 也塞进这一张，城就分不出哪个该从列表里挑、哪个该照人的话登记，读到列表时人打的 id 被当作列表外的勾选略去，一次登记登记出零个模型。收下人打的 id 是人定下的规矩：中转站常常服务列表里没有的 id，人打一个 id 就是要它被用上。标记由城写在行上，不让页面拿自己手里的列表去比：页面的列表是上一次探测读到的，登记时城读的可能是另一份。
 

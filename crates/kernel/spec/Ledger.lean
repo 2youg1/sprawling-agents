@@ -18,7 +18,7 @@ Ledger 的每一行都带一个 `prev`：它上一行的摘要。决定这个值
 
 **为什么用 Lean 而不是再写一个 Rust 测试。** Rust 测试断言的是它能构造出来的账本，`proptest` 抽样的是一个策略能抽到的账本。这里的陈述针对每一串行、每一个摘要函数，其中两条是否定的——它们说某个声索*得不到*——而这是任何样本都显示不了的。`cargo xtask proof` 拿真实 MIR 检验几条 kernel 命题；这里关乎的是一条规则能管到多远。
 
-**为什么这不会成为第二个权威。** 它不重述产品的任何规则：没有代码查询下面的谓词，里面不出现任何摘要值，它的载体都是树里已有的，按磁盘上的样子读——文件的行作为文本，以及每条记录携带的 `prev`，按读者解析出来的次序。需要判定时，检验器 `tools/adversary/src/Sprawling/Door.lean` 从门外问产品（`Door.verify` 跑产品自己的离线校验），而不问本模块；检验器也不 import 本模块。每条陈述都写明它对应的 Rust 代码行。
+**为什么这不会成为第二个权威。** 它不重述产品的任何规则：没有代码查询下面的谓词，里面不出现任何摘要值，它的载体都是树里已有的，按磁盘上的样子读——文件的行作为文本，以及每条记录携带的 `prev`，按读者解析出来的次序。需要判定时，检验器 `crates/adversary/src/Sprawling/Door.lean` 从门外问产品（`Door.verify` 跑产品自己的离线校验），而不问本模块；检验器也不 import 本模块。每条陈述都写明它对应的 Rust 代码行。
 -/
 
 /-!
@@ -96,7 +96,7 @@ def required (hash : String → String) (genesis : String) (lines : List String)
 
 任何一串 prev 都可以，所以下面的陈述对读者把记录解析成什么都成立；检验器的 `Record` 是这样的读者之一，本模块不 import 它。
 
-摘要函数与创世摘要是参数，因为两者都不是这里的事实：`chain_hash` 住在 `crates/kernel/src/ledger.rs`，它的值与 `GENESIS_PREV` 从产品读出。在这里抄一份，就是 `tools/adversary/Spec.lean` 第 5 节禁止的第二个家。 -/
+摘要函数与创世摘要是参数，因为两者都不是这里的事实：`chain_hash` 住在 `crates/kernel/src/ledger.rs`，它的值与 `GENESIS_PREV` 从产品读出。在这里抄一份，就是 `crates/adversary/Spec.lean` 第 5 节禁止的第二个家。 -/
 def Chained (hash : String → String) (genesis : String) (lines : List String)
     (prevs : List String) : Prop :=
   prevs = required hash genesis lines
@@ -183,7 +183,7 @@ theorem theLastLineIsNotCertified (genesis a b c : String) (different : b ≠ c)
 
 一串 prev，两本账本，都成链，在一条有后继对它取过摘要的行上不同——摘要函数把每一行都映到同一个字符串。`theClaimsDecideTheCoveredLines` 与 `aCoveredLineCannotChangeUnnoticed` 用假设排除的就是这种情形，而它不是边角情形：「假设不成立」就长这个样子。树的校验有多强，就等于这条假设有多强，别无其他。
 
-要紧的是这条假设写在哪里。这里没有证明它，也证明不了：它是关于 blake3 的陈述。树能做的，是说清自己的哪些承诺建立在它上面，`tools/adversary/Spec.lean` 第 5 节做的就是这件事——下一个需要更强保证的读者因此知道自己在换什么，而不是事后发现一个洞。 -/
+要紧的是这条假设写在哪里。这里没有证明它，也证明不了：它是关于 blake3 的陈述。树能做的，是说清自己的哪些承诺建立在它上面，`crates/adversary/Spec.lean` 第 5 节做的就是这件事——下一个需要更强保证的读者因此知道自己在换什么，而不是事后发现一个洞。 -/
 theorem aCoveredLineHidesWithoutInjectivity (genesis a z b : String) (different : a ≠ z) :
     ∃ lines lines' prevs,
       lines ≠ lines' ∧ Chained (fun _ => "") genesis lines prevs

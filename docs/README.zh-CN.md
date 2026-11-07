@@ -168,8 +168,8 @@ sprawling 在底层做了大量针对 Agent 行为特征（AX）与人类注意�
 - **只读工具流式推测与智能缓存保温**：模型还在流式生成回复时，打头的只读工具（`read`、`search`）已经提前并发起跑；上下文严格锁定 `City → Building → Resident → Run` 四段静态前缀，编译期禁止混入时间戳等易变字段，最大化命中服务商的 Prompt Cache，并支持根据实测首包提前量以 1 token 的最低代价自动续期保温。
 - **主核优先与子进程降级礼让**：在“设置 → 性能”中可配置 CPU 放置策略（`soft` / `pinned` / `soft_shares`）与核心线程优先级。Agent 派出的所有构建、测试等子命令都默认以低于城市的系统优先级启动（Windows 下为 Below Normal，Unix 下为 `nice -n 10`），哪怕后台几个 Agent 同时跑全量编译，页面也照常响应。
 - **OS 级内存硬上限与整机预算排队**：支持为单次 run 设置内存上限（通过 Windows Job Object 或 Linux cgroups 强制执行），并配合整机内存预算队列（`memory = "auto"`）先预订后执行，超限任务自动排队而非把机器撑爆（[城市怎样使用你的硬件](performance.md#choose-how-the-city-uses-the-machine)）。
-- **内建性能监视与棘轮门禁**：网页监视器与命令行 `sprawling gauge`（别名 `top`）可在你自己的硬件上实时测量耗时分位数（floor / p50 / p95 / p99）、模型调用、token、精确到微美元的成本与进程树资源占用；项目的各项预算与历史基线均公示在 [性能登记表](../tools/xtask/budgets.toml) 中（[性能文档](performance.md)）。
-- **性能是持续的工作**：每个读数都记进性能登记表（`tools/xtask/budgets.toml`），带机器类别和复现命令；哪条被门禁挡住、哪条只登记，表里逐行写明。下一步优化从火焰图里挑，改完用同一套 harness 复测。规模上去时先看账本和端点闸门：run 并行驱动，记账串行落到一个线程，并发上限只有每个端点自己的 `max_in_flight`，为的是让 Agent 数量增加时开销不以乘方式增长。
+- **内建性能监视与棘轮门禁**：网页监视器与命令行 `sprawling gauge`（别名 `top`）可在你自己的硬件上实时测量耗时分位数（floor / p50 / p95 / p99）、模型调用、token、精确到微美元的成本与进程树资源占用；项目的各项预算与历史基线均公示在 [性能登记表](../crates/xtask/budgets.toml) 中（[性能文档](performance.md)）。
+- **性能是持续的工作**：每个读数都记进性能登记表（`crates/xtask/budgets.toml`），带机器类别和复现命令；哪条被门禁挡住、哪条只登记，表里逐行写明。下一步优化从火焰图里挑，改完用同一套 harness 复测。规模上去时先看账本和端点闸门：run 并行驱动，记账串行落到一个线程，并发上限只有每个端点自己的 `max_in_flight`，为的是让 Agent 数量增加时开销不以乘方式增长。
 
 ### 6. 多 Agent 社会模拟与二次开发
 
