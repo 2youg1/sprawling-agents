@@ -46,7 +46,7 @@ import crates.adversary.spec.Model
 
 1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，本规格不抄。
 
-   **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。这些固定反例由渲染器写进 `crates/sprawling/tests/from_adversary.rs`；其他新反例按 §9 第 4 步另写 Rust 测试，本目录不再留着它们。
+   **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。`crates/sprawling/tests/from_adversary.rs` 中两个 provider 测试分别守住 endpoint 挂载 URL 的归一化与模型注册时带上限；它们不覆盖全部三条反例。原先失败的 probe 路径及因缺少上限而拒绝派活的路径仍由 Lean 检查。其他新反例按 §9 第 4 步另写 Rust 测试。
 2. `just check` 不构建或运行检验器；`xtask spec` 读取本规格的 Lean 文件，检查 `sorry`、`admit`、`axiom` 与不允许的 import。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。

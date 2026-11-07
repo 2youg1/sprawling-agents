@@ -111,10 +111,16 @@ has not changed.
 The package has no features: every caller compiles the same code. It declares no `unsafe`; the
 workspace lint table at the root `Cargo.toml` forbids it.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:9a00cfebcf21e9fa64887c62622f8114626feb64f9f570d3f66d7a88d30d0844 -->
+
 It reads file metadata — an `mtime` and a length — to know whether a cached rules file is still
 current, and takes no clock sample of its own. It keeps one piece of process-wide state: `document`
 holds a table of per-path writer locks behind a `OnceLock`, so two saves of one document serialise
-inside one process; a second process is the writer lock's business elsewhere.
+inside one process. This lock coordinates only in-process edits; it does not protect changes by external editors or other processes, so concurrent edits across processes need separate coordination and can still be overwritten by a save. `city::document::edit` does not require the Ledger writer lock.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Two external dependencies need a reason a reader can check. `cap-std` and `cap-fs-ext` walk a skill
 package by directory handle, following no link, because the standard library opens only by path and

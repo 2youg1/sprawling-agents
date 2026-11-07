@@ -60,6 +60,10 @@ pub(crate) struct Screen {
     previous: Option<Part>,
     /// The bytes of the last frame, kept for their capacity.
     frame: Vec<u8>,
+    /// Transcript not yet shown because the renderer refused a frame.
+    pending: Vec<Entry>,
+    /// A repeated refusal is reported once until a frame succeeds.
+    refused: Option<console_ffi::Refused>,
 }
 
 impl Screen {
@@ -118,29 +122,53 @@ impl Screen {
         if self.lost || self.is_quiet() {
             return Written::Shown;
         }
-        let scene = Scene::inline(&Inline {
-            columns: size.0,
-            rows: size.1,
-            erase: self.erase,
-            previous: self.previous,
-            entries,
-            live,
-        });
-        match console_ffi::draw(&scene, &mut self.frame) {
-            Ok(drawn) => {
-                self.erase = drawn.cursor_row;
-                if let Some(last) = entries.last() {
-                    self.previous = Some(last.part());
-                }
+        if let Err(reason) = self.render(entries, live, size) {
+            if self.refused == Some(reason) {
+                return Written::Shown;
             }
-            // A frame the renderer refused draws nothing; the next one
-            // starts from the same place.
-            Err(_) => return Written::Shown,
+            self.refused = Some(reason);
+            let erase = self.erase;
+            self.erase = 0;
+            return self.write(|out| {
+                queue!(
+                    out,
+                    cursor::MoveToColumn(0),
+                    cursor::MoveUp(erase),
+                    terminal::Clear(terminal::ClearType::FromCursorDown)
+                )?;
+                write!(out, "{reason}\r\n")
+            });
         }
         let bytes = std::mem::take(&mut self.frame);
         let written = self.write(|out| out.write_all(&bytes));
         self.frame = bytes;
         written
+    }
+
+    /// Keeps unseen transcript until the renderer accepts the complete frame.
+    fn render(
+        &mut self,
+        entries: &[Entry],
+        live: Option<Live<'_>>,
+        size: (u16, u16),
+    ) -> Result<(), console_ffi::Refused> {
+        self.pending.extend_from_slice(entries);
+        let scene = Scene::inline(&Inline {
+            columns: size.0,
+            rows: size.1,
+            erase: self.erase,
+            previous: self.previous,
+            entries: &self.pending,
+            live,
+        });
+        let drawn = console_ffi::draw(&scene, &mut self.frame)?;
+        self.erase = drawn.cursor_row;
+        self.refused = None;
+        if let Some(last) = self.pending.last() {
+            self.previous = Some(last.part());
+        }
+        self.pending.clear();
+        Ok(())
     }
 
     /// The alternate screen, showing the quiet host and nothing else.
@@ -280,4 +308,28 @@ fn restore_on_panic() {
         drop(terminal::disable_raw_mode());
         previous(info);
     }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A refused layout must not consume its transcript.
+    #[test]
+    fn a_refused_frame_keeps_its_transcript_until_a_frame_succeeds() {
+        let mut screen = Screen::default();
+        let entries = [Entry::Reply {
+            said: "x".repeat(24 * 1024 * 1024),
+        }];
+        assert_eq!(
+            screen.render(&entries, None, (2, 24)),
+            Err(console_ffi::Refused::TooLong)
+        );
+        assert_eq!(screen.pending, entries);
+        assert_eq!(screen.previous, None);
+        // A wider terminal reduces the layout overhead of the same transcript.
+        assert_eq!(screen.render(&[], None, (u16::MAX, 24)), Ok(()));
+        assert!(screen.pending.is_empty());
+        assert_eq!(screen.previous, Some(entries[0].part()));
+    }
 }

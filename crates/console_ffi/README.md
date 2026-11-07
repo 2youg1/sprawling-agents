@@ -49,12 +49,18 @@ Because of that, the package writes out a lint table of its own: the workspace's
 
 ## Constraints a reader acts on
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:e7d8a91cbf2b6929ef3778dfb310830bfa55abaf5591115bc78bb4fbe0e5021f -->
+
 - The package declares no features and names no workspace package. `vt100` is a development dependency, so the tests can read a frame the way a person does.
 - The leaf is built on Windows, Linux and macOS, so Zig at the version `crates/console_ffi/zig-version` pins is needed to build the workspace on all three; `sprawling doctor` lists it with the other tools. `build.rs` refuses a `zig` that answers another version, and inside this repository it also refuses a pin that differs from the one in `crates/desktop/ffi/zig-version`, because both leaves are built with one Zig. A package built from crates.io has no sibling and skips that second check.
 - `zig/part.zig` must spell the enums `src/part.rs` defines. `build.rs` refuses to build when it does not, and prints the text it should hold.
 - The leaf is compiled with `-O ReleaseSafe`, so every bounds and overflow check stays in the shipped binary and a failed one traps; `-fPIC` is added for every non-Windows target. The build refuses a target other than x86_64 or aarch64, and one that is not Windows, Linux or macOS.
 - `build.rs` reruns only when `zig/`, `src/part.rs` or one of the pins changes, never when `PATH` does: the leaf is built by the pinned compiler, and an editor whose `PATH` differs from CI's would otherwise rebuild it on every call.
-- A record cannot drive the terminal. Every C0 and C1 control character, every DEL and every byte that is not UTF-8 is drawn as U+FFFD (D5), colour comes from the terminal's own palette (D3), and nothing on the screen moves on its own (D4).
+- A record cannot drive the terminal. Text passed through the character renderer replaces C0, C1, DEL and invalid UTF-8 with U+FFFD (D5); layout may interpret newlines and whitespace before that step. OSC 8 link URIs filter those controls and invalid UTF-8 before output, colour comes from the terminal's own palette (D3), and nothing on the screen moves on its own (D4).
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Who uses it
 
@@ -76,4 +82,10 @@ zig fmt --check crates/console_ffi/zig        # the leaf's formatting, which `ju
 cargo xtask gates guard                       # this package's lint table against the workspace's
 ```
 
-`just test`, `just models` and `just fmt-check` run the same checks for the whole workspace.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d4db5e9888d7c2c2b606a77e5e28b357091ffde0c447f2017f1a247898c6bac4 -->
+
+`just test` runs workspace Rust tests, `just models` builds all Lean specifications, and `just fmt-check` checks formatting. None runs `just check-console` (Zig tests) or `cargo xtask gates guard`; run those separately, or use `just check`, which includes them.
+
+<!-- /coderabbit-ai-generated:v1 -->

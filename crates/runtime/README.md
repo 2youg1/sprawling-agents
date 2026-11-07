@@ -93,13 +93,16 @@ fail to compile.
 
 <!-- coderabbit-ai-generated:v1 -->
 
+<!-- coderabbit-ai-generated-section:v1:d22aea88cbff232beb0b0450b0ec5f9230f8bd5018bd8faae3aa953d4ad243e0 -->
+
 <!-- coderabbit-ai-generated-section:v1:5bdb2517c6c895367c8bc0c23f1aa37439c41fbef1078d4183848c00e527580d -->
 
 - **Features.** `wasm` is off in this crate and on in the product: `sprawling`
   turns it on through its default `sandbox` feature, which is `runtime/wasm`,
   because `cargo install sprawling` must produce a binary that can execute code.
-  Without it, `AbsentSandbox` refuses tool execution and names the feature in its
-  recovery. `conformance` turns on `kernel/conformance`, so the kernel's port
+  Without it, `AbsentSandbox` refuses WASI guest execution and names the feature in its
+  recovery. The exec command branch can still start processes according to its
+  placement and confinement configuration; disabling `wasm` does not disable all tools. `conformance` turns on `kernel/conformance`, so the kernel's port
   suites run against this crate's adapters. Select it with `--features conformance`;
   neither `--all-features` nor `wasm` is required.
 - **The clock and identity.** Time arrives through `run`'s `now` hook and

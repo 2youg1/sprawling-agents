@@ -22,7 +22,13 @@ The checker is three targets of the Lean package whose `lakefile.toml` sits at t
 
 ## When a check fails
 
-An assertion that does not hold is a finding, not an error to recover from (`adversary D1`). The report gives the seed, the number of shrinks, the minimized trace and the promise that broke; passing the seed back through `SPRAWLING_SEED` reproduces the run.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:33f3c4eb6b6da22789182aca7fbc5525e0b688330053089938895fa27ae48127 -->
+
+An assertion that does not hold is a finding, not an error to recover from (`adversary D1`). Random checks using `forAll` report the seed, shrink count, minimized trace and broken promise; `SPRAWLING_SEED=<n> just adversary` reproduces the run. Fixed checks, such as `messagesWorkIsNeverRefusedForACeiling`, report only the check name and error. Rerun them with `just adversary --select "<check path text>"`; they produce no trace and require no seed.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Three things are thrown rather than reported, because carrying on would read a changed door as a refusal and turn a red green: the door's shape changed (unreadable JSON, an unknown frame kind), the ground would not start (a port or a process), and a usage error (a frame built from `Verb` answered with exit 2). A seed that does not parse stops with exit 2 before any city starts, because a mistyped seed is not evidence about the product.
 
@@ -30,12 +36,24 @@ One failed check does not stop the tree. The whole tree runs serially (`adversar
 
 ## Constraints
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:2593e3bf2352ac8c14c07d3143d9f4affebbeb02cfb52819837b876f1defd3ed -->
+
 - No external Lean dependency (`adversary D2`): `mkStdGen` draws the traces, `Lean.Data.Json` reads the wire, `IO.Process` runs the door and `IO.FS` holds the ground. The price is that sampling, shrinking and the check tree are written here rather than imported.
 - No provider is started here (`adversary D3`). `just adversary` builds `sprawling` and hands in its path as `SPRAWLING_BIN`; `just acceptance` starts `crates/citysim`'s `provider` and hands in its URL as `SPRAWLING_PROVIDER`. The justfile is the only place that knows where either is, so a run cannot be driven by a stale binary.
-- A served city is closed in order: `SIGINT` on macOS and Linux, and on Windows through citysim's `serve_grouped` launcher, which sends Ctrl-Break to the group (`adversary D8`). Only the second serving of the acceptance walk is killed; a walk that falls back to terminating a city prints a `note` line saying so.
-- Ports run from 47100 upward, sixteen of them, and `127.0.0.1:47199` is the address no one on this machine listens on, which is where the provider world points. A verb that can name the frame it waits for ends on that frame, with 5000 ms as its ceiling; the rest wait for the city to fall quiet, 250 ms (`adversary D9`).
+- Ordinary `just adversary` checks use `withGround`, which ends each city with `.killed`; they do not cover ordered shutdown or handoff. The acceptance walk closes its first and third servings in order: `SIGINT` on macOS and Linux, and on Windows through citysim's `serve_grouped` launcher, which sends Ctrl-Break to the group (`adversary D8`). Only the second serving of the acceptance walk is killed; a walk that falls back to terminating a city prints a `note` line saying so.
+
+<!-- /coderabbit-ai-generated:v1 -->
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c4ecb753c4cb652908b759411ca84ead2df4f957e2701f95fe2130528deb8f15 -->
+
+- Ports run from 47100 upward, sixteen of them, and the provider world requires `127.0.0.1:47199` to have no listener before running. If it is already listening, investigate the local environment first: another process changes the probe result (see `Spec.lean` section 16). A verb that can name the frame it waits for ends on that frame, with 5000 ms as its ceiling; the rest wait for the city to fall quiet, 250 ms (`adversary D9`).
 - Everything it asserts is a relation between two traces or a promise the door makes to a caller; it predicts no hash, `seq`, timestamp or idempotency key.
 - Its Lean files name no Rust crate and import no product specification. What a Rust module must hold is specified in its own crate's `spec/`, and this directory cites those theorems in comments only.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Who uses it
 
@@ -47,11 +65,17 @@ Nothing in the workspace depends on it: it is not a Cargo package, so it appears
 
 <!-- coderabbit-ai-generated-section:v1:73c6cbea8b5d39808b1dbc62dcc667a3deffea27e4474760e50cbd9ee28542a8 -->
 
-1. Rerun with the seed the failure printed, until the trace is the same twice.
-2. Read the minimized trace and the promise it broke.
-3. Save the minimized counterexample as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d58b8d4238350ed40696c4a5e76b5f7d5c6c37f913c26866be6fdab734bcd58e -->
+
+1. For a `forAll` failure, rerun with the printed seed until the trace is the same twice. For a fixed check, rerun its named check with `just adversary --select "<check path text>"`.
+2. Read the error and, for random checks, the minimized trace and broken promise.
+3. Save the counterexample as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
 4. Fix the defect in Rust. This directory keeps no copy of the case.
 5. When the wire changes, update [`src/Sprawling/Door.lean`](src/Sprawling/Door.lean) and the renderer in [`src/Sprawling/Regression.lean`](src/Sprawling/Regression.lean) in the same change, as the *Tests* section of [`AGENTS.md`](../../AGENTS.md) requires.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
 

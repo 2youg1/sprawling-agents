@@ -68,15 +68,21 @@ so a new code that nobody placed is a compile error rather than a code with no r
 surface is `Carrier::Loadtime` arises only while the Ledger cannot be written, and that set is
 closed on purpose: the refused party there is exactly the one that cannot record its own refusal.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:450ecbe2ea147253a7863d8b4358f88a1c4237f5c181c51893aaa9eef6adb2bd -->
+
 `AxCode::parse` answers `Option`, and `None` is the caller's fail-closed branch. Requests refused
 rather than attempted, each with its own code: an address that is absolute or holds a `..` segment,
 an empty segment, a backslash, a `.` segment, a leading or trailing `/`, a control character, `:` (a
 Windows drive or an NTFS stream), a segment ending in a dot or whitespace, or non-UTF-8 bytes
 (`E_INVALID_ARGS`); a locator with a trailing space or odd-length hex (`E_LOCATOR_INVALID`); a
 payload holding a float, or nested deeper than `PAYLOAD_DEPTH_MAX`; a `Seq` incremented past its
-maximum; a log version older than the first readable one (`E_LOG_VERSION_UNSUPPORTED`). The reason
+maximum; a log version newer than the supported range (`E_LOG_VERSION_UNSUPPORTED`). In replay, a version below the first readable version is treated as corruption (`E_CAS_CORRUPT`). The reason
 each refusal exists is in `spec/Error.lean` and `spec/Address.lean`; the code list and each code's
 recovery are in `crates/kernel/Spec.lean` section 12.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Constraints a caller acts on
 
@@ -124,12 +130,18 @@ names in English, as the *Language* section of [`AGENTS.md`](../../AGENTS.md) re
 
 ## Checking it
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:ca40bb7c85d7ba09b1a562f4b6870497a654e2043ed004ac0cd8f69882de52df -->
+
 ```bash
 cargo nextest run -p sprawling-kernel --all-features   # the module tests, with both features on
 lake build crates.kernel.Spec                          # the SPEC's proofs
 cargo xtask gates spec lexicon specalign               # the SPEC, the words, and the two enum tables
-just proof                                             # the kani harnesses, on a Linux or macOS host
+just proof                                             # Kani harnesses on Linux/macOS; skips successfully if Kani is absent
 ```
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 `cargo xtask gates specalign` is the narrow gate for this crate: it compares the `EventKind` roster
 and each `AxCode` against the tables in `spec/Event/Kind.lean` and `spec/Error.lean`, variant by
