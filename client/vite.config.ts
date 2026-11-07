@@ -50,7 +50,10 @@ function declaredFaces(): {
 
 /// The licence files beside the fonts, sorted: every `.txt` in the
 /// directory, because a text file next to a font is that font's licence.
+/// A tree without the directory is a bundle that draws with what the
+/// machine has rather than a failed build, so it answers with none.
 function declaredLicences(): readonly string[] {
+  if (!existsSync(FACES_DIR)) return [];
   return readdirSync(FACES_DIR)
     .filter((name) => name.endsWith(".txt"))
     .sort();

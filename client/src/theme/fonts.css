@@ -24,28 +24,30 @@
 /* Maple Mono, three static files, shipped beside Paper Mono because the
  * doctor's NF CN build extends the same design with Han glyphs and Nerd
  * Font icons, and because a person may choose it for a role
- * (wire D123). It is not preloaded: no page opens in it, and a person who
- * chooses it sees the face one fetch after the choice. */
+ * (wire D123). `swap` rather than Paper Mono's `optional`, for the reason
+ * Libron's files use it: these are fetched only once a person has chosen
+ * the face, usually mid-visit, and `optional` would keep the fallback for
+ * the rest of that visit. Nothing preloads them: no page opens in one. */
 @font-face {
   font-family: "Maple Mono";
   src: url("../fonts/MapleMono-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 @font-face {
   font-family: "Maple Mono";
   src: url("../fonts/MapleMono-SemiBold.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 @font-face {
   font-family: "Maple Mono";
   src: url("../fonts/MapleMono-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 
 /* Libron, the serif face reading text may be set in (wire D52), one
