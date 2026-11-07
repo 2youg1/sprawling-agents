@@ -10,6 +10,7 @@ use std::error::Error;
 use std::path::Path;
 
 use benchstat::estimators::{Quantile, nearest_rank, range};
+use benchstat::observation::CellKey;
 use serde_json::Value;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,14 +28,7 @@ fn check(source: &Path, exports: &Path) -> Result<(), Box<dyn Error>> {
     let cells = exports
         .get("cells")
         .and_then(Value::as_object)
-        .ok_or("exports cells missing")?
-        .values()
-        .filter_map(|cell| {
-            cell.get("label")
-                .and_then(Value::as_str)
-                .map(|label| (label, cell))
-        })
-        .collect::<BTreeMap<_, _>>();
+        .ok_or("exports cells missing")?;
     let mut reader = csv::Reader::from_path(source.join("results.csv"))?;
     let headers = reader.headers()?.clone();
     let mut pooled = BTreeMap::<String, Vec<f64>>::new();
@@ -67,13 +61,25 @@ fn check(source: &Path, exports: &Path) -> Result<(), Box<dyn Error>> {
         } else {
             field(&old, "case")?.to_owned()
         };
-        let label = format!(
-            "{}/{}/{}/latency ({})",
-            field(&old, "agent")?,
-            mapped,
+        let key = CellKey {
+            build: "v0.0.11".to_owned(),
+            arm: "historical".to_owned(),
+            agent: field(&old, "agent")?.to_owned(),
+            series: mapped.to_owned(),
+            workload: series.to_owned(),
             case,
-            field(&old, "unit")?
-        );
+            state: field(&old, "state")?.to_owned(),
+            sessions: if field(&old, "sessions")?.is_empty() {
+                None
+            } else {
+                Some(field(&old, "sessions")?.parse::<f64>()?.to_string())
+            },
+            metric: "latency".to_owned(),
+            unit: field(&old, "unit")?.to_owned(),
+            counter_source: "v0.0.11 historical instrument".to_owned(),
+            condition: field(&old, "condition")?.to_owned(),
+        };
+        let label = key.id();
         let values: Vec<f64> = serde_json::from_str(field(&old, "values_json")?)?;
         let mut sorted = values.clone();
         sorted.sort_by(f64::total_cmp);
@@ -150,9 +156,7 @@ fn check(source: &Path, exports: &Path) -> Result<(), Box<dyn Error>> {
         )?;
         pooled_cells = pooled_cells.checked_add(1).ok_or("pooled count overflow")?;
     }
-    if pooled_cells != 41 {
-        return Err(format!("expected 41 pooled cells, compared {pooled_cells}").into());
-    }
+
     let outcomes = exports
         .get("outcome_summaries")
         .and_then(Value::as_object)

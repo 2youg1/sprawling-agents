@@ -118,7 +118,16 @@ pub struct Observation {
 
 impl Observation {
     fn numeric_cell(&self) -> bool {
-        self.selected && !self.censored && self.missing_reason.is_none()
+        self.selected && !self.censored && self.effective_missing_reason().is_none()
+    }
+
+    /// Missingness includes incomplete token totals without affecting other metrics.
+    pub fn effective_missing_reason(&self) -> Option<&str> {
+        self.missing_reason.as_deref().or_else(|| {
+            (matches!(self.metric.as_str(), "input_tokens" | "output_tokens")
+                && !self.usage_complete)
+                .then_some("token usage is incomplete")
+        })
     }
 
     /// Whether this row contributes to an ordinary quantitative estimate.
@@ -200,20 +209,7 @@ impl CellKey {
 
     /// A short human label used in the Markdown report.
     pub fn label(&self) -> String {
-        let case = if self.case.is_empty() {
-            "all"
-        } else {
-            self.case.as_str()
-        };
-        let sessions = self
-            .sessions
-            .as_ref()
-            .map(|sessions| format!(" sessions={sessions}"))
-            .unwrap_or_default();
-        format!(
-            "{}/{}/{}{}/{} ({})",
-            self.agent, self.series, case, sessions, self.metric, self.unit
-        )
+        self.id()
     }
 }
 

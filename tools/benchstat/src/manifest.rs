@@ -87,6 +87,9 @@ pub enum Headline {
 pub struct CellPlan {
     /// The length-prefixed cell identity emitted by `CellKey::id`.
     pub key: String,
+    /// Explicit full baseline cell identity for outcome contrasts.
+    #[serde(default)]
+    pub baseline_key: Option<String>,
     /// Quantile whose interval is sized.
     pub headline: Headline,
     /// Positive relative or absolute width target.
@@ -305,6 +308,15 @@ impl Manifest {
                 return Err(invalid(
                     &format!("duplicate cell plan {}", plan.key),
                     "keep one plan per cell key",
+                ));
+            }
+            if plan.s0.is_some() != plan.h_abs.is_some()
+                || plan.s0.is_some_and(|v| !v.is_finite() || v <= 0.0)
+                || plan.h_abs.is_some_and(|v| !v.is_finite() || v <= 0.0)
+            {
+                return Err(invalid(
+                    &plan.key,
+                    "register positive finite s0 and h_abs together",
                 ));
             }
             if plan.target_half_width <= 0.0

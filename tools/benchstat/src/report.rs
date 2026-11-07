@@ -42,7 +42,7 @@ pub fn markdown(exports: &Value) -> Result<String, BenchError> {
     text.push_str("The JSON export is the machine-readable authority for every number below. Unavailable analyses and deferred coverage remain explicit.\n\n");
     text.push_str(&analysis_provenance(object)?);
     text.push_str(&coverage_and_claims(object)?);
-    text.push_str("\n### Quantitative cells\n\n| Cell | n | Missing / censored | P50 (95% BCa) | P95 (95% BCa) | P99 (95% BCa) | P99 publishable | Drift | Shape (descriptive) |\n| --- | ---: | --- | ---: | ---: | ---: | --- | --- | --- |\n");
+    text.push_str("\n### Quantitative cells\n\n| Cell | n | Missing / censored | P50 (interval status) | P95 (interval status) | P99 (interval status) | P99 publishable | Drift | Shape (descriptive) |\n| --- | ---: | --- | ---: | ---: | ---: | --- | --- | --- |\n");
     for (id, cell) in object
         .get("cells")
         .and_then(Value::as_object)
@@ -211,6 +211,20 @@ pub fn markdown(exports: &Value) -> Result<String, BenchError> {
                 .unwrap_or_else(|| "unavailable".to_owned())
         ));
     }
+    text.push_str("\nMemory sizing (target, achieved half-width and precision status):\n\n");
+    for (id, fitted) in object
+        .get("memory_fits")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("memory_fits is not an object"))?
+    {
+        if let Some(sizing) = fitted.get("sizing") {
+            text.push_str(&format!(
+                "- `{}`: {}\n",
+                escape(id),
+                escape(&display(sizing))
+            ));
+        }
+    }
     Ok(text)
 }
 
@@ -360,14 +374,16 @@ fn coverage_and_claims(object: &Map<String, Value>) -> Result<String, BenchError
             escape(reopen)
         ));
     }
-    text.push_str("\n### Claims\n\n| Claim | Series | Status |\n| --- | --- | --- |\n");
+    text.push_str(
+        "\n### Claims\n\n| Claim | Series | Status | Limitation |\n| --- | --- | --- | --- |\n",
+    );
     for claim in object
         .get("claims")
         .and_then(Value::as_array)
         .ok_or_else(|| invalid("claims is not an array"))?
     {
         text.push_str(&format!(
-            "| {} | {} | {} |\n",
+            "| {} | {} | {} | {} |\n",
             escape(claim.get("id").and_then(Value::as_str).unwrap_or("unknown")),
             escape(
                 claim
@@ -380,7 +396,8 @@ fn coverage_and_claims(object: &Map<String, Value>) -> Result<String, BenchError
                     .get("status")
                     .and_then(Value::as_str)
                     .unwrap_or("unknown")
-            )
+            ),
+            escape(claim.get("reason").and_then(Value::as_str).unwrap_or(""))
         ));
     }
     Ok(text)
@@ -423,7 +440,9 @@ fn shape_display(cell: &Value) -> String {
     let Some(shape) = cell.get("shape") else {
         return format!("dip={dip}; shape unavailable");
     };
-    if shape.get("modes").is_none() {
+    if shape.get("modes").is_none()
+        || shape.get("status").and_then(Value::as_str) == Some("unavailable")
+    {
         return format!(
             "dip={dip}; {}",
             shape
@@ -465,7 +484,13 @@ fn quantile(cell: &Value, point: &str, interval: &str) -> String {
     let low = bca.and_then(|value| value.get("low")).map(display);
     let high = bca.and_then(|value| value.get("high")).map(display);
     match (low, high) {
-        (Some(low), Some(high)) => format!("{estimate} [{low}, {high}]"),
+        (Some(low), Some(high)) => format!(
+            "{estimate} [{low}, {high}] ({})",
+            interval
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("unavailable")
+        ),
         _ => format!(
             "{estimate} ({})",
             interval

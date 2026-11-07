@@ -95,7 +95,7 @@ manifest 顶层必填：`schema_version`、`analysis_revision`、`method_version
 `seed_string`、`resamples`、`confidence`、`alpha`、`power`、`bootstrap_unit`、`input_hashes`、
 `coverage`、`claims`、`cell_plans`。coverage 使用 `series/status/reason/reopen_when/measured_by/reading`；
 cell plan 使用 `key/headline/target_half_width/observations_per_cohort/resource_ceiling/independent_unpaired`，
-另可含 `absolute_target`、`s0`、`h_abs`，以及独立非配对结局定样所需的
+另可含完整单元映射 `baseline_key`、`absolute_target`、`s0`、`h_abs`，以及独立非配对结局定样所需的
 `assumed_first`、`assumed_second`、`family_size`；这些比例只适用于该设计，重复或配对尝试不得使用。
 
 exports 是排序键 JSON，整数保持整数，浮点使用 serde_json 的最短 round-trip 十进制，LF 结尾，无时间戳。
@@ -111,6 +111,13 @@ verify：执行与 export 相同的重算，再比较 exports 字节和 README �
 -/
 
 /-! ## 10 实现逻辑
+
+用量不完整只排除 token 总量；终止证据独立保留。报告标签包含完整 cell 身份。
+只有 status=bca 的区间参与确认性定样和 P99 发布。未支持的 KDE 峰保留位置和支持率，
+无保留峰时摘要 unavailable，不生成切点或份额。内存定样用 sessions 为空的 pooled key
+关联 plan，导出目标、实际半宽和资源上限结果。自由文本声明不能自动解析证伪逻辑；
+导出所需观测、方向、阈值和限制，无法执行的声明 unavailable，不能仅凭 coverage 判 evaluated。
+结局比较使用候选 plan 的 baseline_key；所有 case 必须一致映射至同一基线汇总，且两组均合格。
 
 随机流是 SHA-256 对 length-prefixed UTF-8 `(seed_string, round, cell key, statistic)` 的计数器输出；
 每次 draw 取摘要的下一 8 字节并做拒绝采样，避免模偏差。所有 map 为 BTreeMap，CSV 行序不影响 cell 身份。

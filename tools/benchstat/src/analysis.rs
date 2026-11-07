@@ -90,7 +90,20 @@ pub fn analyze(manifest: &Manifest, rows: &[Observation]) -> Result<Value, Bench
             Ok(json!({
                 "id": claim.id,
                 "series": claim.series,
-                "status": if measured { "evaluated" } else { "deferred" },
+                "status": if measured { "unavailable" } else { "deferred" },
+                "primary_metric": claim.primary_metric,
+                "direction": claim.direction,
+                "minimum_worthwhile_change": claim.minimum_worthwhile_change,
+                "falsification_condition": claim.falsification_condition,
+                "evidence": rows.iter().filter(|row| row.series == claim.series
+                    && row.metric == claim.primary_metric && row.unit == claim.unit
+                    && row.quantitative().is_some()).map(|row| json!({
+                        "observation_id": row.observation_id, "cell": CellKey::of(row).id(), "value": row.value
+                    })).collect::<Vec<_>>(),
+                "reason": if !measured { "required coverage is not measured" }
+                    else if !rows.iter().any(|row| row.series == claim.series && row.metric == claim.primary_metric
+                        && row.unit == claim.unit && row.quantitative().is_some()) { "no eligible primary metric observations in the registered unit" }
+                    else { "claim has no executable cell contrast or falsification rule; free-text conditions require explicit evaluation" },
                 "estimator": "pre_registered_claim_ladder",
             }))
         })
@@ -261,6 +274,7 @@ fn quantitative_cell(
             "label": key.label(),
             "status": "unavailable",
             "reason": "no selected, uncensored, non-missing quantitative observations",
+            "missing": rows.iter().filter(|row| row.selected).filter_map(|row| row.effective_missing_reason()).collect::<Vec<_>>(),
         }));
     }
     let n = sorted.len();
@@ -290,8 +304,8 @@ fn quantitative_cell(
         "missing".to_owned(),
         json!(
             rows.iter()
-                .filter(|row| row.selected && row.missing_reason.is_some())
-                .map(|row| row.missing_reason.clone())
+                .filter(|row| row.selected && row.effective_missing_reason().is_some())
+                .map(|row| row.effective_missing_reason())
                 .collect::<Vec<_>>()
         ),
     );
@@ -388,7 +402,9 @@ fn quantitative_cell(
         output.insert(
             "shape".to_owned(),
             json!({
-                "status": "descriptive",
+                "status": if shape.modes.is_empty() { "unavailable" } else { "descriptive" },
+                "reason": if shape.modes.is_empty() { Some("no original peak reaches 95% bootstrap support") } else { None },
+                "original_modes": shape.original_modes,
                 "estimator": "gaussian_kde_sheather_jones_ste_4097_scalar_fft",
                 "bandwidth": shape.bandwidth,
                 "grid": shape.grid,
@@ -413,7 +429,10 @@ fn quantitative_cell(
         );
     }
     let p99 = output.get("p99").cloned().unwrap_or(Value::Null);
-    let p99_interval = output.get("p99_ci").and_then(Value::as_object);
+    let p99_interval = output
+        .get("p99_ci")
+        .and_then(Value::as_object)
+        .filter(|interval| interval.get("status").and_then(Value::as_str) == Some("bca"));
     let half_width = p99_interval
         .and_then(|interval| interval.get("bca"))
         .and_then(Value::as_object)
@@ -558,7 +577,7 @@ fn outcome_summaries(manifest: &Manifest, rows: &[Observation]) -> Result<Value,
     let plans = manifest
         .cell_plans
         .iter()
-        .map(|plan| (plan.key.as_str(), plan.independent_unpaired))
+        .map(|plan| (plan.key.as_str(), plan))
         .collect::<BTreeMap<_, _>>();
     let mut groups = BTreeMap::<CellKey, Vec<Observation>>::new();
     for row in rows.iter().filter(|row| {
@@ -572,16 +591,34 @@ fn outcome_summaries(manifest: &Manifest, rows: &[Observation]) -> Result<Value,
         key.sessions = None;
         groups.entry(key).or_default().push(row.clone());
     }
+    let summary_ids = rows
+        .iter()
+        .map(|row| {
+            let full = CellKey::of(row).id();
+            let mut key = CellKey::of(row);
+            key.case.clear();
+            key.sessions = None;
+            (full, key.id())
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut baseline_mappings = BTreeMap::new();
     let mut summaries = Map::new();
     let mut keys = BTreeMap::new();
     for (key, observations) in groups {
         let independent = observations.iter().all(|row| {
             plans
                 .get(CellKey::of(row).id().as_str())
-                .copied()
-                .unwrap_or(false)
+                .is_some_and(|plan| plan.independent_unpaired)
         });
         let id = key.id();
+        let mapped = observations
+            .iter()
+            .map(|row| {
+                let plan = plans.get(CellKey::of(row).id().as_str())?;
+                summary_ids.get(plan.baseline_key.as_ref()?).cloned()
+            })
+            .collect::<Option<BTreeSet<_>>>();
+        baseline_mappings.insert(id.clone(), mapped);
         let cell = outcome_cell(&key, &observations, independent, None)?;
         keys.insert(id.clone(), key);
         summaries.insert(id, cell);
@@ -590,15 +627,12 @@ fn outcome_summaries(manifest: &Manifest, rows: &[Observation]) -> Result<Value,
         .iter()
         .filter(|(id, _)| keys.get(*id).is_some_and(|key| key.arm != "baseline"))
         .map(|(id, candidate)| {
-            let baseline_id = keys.get(id).map(|key| {
-                let mut baseline = key.clone();
-                baseline.arm = "baseline".to_owned();
-                baseline.id()
-            });
+            let baseline_id = baseline_mappings.get(id).and_then(Option::as_ref)
+                .filter(|ids| ids.len() == 1).and_then(|ids| ids.iter().next()).cloned();
             let contrast = baseline_id
                 .as_ref()
                 .and_then(|baseline_id| summaries.get(baseline_id))
-                .map_or_else(|| unavailable("no baseline summary for this arm"), |baseline| {
+                .map_or_else(|| unavailable("no consistent pre-registered full-cell baseline mapping"), |baseline| {
                     let first = proportion_parts(candidate)?;
                     let second = proportion_parts(baseline)?;
                     if candidate
@@ -690,9 +724,38 @@ fn memory_fits(manifest: &Manifest, rows: &[Observation]) -> Result<Value, Bench
             manifest.confidence,
             &mut stream,
         )?;
+        let plan = manifest.cell_plans.iter().find(|plan| plan.key == id);
+        let sizing_result = if let Some(plan) = plan {
+            if let (Some(s0), Some(h_abs)) = (plan.s0, plan.h_abs) {
+                let target = if fitted.slope.abs() <= s0 {
+                    h_abs
+                } else {
+                    0.25 * fitted.slope.abs()
+                };
+                let half_width = (interval.1 - interval.0) / 2.0;
+                let n = u64::try_from(points.len())
+                    .map_err(|_| numeric("memory sizing", "too many cohorts"))?;
+                let mut result = size_from_width(n, target, Some(half_width), plan)?;
+                let object = result
+                    .as_object_mut()
+                    .ok_or_else(|| numeric("memory sizing", "sizing result is not an object"))?;
+                object.insert("achieved_half_width".to_owned(), json!(half_width));
+                object.insert("precision_met".to_owned(), json!(half_width <= target));
+                object.insert(
+                    "estimator".to_owned(),
+                    json!("pilot_pairs_bootstrap_square_root_scaling"),
+                );
+                result
+            } else {
+                unavailable("register s0 and h_abs for the pooled memory fit")?
+            }
+        } else {
+            unavailable("no pooled memory fit plan")?
+        };
         output.insert(
             id,
             json!({
+                "sizing": sizing_result,
                 "status": "analyzed",
                 "estimator": "ordinary_least_squares_one_point_per_cohort",
                 "slope": fitted.slope,
@@ -770,14 +833,38 @@ fn sizing(sorted: &[f64], plan: &CellPlan, cell: &Map<String, Value>) -> Result<
             )
         })?
     };
+    if cell
+        .get(&format!("{}_ci", headline.name()))
+        .and_then(|interval| interval.get("status"))
+        .and_then(Value::as_str)
+        == Some("iid_sensitivity")
+    {
+        return unavailable(
+            "collection order is missing; iid sensitivity cannot size a confirmatory sample",
+        );
+    }
     let interval = cell
         .get(&format!("{}_ci", headline.name()))
+        .filter(|interval| interval.get("status").and_then(Value::as_str) == Some("bca"))
         .and_then(Value::as_object)
         .and_then(|value| value.get("bca"))
         .and_then(Value::as_object);
     let n = u64::try_from(sorted.len()).map_err(|_| numeric("sizing", "sample count too large"))?;
+    let width = interval.and_then(|interval| {
+        Some((interval.get("high")?.as_f64()? - interval.get("low")?.as_f64()?) / 2.0)
+    });
+    size_from_width(n, target, width, plan)
+}
+
+/// Shared pilot arithmetic for registered quantile and slope interval targets.
+fn size_from_width(
+    n: u64,
+    target: f64,
+    width: Option<f64>,
+    plan: &CellPlan,
+) -> Result<Value, BenchError> {
     let m = plan.observations_per_cohort;
-    let Some(interval) = interval else {
+    let Some(h) = width else {
         let next = n
             .checked_add(m)
             .ok_or_else(|| numeric("sizing", "next pilot overflow"))?;
@@ -786,17 +873,15 @@ fn sizing(sorted: &[f64], plan: &CellPlan, cell: &Map<String, Value>) -> Result<
             "required_n": if next <= plan.resource_ceiling { json!(next) } else { Value::Null },
             "reason": "BCa width is zero or undefined; collect one fresh complete cohort and retain the failed analysis",
             "estimator": "degenerate_pilot_next_cohort",
+            "target_half_width": target,
         }));
     };
-    let low = interval.get("low").and_then(Value::as_f64).unwrap_or(0.0);
-    let high = interval.get("high").and_then(Value::as_f64).unwrap_or(0.0);
-    let h = (high - low) / 2.0;
     if h == 0.0 {
         let next = n
             .checked_add(m)
             .ok_or_else(|| numeric("sizing", "next pilot overflow"))?;
         return Ok(
-            json!({"status": "fresh_cohort_required", "required_n": next, "target_half_width": target}),
+            json!({"status": if next <= plan.resource_ceiling { "fresh_cohort_required" } else { "sizing_failed" }, "required_n": if next <= plan.resource_ceiling { json!(next) } else { Value::Null }, "target_half_width": target}),
         );
     }
     let n0 = f64::from(u32::try_from(n).map_err(|_| numeric("sizing", "pilot too large"))?);
@@ -961,6 +1046,24 @@ fn numeric(action: &str, subject: &str) -> BenchError {
 mod tests {
     use super::decompositions;
     use crate::observation::{HEADER, parse};
+
+    #[test]
+    fn confirmatory_sizing_rejects_iid_and_honors_zero_width_ceiling() {
+        let plan: crate::manifest::CellPlan = serde_json::from_value(serde_json::json!({
+            "key": "test", "headline": "p50", "target_half_width": 0.25,
+            "observations_per_cohort": 4, "resource_ceiling": 8, "independent_unpaired": false
+        }))
+        .unwrap();
+        let fresh = super::size_from_width(4, 1.0, Some(0.0), &plan).unwrap();
+        assert_eq!(fresh.get("required_n").unwrap(), 8);
+        let failed = super::size_from_width(8, 1.0, Some(0.0), &plan).unwrap();
+        assert_eq!(failed.get("status").unwrap(), "sizing_failed");
+        assert!(failed.get("required_n").unwrap().is_null());
+        let cell = serde_json::json!({"p50_ci": {"status": "iid_sensitivity", "bca": {"low": 1, "high": 2}}});
+        let result = super::sizing(&[1.0, 2.0], &plan, cell.as_object().unwrap()).unwrap();
+        assert_eq!(result.get("status").unwrap(), "unavailable");
+        assert!(result.get("required_n").is_none());
+    }
 
     #[test]
     fn wall_decomposition_unions_overlapping_request_spans() {

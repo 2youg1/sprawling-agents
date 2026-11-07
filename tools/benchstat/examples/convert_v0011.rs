@@ -191,9 +191,7 @@ fn expand_task(
     let deadline = if series == "gpt_coding" { 300.0 } else { 180.0 };
     let wall = field(old, "wall_seconds")?.parse::<f64>()?;
     let normal = field(old, "normal_completion")?;
-    let failure = if field(old, "usage_complete")? == "0" {
-        "infrastructure"
-    } else if normal == "0" && wall >= deadline {
+    let failure = if normal == "0" && wall >= deadline {
         "timeout"
     } else if normal == "1" {
         "none"

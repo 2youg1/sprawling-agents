@@ -31,6 +31,8 @@ pub struct Shape {
     pub grid: Vec<f64>,
     /// Gaussian KDE at each grid coordinate.
     pub density: Vec<f64>,
+    /// Original maxima, aligned with bootstrap support.
+    pub original_modes: Vec<f64>,
     /// Supported mode centres.
     pub modes: Vec<f64>,
     /// Cuts between retained modes.
@@ -409,16 +411,13 @@ pub fn shape(
             )?)
         })
         .collect::<Result<Vec<_>, BenchError>>()?;
-    let modes = original_modes
-        .iter()
-        .zip(&support)
-        .filter(|(_, support)| **support >= 0.95)
-        .map(|(mode, _)| *mode)
-        .collect::<Vec<_>>();
-    let (_, retained_density) = kde(values, bandwidth)?;
-    let antimodes = antimodes(&grid, &retained_density, &modes)?;
-    let shares = shares(values, &antimodes)?;
+    let Basins {
+        modes,
+        antimodes,
+        shares,
+    } = supported_basins(values, &grid, &density, &original_modes, &support)?;
     Ok(Shape {
+        original_modes,
         bandwidth,
         grid,
         density,
@@ -427,6 +426,44 @@ pub fn shape(
         shares,
         support,
         unmatched,
+    })
+}
+
+/// Supported KDE basin geometry and empirical weights.
+struct Basins {
+    /// Retained centres.
+    modes: Vec<f64>,
+    /// Boundaries between retained centres.
+    antimodes: Vec<f64>,
+    /// Weights inside those boundaries.
+    shares: Vec<f64>,
+}
+
+/// Retain only supported peaks; no retained peak means no basin summary.
+fn supported_basins(
+    values: &[f64],
+    grid: &[f64],
+    density: &[f64],
+    original_modes: &[f64],
+    support: &[f64],
+) -> Result<Basins, BenchError> {
+    let modes = original_modes
+        .iter()
+        .zip(support)
+        .filter(|(_, support)| **support >= 0.95)
+        .map(|(mode, _)| *mode)
+        .collect::<Vec<_>>();
+    let (antimodes, shares) = if modes.is_empty() {
+        (Vec::new(), Vec::new())
+    } else {
+        let cuts = antimodes(grid, density, &modes)?;
+        let weights = shares(values, &cuts)?;
+        (cuts, weights)
+    };
+    Ok(Basins {
+        modes,
+        antimodes,
+        shares,
     })
 }
 
@@ -777,6 +814,30 @@ fn numeric(action: &str, subject: &str) -> BenchError {
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unsupported_peaks_do_not_invent_a_single_basin() {
+        let values = [1.0, 1.1, 5.0, 5.1];
+        let bandwidth = sheather_jones(&values).unwrap();
+        let (grid, density) = kde(&values, bandwidth).unwrap();
+        let original = maxima(&grid, &density).unwrap();
+        assert!(!original.is_empty());
+        let Basins {
+            modes,
+            antimodes: cuts,
+            shares,
+        } = supported_basins(
+            &values,
+            &grid,
+            &density,
+            &original,
+            &vec![0.94; original.len()],
+        )
+        .unwrap();
+        assert!(modes.is_empty());
+        assert!(cuts.is_empty());
+        assert!(shares.is_empty());
+    }
 
     #[test]
     fn constant_and_reference_dips_match_as_217() {
