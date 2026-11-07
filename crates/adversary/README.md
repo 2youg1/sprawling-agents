@@ -26,7 +26,13 @@ The checker is three targets of the Lean package whose `lakefile.toml` sits at t
 
 <!-- coderabbit-ai-generated-section:v1:33f3c4eb6b6da22789182aca7fbc5525e0b688330053089938895fa27ae48127 -->
 
-An assertion that does not hold is a finding, not an error to recover from (`adversary D1`). Random checks using `forAll` report the seed, shrink count, minimized trace and broken promise; `SPRAWLING_SEED=<n> just adversary` reproduces the run. Fixed checks, such as `messagesWorkIsNeverRefusedForACeiling`, report only the check name and error. Rerun them with `just adversary --select "<check path text>"`; they produce no trace and require no seed.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d2e2c1d20e1c53274340b1b71cf3716dee90fd7fa57e7e664a5982a4430b6897 -->
+
+An assertion that does not hold is a finding, not an error to recover from (`adversary D1`). When an attempt returns `.broke`, `forAll` reports the sample seed, shrink count, minimized trace and broken promise; `SPRAWLING_SEED=<n> just adversary` reproduces the run. An exception while executing a check, such as `Door.readBudget` failing inside `savedReadsBack`, produces no shrinkable counterexample report: there is no sample seed, shrink count or trace. Use the seed printed at the start of the run and the check path to rerun it: `SPRAWLING_SEED=<n> just adversary --select "<check path text>"`. Fixed checks, such as `messagesWorkIsNeverRefusedForACeiling`, report only the check name and error. Rerun them with `just adversary --select "<check path text>"`; they produce no trace and require no seed.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
 
@@ -69,12 +75,18 @@ Nothing in the workspace depends on it: it is not a Cargo package, so it appears
 
 <!-- coderabbit-ai-generated-section:v1:d58b8d4238350ed40696c4a5e76b5f7d5c6c37f913c26866be6fdab734bcd58e -->
 
-1. For a `forAll` failure, rerun with the printed seed until the trace is the same twice. For a fixed check, rerun its named check with `just adversary --select "<check path text>"`.
-2. Read the error and, for random checks, the minimized trace and broken promise.
-3. Save the counterexample as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:74d9b4d704b956a36f4d7ec5493a450f7be2b315888ddcc3e781704bcdc8cc1b -->
+
+1. For a `forAll` counterexample, rerun with the reported sample seed until the trace is the same twice. For an execution exception, use the run’s opening seed and the check path as described above. For a fixed check, rerun its named check with `just adversary --select "<check path text>"`.
+2. Read the error and, for `.broke` counterexamples, the minimized trace and broken promise.
+3. Fixed checks also compare the deliverable. If the renderer changed without regenerating `from_adversary.rs`, inspect the renderer change first, then follow the error and regenerate with `SPRAWLING_ACCEPT=1 just adversary`. This mismatch is not a new product counterexample and needs no new regression test or product-code change. For a new product counterexample, save it as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
 4. Fix the defect in Rust. This directory keeps no copy of the case.
 5. When the wire changes, update [`src/Sprawling/Door.lean`](src/Sprawling/Door.lean) and the renderer in [`src/Sprawling/Regression.lean`](src/Sprawling/Regression.lean) in the same change, as the *Tests* section of [`AGENTS.md`](../../AGENTS.md) requires.
 
+
+<!-- /coderabbit-ai-generated:v1 -->
 <!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->

@@ -60,8 +60,6 @@ pub(crate) struct Screen {
     previous: Option<Part>,
     /// The bytes of the last frame, kept for their capacity.
     frame: Vec<u8>,
-    /// Transcript not yet shown because the renderer refused a frame.
-    pending: Vec<Entry>,
     /// A repeated refusal is reported once until a frame succeeds.
     refused: Option<console_ffi::Refused>,
 }
@@ -136,7 +134,10 @@ impl Screen {
                     cursor::MoveUp(erase),
                     terminal::Clear(terminal::ClearType::FromCursorDown)
                 )?;
-                write!(out, "{reason}\r\n")
+                write!(
+                    out,
+                    "{reason}; transcript in refused frames is discarded; read replies in the WebUI\r\n"
+                )
             });
         }
         let bytes = std::mem::take(&mut self.frame);
@@ -145,29 +146,27 @@ impl Screen {
         written
     }
 
-    /// Keeps unseen transcript until the renderer accepts the complete frame.
+    /// Draws only this event; refused transcript is discarded (sprawling D106).
     fn render(
         &mut self,
         entries: &[Entry],
         live: Option<Live<'_>>,
         size: (u16, u16),
     ) -> Result<(), console_ffi::Refused> {
-        self.pending.extend_from_slice(entries);
         let scene = Scene::inline(&Inline {
             columns: size.0,
             rows: size.1,
             erase: self.erase,
             previous: self.previous,
-            entries: &self.pending,
+            entries,
             live,
         });
         let drawn = console_ffi::draw(&scene, &mut self.frame)?;
         self.erase = drawn.cursor_row;
         self.refused = None;
-        if let Some(last) = self.pending.last() {
+        if let Some(last) = entries.last() {
             self.previous = Some(last.part());
         }
-        self.pending.clear();
         Ok(())
     }
 
@@ -314,22 +313,26 @@ fn restore_on_panic() {
 mod tests {
     use super::*;
 
-    /// A refused layout must not consume its transcript.
+    /// A refused reply must not poison later events, even without a resize.
     #[test]
-    fn a_refused_frame_keeps_its_transcript_until_a_frame_succeeds() {
+    fn a_refused_frame_does_not_accumulate_or_block_later_transcript() {
         let mut screen = Screen::default();
-        let entries = [Entry::Reply {
+        let oversized = [Entry::Reply {
             said: "x".repeat(24 * 1024 * 1024),
         }];
-        assert_eq!(
-            screen.render(&entries, None, (2, 24)),
-            Err(console_ffi::Refused::TooLong)
-        );
-        assert_eq!(screen.pending, entries);
-        assert_eq!(screen.previous, None);
-        // A wider terminal reduces the layout overhead of the same transcript.
-        assert_eq!(screen.render(&[], None, (u16::MAX, 24)), Ok(()));
-        assert!(screen.pending.is_empty());
-        assert_eq!(screen.previous, Some(entries[0].part()));
+        for _ in 0..3 {
+            assert_eq!(
+                screen.render(&oversized, None, (2, 24)),
+                Err(console_ffi::Refused::TooLong)
+            );
+            assert_eq!(screen.previous, None);
+        }
+        let next = [Entry::Reply { said: "ok".into() }];
+        assert_eq!(screen.render(&next, None, (2, 24)), Ok(()));
+        assert_eq!(screen.previous, Some(next[0].part()));
+        let bytes = screen.frame.clone();
+        let mut fresh = Screen::default();
+        assert_eq!(fresh.render(&next, None, (2, 24)), Ok(()));
+        assert_eq!(bytes, fresh.frame);
     }
 }
