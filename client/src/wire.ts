@@ -9,13 +9,17 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 75 as const;
+export const WIRE_V = 76 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "d5b62816c11a76d8ad63cd0a0d7186addd424fb05ba74fece28d2e7cca9fa6e7" as const;
+export const WIRE_HASH = "44851afe6192e806d5889e0e26a060c2a4f0242fc28d8fa1ca7c80c63f88b716" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
 export const BODY_PX = { min: 12 } as const;
+/** The smallest line box, in thousandths of the font size: `wire::LINE_HEIGHT_MIN`. */
+export const LINE_HEIGHT = { min: 1200 } as const;
+/** The tightest letter spacing, in thousandths of an em: `wire::TRACKING_MIN`. */
+export const TRACKING = { min: -50 } as const;
 /** The default thinking level: `kernel::consts_policy::DEFAULT_EFFORT`. */
 export const DEFAULT_EFFORT = "high" as const;
 
@@ -3435,6 +3439,7 @@ export type Density = typeof Density.Type;
  * Where one of the two typefaces comes from.
  */
 export const Face = Schema.Union([
+  Schema.Literal("paper"),
   Schema.Literal("maple"),
   Schema.Literal("system"),
   Schema.Literal("custom"),
@@ -3479,6 +3484,35 @@ export const ReadingFace = Schema.Union([
 export type ReadingFace = typeof ReadingFace.Type;
 
 /**
+ * One of the shipped face's own OpenType features, spelled as that
+ * face's name table spells it (`crates/wire/spec/Preference.lean`
+ * D125).
+ * 
+ * The six are Paper Mono's, whose `ss01`, `ss02`, `ss03`, `ss04`,
+ * `cv01` and `zero` carry these names; another bundled face spells the
+ * same intents with its own tags, and the stylesheet is where the two
+ * are held together. The spelling here is what a person's file holds
+ * and what the page's `data-features` attribute carries.
+ */
+export const TypeFeature = Schema.Union([
+  Schema.Literal("coding_ligatures"),
+  Schema.Literal("duospace"),
+  Schema.Literal("narrow_space"),
+  Schema.Literal("small_arrows"),
+  Schema.Literal("single_story_a"),
+  Schema.Literal("slashed_zero"),
+]).annotate({ identifier: "TypeFeature" });
+export type TypeFeature = typeof TypeFeature.Type;
+
+/**
+ * How heavy running text stands: three postures, and the strong steps
+ * of the type ladder stand two hundred above whichever holds
+ * (`crates/wire/spec/Preference.lean` D126).
+ */
+export const Weight = Schema.Literals(["light", "regular", "medium"]).annotate({ identifier: "Weight" });
+export type Weight = typeof Weight.Type;
+
+/**
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
@@ -3486,14 +3520,19 @@ export const Appearance = Schema.Struct({
   body_px: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(12)))),
   chroma: Chroma,
   density: Density,
+  fallbacks: Schema.optional(Schema.Array(Schema.String)),
+  features: Schema.optional(Schema.Array(TypeFeature)),
   glass: Schema.optional(Schema.NullOr(Glass)),
+  letter_spacing: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(-50)))),
   lighting: Lighting,
+  line_height: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1200)))),
   mono: Face,
   mono_stack: Schema.String,
   motion: Motion,
   reading: Schema.optional(Schema.NullOr(ReadingFace)),
   sans: Face,
   sans_stack: Schema.String,
+  weight: Schema.optional(Schema.NullOr(Weight)),
 }).annotate({ identifier: "Appearance" });
 export type Appearance = typeof Appearance.Type;
 

@@ -76,7 +76,7 @@
 
 <div class="flex flex-col gap-base">
   <p class="text-note text-text-quiet">{say($lang, "setup_effort")}</p>
-  <p class="max-w-measure text-note leading-relaxed text-text-faint">
+  <p class="max-w-measure text-note leading-read text-text-faint">
     {say($lang, "setup_effort_essay")}
   </p>
   {#if standing !== null}

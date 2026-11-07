@@ -5,13 +5,23 @@
     "ignoreValues": [
       {
         "rule": "overused-font",
+        "value": "paper mono",
+        "reason": "The person chose Paper Mono as the built-in OFL face, with Maple Mono kept beside it (docs/frontend-method.md 4-37). Changing the face is a design choice."
+      },
+      {
+        "rule": "overused-font",
+        "value": "paper-mono",
+        "reason": "The person chose Paper Mono as the built-in OFL face, with Maple Mono kept beside it (docs/frontend-method.md 4-37). Changing the face is a design choice."
+      },
+      {
+        "rule": "overused-font",
         "value": "maple",
-        "reason": "The person chose Maple Mono as the built-in OFL face (docs/frontend-method.md 4-37). Changing the face is a design choice."
+        "reason": "The person chose Paper Mono as the built-in OFL face, with Maple Mono kept beside it (docs/frontend-method.md 4-37). Changing the face is a design choice."
       },
       {
         "rule": "overused-font",
         "value": "maple mono",
-        "reason": "The person chose Maple Mono as the built-in OFL face (docs/frontend-method.md 4-37). Changing the face is a design choice."
+        "reason": "The person chose Paper Mono as the built-in OFL face, with Maple Mono kept beside it (docs/frontend-method.md 4-37). Changing the face is a design choice."
       }
     ]
   }

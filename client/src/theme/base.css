@@ -197,11 +197,17 @@
   }
   /* Text is shaped for the screen it lands on, not the one it was
    * drawn on: legibility over speed, optical sizing where the face has
-   * it, and no synthetic weights. */
+   * it, and no synthetic weights. Weight and tracking are inherited from
+   * here because they are the page's own posture: a person's choice moves
+   * one custom property, and every element without a utility of its own
+   * follows (`--font-weight-body`, `--tracking`, wire D126). The
+   * fallbacks are the postures a person who stated nothing is drawn in. */
   html {
     text-rendering: optimizeLegibility;
     font-optical-sizing: auto;
     font-synthesis: none;
+    font-weight: var(--font-weight-body);
+    letter-spacing: var(--tracking, normal);
   }
   button,
   a {
@@ -228,5 +234,5 @@
    * separate squares it only loosens the line. */
   --text-note: var(--text-body);
   line-height: 1.6;
-  letter-spacing: 0;
+  letter-spacing: var(--tracking, 0);
 }

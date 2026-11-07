@@ -50,7 +50,7 @@
   <!-- The code scrolls sideways and never folds a line in half: the
   gutter stays put at the left while the text runs under it. -->
   <div class="min-h-0 flex-1 overflow-auto" {@attach look.scroller}>
-    <div class="relative flex min-w-max font-mono text-note leading-relaxed">
+    <div class="relative flex min-w-max font-mono text-note leading-read">
       <pre
         class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint"
         aria-hidden="true">{look.gutter}</pre>

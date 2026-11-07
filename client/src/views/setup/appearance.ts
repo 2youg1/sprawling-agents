@@ -30,7 +30,10 @@ import type {
   Lighting,
   Motion,
   ReadingFace,
+  TypeFeature,
+  Weight,
 } from "../../core/appearance";
+import { spelledRatio } from "../../core/metrics";
 import type { PreferenceDoor } from "../../core/prefs";
 import { motionOff } from "../shared/motion";
 
@@ -58,7 +61,10 @@ export type Setting =
   | "face"
   | "mono"
   | "reading"
+  | "fallbacks"
+  | "features"
   | "body"
+  | "metrics"
   | "density"
   | "chroma"
   | "motion"
@@ -69,6 +75,16 @@ export type Setting =
 // property `theme/tokens-type.css` declares the default in and derives the note and
 // label steps from.
 const BODY_PROPERTY = "--text-body";
+// The custom property the fallback chain is written to: the families
+// after the chosen face, each with the comma that joins it to what is in
+// front of it, so an unnamed chain leaves the family list valid.
+const FALLBACK_PROPERTY = "--face-fallback";
+// The custom property the line box is written to, which the elements
+// that run text read through `leading-read` (`theme/tokens-type.css`).
+const LINE_HEIGHT_PROPERTY = "--leading-read";
+// The custom property the tracking is written to, which
+// `theme/base.css` reads in both its postures.
+const TRACKING_PROPERTY = "--tracking";
 // The custom property the world layer's opacity in the blend tier is
 // written to, which `theme/colour.css` declares the default in.
 const BLEND_PROPERTY = "--blend-opacity";
@@ -84,9 +100,27 @@ export const LIGHTING_WORDS: Record<Lighting, Key> = {
   light: "appearance_lighting_light",
 };
 export const FACE_WORDS: Record<Face, Key> = {
+  paper: "appearance_face_paper",
   maple: "appearance_face_maple",
   system: "appearance_face_system",
   custom: "appearance_face_custom",
+};
+export const WEIGHT_WORDS: Record<Weight, Key> = {
+  light: "appearance_weight_light",
+  regular: "appearance_weight_regular",
+  medium: "appearance_weight_medium",
+};
+// What each of the bundled face's own features is called, in the words a
+// person reads. A record keyed by the value rather than a list of pairs:
+// the set of features belongs to the wire, and a feature added there
+// leaves this table refusing to compile until somebody gives it a word.
+export const FEATURE_WORDS: Record<TypeFeature, Key> = {
+  coding_ligatures: "appearance_feature_coding_ligatures",
+  duospace: "appearance_feature_duospace",
+  narrow_space: "appearance_feature_narrow_space",
+  small_arrows: "appearance_feature_small_arrows",
+  single_story_a: "appearance_feature_single_story_a",
+  slashed_zero: "appearance_feature_slashed_zero",
 };
 export const READING_WORDS: Record<ReadingFace, Key> = {
   interface: "appearance_reading_interface",
@@ -156,10 +190,35 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
   wearFace(root, "sans", held.sans, held.sansStack);
   wearFace(root, "mono", held.mono, held.monoStack);
   root.dataset.read = held.reading;
+  // The chain the person named, each name carrying the comma after it,
+  // which is what `theme/tokens-type.css` expects of the token: a chain
+  // nobody named is a removed property, and the stack reads on with its
+  // own comma (`var(--face-fallback,)`).
+  if (held.fallbacks.length === 0) {
+    root.style.removeProperty(FALLBACK_PROPERTY);
+  } else {
+    root.style.setProperty(FALLBACK_PROPERTY, fallbackToken(held.fallbacks));
+  }
+  // The words are the wire's own spelling, which is what
+  // `theme/preference.css` selects on: one spelling from the file to the
+  // stylesheet.
+  if (held.features.length === 0) delete root.dataset.features;
+  else root.dataset.features = held.features.join(" ");
+  root.dataset.weight = held.weight;
   if (held.body === null) {
     root.style.removeProperty(BODY_PROPERTY);
   } else {
     root.style.setProperty(BODY_PROPERTY, `${String(held.body)}px`);
+  }
+  if (held.lineHeight === null) {
+    root.style.removeProperty(LINE_HEIGHT_PROPERTY);
+  } else {
+    root.style.setProperty(LINE_HEIGHT_PROPERTY, spelledRatio(held.lineHeight));
+  }
+  if (held.tracking === null) {
+    root.style.removeProperty(TRACKING_PROPERTY);
+  } else {
+    root.style.setProperty(TRACKING_PROPERTY, `${spelledRatio(held.tracking)}em`);
   }
   root.dataset.density = held.density;
   root.dataset.chroma = held.chroma;
@@ -197,11 +256,20 @@ function wearLighting(root: HTMLElement, lighting: "dark" | "light"): void {
   });
 }
 
-// Whether a stack box holds characters this page may not write into a
-// declaration. An empty box is not a refusal: absence is the person
-// saying nothing, and the page keeps the face it already chose.
+// What a person may write into a font stack: the characters a family
+// name is made of. A stack with anything else in it is not repaired, it
+// is refused, and the field says so.
 export function stackRefused(stack: string): boolean {
   return stack !== "" && !STACK_SHAPE.test(stack);
+}
+
+// The fallback chain as the one custom property the family stacks read.
+// Each name is quoted and followed by the comma that joins it to the next
+// family, so one token holds the whole chain: the stacks in
+// `theme/tokens-type.css` put it where a family would stand and supply the
+// comma that ends it when nobody named one (`var(--face-fallback,)`).
+export function fallbackToken(fallbacks: readonly string[]): string {
+  return fallbacks.map((name) => `"${name}",`).join(" ");
 }
 
 // The size the page is drawn at right now, in whole pixels, read back
@@ -211,6 +279,15 @@ export function stackRefused(stack: string): boolean {
 export function drawnSize(root: HTMLElement): string {
   const drawn = window.getComputedStyle(root).getPropertyValue(BODY_PROPERTY);
   return /^([0-9]+)/.exec(drawn.trim())?.[1] ?? "";
+}
+
+// The line box the page is drawn at right now, read back off the root
+// element for the reason `drawnSize` reads the body size: the box shows
+// what a person is looking at, and this file never repeats the
+// stylesheet's own figure.
+export function drawnLeading(root: HTMLElement): string {
+  const drawn = window.getComputedStyle(root).getPropertyValue(LINE_HEIGHT_PROPERTY);
+  return /^([0-9]*\.?[0-9]+)/.exec(drawn.trim())?.[1] ?? "";
 }
 
 // The world layer's opacity in the blend tier as the page draws it now,

@@ -154,7 +154,7 @@
             <Prose text={doc.text} />
           </div>
         {:else}
-          <ol class="overflow-x-auto font-mono text-note leading-relaxed text-text-quiet">
+          <ol class="overflow-x-auto font-mono text-note leading-read text-text-quiet">
             <!-- Each line carries its own identity, so a file that
                  repeats a line keys no two rows alike; the number beside
                  it is the position, which is what the number says. -->

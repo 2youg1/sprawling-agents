@@ -70,7 +70,7 @@
 # states, with their gallery fixtures. The best reading is what ships
 # with them; the slack stays at 20 KB.
 [frontend_artifact]
-what = "the client the browser downloads, gzipped, the two shipped faces included"
+what = "the client the browser downloads, gzipped, the three shipped families included"
 budget_bytes = 2097152
 # The bundle the deliverable ships, gzipped, fonts included: the view
 # tree carries the storybook and its fixture tables, which ship with
@@ -96,10 +96,15 @@ budget_bytes = 2097152
 # Geist Mono with Maple Mono moved the reading to 3,240,562 B: Maple's
 # regular, semibold and bold faces keep the interface's actual 400/600/700
 # weights and add 157,892 B over the one face they replace; the rest is
-# generated bundle and notice variation. NF CN is not embedded.
-best_bytes = 3240562
+# generated bundle and notice variation. NF CN is not embedded. Paper
+# Mono arriving as the face the page opens in adds its one variable file:
+# 53,344 B carrying the 100-800 axis and all six features the appearance
+# group switches, with Maple Mono's three files kept beside it, so the
+# reading is 3,315,064 B; the 21 KB beyond that face is the fallback
+# chain, the six switches, the three ratios and their cards.
+best_bytes = 3315064
 measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
-status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, then cargo xtask budget retakes it"
+status = "reported, not gated: the person's ruling that runtime speed comes before size. The reading was retaken with just build-web, then cargo xtask budget (the whole dist directory, recursive), on the tree that adds Paper Mono"
 
 # The remediation pass found the single-binary promise was hollow: build.rs
 # embedded a 1,306-byte placeholder and the real client never shipped. The

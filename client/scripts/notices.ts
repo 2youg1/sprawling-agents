@@ -44,15 +44,26 @@ const LICENCE_FILE = /^(licen[cs]e|copying|notice)/i;
 
 const SEPARATOR = "-".repeat(72);
 
-const HEAD = [
-  "The npm packages this bundle was built from, each with the licence text it ships.",
-  "The licences of the fonts are fonts/OFL.txt (Maple Mono) and fonts/Libron-OFL.txt (Libron).",
-];
+/// What the file says before any package: that the npm licences follow,
+/// and where the fonts' licences are, named from the files the build put
+/// beside them rather than from a list that a new face would leave stale.
+function head(licences: readonly string[]): readonly string[] {
+  const where =
+    licences.length === 0
+      ? "The fonts this bundle ships carry their licences under fonts/."
+      : `The fonts this bundle ships carry theirs as ${licences
+          .map((name) => `fonts/${name}`)
+          .join(", ")}.`;
+  return [
+    "The npm packages this bundle was built from, each with the licence text it ships.",
+    where,
+  ];
+}
 
 // A package that reaches the bundle without a licence file stops the
 // build and is named: a notices file that silently lacks one package is
 // the gap it exists to close.
-export function thirdPartyNotices(): Plugin {
+export function thirdPartyNotices(licences: readonly string[]): Plugin {
   // An asset names its source relative to the build's root; a chunk's
   // module ids are absolute, and one package must have one directory.
   let root = "";
@@ -84,7 +95,7 @@ export function thirdPartyNotices(): Plugin {
         );
       } else {
         const notices = read.flatMap((entry) => (entry.notice === undefined ? [] : [entry.notice]));
-        this.emitFile({ type: "asset", fileName: FILE, source: noticesText(notices) });
+        this.emitFile({ type: "asset", fileName: FILE, source: noticesText(notices, licences) });
       }
     },
   };
@@ -123,12 +134,12 @@ export function packagesIn(moduleIds: Iterable<string>): readonly Installed[] {
  * package's name, version and declared licence followed by its licence
  * files verbatim, line endings folded to `\n`.
  */
-export function noticesText(entries: readonly Notice[]): string {
+export function noticesText(entries: readonly Notice[], licences: readonly string[]): string {
   const blocks = entries.flatMap((entry) => [
     SEPARATOR,
     [`${entry.name} ${entry.version} (${entry.license})`, ...entry.texts.map(folded)].join("\n\n"),
   ]);
-  return `${[HEAD.join("\n"), ...blocks].join("\n\n")}\n`;
+  return `${[head(licences).join("\n"), ...blocks].join("\n\n")}\n`;
 }
 
 /**

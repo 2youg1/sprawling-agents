@@ -3,12 +3,26 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
-/* The faces a person may choose instead of the shipped one. Maple Mono
- * is the absent case, so a root element saying nothing is already right.
- * A stack somebody typed is the one value the theme cannot hold, and
- * arrives as `--face-sans` set on the root element itself. */
+/* The faces a person may choose instead of the one the page opens in.
+ * `paper` is the family this build ships first and `maple` the one the
+ * doctor's NF CN build extends with Han glyphs (wire D123); `system` and
+ * `custom` are the two ways of naming a face this build does not carry,
+ * and a stack somebody typed is the one value the theme cannot hold, so
+ * it arrives as `--face-sans` set on the root element itself. */
+:root[data-sans="paper"] {
+  --face-sans: var(--face-paper);
+}
+:root[data-sans="maple"] {
+  --face-sans: var(--face-maple);
+}
 :root[data-sans="system"] {
   --face-sans: system-ui;
+}
+:root[data-mono="paper"] {
+  --face-mono: var(--face-paper);
+}
+:root[data-mono="maple"] {
+  --face-mono: var(--face-maple);
 }
 :root[data-mono="system"] {
   --face-mono: ui-monospace;
@@ -21,8 +35,97 @@
  * carry the attribute, not only the root, so a gallery case can show the
  * face without changing the page around it. */
 [data-read="libron"] {
-  --font-read: "Libron", serif;
+  --font-read: "Libron", var(--face-fallback,) serif;
   --font-read--font-feature-settings: normal;
+}
+
+/* The bundled faces' own features, as the person turned them on
+ * (`crates/wire/spec/Preference.lean` D125).
+ *
+ * A switch is one word of `wire::TypeFeature` on the root element, and
+ * each word either fills the slot the face spells that intent with or
+ * leaves it alone. **A tag that is off is left out rather than written
+ * as `"tag" 0`**: `--figures` already asks for a slashed zero on a
+ * column of numbers through `font-variant-numeric`, and a
+ * `font-feature-settings` that named `zero` would overrule it. Every
+ * optional slot therefore carries the comma in front of it, so a list
+ * with three of six switched on is punctuated exactly as it should be.
+ *
+ * Paper Mono's six are the ones its name table declares. Maple Mono
+ * spells three of the same intents its own way and declares nothing for
+ * the other three, so those switches move Paper Mono only. */
+:root[data-features~="coding_ligatures"] {
+  --paper-coding-ligatures: , "ss01" 1;
+  --maple-calt: 1;
+}
+:root[data-features~="duospace"] {
+  --paper-duospace: , "ss02" 1;
+}
+:root[data-features~="narrow_space"] {
+  --paper-narrow-space: , "ss03" 1;
+}
+:root[data-features~="small_arrows"] {
+  --paper-small-arrows: , "ss04" 1;
+}
+:root[data-features~="single_story_a"] {
+  --paper-single-story-a: , "cv01" 1;
+  --maple-single-story-a: , "cv02" 1;
+}
+:root[data-features~="slashed_zero"] {
+  --paper-slashed-zero: , "zero" 1;
+  --maple-slashed-zero: , "zero" 1;
+}
+
+:root {
+  /* The whole list a role drawn in one of the bundled faces carries.
+   * `calt` is a number in Maple Mono's list rather than a slot because
+   * that face keeps its ligatures in `calt`, which the base list turns
+   * off for the reason `theme/tokens-type.css` gives. */
+  --paper-features:
+    "liga" 0,
+    "calt" 0 var(--paper-coding-ligatures,) var(--paper-duospace,) var(--paper-narrow-space,)
+      var(--paper-small-arrows,) var(--paper-single-story-a,) var(--paper-slashed-zero,);
+  --maple-features:
+    "liga" 0, "calt" var(--maple-calt, 0) var(--maple-single-story-a,) var(--maple-slashed-zero,);
+}
+
+/* A role drawn in a bundled face carries that face's list; a role drawn
+ * in a face this build does not bundle keeps the base list above, where
+ * no tag means anything but "draw the face as its maker drew it". */
+:root[data-sans="paper"] {
+  --font-sans--font-feature-settings: var(--paper-features);
+}
+:root[data-sans="maple"] {
+  --font-sans--font-feature-settings: var(--maple-features);
+}
+:root[data-mono="paper"] {
+  --font-mono--font-feature-settings: var(--paper-features);
+}
+:root[data-mono="maple"] {
+  --font-mono--font-feature-settings: var(--maple-features);
+}
+
+/* Running text stands where the person put it, and the strong steps of
+ * the ladder stand two hundred above it, so the hierarchy the page is
+ * built on holds at every posture (`crates/wire/spec/Preference.lean`
+ * D126). `regular` is the theme's own list, so it has no rule here, for
+ * the reason `chroma` has none: the page's posture is the one the tokens
+ * already state. */
+:root[data-weight="light"] {
+  --font-weight-body: 300;
+  --font-weight-note: 300;
+  --font-weight-label: 500;
+  --font-weight-heading: 500;
+  --font-weight-title: 500;
+  --font-weight-figure: 500;
+}
+:root[data-weight="medium"] {
+  --font-weight-body: 500;
+  --font-weight-note: 500;
+  --font-weight-label: 700;
+  --font-weight-heading: 700;
+  --font-weight-title: 700;
+  --font-weight-figure: 700;
 }
 
 /* All the colour, or none of it. The coefficient is already the one

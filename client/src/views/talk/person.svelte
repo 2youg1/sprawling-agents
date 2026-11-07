@@ -44,7 +44,7 @@ action. -->
 <NotePlace rhythm="shape">
   <div class="group flex flex-col items-end">
     <div
-      class="max-w-[83%] rounded-panel bg-speech px-pane py-base font-read text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
+      class="max-w-[83%] rounded-panel bg-speech px-pane py-base font-read text-body leading-read whitespace-pre-wrap wrap-anywhere"
     >
       {text}
     </div>

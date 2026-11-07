@@ -14,7 +14,7 @@ addresses and names. A refused box takes the alert edge. -->
   const look: TextBoxLook = $props();
 
   const ROOM: Record<TextBoxSize, string> = {
-    document: "min-h-palette leading-relaxed",
+    document: "min-h-palette leading-read",
     list: "min-h-[calc(var(--spacing-control)*3)]",
   };
 </script>

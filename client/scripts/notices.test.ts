@@ -42,24 +42,27 @@ describe("third-party notices", () => {
 
   test("the file states each package with its licence texts verbatim, line endings folded", () => {
     expect(
-      noticesText([
-        {
-          name: "effect",
-          version: "3.22.1",
-          license: "MIT",
-          texts: ["MIT License\r\n\r\nCopyright (c) E\r\n"],
-        },
-        {
-          name: "svelte",
-          version: "5.57.1",
-          license: "MIT",
-          texts: ["Copyright (c) S\n", "NOTICE text\n"],
-        },
-      ]),
+      noticesText(
+        [
+          {
+            name: "effect",
+            version: "3.22.1",
+            license: "MIT",
+            texts: ["MIT License\r\n\r\nCopyright (c) E\r\n"],
+          },
+          {
+            name: "svelte",
+            version: "5.57.1",
+            license: "MIT",
+            texts: ["Copyright (c) S\n", "NOTICE text\n"],
+          },
+        ],
+        ["Libron-OFL.txt", "MapleMono-OFL.txt"],
+      ),
     ).toBe(
       [
         "The npm packages this bundle was built from, each with the licence text it ships.",
-        "The licences of the fonts are fonts/OFL.txt (Maple Mono) and fonts/Libron-OFL.txt (Libron).",
+        "The fonts this bundle ships carry theirs as fonts/Libron-OFL.txt, fonts/MapleMono-OFL.txt.",
         "",
         "-".repeat(72),
         "",

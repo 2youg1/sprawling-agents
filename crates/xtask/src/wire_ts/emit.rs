@@ -60,12 +60,18 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
          export const CITY_RUN = \"{}\" as const;\n\
          /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */\n\
          export const BODY_PX = {{ min: {} }} as const;\n\
+         /** The smallest line box, in thousandths of the font size: `wire::LINE_HEIGHT_MIN`. */\n\
+         export const LINE_HEIGHT = {{ min: {} }} as const;\n\
+         /** The tightest letter spacing, in thousandths of an em: `wire::TRACKING_MIN`. */\n\
+         export const TRACKING = {{ min: {} }} as const;\n\
          /** The default thinking level: `kernel::consts_policy::DEFAULT_EFFORT`. */\n\
          export const DEFAULT_EFFORT = {} as const;\n\n",
         constants.wire_v,
         constants.hash,
         constants.city_run,
         constants.body_px_min,
+        constants.line_height_min,
+        constants.tracking_min,
         quoted(constants.default_effort)
     );
     out.push_str(

@@ -4976,8 +4976,8 @@
     "zh": "just proof，对真实的 MIR 证明性质，只在 Linux 上可用"
   },
   "machine_enables_maple_mono_nf_cn": {
-    "en": "Chinese glyphs and Nerd Font icons in terminals and tools that use Maple Mono NF CN",
-    "zh": "为使用 Maple Mono NF CN 的终端与工具补齐中文字形和 Nerd Font 图标"
+    "en": "Chinese glyphs for the page's fallback faces, and Nerd Font icons in tools that use it",
+    "zh": "为页面的回退字体与使用它的工具补齐中文字形和 Nerd Font 图标"
   },
   "machine_enables_msedgedriver": {
     "en": "the browser tool against Edge, which every Windows machine already has",
@@ -11634,5 +11634,133 @@
   "close_done": {
     "en": "The city is closed. Run sprawling in a terminal to start it again.",
     "zh": "城市已关闭。在终端里运行 sprawling 即可再次启动城市。"
+  },
+  "appearance_face_paper": {
+    "en": "Paper Mono",
+    "zh": "Paper Mono 等宽字"
+  },
+  "appearance_fallbacks": {
+    "en": "the fallback faces",
+    "zh": "回退字体"
+  },
+  "appearance_fallbacks_note": {
+    "en": "the faces tried after the one you chose, for the characters it has none of — usually Chinese",
+    "zh": "所选字体没有的字形按这里依次往后找，通常是中文"
+  },
+  "appearance_fallbacks_help": {
+    "en": "one family name per box, in the order they are tried; an empty box leaves the choice to this machine. The doctor recommends Maple Mono NF CN for Chinese and symbols.",
+    "zh": "每格一个字体名，按顺序往后找；留空就由系统决定。doctor 推荐用 Maple Mono NF CN 补中文与符号。"
+  },
+  "appearance_fallback_first": {
+    "en": "first fallback",
+    "zh": "第一回退"
+  },
+  "appearance_fallback_second": {
+    "en": "second fallback",
+    "zh": "第二回退"
+  },
+  "appearance_fallback_needs_first": {
+    "en": "fill the first fallback before this one: the chain has no gaps",
+    "zh": "先填第一回退：这条链中间不留空"
+  },
+  "appearance_fallback_second_help": {
+    "en": "tried after the first fallback",
+    "zh": "排在第一回退之后试"
+  },
+  "appearance_fallback_refused": {
+    "en": "one family name: letters, digits, spaces, `-`, `_` or `.`, and no comma",
+    "zh": "只写一个字体名：字母、数字、空格、`-`、`_` 或 `.`，不要逗号"
+  },
+  "appearance_metrics": {
+    "en": "line and weight",
+    "zh": "行距与字重"
+  },
+  "appearance_metrics_note": {
+    "en": "how loose a line of running text is, how far apart its letters stand, and how heavy it is",
+    "zh": "一行正文有多松、字与字隔多开、笔画有多重"
+  },
+  "appearance_leading": {
+    "en": "line height",
+    "zh": "行高"
+  },
+  "appearance_leading_floor": {
+    "en": "a multiple of the text size from {min} up; an empty box takes the leading the page is drawn at",
+    "zh": "{min} 倍起的行高；留空即采用页面本来的行高"
+  },
+  "appearance_tracking": {
+    "en": "letter spacing",
+    "zh": "字距"
+  },
+  "appearance_tracking_floor": {
+    "en": "in em from {min} up; an empty box takes the spacing the page is drawn at, which differs by language",
+    "zh": "以 em 计，{min} 起；留空即采用页面本来的字距，中英文各自不同"
+  },
+  "appearance_tracking_unit": {
+    "en": "em",
+    "zh": "em"
+  },
+  "appearance_weight": {
+    "en": "weight",
+    "zh": "字重"
+  },
+  "appearance_weight_light": {
+    "en": "light",
+    "zh": "细"
+  },
+  "appearance_weight_regular": {
+    "en": "regular",
+    "zh": "常规"
+  },
+  "appearance_weight_medium": {
+    "en": "medium",
+    "zh": "偏粗"
+  },
+  "appearance_weight_note": {
+    "en": "a face that ships no such weight draws the nearest one it has",
+    "zh": "字体没有这一档字重时，取它最近的一档"
+  },
+  "appearance_features": {
+    "en": "type features",
+    "zh": "字体特性"
+  },
+  "appearance_features_note": {
+    "en": "the six features the shipped faces declare; Paper Mono carries all six and Maple Mono three, and a switch a face does not declare is out of reach",
+    "zh": "随包字体自己声明的六项；Paper Mono 六项俱全，Maple Mono 有其中三项，字体没有声明的那一格不能选"
+  },
+  "appearance_feature_off": {
+    "en": "off",
+    "zh": "关"
+  },
+  "appearance_feature_on": {
+    "en": "on",
+    "zh": "开"
+  },
+  "appearance_feature_absent": {
+    "en": "the faces in use declare no such feature",
+    "zh": "当前字体没有声明这一项"
+  },
+  "appearance_feature_coding_ligatures": {
+    "en": "coding ligatures",
+    "zh": "编程连字"
+  },
+  "appearance_feature_duospace": {
+    "en": "duospace glyphs",
+    "zh": "双宽字形"
+  },
+  "appearance_feature_narrow_space": {
+    "en": "narrow space",
+    "zh": "窄空格"
+  },
+  "appearance_feature_small_arrows": {
+    "en": "small arrows",
+    "zh": "小箭头"
+  },
+  "appearance_feature_single_story_a": {
+    "en": "single-story a",
+    "zh": "单层 a"
+  },
+  "appearance_feature_slashed_zero": {
+    "en": "slashed zero",
+    "zh": "斜线零"
   }
 }

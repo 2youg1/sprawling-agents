@@ -331,7 +331,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: "maple-mono-nf-cn",
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "Chinese glyphs and Nerd Font icons in terminals and tools that use Maple Mono NF CN",
+        enables: "Chinese glyphs for the page's fallback slots, and Nerd Font icons in tools that use it",
         detect: Detection::Font {
             file: "MapleMono-NF-CN-Regular.ttf",
         },

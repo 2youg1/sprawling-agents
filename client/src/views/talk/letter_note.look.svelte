@@ -23,5 +23,5 @@ words. -->
   <div class="mb-tight">
     <NoteRow role={undefined} pieces={head} />
   </div>
-  <div class="text-body leading-relaxed whitespace-pre-wrap wrap-anywhere">{said}</div>
+  <div class="text-body leading-read whitespace-pre-wrap wrap-anywhere">{said}</div>
 </article>

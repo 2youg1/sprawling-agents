@@ -51,7 +51,7 @@
   {#if line.speaker === "person"}
     <div class="my-base flex flex-col items-end">
       <div
-        class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap"
+        class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-read whitespace-pre-wrap"
       >
         {line.text}
       </div>
@@ -60,7 +60,7 @@
   {:else}
     <div class="my-base text-body">
       <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
-      <div class="whitespace-pre-wrap leading-relaxed">{line.text}</div>
+      <div class="whitespace-pre-wrap leading-read">{line.text}</div>
     </div>
   {/if}
 {/snippet}
@@ -71,7 +71,7 @@
 {#snippet arriving()}
   <div class="my-base text-body">
     <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
-    <div class="whitespace-pre-wrap leading-relaxed">
+    <div class="whitespace-pre-wrap leading-read">
       {SETTLED}<span class="text-text-faint">{EDGE}</span><span
         class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"
       ></span>
