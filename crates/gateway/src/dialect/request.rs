@@ -156,6 +156,7 @@ pub(crate) fn sample_request() -> ChatRequest<'static> {
         breakpoint: kernel::MessageBreakpoint::Unmarked,
         shared: kernel::SharedPrefix::Unshared,
         effort: None,
+        generation: kernel::GenerationSettings::default(),
     }
 }
 

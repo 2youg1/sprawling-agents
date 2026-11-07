@@ -283,6 +283,9 @@ pub struct Opening {
     /// existed.
     #[serde(default)]
     pub effort: Option<kernel::Effort>,
+    /// The effective generation this run froze, read from its opening.
+    #[serde(default)]
+    pub generation: Option<kernel::FrozenGeneration>,
     /// The names the run's session froze, read back from the version its
     /// `run_started` names (`crates/wire/Spec.lean` D17). `None` for a
     /// line written before the city recorded names, and for a version

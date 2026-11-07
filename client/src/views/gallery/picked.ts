@@ -38,6 +38,13 @@ function model(id: string, said: Said): ModelFactsSummary {
       from: said.levels === undefined ? "unknown" : "upstream",
       words: [],
     },
+    generation: {
+      output_pointer: "/max_tokens",
+      settings: {},
+      temperature: { support: "unknown" },
+      top_p: { support: "unknown" },
+      top_k: { support: "unknown" },
+    },
   };
 }
 

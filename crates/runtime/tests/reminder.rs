@@ -95,7 +95,10 @@ fn plan(window: u64) -> RunPlan {
         inherited: Vec::new(),
         shape: CallShape {
             model: "metered".to_owned(),
-            max_tokens: kernel::Ceiling::new(4096),
+            generation: kernel::FrozenGeneration {
+                max_tokens: kernel::Ceiling::new(4096),
+                ..kernel::FrozenGeneration::default()
+            },
             effort: None,
             context_tokens: window,
         },

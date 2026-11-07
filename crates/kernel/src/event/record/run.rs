@@ -95,6 +95,10 @@ pub struct RunStarted {
     /// in a record written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
+    /// The sampling, effective output ceiling and raw overrides this
+    /// model run froze; absent on old records and harness runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<crate::FrozenGeneration>,
     /// The ACP agent that took this harness run (`crates/kernel/spec/Event/Record.lean`
     /// §8-87). Absent on a run this city's own model loop drives, and in a
     /// record written before the key existed.

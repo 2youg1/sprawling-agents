@@ -125,8 +125,11 @@ pub(super) fn run_id() -> RunId {
 pub(super) fn shape() -> CallShape {
     CallShape {
         model: "script".to_owned(),
-        max_tokens: kernel::Ceiling::new(512),
         effort: None,
+        generation: kernel::FrozenGeneration {
+            max_tokens: kernel::Ceiling::new(512),
+            ..kernel::FrozenGeneration::default()
+        },
         context_tokens: 0,
     }
 }

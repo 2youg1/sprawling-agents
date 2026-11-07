@@ -136,6 +136,9 @@ pub struct AttachedTuning {
         deserialize_with = "readable_pairs"
     )]
     pub overrides: Vec<(String, String)>,
+    /// Per-model generation defaults and capability corrections.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub generation: Vec<crate::ModelGeneration>,
 }
 
 fn readable_tuning<'de, D: Deserializer<'de>>(

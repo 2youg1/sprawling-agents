@@ -43,6 +43,9 @@ pub struct ModelFacts {
     pub thinking: Option<ThinkingStatement>,
     /// The upstream's own identity for this model across providers,
     /// where it states one (`crates/gateway/spec/Provider/Identity.lean`).
+    /// Machine-readable sampling support stated by the provider.
+    #[serde(default)]
+    pub generation: Option<crate::GenerationSupport>,
     #[serde(default)]
     pub canonical: Option<String>,
     /// Whether the endpoint's own list carried this row, or the person
@@ -91,7 +94,7 @@ pub struct ThinkingStatement {
 impl Serialize for ModelFacts {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let absence = Absence::of(&serializer);
-        let mut row = serializer.serialize_struct("ModelFacts", 9)?;
+        let mut row = serializer.serialize_struct("ModelFacts", 10)?;
         row.serialize_field("id", &self.id)?;
         row.serialize_field("context_tokens", &self.context_tokens)?;
         row.serialize_field("max_output_tokens", &self.max_output_tokens)?;
@@ -99,6 +102,7 @@ impl Serialize for ModelFacts {
         row.serialize_field("input_price", &self.input_price)?;
         row.serialize_field("output_price", &self.output_price)?;
         absence.option(&mut row, "thinking", &self.thinking)?;
+        absence.option(&mut row, "generation", &self.generation)?;
         absence.option(&mut row, "canonical", &self.canonical)?;
         absence.listing(&mut row, self.listing)?;
         row.end()

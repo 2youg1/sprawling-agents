@@ -28,6 +28,7 @@
 //! one that bills.
 
 pub mod ceiling;
+pub mod generation;
 pub mod identity;
 pub mod input;
 // Both are re-exported by the crate root, so the attach path in

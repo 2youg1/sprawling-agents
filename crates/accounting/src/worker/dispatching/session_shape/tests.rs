@@ -109,6 +109,49 @@ fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {
         .unwrap();
 }
 
+fn set_temperature(worker: &mut RunWorker, temperature: &str) {
+    let endpoint = worker
+        .credentials
+        .book
+        .endpoints()
+        .find(|endpoint| endpoint.name == "house")
+        .unwrap()
+        .clone();
+    let mut tuning = crate::tuning::tuning_as_attached(&endpoint.tuning);
+    tuning.accounts = None;
+    tuning.generation = vec![kernel::ModelGeneration {
+        model: "m-local".to_owned(),
+        settings: kernel::GenerationSettings {
+            temperature: Some(temperature.to_owned()),
+            ..kernel::GenerationSettings::default()
+        },
+        ..kernel::ModelGeneration::default()
+    }];
+    worker
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
+            base_url: endpoint.base_url,
+            dialect: endpoint.dialect,
+            secret: None,
+            auth_header: None,
+            admit: endpoint
+                .models
+                .iter()
+                .filter(|row| row.listing == kernel::event::record::Listing::Listed)
+                .map(|row| row.id.clone())
+                .collect(),
+            named: endpoint
+                .models
+                .iter()
+                .filter(|row| row.listing == kernel::event::record::Listing::Named)
+                .map(|row| row.id.clone())
+                .collect(),
+            tuning,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, temperature.as_bytes()),
+        })
+        .unwrap();
+}
+
 fn open_lab(dir: &std::path::Path) {
     crate::worker::fixture::init_city(dir).unwrap();
     city::create_building(
@@ -213,6 +256,48 @@ fn a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort() {
         after[2], frozen[0],
         "the session runs on the prefix it froze"
     );
+}
+
+#[test]
+fn generation_defaults_reach_new_sessions_without_moving_an_existing_one() {
+    let dir = tempfile::tempdir().unwrap();
+    open_lab(dir.path());
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![completion("done", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    set_temperature(&mut worker, "0.2");
+    worker.handle(ask(&room, None, b"dispatch-1")).unwrap();
+    assert_eq!(
+        city::own_layer(dir.path(), &room)
+            .unwrap()
+            .generation()
+            .and_then(|generation| generation.settings.temperature.as_deref()),
+        Some("0.2")
+    );
+
+    set_temperature(&mut worker, "0.8");
+    let refused = worker.handle(ask(&room, None, b"dispatch-2")).unwrap_err();
+    assert_eq!(*refused.code(), AxCode::ConfigInvalid);
+    assert!(refused.subject().contains("sampling settings"));
+
+    let elsewhere = Address::parse("lab/room2").unwrap();
+    worker.handle(ask(&elsewhere, None, b"dispatch-3")).unwrap();
+    let temperatures = provider
+        .bodies()
+        .into_iter()
+        .filter(|body| !body.is_empty())
+        .map(|body| {
+            serde_json::from_str::<serde_json::Value>(&body)
+                .unwrap()
+                .get("temperature")
+                .and_then(serde_json::Value::as_f64)
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(temperatures, vec![0.2, 0.8]);
 }
 
 /// The way out that `/new` opened: the room that could not dispatch a

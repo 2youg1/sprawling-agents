@@ -153,8 +153,16 @@ fn a_call_shape_that_changed_mid_session_is_refused() {
     assert!(moved_effort.verified_against(&frozen).is_err());
 
     let mut moved_ceiling = shape();
-    moved_ceiling.max_tokens = kernel::Ceiling::new(4_096);
+    moved_ceiling.generation.max_tokens = kernel::Ceiling::new(4_096);
     assert!(moved_ceiling.verified_against(&frozen).is_err());
+
+    let mut moved_sampling = shape();
+    moved_sampling.generation.settings.temperature = Some("0.2".to_owned());
+    assert!(moved_sampling.verified_against(&frozen).is_err());
+
+    let mut moved_override = shape();
+    moved_override.generation.overrides = vec![("/temperature".to_owned(), "0.8".to_owned())];
+    assert!(moved_override.verified_against(&frozen).is_err());
 
     let mut gauge = shape();
     gauge.context_tokens = 200_000;

@@ -19,6 +19,7 @@ import type {
   ProviderName,
   Proxying,
 } from "../../wire";
+import type { BodyOverride, ModelGeneration } from "../../wire";
 import { ProviderName as ProviderNameSchema } from "../../wire";
 import { mintIdem } from "../idem";
 
@@ -163,7 +164,12 @@ export function probeAttached(summary: EndpointSummary): Command {
 
 // Replace only an attached endpoint's admitted models and role-independent
 // tuning; its archived credentials and account order stay where they are.
-export function saveModels(summary: EndpointSummary, admit: Admission): Command {
+export function saveModels(
+  summary: EndpointSummary,
+  admit: Admission,
+  generation: readonly ModelGeneration[] = summary.tuning.generation ?? [],
+  overrides: readonly BodyOverride[] = summary.tuning.overrides,
+): Command {
   return {
     attach_endpoint: {
       name: providerName(summary.name),
@@ -173,7 +179,12 @@ export function saveModels(summary: EndpointSummary, admit: Admission): Command 
       auth_header: null,
       admit: [...admit.listed],
       named: [...admit.named],
-      tuning: { ...summary.tuning, accounts: null },
+      tuning: {
+        ...summary.tuning,
+        accounts: null,
+        generation: [...generation],
+        overrides: [...overrides],
+      },
       idem: mintIdem(),
     },
   };

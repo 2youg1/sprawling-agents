@@ -34,6 +34,7 @@ pub(super) fn opening(records: &[EventRecord], city_root: &Path) -> Option<wire:
                 parent: started.parent,
                 policy: started.policy,
                 effort: started.effort,
+                generation: started.generation,
                 names: started
                     .naming
                     .and_then(|version| frozen_names(city_root, &version)),

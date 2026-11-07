@@ -42,6 +42,13 @@ function facts(id: string, context: number | null, ceiling: number | null): Mode
     input_price: null,
     output_price: null,
     thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+    generation: {
+      output_pointer: "/max_tokens",
+      settings: {},
+      temperature: { support: "unknown" },
+      top_p: { support: "unknown" },
+      top_k: { support: "unknown" },
+    },
     canonical: id,
     listing: "listed",
   };

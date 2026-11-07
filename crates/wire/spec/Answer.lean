@@ -28,6 +28,7 @@ pub struct RoundsAnswer { pub run: RunId, pub turns: Vec<Turn>, pub opened_at: O
                           pub opening: Option<Opening>, pub closing: Option<Closing> }
 pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs,
                      pub dispatched_by: Option<Who>,    // §8-48；policy §8-76，effort 与 names §8-79
+                     pub generation: Option<FrozenGeneration>, // 这次 run 冻下的有效生成配置；旧行缺席
                      pub parent: Option<RunId> }        // 派它的那个 run，`Answer/Sessions.lean` D40
 pub struct Closing { pub completion: String, pub at: TimeMs }
 

@@ -64,6 +64,13 @@ function facts(id: string, canonical: string, levels: readonly Effort[]): ModelF
     input_price: null,
     output_price: null,
     thinking: { levels: [...levels], on: "unknown", from: "upstream", words: [] },
+    generation: {
+      output_pointer: "/max_tokens",
+      settings: {},
+      temperature: { support: "unknown" },
+      top_p: { support: "unknown" },
+      top_k: { support: "unknown" },
+    },
   };
 }
 

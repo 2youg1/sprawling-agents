@@ -34,7 +34,7 @@ pub(crate) enum Answer {
     /// A `ProbeEndpoint` read the endpoint.
     Probed(Probed),
     /// An `AttachEndpoint` asked the endpoint what it serves.
-    Attached(Attaching),
+    Attached(Box<Attaching>),
 }
 
 /// The requests out on threads of their own, and the queue their
@@ -102,7 +102,7 @@ impl RunWorker {
         match answer {
             Answer::Renewed(renewed) => self.record_renewal(renewed),
             Answer::Probed(probed) => self.record_probe(probed),
-            Answer::Attached(attaching) => self.finish_attach(attaching),
+            Answer::Attached(attaching) => self.finish_attach(*attaching),
         }
     }
 }

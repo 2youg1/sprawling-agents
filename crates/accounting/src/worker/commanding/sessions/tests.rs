@@ -49,7 +49,12 @@ fn carried_in_history(city_root: &Path, at: &Address) -> Option<bool> {
 /// A room whose first session froze a shape, and which has a summary the
 /// last one left for the next.
 fn frozen_room(city_root: &Path, room: &Address) -> std::path::PathBuf {
-    city::write_session(city_root, room, "m-local", Some(kernel::Effort::High)).unwrap();
+    city::write_session(
+        city_root,
+        room,
+        &city::SessionShape::new("m-local", Some(kernel::Effort::High), None),
+    )
+    .unwrap();
     let handoff = city::handoff_path(city_root, room);
     std::fs::create_dir_all(handoff.parent().unwrap()).unwrap();
     std::fs::write(&handoff, "the previous session's summary\n").unwrap();
@@ -142,7 +147,12 @@ fn carrying_nothing_is_not_a_refusal() {
     let room = addr("lab/refactor");
     let (base_url, _provider) = fake_openai(&["m-local"], vec![]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    city::write_session(dir.path(), &room, "m-local", Some(kernel::Effort::High)).unwrap();
+    city::write_session(
+        dir.path(),
+        &room,
+        &city::SessionShape::new("m-local", Some(kernel::Effort::High), None),
+    )
+    .unwrap();
 
     worker
         .open_session(&room, wire::Carry::Handoff, None)

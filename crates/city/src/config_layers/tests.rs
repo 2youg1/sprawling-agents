@@ -104,7 +104,12 @@ fn an_address_that_is_its_own_building_has_two_layers_not_three() {
 fn a_chosen_effort_is_written_where_the_ladder_reads_it() {
     let dir = tempfile::tempdir().unwrap();
     let room = addr("lab/refactor");
-    write_session(dir.path(), &room, "sonnet", Some(Effort::High)).unwrap();
+    write_session(
+        dir.path(),
+        &room,
+        &crate::SessionShape::new("sonnet", Some(Effort::High), None),
+    )
+    .unwrap();
     assert_eq!(load(dir.path(), &room).unwrap().effort, Some(Effort::High));
 
     // Choosing again replaces the value and nothing else: a person
@@ -112,7 +117,12 @@ fn a_chosen_effort_is_written_where_the_ladder_reads_it() {
     let file = path(dir.path(), &room, Layer::Resident).unwrap();
     let text = std::fs::read_to_string(&file).unwrap();
     std::fs::write(&file, format!("{text}\n[sandbox]\nshell = true\n")).unwrap();
-    write_session(dir.path(), &room, "sonnet", Some(Effort::Low)).unwrap();
+    write_session(
+        dir.path(),
+        &room,
+        &crate::SessionShape::new("sonnet", Some(Effort::Low), None),
+    )
+    .unwrap();
     let after = load(dir.path(), &room).unwrap();
     assert_eq!(after.effort, Some(Effort::Low));
     assert!(

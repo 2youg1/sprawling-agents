@@ -75,6 +75,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         naming: None,
         opening: None,
         effort: None,
+        generation: None,
         agent: None,
         skills: vec![
             SkillPin {
@@ -87,6 +88,22 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
             },
         ],
     }
+}
+
+#[test]
+fn a_run_started_line_reads_back_the_generation_it_froze() {
+    let mut started = typed_started(None, None);
+    started.generation = Some(crate::FrozenGeneration {
+        settings: crate::GenerationSettings {
+            temperature: Some("0.2".to_owned()),
+            top_k: Some("40".to_owned()),
+            ..crate::GenerationSettings::default()
+        },
+        max_tokens: crate::Ceiling::new(2048),
+        overrides: vec![("/temperature".to_owned(), "0.8".to_owned())],
+    });
+    let payload = Payload::of(&started).unwrap();
+    assert_eq!(payload.read::<RunStarted>().unwrap(), started);
 }
 
 #[test]

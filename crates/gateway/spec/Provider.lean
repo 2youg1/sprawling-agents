@@ -17,7 +17,10 @@
 ```rust
 // provider::preset —— 数据面，逐行注出处
 pub struct HostPreset { pub host: &'static str, pub faces: &'static [Face],
-                        pub models: &'static [ModelPreset], pub source: &'static str }
+                        pub models: &'static [ModelPreset], pub generation: GenerationPreset,
+                        pub source: &'static str }
+pub struct GenerationPreset { pub anthropic: GenerationSupport, pub open_ai: GenerationSupport,
+                              pub responses: GenerationSupport }   // 无人声明的字段为 None；不由模型名猜
 pub struct Face { pub dialect: DialectKind, pub path: &'static str }   // 厂商文档写的一面，与它挂在哪条路径下
 impl HostPreset {
     pub fn default_dialect(&self) -> Option<DialectKind>;   // 恰一面时是那一面，否则 None
@@ -48,6 +51,7 @@ pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling>;
 pub fn window_for(base_url: &str, id: &str) -> Option<Window>;               // 同一行的上下文窗口
 pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;     // 同一行的 input，只由 §8-37 的梯子读
 pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetThinking>;   // 同一行的思考列，只由 §8-39 的梯子读
+pub(crate) fn generation_for(base_url: &str, dialect: DialectKind) -> GenerationSupport; // 这一面的采样能力，只由 §8-41 的梯子读
 
 // provider::ceiling —— 判定，先命中者胜；窗口与上限走同一架梯子，上限的后两档只在这一面要这个字段时作答
 pub enum FigureSource { Person, Upstream, Registered, Preset, Policy }   // as_str(): person|upstream|registered|preset|policy

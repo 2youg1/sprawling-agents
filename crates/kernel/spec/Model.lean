@@ -42,12 +42,23 @@ pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
 pub struct ChatMessage { pub role: Role, pub content: Vec<ContentBlock> }
 pub struct ToolDef { pub name: ToolName, pub description: String, pub input_schema: Payload }
 pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
+pub enum ParameterSupport { Unknown, Supported, Unsupported }       // 支持情况；Unknown 可显式设置但不承诺
+pub enum ParameterSource { Person, Upstream, Preset }               // 答案来源；Unknown 且无陈述时没有来源
+pub struct GenerationSupport { pub temperature: Option<ParameterSupport>,
+                               pub top_p: Option<ParameterSupport>, pub top_k: Option<ParameterSupport> }
+pub struct GenerationSettings { pub temperature: Option<String>, pub top_p: Option<String>,
+                                pub top_k: Option<String> }         // 浮点与 top-k 都以文本保存；空串不是零
+pub struct ModelGeneration { pub model: String, pub settings: GenerationSettings,
+                             pub output_tokens: Option<Ceiling>,   // 会话输出偏好，不是模型硬上限
+                             pub support: GenerationSupport }      // 只存人的纠正；缺席即这一级没说
+pub struct FrozenGeneration { pub settings: GenerationSettings, pub max_tokens: Option<Ceiling>,
+                              pub overrides: Vec<(String, String)> } // 实发上限与最后应用的原始覆盖
 pub enum MessageBreakpoint { Unmarked, Tail }        // 请求侧注记，不进 serde；缺省 Unmarked
 pub enum SharedPrefix { Unshared, Leading(NonZeroUsize) }   // 请求侧注记，不进 serde：system 的前几块是一栋楼共享的（D60）
 pub struct ChatRequest<'a> { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Cow<'a, [ChatMessage]>, pub tools: Cow<'a, [ToolDef]>,
                          pub breakpoint: MessageBreakpoint, pub shared: SharedPrefix,
-                         pub effort: Option<Effort> }
+                         pub effort: Option<Effort>, pub generation: GenerationSettings }
 impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool;  // 该下标的消息是否带断点：Tail 且为末条
                        pub fn shared_system(&self) -> Option<&[SystemBlock]>; } // 一栋楼共享的那几块；Unshared 或越过 system 时 None（D60）
 pub struct ModelRequest<'a> { pub policy: BuildingPolicy, pub segments: [B3Hash; 4], pub chat: ChatRequest<'a> }
@@ -88,7 +99,13 @@ pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxEr
 - **`Effort` 七级，闭枚举**：`none/minimal/low/medium/high/xhigh/max`，城内拼写即上游的词。托管上游用的都是这七个词的子集：OpenAI 的 `ReasoningEffort` 与 OpenRouter 的 effort 枚举都是这七个，vLLM 的 schema 也是；Gemini 兼容面映射 `minimal/low/medium/high`，而 gemini-3.5-flash-lite 的默认档就是 `minimal`，没有这一格就说不出它的默认档。闭枚举保住两件事：`CONFIG.toml` 里拼错的值在解码时就被拒，而不是等到请求发出；新增一级在每一种兼容格式的编码里同时编译失败。`None` 只为读回旧账保留：关闭思考不是一档，没有选择器提供它（这是人定下的）。不加「开，档位由上游定」这一态：只有开关、没有档位的模型，默认档 `High` 编码成「开启思考」即可。Anthropic 的 `effort` 只收五级，`none` 在另一个字段 `thinking:{type:"disabled"}`；每种兼容格式怎样写一级、发不发它，归 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块），恒不夹取到邻级。
 - **每个（Endpoint，模型）提供哪几级是上游说出的事实，由 gateway 回答**：Anthropic（`capabilities.effort.*`）、DeepSeek（`effort.supported_levels`）、OpenRouter（`reasoning.supported_efforts`）、xAI（`capabilities.reasoning_effort`）的模型列表逐模型列出档位，Ollama 与 LM Studio 的原生端点也列。这一集合的唯一权威是 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块）（梯子 Person → Upstream → Preset → Unknown），kernel 只定义词汇与默认档。单位是（Endpoint，模型）而不是模型：同一个模型在不同 face、不同中转站上收的档位不同。
 - **默认档 `High` 只定义一次**：`kernel::consts_policy::DEFAULT_EFFORT`。一次请求实际用哪一档由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 解出：这次明说的档（`/effort <level>` 或 `Dispatch.effort`）当前（Endpoint，模型）不提供就在派活前拒绝；否则用存下或继承的档（提供时），再不然用 `High`（提供时），再不然用上游说的默认档，都没有就不写字段。
-- **`max_tokens` 是模型的事实，不是调用方的偏好**：Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。两家的 `GET /v1/models` 都不返回该上限，所以它探不到，只能随模型登记。权威定在 `gateway::market::ModelEntry.max_output_tokens`，`CallShape.max_tokens` 由选型点从那一行解出；**任何调用处手写数字即错**——截断会发生在一个账上找不到理由的地方。
+- **模型硬上限与会话输出偏好是两个事实**：`ModelEntry.max_output_tokens` 仍是模型事实；`ModelGeneration.output_tokens` 是人对新 Session 的可选偏好，高于已知硬上限即拒，不静默截断。`FrozenGeneration.max_tokens` 是二者与最后 raw override 解析出的本次实发上限，`CallShape` 与 `ChatRequest` 只消费这个有效值。Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。没有偏好时完全沿用现有上限梯。
+
+/-! D124 生成参数在 canonical 请求里以文本保存，模型输出事实与会话偏好分开
+
+决定：`GenerationSettings` 的三个采样值在设置、账本、会话文件与 canonical 请求之间都以文本携带，请求边界才解析成 JSON 数字；`top_k` 只收非负整数。模型级 `ModelGeneration` 同时保存人的能力纠正与输出偏好，provider 刷新不得抹掉它。`FrozenGeneration` 另记实发输出上限与原始 overrides，使已有 Session、分支和重放不重新读取当前默认值。
+
+理由：账本与配置不收浮点，空串也不能变成零；把偏好写回 `ModelEntry.max_output_tokens` 会把人的选择伪装成模型事实。被否：直接在帧与账本里放 JSON 浮点；把生成字段留作每个 dialect 的私有状态，脚本模型便看不到同一请求形状。 -/
 - **没人登记过的上限，载为「没人登记过」**：`Ceiling` 包 `NonZeroU64`，`ChatRequest.max_tokens` 是 `Option<Ceiling>`，于是「零」在类型上不存在，「缺席」也不等于零。缺席时 OpenAI 形不写该字段、取供应方自己的默认；Anthropic 形写不出请求，于是**拒**（`E_CONFIG_INVALID`，恢复语指向模型登记处），绝不在兼容格式那一层现编一个数。理由是实测：一个目录不认识的模型曾以 `max_tokens: 0` 上线，供应方答空、`stop` 记 `end_turn`、那次 run 冻结为「做完了」——**一个零上限造出的是一条看起来完成了的假历史**。
 
 **模型看得见图**（`kernel::model::image`；形状 2 value）

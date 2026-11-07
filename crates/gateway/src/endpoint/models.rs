@@ -24,7 +24,7 @@
 //! is worse than the string the provider printed.
 
 use kernel::event::record::{ModelFacts, ThinkingStatement};
-use kernel::{Ceiling, Effort};
+use kernel::{Ceiling, Effort, GenerationSupport, ParameterSupport};
 use serde_json::Value;
 
 /// The keys a context window arrives under, first one wins.
@@ -241,6 +241,33 @@ fn level(word: &Value) -> Option<Effort> {
         .find(|level| level.as_str().eq_ignore_ascii_case(word))
 }
 
+/// Machine-readable sampling support, either in `generation` or under
+/// `capabilities.generation`. Booleans and the three closed words are
+/// accepted; any other value leaves that parameter unstated.
+fn generation(row: &Value) -> Option<GenerationSupport> {
+    let said = row
+        .get("generation")
+        .or_else(|| row.get("capabilities")?.get("generation"))?;
+    let read = |parameter: &str| match said.get(parameter) {
+        Some(Value::Bool(true)) => Some(ParameterSupport::Supported),
+        Some(Value::Bool(false)) => Some(ParameterSupport::Unsupported),
+        Some(Value::String(word)) => match word.as_str() {
+            "unknown" => Some(ParameterSupport::Unknown),
+            "supported" => Some(ParameterSupport::Supported),
+            "unsupported" => Some(ParameterSupport::Unsupported),
+            _ => None,
+        },
+        Some(Value::Null | Value::Number(_) | Value::Array(_) | Value::Object(_)) | None => None,
+    };
+    let answer = GenerationSupport {
+        temperature: read("temperature"),
+        top_p: read("top_p"),
+        top_k: read("top_k"),
+    };
+    (answer.temperature.is_some() || answer.top_p.is_some() || answer.top_k.is_some())
+        .then_some(answer)
+}
+
 /// The upstream's own identity for the model across providers:
 /// OpenRouter's `hugging_face_id`, where it is not empty. Its
 /// `canonical_slug` is not read: it carries a release date the
@@ -273,6 +300,7 @@ pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
         input_price: price(row, ["input_price", "prompt"]),
         output_price: price(row, ["output_price", "completion"]),
         thinking: thinking(row),
+        generation: generation(row),
         canonical: canonical(row),
         listing: kernel::event::record::Listing::Listed,
     })
@@ -288,6 +316,25 @@ pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn machine_readable_generation_support_is_part_of_the_recorded_facts() {
+        let facts = facts_of(&serde_json::json!({
+            "id": "m-supported",
+            "capabilities": {
+                "generation": { "temperature": true, "top_p": "unknown", "top_k": false }
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            facts.generation,
+            Some(GenerationSupport {
+                temperature: Some(ParameterSupport::Supported),
+                top_p: Some(ParameterSupport::Unknown),
+                top_k: Some(ParameterSupport::Unsupported),
+            })
+        );
+    }
 
     #[test]
     fn a_row_that_states_nothing_but_an_id_states_nothing_but_an_id() {
@@ -322,6 +369,7 @@ mod tests {
                 input_price: Some("0.0000004".to_owned()),
                 output_price: Some("0.0000016".to_owned()),
                 thinking: None,
+                generation: None,
                 canonical: None,
                 listing: kernel::event::record::Listing::Listed,
             })

@@ -90,6 +90,10 @@ pub struct EndpointTuning {
     /// takes the request; absent means [`EndpointTuning::DEFAULTS`].
     #[serde(default)]
     pub account_retries: Option<AccountRetries>,
+    /// Per-model generation defaults and the person's capability
+    /// corrections; an empty list means nobody settled either.
+    #[serde(default)]
+    pub generation: Vec<kernel::ModelGeneration>,
 }
 
 impl EndpointTuning {

@@ -75,34 +75,53 @@ impl RunWorker {
         at: &Assignment,
         model: &gateway::ModelEntry,
         provider: &str,
-    ) -> Result<(), AxError> {
-        if let Some(endpoint) = self
+    ) -> Result<kernel::FrozenGeneration, AxError> {
+        let endpoint = self
             .credentials
             .book
             .endpoints()
-            .find(|endpoint| endpoint.name == provider)
-        {
+            .find(|endpoint| endpoint.name == provider);
+        if let Some(endpoint) = endpoint {
             gateway::thinking_offer(endpoint, &model.id).admit(at.effort, &model.id)?;
         }
+        let generation = match endpoint {
+            Some(endpoint) => gateway::freeze_generation(endpoint, model)?,
+            None => kernel::FrozenGeneration {
+                max_tokens: model.max_output_tokens,
+                ..kernel::FrozenGeneration::default()
+            },
+        };
         let own = city::own_layer(&self.city_root, &at.addr)?;
         let Some(frozen_model) = own.model() else {
-            return city::write_session(&self.city_root, &at.addr, &model.id, at.effort);
+            city::write_session(
+                &self.city_root,
+                &at.addr,
+                &city::SessionShape::new(&model.id, at.effort, Some(generation.clone())),
+            )?;
+            return Ok(generation);
         };
         // What the session froze. The effort is the ladder's answer at
         // this address, which is the value the run that opened the
         // session froze and the value this one would freeze.
         let settled = city::settled_effort(&self.city_root, &at.addr)?.map(|(effort, _)| effort);
-        let frozen = self.frozen_shape(frozen_model, settled);
+        let mut frozen = self.frozen_shape(frozen_model, settled, own.generation());
         let moved = CallShape {
             model: model.id.clone(),
-            max_tokens: model.max_output_tokens,
             effort: at.effort.or(settled),
+            generation,
             context_tokens: model.context_tokens,
         };
+        // A legacy record had no generation keys. Keep its old raw
+        // override behaviour, while a newly typed sampling default still
+        // refuses rather than moving that session silently.
+        if own.generation().is_none() {
+            frozen.generation.overrides = moved.generation.overrides.clone();
+        }
         // The comparison and the words of the refusal are the runtime's,
         // so that a shape moving mid-session is refused once and in one
         // sentence wherever it is noticed.
-        moved.verified_against(&frozen)
+        moved.verified_against(&frozen)?;
+        Ok(frozen.generation)
     }
 
     /// The shape the session froze, as the endpoint book states it now.
@@ -111,7 +130,12 @@ impl RunWorker {
     /// window. That is not a guess: the comparison refuses on the model
     /// before it reaches either of them, and a value invented here
     /// would be a fact this city does not have.
-    fn frozen_shape(&self, model: &str, effort: Option<Effort>) -> CallShape {
+    fn frozen_shape(
+        &self,
+        model: &str,
+        effort: Option<Effort>,
+        generation: Option<&kernel::FrozenGeneration>,
+    ) -> CallShape {
         let held = self
             .credentials
             .book
@@ -120,8 +144,13 @@ impl RunWorker {
             .map(|(_, _, entry)| entry);
         CallShape {
             model: model.to_owned(),
-            max_tokens: held.and_then(|entry| entry.max_output_tokens),
             effort,
+            generation: generation
+                .cloned()
+                .unwrap_or_else(|| kernel::FrozenGeneration {
+                    max_tokens: held.and_then(|entry| entry.max_output_tokens),
+                    ..kernel::FrozenGeneration::default()
+                }),
             context_tokens: held.map_or(0, |entry| entry.context_tokens),
         }
     }

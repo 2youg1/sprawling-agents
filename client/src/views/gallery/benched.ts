@@ -239,6 +239,13 @@ const ENDPOINTS: EndpointsAnswer = {
           input_price: "$3/M",
           output_price: "$15/M",
           thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+          generation: {
+            output_pointer: "/max_tokens",
+            settings: {},
+            temperature: { support: "unknown" },
+            top_p: { support: "unknown" },
+            top_k: { support: "unknown" },
+          },
           canonical: "claude-fable-5.1",
           listing: "listed",
         },

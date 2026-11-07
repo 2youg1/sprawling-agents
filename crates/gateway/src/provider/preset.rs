@@ -64,10 +64,57 @@ pub struct HostPreset {
     /// prompt cache key in, so that requests sharing one conversation's
     /// prefix are routed to one cache (gateway D25).
     pub cache_key_field: Option<&'static str>,
-    /// Where `faces`, `chat`, `session_header` and `cache_key_field`
-    /// were read.
+    /// Sampling support by request face, stated only where the cited
+    /// schema answers for the model rather than for one exceptional row.
+    pub generation: GenerationPreset,
+    /// Where `faces`, `chat`, `session_header`, `cache_key_field` and
+    /// `generation` were read.
     pub source: &'static str,
 }
+
+/// Sampling support on each face a host serves. `None` in a
+/// `GenerationSupport` field means the schema does not answer for every
+/// model on that face.
+#[derive(Debug, Clone, Copy)]
+pub struct GenerationPreset {
+    pub anthropic: kernel::GenerationSupport,
+    pub open_ai: kernel::GenerationSupport,
+    pub responses: kernel::GenerationSupport,
+}
+
+impl GenerationPreset {
+    pub const UNKNOWN: GenerationPreset = GenerationPreset {
+        anthropic: kernel::GenerationSupport {
+            temperature: None,
+            top_p: None,
+            top_k: None,
+        },
+        open_ai: kernel::GenerationSupport {
+            temperature: None,
+            top_p: None,
+            top_k: None,
+        },
+        responses: kernel::GenerationSupport {
+            temperature: None,
+            top_p: None,
+            top_k: None,
+        },
+    };
+}
+
+pub(crate) const ANTHROPIC_GENERATION: kernel::GenerationSupport = kernel::GenerationSupport {
+    temperature: Some(kernel::ParameterSupport::Supported),
+    top_p: Some(kernel::ParameterSupport::Supported),
+    top_k: Some(kernel::ParameterSupport::Supported),
+};
+
+/// OpenAI's schemas omit `top_k`; they warn that sampling support differs
+/// on reasoning models, so temperature and top-p stay unstated here.
+pub(crate) const OPENAI_GENERATION: kernel::GenerationSupport = kernel::GenerationSupport {
+    temperature: None,
+    top_p: None,
+    top_k: Some(kernel::ParameterSupport::Unsupported),
+};
 
 /// One face a host answers on, and the path it hangs under, leading
 /// slash included. The path is filled in only when the person entered
@@ -360,6 +407,20 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
 #[must_use]
 pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetThinking> {
     model_for(base_url, id)?.thinking.as_ref()
+}
+
+/// Sampling support stated for one documented host and face. Hosts and
+/// faces without a machine-checked statement leave every parameter
+/// unstated rather than guessing from a model id.
+pub(crate) fn generation_for(base_url: &str, dialect: DialectKind) -> kernel::GenerationSupport {
+    let Some(row) = host_row(base_url) else {
+        return kernel::GenerationSupport::default();
+    };
+    match dialect {
+        DialectKind::Anthropic => row.generation.anthropic,
+        DialectKind::OpenAi => row.generation.open_ai,
+        DialectKind::OpenAiResponses => row.generation.responses,
+    }
 }
 
 /// The preset table as the host authority the normaliser reads.

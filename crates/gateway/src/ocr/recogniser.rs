@@ -133,6 +133,7 @@ impl Seeing {
                 breakpoint: kernel::MessageBreakpoint::Unmarked,
                 shared: kernel::SharedPrefix::Unshared,
                 effort: None,
+                generation: kernel::GenerationSettings::default(),
             },
         }
     }

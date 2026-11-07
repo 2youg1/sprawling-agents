@@ -273,6 +273,7 @@ impl RunWorker {
         agreed: Agreed,
         at: &Assignment,
         given: &Given,
+        generation: kernel::FrozenGeneration,
     ) -> Result<Site, AxError> {
         let addr = &at.addr;
         let Agreed {
@@ -308,6 +309,7 @@ impl RunWorker {
             config,
             reading_room: selection.reading_room,
             model,
+            generation,
             provider,
             adapter: Some(adapter),
             identity,

@@ -393,6 +393,10 @@ pub struct ChatRequest<'a> {
     /// Frozen at run start: changing it mid-run would start a new cached
     /// prompt prefix, so the value rides in from [`crate::FrozenConfig`].
     pub effort: Option<Effort>,
+    /// Sampling values for this request, still text until the dialect
+    /// writes JSON numbers at the provider boundary.
+    #[serde(default)]
+    pub generation: crate::GenerationSettings,
 }
 
 /// The canonical response: dialect output, endpoint input.
@@ -416,6 +420,7 @@ impl ChatRequest<'_> {
             breakpoint: MessageBreakpoint::Unmarked,
             shared: SharedPrefix::Unshared,
             effort: None,
+            generation: crate::GenerationSettings::default(),
         }
     }
 
@@ -451,6 +456,7 @@ impl ChatRequest<'_> {
             breakpoint: self.breakpoint,
             shared: self.shared,
             effort: self.effort,
+            generation: self.generation,
         }
     }
 }

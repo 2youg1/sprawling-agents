@@ -26,6 +26,7 @@ pub struct EndpointTuning {
     pub proxying: Option<Proxying>,          // 这个端点的调用走不走这台电脑的代理，缺席即城自己的规则
     pub max_in_flight: Option<u32>,          // 同时在飞的调用至多几个；缺席与零即这一类连接的缺省
     pub account_retries: Option<AccountRetries>, // 同一账号上再发几次（one｜two，kernel §8-86）；缺席即城的缺省
+    pub generation: Vec<kernel::ModelGeneration>, // 每个模型的类型化默认值与人的能力纠正；空即没设
 }
 
 ProbeEndpoint  { name, base_url, dialect, secret, auth_header, tuning: EndpointTuning, idem }
@@ -41,6 +42,14 @@ EndpointSummary { name, label, base_url, dialect, connection_kind, models, local
 - **`Turn` 携 `thought`**。thinking 块为供应方的签名校验端到端携带，看起来属于传输；但对一个把大部分调用花在推理上的模型，挡住它就是让人先对着空线程等几分钟，再读到两句话。所以推理以自己的字段作答，页面把它折起来放在散文旁边，两者永不混进同一个缓冲区。`RedactedThinking` 仍然不出现：它的载荷是加密的，里面没有人能读的东西。
 - **`max_in_flight` 是第八件**（gateway D21）：`Option<u32>`，缺席与零都是「没人定过」，由 gateway 读成这一类连接的缺省；1 到 `IN_FLIGHT_MAX`（256）之外由装配层以 `E_CONFIG_INVALID` 拒（与同一张表单上读作凭据的请求头同一个码），恢复语说出合法域。它随 `endpoint_attached` 的载荷进账本，旧账本里没有这把键的一行读作缺席，所以旧城重开后每个端点取缺省，而不是被拒。帧形、golden 与 `client/src/wire.ts` 随本版 `WIRE_V` 的那一次进位（D22）一起改。
 - **`account_retries` 是第九件**（kernel D54）：`Option<kernel::account_recovery::AccountRetries>`，线上拼作 `"one"`／`"two"`，缺席即「没人定过」，由 gateway 读成 `EndpointTuning::DEFAULTS` 的值。它是一个枚举而不是一个数，所以线上拼不出零或三，装配层没有一个范围要拒；只在名册有两个以上账号时被读，表单在账号少于两个时不显示它。旧客户端不发这把键，读作缺席。
+- **`generation` 按模型保存**：每行以 `(endpoint, model, dialect)` 为身份，含文本采样值、可选输出偏好与人的支持纠正；`AttachEndpoint` 整份替换它，账号编辑器与模型编辑器都读回未修改的行再发。保存时拒绝未知模型、重复模型、非法数值、已知 `Unsupported` 上仍带值，以及高过已知硬上限的输出偏好。`Unknown` 允许显式值；一次 HTTP 错误不改能力陈述。原始 `overrides` 仍在最后应用，页面列出与类型化字段同路径的覆盖。
+
+/-! D65 模型高级设置复用 AttachEndpoint 的 tuning，不新增模型设置命令
+
+决定：`EndpointTuning.generation` 是逐模型的完整草稿，`EndpointSummary` 原样读回；保存复用现有原子挂接门与凭据保留规则。生成请求的有效值与 raw overrides 随 Session 冻结，而不是每次调用重读表单。
+
+理由：新命令会复制账号、模型登记与失败处理，并给同一设置第二个写者。被否：把类型化值展开成端点级 raw overrides——同名模型与不同模型不能各有一份，能力来源也会丢失。`ModelFactsSummary.generation`、`Opening.generation` 与 `run_started.generation` 同批落地，`WIRE_V` 74 → 75，并重生 shape golden 与 `client/src/wire.ts`。 -/
+
 - **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
 - **`proxying` 跟着 tuning 走，因而探测与调用恒用同一个决定**（WIRE_V 27→28）。一个只在调用时生效的代理设置，会让表单上那份分段读数描述一条真正的调用不会走的路，而那份读数存在的全部意义就是告诉人调用停在了哪一段。`Option` 而非值：线上的缺席是「没人定过」，装配层把它翻成城的默认值（`ExceptLocal`），于是 `gateway` 一侧拿到的是一个已经定下来的值，没有第三种状态要每一个调用方再答一次。
 -/

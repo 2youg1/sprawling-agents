@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test";
 import { FIRST_POLICY } from "../../core/commands";
 import { say } from "../../core/lang";
-import { TimeMs } from "../../wire";
+import { Ceiling, TimeMs } from "../../wire";
 import { firstHeadSaid, frozenSaid } from "./frozen";
 import { policyFace } from "./policy";
 
@@ -27,4 +27,17 @@ test("the first head keeps the opening write limit and trial policy", () => {
     [say("en", "effort_high"), say("en", `mode_${policy.mode}`)].join(" · "),
   );
   expect(firstHeadSaid({ at: opening.at, task: opening.task, goal: opening.goal }, "en")).toBe("");
+});
+
+test("the opening states frozen generation rather than current defaults", () => {
+  const opening = {
+    at: TimeMs.make(1),
+    task: "review",
+    goal: "",
+    generation: {
+      settings: { temperature: "0.2", top_k: "40" },
+      max_tokens: Ceiling.make(2048),
+    },
+  } as const;
+  expect(frozenSaid(opening, "en")).toBe("temperature=0.2 · top_k=40 · max_tokens=2048");
 });

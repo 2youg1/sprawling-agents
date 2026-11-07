@@ -149,7 +149,11 @@ fn a_write_the_reader_would_refuse_is_not_written() {
     std::fs::write(&file, original).unwrap();
 
     assert_eq!(
-        super::super::write_session(dir.path(), &lab, "m-local", None),
+        super::super::write_session(
+            dir.path(),
+            &lab,
+            &crate::SessionShape::new("m-local", None, None),
+        ),
         Err(refuse_file(
             &file,
             super::super::refuse::two_residents("m-local", "pi").subject()

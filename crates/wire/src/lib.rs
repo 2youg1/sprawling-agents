@@ -55,7 +55,7 @@ pub use answer::{CatalogSnapshot, LoginKind, LoginState, PinState};
 pub use answer::{CeilingLine, FigureFrom, FiguresAsked, FiguresLine};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, Renewals};
-pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
+pub use answer::{ConfigAnswer, ConfigLayer, GenerationAnswer, ModelFactsSummary, ParameterAnswer};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};

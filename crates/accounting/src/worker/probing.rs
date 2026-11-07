@@ -133,6 +133,7 @@ impl RunWorker {
                     breakpoint: kernel::MessageBreakpoint::Unmarked,
                     shared: kernel::SharedPrefix::Unshared,
                     effort: plan.shape.effort,
+                    generation: plan.shape.generation.settings.clone(),
                 },
             };
             model.call(&request).ok()
@@ -186,6 +187,7 @@ impl Site {
                     breakpoint: kernel::MessageBreakpoint::Unmarked,
                     shared: kernel::SharedPrefix::Unshared,
                     effort: plan.shape.effort,
+                    generation: plan.shape.generation.settings.clone(),
                 },
             };
             model.call(&request).ok()

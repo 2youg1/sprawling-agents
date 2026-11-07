@@ -303,6 +303,33 @@ mod tests {
     }
 
     #[test]
+    fn generation_defaults_and_capability_corrections_survive_the_ledger_round_trip() {
+        let mut endpoint = attached("house", "https://api.example.test/v1");
+        endpoint.tuning.generation = vec![kernel::ModelGeneration {
+            model: "m-small".to_owned(),
+            settings: kernel::GenerationSettings {
+                temperature: Some("0.2".to_owned()),
+                ..kernel::GenerationSettings::default()
+            },
+            output_tokens: kernel::Ceiling::new(1024),
+            support: kernel::GenerationSupport {
+                top_k: Some(kernel::ParameterSupport::Unsupported),
+                ..kernel::GenerationSupport::default()
+            },
+        }];
+        let mut book = EndpointBook::new();
+        book.apply(&record(
+            EventKind::EndpointAttached,
+            attached_payload(&endpoint).unwrap(),
+        ))
+        .unwrap();
+        assert_eq!(
+            book.endpoints().next().unwrap().tuning.generation,
+            endpoint.tuning.generation
+        );
+    }
+
+    #[test]
     fn a_record_written_before_probed_existed_reads_as_probed() {
         let endpoint = attached("house", "https://api.example.test/v1");
         let mut map = attached_payload(&endpoint).unwrap().as_map().clone();

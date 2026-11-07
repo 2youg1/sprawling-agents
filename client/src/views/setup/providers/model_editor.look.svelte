@@ -13,6 +13,7 @@
 
   export interface ModelEditorLookProps extends ModelEditorLook {
     readonly table: Snippet;
+    readonly generation: Snippet;
     readonly holdSummary: Attachment<HTMLElement>;
     readonly open?: boolean;
     readonly onToggle: (open: boolean) => void;
@@ -70,6 +71,8 @@
     {/if}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render look.table()}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+    {@render look.generation()}
     {#if look.status !== undefined}
       <p role="status" class="text-note text-text-quiet">{look.status}</p>
     {/if}

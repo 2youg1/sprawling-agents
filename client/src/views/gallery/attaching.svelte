@@ -28,6 +28,8 @@
   import type { Draft } from "../setup/providers/draft";
   import EndpointList from "../setup/providers/endpoint_list.svelte";
   import { freshFlight } from "../setup/providers/flight";
+  import Generation from "../setup/providers/generation.svelte";
+  import { freshGeneration } from "../setup/providers/generation";
   import ModelEditor from "../setup/providers/model_editor.svelte";
   import Previews from "../setup/providers/preview.svelte";
   import Case from "./case.svelte";
@@ -77,6 +79,25 @@
   const typedLook = $derived(lookOf(typed, [], [], $lang));
   const answeredLook = $derived(lookOf(answered, PROBED, FIGURED, $lang));
   const modelFlight = $state(freshFlight());
+  const listedGeneration = LISTED.endpoints[0];
+  const generationEndpoint =
+    listedGeneration === undefined
+      ? undefined
+      : {
+          ...listedGeneration,
+          tuning: {
+            ...listedGeneration.tuning,
+            overrides: [{ pointer: "/temperature", value: "0.8" }],
+          },
+        };
+  const generationDrafts = $state(
+    generationEndpoint === undefined ? {} : freshGeneration(generationEndpoint),
+  );
+  if (generationEndpoint !== undefined) {
+    const first = generationEndpoint.models[0]?.id;
+    if (first !== undefined && generationDrafts[first] !== undefined)
+      generationDrafts[first].temperature = "0.2";
+  }
 </script>
 
 <Case label="provider · a long address, and a row with no model listed">
@@ -100,6 +121,19 @@
 <Case label="provider · the two readings of a draft with a header and an override">
   <Previews {draft} reference="secret:providers/example" model="house/writer" />
 </Case>
+
+{#if generationEndpoint !== undefined}
+  <Case label="models · generation defaults, support sources, and an endpoint override">
+    <Generation
+      models={generationEndpoint.models}
+      summary={generationEndpoint}
+      drafts={generationDrafts}
+      overrideRows={generationEndpoint.tuning.overrides}
+      onEdit={() => undefined}
+      open
+    />
+  </Case>
+{/if}
 
 <Case label="models · every row ticked, one with its figures and role stated">
   <TableLook {...workedLook} />

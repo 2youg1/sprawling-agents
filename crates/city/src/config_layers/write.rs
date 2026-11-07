@@ -244,6 +244,7 @@ pub(super) enum Change<'a> {
     Session {
         model: &'a str,
         effort: Option<Effort>,
+        generation: Option<&'a kernel::FrozenGeneration>,
     },
     /// The record a session wrote at its own address, removed: the
     /// inverse of `Session`, and the one change here that takes
@@ -289,12 +290,17 @@ impl Change<'_> {
     /// person who wrote it left it.
     fn state(&self, document: &mut toml::Table, file: &Path) -> Result<(), AxError> {
         match self {
-            Change::Session { model, effort } => {
+            Change::Session {
+                model,
+                effort,
+                generation,
+            } => {
                 let section = table(document, "model", file)?;
                 section.insert("name".to_owned(), toml::Value::String((*model).to_owned()));
                 if let Some(effort) = effort {
                     section.insert("effort".to_owned(), spelled(*effort, file)?);
                 }
+                state_generation(section, *generation, file)?;
             }
             Change::Forget => {
                 // Only the two keys `Change::Session` writes. The table
@@ -306,6 +312,9 @@ impl Change<'_> {
                     Some(toml::Value::Table(section)) => {
                         section.remove("name");
                         section.remove("effort");
+                        for key in GENERATION_KEYS {
+                            section.remove(key);
+                        }
                         section.is_empty()
                     }
                     Some(_) => return Err(refuse_file(file, "`[model]` is not a section")),
@@ -421,9 +430,58 @@ impl Change<'_> {
     }
 }
 
+const GENERATION_KEYS: [&str; 5] = ["temperature", "top_p", "top_k", "max_tokens", "overrides"];
+
+/// Replace only the generation keys a session owns, preserving every
+/// other setting in `[model]` and the rest of the file.
+fn state_generation(
+    section: &mut toml::Table,
+    generation: Option<&kernel::FrozenGeneration>,
+    file: &Path,
+) -> Result<(), AxError> {
+    for key in GENERATION_KEYS {
+        section.remove(key);
+    }
+    let Some(frozen) = generation else {
+        return Ok(());
+    };
+    for (key, value) in [
+        ("temperature", &frozen.settings.temperature),
+        ("top_p", &frozen.settings.top_p),
+        ("top_k", &frozen.settings.top_k),
+    ] {
+        if let Some(text) = value {
+            section.insert(key.to_owned(), toml::Value::String(text.clone()));
+        }
+    }
+    if let Some(ceiling) = frozen.max_tokens {
+        let count =
+            i64::try_from(ceiling.get()).map_err(|err| refuse_file(file, &err.to_string()))?;
+        section.insert("max_tokens".to_owned(), toml::Value::Integer(count));
+    }
+    if !frozen.overrides.is_empty() {
+        section.insert(
+            "overrides".to_owned(),
+            toml::Value::Array(
+                frozen
+                    .overrides
+                    .iter()
+                    .map(|(pointer, value)| {
+                        toml::Value::Array(vec![
+                            toml::Value::String(pointer.clone()),
+                            toml::Value::String(value.clone()),
+                        ])
+                    })
+                    .collect(),
+            ),
+        );
+    }
+    Ok(())
+}
+
 /// The `[model]` table, made if this file has none: one place the
-/// section is found or created, so the three values written into it
-/// cannot disagree about which table holds them.
+/// section is found or created, so the values written into it cannot
+/// disagree about which table holds them.
 fn table<'d>(
     document: &'d mut toml::Table,
     name: &str,

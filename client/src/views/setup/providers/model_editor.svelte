@@ -38,6 +38,7 @@
     settleProbe,
   } from "./model_editor";
   import type { Hands } from "./model_editor";
+  import Generation from "./generation.svelte";
   import Look from "./model_editor.look.svelte";
 
   const { answer, name, flight, open }: ModelEditorProps = $props();
@@ -102,9 +103,25 @@
   />
 {/snippet}
 
+{#snippet generation()}
+  {@const endpoint = answer.endpoints.find((each) => each.name === name)}
+  {#if endpoint !== undefined}
+    <Generation
+      models={endpoint.models.filter((model) => editor.chosen.some((row) => row.id === model.id))}
+      summary={endpoint}
+      drafts={editor.generation}
+      overrideRows={editor.overrides}
+      onEdit={() => {
+        choose(editor, editor.chosen);
+      }}
+    />
+  {/if}
+{/snippet}
+
 <Look
   {...look}
   {table}
+  {generation}
   {holdSummary}
   open={expanded}
   onToggle={(next) => {

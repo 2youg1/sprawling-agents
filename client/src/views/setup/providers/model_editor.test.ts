@@ -38,6 +38,13 @@ function model(id: string, listing: "listed" | "named" = "listed"): ModelFactsSu
     input_price: null,
     output_price: null,
     thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+    generation: {
+      output_pointer: "/max_tokens",
+      settings: {},
+      temperature: { support: "unknown" },
+      top_p: { support: "unknown" },
+      top_k: { support: "unknown" },
+    },
     canonical: id,
     listing,
   };
@@ -185,6 +192,115 @@ describe("saving an attached endpoint's models", () => {
     expect(
       selection !== undefined && "select_model" in selection ? selection.select_model.model : null,
     ).toBe("c");
+  });
+
+  test("changing only a role model's output facts still sends its selection", () => {
+    const { editor, hands, sent } = rig();
+    editor.table.output.a = "4096";
+    choose(editor, chosenRows(editor.table, editor.served));
+    save(editor, hands);
+    expect(sent.map((command) => Object.keys(command)[0])).toEqual([
+      "attach_endpoint",
+      "select_model",
+    ]);
+    const selection = sent[1];
+    expect(
+      selection !== undefined && "select_model" in selection
+        ? selection.select_model.max_output_tokens
+        : null,
+    ).toBe(Ceiling.make(4096));
+  });
+
+  test("changing only generation saves it and waits for that exact read-back", () => {
+    const { editor, hands, world, sent } = rig();
+    const draft = editor.generation.a;
+    expect(draft).toBeDefined();
+    if (draft !== undefined) draft.temperature = "0.2";
+    save(editor, hands);
+    expect(sent.map((command) => Object.keys(command)[0])).toEqual(["attach_endpoint"]);
+    const frame = sent[0];
+    const generation =
+      frame !== undefined && "attach_endpoint" in frame
+        ? (frame.attach_endpoint.tuning.generation ?? [])
+        : [];
+    expect(generation).toEqual([
+      {
+        model: "a",
+        settings: { temperature: "0.2", top_p: null, top_k: null },
+        output_tokens: null,
+        support: {},
+      },
+    ]);
+    settleAnswer(editor, world.answer);
+    expect(awaiting(editor)).toBe(true);
+    world.answer = {
+      ...world.answer,
+      endpoints: world.answer.endpoints.map((endpoint) => ({
+        ...endpoint,
+        tuning: { ...endpoint.tuning, generation: [...generation] },
+      })),
+    };
+    settleAnswer(editor, world.answer);
+    expect(awaiting(editor)).toBe(false);
+  });
+
+  test("an attached endpoint's raw overrides edit in the same save", () => {
+    const { editor, hands, sent } = rig();
+    editor.overrides.push({ pointer: "/temperature", value: "0.8" });
+    save(editor, hands);
+    const frame = sent[0];
+    expect(
+      frame !== undefined && "attach_endpoint" in frame
+        ? frame.attach_endpoint.tuning.overrides
+        : [],
+    ).toEqual([{ pointer: "/temperature", value: "0.8" }]);
+  });
+
+  test("a capability correction makes an unsupported value saveable", () => {
+    const answer = {
+      ...ANSWER,
+      endpoints: ANSWER.endpoints.map((endpoint) => ({
+        ...endpoint,
+        models: endpoint.models.map((model) =>
+          model.id === "a"
+            ? {
+                ...model,
+                generation: {
+                  ...model.generation,
+                  top_k: { support: "unsupported" as const, source: "upstream" as const },
+                },
+              }
+            : model,
+        ),
+      })),
+    };
+    const { editor, hands, sent } = rig(answer);
+    const draft = editor.generation.a;
+    expect(draft).toBeDefined();
+    if (draft === undefined) return;
+    draft.top_k = "40";
+    save(editor, hands);
+    expect(sent).toEqual([]);
+    draft.support = { top_k: "supported" };
+    save(editor, hands);
+    expect(sent.map((command) => Object.keys(command)[0])).toEqual(["attach_endpoint"]);
+  });
+
+  test("a save acknowledgement does not overwrite a newer role draft", () => {
+    const { editor, hands, world } = rig();
+    untick(editor, "b");
+    save(editor, hands);
+    editor.table.role.a = "";
+    world.answer = {
+      ...world.answer,
+      endpoints: world.answer.endpoints.map((endpoint) => ({
+        ...endpoint,
+        models: [model("a"), model("typed", "named")],
+      })),
+    };
+    settleAnswer(editor, world.answer);
+    expect(editor.table.role.a).toBe("");
+    expect(editor.table.heldRole.a).toBe("main");
   });
 
   test("clearing a role without a replacement sends nothing", () => {

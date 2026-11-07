@@ -301,6 +301,7 @@ impl RunWorker {
             {
                 endpoint.models = kept.models.clone();
                 endpoint.probed = kept.probed;
+                gateway::validate_generation(&endpoint)?;
                 return self.record_attached(endpoint);
             }
         }
@@ -308,13 +309,13 @@ impl RunWorker {
         let (admission, finishing) = (admission.clone(), self.finishing());
         self.flight.errands.send(move || {
             let served = listing.and_then(ListRequest::read);
-            Answer::Attached(Attaching {
+            Answer::Attached(Box::new(Attaching {
                 endpoint,
                 admission,
                 kept: kept.map(Box::new),
                 served,
                 finishing,
-            })
+            }))
         })
     }
 
@@ -375,6 +376,7 @@ impl RunWorker {
                 })
             }
         };
+        gateway::validate_generation(&endpoint)?;
         self.credentials.book.refuse_dropping_a_role(&endpoint)?;
         // One line either way, and it says which of the two happened.
         // The unprobed attachment is degraded rather than refused - the
