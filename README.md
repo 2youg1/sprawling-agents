@@ -1,26 +1,20 @@
-<div align="center">
+# *Sprawling* 🏙️
 
-# sprawling
+**Let agents live like citizens in the city of sprawling, where nothing is hidden: prompts are plain files you own, and every context is a line in a hash-chained, offline-verifiable Ledger you can replay.**
 
-**Let agents live like citizens in the city of sprawling, and give you back your attention and time.**
+<p><a href="README.md">English</a> · <a href="docs/README.zh-CN.md">简体中文</a></p>
 
-<p align="center"><a href="README.md">English</a> · <a href="docs/README.zh-CN.md">简体中文</a></p>
-
-<p align="center">
-  <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+<p>
+  <a href="https://docs.rs/sprawling"><img alt="docs.rs" src="https://docs.rs/sprawling/badge.svg"></a>
   <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
   <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5"></a>
   <a href="https://deepwiki.com/2youg1/sprawling-agents"><img alt="Ask DeepWiki" src="https://img.shields.io/badge/Ask-DeepWiki-2B6CB0?labelColor=171717"></a>
+  <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main"></a>
 </p>
 
-</div>
-
-> **Looking for collaborators and fellow travellers**
->
-> `sprawling` is still in development, and I would like a few more people working on it. If you have a hand in agent workflows and orchestration, WebUI front-end design and interaction, Rust systems and performance, formal verification in Lean 4, or multi-agent social simulation and AI alignment in the humanities and social sciences, come and talk. If you are in none of those fields and simply want to fold your own craft into this "city", that is just as welcome.
->
-> Reach me through **[GitHub Issues](https://github.com/2youg1/sprawling-agents/issues)**; the email address is on my [GitHub profile](https://github.com/2youg1) for anything that needs a private channel.
+> **Looking for collaborators and fellow travellers**: `sprawling` is still in development, and new collaborators and feedback of any kind are welcome.<br>
+> Reach me through **[GitHub Issues](https://github.com/2youg1/sprawling-agents/issues)**. For a private conversation, my email address is on my [GitHub profile](https://github.com/2youg1).
 
 ---
 
@@ -28,7 +22,7 @@ In **sprawling**, a **city** is one directory on your computer, every project is
 
 Buildings, floors and rooms are the directory tree itself. An address such as `lab/room1` settles three things at once: which files the agent may change, which documents it starts with, and whom it reports to. The three are one fact, so no second rule is needed to keep them agreeing ([glossary](docs/glossary.md)). A resident's identity lasts across sessions; what costs money is the one **run** it is sent out on, so however many idle residents a city holds, they cost nothing.
 
-**sprawling interrupts you as little as it can, and does not keep you outside a black box:**
+**sprawling interrupts you as little as it can, and does not keep you outside a black box.**
 
 - **Full permission by default**: in a building raised from `minimal`, an agent may write every file and finished work lands without review (to turn on review or narrow writes, see [A building of your own](docs/getting-started.md#a-building-of-your-own)). A gate stops an action that crosses a line and tells the agent what to do instead; what reaches you is a **design question** the resident cannot settle from the building's rules.
 - **The workflow is a set of files**: the directory tree, the Markdown forms, `RULES.toml`, `CONFIG.toml`, `SKILL.md`, plus MCP servers and ACP agents. No orchestration code, and no third-party extension to install. Model permissions, the three tiers for tools and skills, MCP, the network and the write domain all live in TOML, and you see their effect on the building page before you change them. Memory stays in your files, code and document libraries, so the next session carries on.
@@ -37,7 +31,7 @@ Buildings, floors and rooms are the directory tree itself. An address such as `l
 <p align="center">
   <a href="docs/images/a-report-beside-its-file.png"><img alt="A report with a table and a numbered list in the conversation, with the observations.csv it is based on open on the right" src="docs/images/a-report-beside-its-file.png" width="100%"></a>
   <br>
-  <sub>A run's report beside the CSV it read; select the image for the full window.</sub>
+  <sub>A run's report beside the CSV it read. Select the image for the full window.</sub>
 </p>
 
 <table>
@@ -107,7 +101,7 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 cargo install sprawling --locked
 ```
 
-Prebuilt archives cover Windows x86-64, macOS on Apple silicon and Linux x86-64. To download one by hand, go to the [release list](https://github.com/2youg1/sprawling-agents/releases); for pinning a version, checking a signature or building with Nix, see the [installation guide](docs/getting-started.md#1-install).
+Prebuilt archives cover Windows x86-64, macOS on Apple silicon and Linux x86-64. To download one by hand, go to the [release list](https://github.com/2youg1/sprawling-agents/releases). For pinning a version, checking a signature or building with Nix, see the [installation guide](docs/getting-started.md#1-install).
 
 One command both raises the city and starts it:
 
@@ -115,13 +109,15 @@ One command both raises the city and starts it:
 sprawling up ./cities/first
 ```
 
-The browser opens the page and pairs itself, and the terminal is left as the **quiet host**: two lines, the serving address and a one-time pairing code. **Use the WebUI**: type `/web` in the terminal and it opens (Enter opens it again); the pages, the command palette, a building's prompts and capabilities, and a run's seven lenses are all there.
+The browser opens the page and pairs itself, while the terminal becomes the **quiet host**, showing only two lines: the serving address and a one-time pairing code.
 
-- **Esc** turns the terminal into the city's CLI: talk to the Mayor directly, or type a slash command (`/help` lists them all, `/web` goes back to the page).
-- Closing the browser stops no work. The city keeps the port, so opening the address again gets you back in.
-- To stop, type `/quit` in the CLI or on the page; with runs going it asks once whether to wait for them or stop them now. `Ctrl+C` and `Ctrl+V` keep their terminal meanings, copy and paste, and never harm the city.
-
-Connect a model, give the `main` role a model, and write down the first task, then watch it run. Where the model offers thinking levels, the city asks for `high` until you choose another.
+- **Use the WebUI**: type `/web` in the terminal to open the page. The pages, the command palette, a building's prompts and capabilities, and a run's seven lenses are all there.
+- **Terminal keys**:
+  - **Enter** opens the page in the browser again.
+  - **Esc** switches the terminal to the city's native CLI, where you can talk to the Mayor directly and run every slash command (`/help` lists them, and `/web` reopens the page and returns the terminal to the quiet host).
+- **Start work**: on the page, connect a model provider or a local model and choose a model for the `main` role. Where a model offers thinking levels, the city asks for `high` until you choose another. Then tell the Mayor what result you want and what counts as done. The Mayor plans and breaks down the work, the residents in each building carry it out, and you follow progress, answer key design questions and review the result.
+- **Close the page without stopping work**: closing the browser tab stops no work, and the city keeps running in the background. The city keeps the port, so opening the address again gets you back in.
+  - **Stop the city**: type `/quit` in the CLI or on the page. If runs are still going, it asks once whether to wait for them or stop them now. `Ctrl+C` and `Ctrl+V` keep their terminal meanings, copy and paste, and never harm the city.
 
 sprawling does not update itself. To upgrade, check the version in Settings and follow [Updating](docs/getting-started.md#updating); export a verifiable backup before you do.
 
@@ -136,8 +132,8 @@ If you have used a terminal agent such as Claude Code, or only ever used a chat 
 A multi-agent workflow here is a set of files. You watch and change it on the page and in TOML; you do not change code.
 
 - **The forms hold project facts and handoffs**: `SPEC.md` says what the project is and which decisions it has settled; `Roadmap.md` is the one task table and the denominator of every progress figure; `Memo.md` keeps decisions, `Handoff.md` hands over to the next session, and `URBANITE.md` says how one resident works. The templates are in [`crates/city/templates/`](crates/city/templates/), and a blank form with the right headings is one even a small local model fills in correctly.
-- **`RULES.toml` sets a building's limits**: where it may write (`prefixes`) and how (`write`: `everything` / `documents`), whether work is reviewed, which skills are admitted, which domains it may reach (`egress`), whether it may use the city's own browser or the one you are using, whether it may drive your desktop (the window allowlist is in `DESKTOP.toml`), and whether it is confidential (`confidential` narrows the model pool to local inference and starts no MCP server). A misspelled key is refused rather than ignored ([`policy.rs`](crates/city/src/policy.rs)); `.sprawling/` is in the reserved subtree, which residents read and cannot write.
-- **Capabilities and permissions go one level further down**: the three tiers for tools and skills, MCP definitions and a building's references to them, sandbox limits and the effort level live in `CONFIG.toml`, layered over city, building and room; the tool table stops at the building, because it sits ahead of the system prompt in a provider's cache, and rooms that differed would split one building's cache ([`config/exposure.rs`](crates/kernel/src/config/exposure.rs)). Each dispatch then picks a run policy: chat or work, whether it may change a file that exists, whether it must carry test evidence before a merge, and whether it lands ordinarily or in an experiment worktree ([`mode.rs`](crates/kernel/src/model/mode.rs)).
+- **`RULES.toml` sets a building's limits**: where it may write (`prefixes`) and how (`write`: `everything` / `documents`), whether work is reviewed, which skills are admitted, which domains it may reach (`egress`), whether it may use the city's own browser or the one you are using, whether it may drive your desktop (the window allowlist is in `DESKTOP.toml`), and whether it is confidential (`confidential` narrows the model pool to local inference and starts no MCP server). A misspelled key is refused rather than ignored ([`policy.rs`](crates/city/src/policy.rs)). `.sprawling/` is in the reserved subtree, which residents read and cannot write.
+- **Capabilities and permissions go one level further down**: the three tiers for tools and skills, MCP definitions and a building's references to them, sandbox limits and the effort level live in `CONFIG.toml`, layered over city, building and room. The tool table stops at the building, because it sits ahead of the system prompt in a provider's cache, and rooms that differed would split one building's cache ([`config/exposure.rs`](crates/kernel/src/config/exposure.rs)). Each dispatch then picks a run policy: chat or work, whether it may change a file that exists, whether it must carry test evidence before a merge, and whether it lands ordinarily or in an experiment worktree ([`mode.rs`](crates/kernel/src/model/mode.rs)).
 - **Outside capabilities**: a building can mount MCP tool servers (one provider may hold several accounts, and a rejected key or an exhausted quota moves to the next account in the order you set), and any external agent that speaks **ACP** (Claude Code, Codex and others) can be brought in as a resident and given a room ([integrations](docs/integrations.md)).
 
 ### 2. The context is visible before it runs
@@ -152,40 +148,40 @@ When a model goes off course, the usual difficulty is not knowing whether a syst
 
 - **A refusal has to be actionable**: when a gate stops an action, the answer carries three things: the rule, what broke it, and what to do instead. `AxError` cannot be constructed without a recovery line in the first place, so a failure with no next step cannot be written ([`error/shape.rs`](crates/kernel/src/error/shape.rs)).
 - **Command output is stored before it is cut**: the full text of an `exec` result goes into the content store and a `.rest/` file, and is then trimmed by the command that produced it: ANSI removed, blank lines folded, repeated templates counted, an unchanged second run of the same command reduced to its new lines, diagnostic lines kept by priority, a line over 2 KiB truncated, and the whole held to 240 lines ([`Sieve.lean`](crates/runtime/spec/Sieve.lean)). The model spends less context, and reads the original back through the path the result carries when it needs the detail.
-- **Intervening needs no interruption**: `/steer` places one instruction at the end of the next tool result; in the **monitor** lens you can revert a change hunk, or write a comment, which reaches the run as a steer; **take this conversation to…** in the command palette branches the context into another room.
-- **Questions are grouped, and can be answered for you**: identical questions become one card, and one allow or deny releases the group; `hall/clerk` can answer for you, and writes its reason into the Ledger.
+- **Intervening needs no interruption**: `/steer` places one instruction at the end of the next tool result. In the **monitor** lens you can revert a change hunk, or write a comment, which reaches the run as a steer; **take this conversation to…** in the command palette branches the context into another room.
+- **Questions are grouped, and can be answered for you**: identical questions become one card, and one allow or deny releases the group. `hall/clerk` can answer for you, and writes its reason into the Ledger.
 - **The interface follows one set of rules**: one grid and one set of theme tokens, keyboard behaviour following the W3C ARIA Authoring Practices, an accessible name on every operable control, fonts embedded in the binary rather than fetched from a CDN, and `prefers-reduced-motion` or motion turned off moving every animation straight to its final state ([frontend method and the approved design](docs/frontend-method.md)).
 
 ### 4. Every step is recorded, and every commit names its run
 
 - **Record first, act second**: every model call, every tool result and every decision is written into `<city>/.sprawling/ledger` before it happens. A decision path takes time as a parameter, uses no random source, and iterates collections in a fixed order ([determinism](docs/ARCHITECTURE.md#10-determinism-and-hardening)), so `sprawling replay` on another machine gives a byte-for-byte identical state, and neither re-runs a tool nor calls a model again.
-- **From a commit back to the run**: before each wave of tool calls that may write, the city writes a checkpoint under `refs/sprawling/runs/` with no `HEAD` pointing at it; every merge commit carries the `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort` and other trailers, and `sprawling whose <city> <commit> --trace` lists that run's calls since its previous commit.
-- **Writing and reviewing are separate**: in a building with review on, the resident that wrote the code has no power to verify it, and a request nobody verified has no merge method; a discarded file goes to the **recycle bin**, where every row says how to get it back.
+- **From a commit back to the run**: before each wave of tool calls that may write, the city writes a checkpoint under `refs/sprawling/runs/` with no `HEAD` pointing at it. Every merge commit carries the `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort` and other trailers, and `sprawling whose <city> <commit> --trace` lists that run's calls since its previous commit.
+- **Writing and reviewing are separate**: in a building with review on, the resident that wrote the code has no power to verify it, and a request nobody verified has no merge method. A discarded file goes to the **recycle bin**, where every row says how to get it back.
 
 ### 5. One binary, small to install and light to run
 
 - **One process, no external service**: the page, the runtime and the Ledger are all in one Rust binary, with the front-end assets embedded in it, so there is no database, message queue or container orchestration to run. `unsafe` is forbidden across the workspace; only two FFI packages relax it, once per call into their own Zig boundary (the console's renderer and the Windows platform leaf), and parsing stays in safe Rust wherever it can.
-- **Caching and head starts**: the context is frozen in four segments, `City → Building → Resident → Run`, and the compiler refuses to mix in volatile fields such as timestamps; renewing a cache costs one output token; while the model is still streaming, the leading read-only tools (`read`, `search`) are already running.
+- **Caching and head starts**: the context is frozen in four segments, `City → Building → Resident → Run`, and the compiler refuses to mix in volatile fields such as timestamps. Renewing a cache costs one output token. While the model is still streaming, the leading read-only tools (`read`, `search`) are already running.
 - **It does not compete with your build for a CPU**: Settings chooses the CPU placement policy (`soft` / `pinned` / `soft_shares`) and the core threads' priority; every build and test an agent starts runs below the city (Below Normal on Windows, `nice -n 10` on Unix), so the page still answers while several agents compile in the background.
 - **A memory ceiling, and a budget that queues**: one run can be given a memory ceiling (enforced by a Windows Job Object or a delegated Linux cgroup), and the whole machine a memory budget (`memory = "auto"`) that reserves before a call and queues what does not fit, rather than running the machine out of memory ([how the city uses the machine](docs/performance.md#choose-how-the-city-uses-the-machine)).
-- **A monitor, and a register**: the page's monitor and `sprawling gauge` (also `top`) read durations, token counts, cost to the microdollar and process-tree use on your own hardware; every budget and recorded baseline is published in the [performance register](crates/xtask/budgets.toml) ([performance guide](docs/performance.md)).
-- **Performance is continuous work**: every reading goes into the performance register (`crates/xtask/budgets.toml`) with its machine class and the command that retakes it, and the table says row by row which reading a gate holds and which is only recorded. The next optimisation comes from a flamegraph, and is re-measured on the same harness. When the city grows, the first thing to read is the Ledger and the endpoint gate: runs are driven in parallel, accounting lands in series on one thread, and the only concurrency limit is each endpoint's own `max_in_flight`, so that the cost does not grow multiplicatively with the number of agents.
+- **A monitor, and a register**: the page's monitor and `sprawling gauge` (also `top`) read durations, token counts, cost to the microdollar and process-tree use on your own hardware. Every budget and recorded baseline is published in the [performance register](crates/xtask/budgets.toml) ([performance guide](docs/performance.md)).
+- **Performance is continuous work**: every reading goes into the performance register (`crates/xtask/budgets.toml`) with its machine class and the command that retakes it. The table says row by row which reading a gate holds and which is only recorded. The next optimisation comes from a flamegraph, and is re-measured on the same harness. When the city grows, the first thing to read is the Ledger and the endpoint gate: runs are driven in parallel, accounting lands in series on one thread, and the only concurrency limit is each endpoint's own `max_in_flight`, so that the cost does not grow multiplicatively with the number of agents.
 
 ### 6. A group of agents at work, and a platform for studying it
 
 - **Residents communicate on their own**: they can find the addresses they can reach, send a letter, knock so an empty room opens a run, divide work, and wait for a reply, without you relaying each exchange. The main agent reports progress to you, and every exchange is recorded; [playback](crates/city/skills/playback/SKILL.md) exports it for comparison against the Ledger, which suits work on multi-agent coordination, organisational behaviour and social simulation.
-- **The wire is public**: [wire.md](docs/wire.md) documents the frames, answers and exit codes, so `sprawling call` and `sprawling dispatch` can drive a city from a script by exit code alone, and the [architecture](docs/ARCHITECTURE.md#8-where-to-change-what) names the seams where a component can be replaced or a client of your own written.
+- **The wire is public**: [wire.md](docs/wire.md) documents the frames, answers and exit codes, so `sprawling call` and `sprawling dispatch` can drive a city from a script by exit code alone. The [architecture](docs/ARCHITECTURE.md#8-where-to-change-what) names the seams where a component can be replaced or a client of your own written.
 
 ### 7. Data stays local, with the boundaries stated
 
-- **Credentials**: a key pasted into a message goes into the platform's credential store first, and the model sees only a `secret:realm/name` reference ([`custody.rs`](crates/accounting/src/worker/dispatching/custody.rs)); secret-shaped spans in model replies and tool results are replaced with a marker before they enter the permanent history ([`redact.rs`](crates/runtime/src/redact.rs)).
+- **Credentials**: a key pasted into a message goes into the platform's credential store first, and the model sees only a `secret:realm/name` reference ([`custody.rs`](crates/accounting/src/worker/dispatching/custody.rs)). Secret-shaped spans in model replies and tool results are replaced with a marker before they enter the permanent history ([`redact.rs`](crates/runtime/src/redact.rs)).
 - **What leaves your computer**: the model services you connect, the MCP servers you turn on, and the web search that is on by default (until it is turned off, it sends the search words to Exa). A confidential building calls no remote provider and starts no MCP server.
 - **The local port**: every caller presents a credential. The browser that `/web` opens is paired without typing; a second browser asks for the pairing code the terminal shows; a script on this computer reads a key file only your account can read ([SECURITY.md](docs/SECURITY.md)). The programs the city starts (ACP agents, MCP servers, browsers) do not inherit the city's environment credentials.
 - **Windows privacy controls**: Settings offers 88 optional system privacy controls, from diagnostic data and speech input to app permissions and Windows AI features. Each shows its current value, what it changes and what it costs, is applied or restored one at a time, and is read back after the write ([Windows privacy controls](docs/operating.md#windows-privacy-controls)).
 
 #### Code signing policy
 
-Free code signing is provided by [SignPath.io](https://signpath.io), with a certificate from [SignPath Foundation](https://signpath.org). **The certificate has not been issued yet; we are waiting for SignPath's notice.** Once it is issued, the Windows binary inside a release archive will carry that signature, each release's notes will say whether it is signed, the archive's SHA-256 is published beside it, and `install.ps1` refuses an archive whose digest does not match.
+Free code signing is provided by [SignPath.io](https://signpath.io), with a certificate from [SignPath Foundation](https://signpath.org). **The certificate has not been issued yet. We are waiting for SignPath's notice.** Once it is issued, the Windows binary inside a release archive will carry that signature, and each release's notes will say whether it is signed. The archive's SHA-256 is published beside it, and `install.ps1` refuses an archive whose digest does not match.
 
 - **Authors**: [@2youg1](https://github.com/2youg1) may change the source directly.
 - **Reviewers**: a change proposed from outside the project is reviewed in its pull request before it merges.
@@ -203,17 +199,17 @@ I have tried many harnesses. Some are conceptually behind; others overshoot what
 
 More and more small companies are a few people delivering an online service with a large group of agents. Taken apart, 99% of their core asset is a well-worked set of Markdown plus a few smart people.
 
-So I wanted a harness that keeps up with the multi-agent (graph engineering) wave and stays pragmatic about RSI and the memory fashion. Extensibility, saving the user's attention, the cost of agent scale-up, privacy and reliability, and running unattended for a long time went into the design core, with a little urban studies and sociology mixed in, and that is how sprawling took shape.
+So I wanted a harness that keeps up with the multi-agent (graph engineering) wave and stays pragmatic about RSI and the memory fashion. I designed it around pragmatic extensibility, saving the user's attention, controlling the cost of agent scale-up, privacy and reliability, and long unattended operation. A little urban studies and sociology went into the mix, and that is how sprawling took shape.
 
-The stronger and more numerous the agents, the more expensive human attention gets. I refuse to let sprawling become another app that tries to hijack yours. Most harnesses spend their effort writing prompts; I think sprawling is best used by turning to the loop: design the workflow, let the agents develop and maintain sprawling itself, take over your fixed work, and go design new business, learn new things, and look in on the city occasionally.
+The stronger and more numerous the agents, the more expensive human attention gets. I refuse to let sprawling become another app that tries to hijack yours. Most harnesses spend their effort writing prompts; I think sprawling is best used by turning to the loop. Design the workflow, let the agents develop and maintain sprawling itself, take over your fixed work, and go design new business, learn new things, and look in on the city occasionally.
 
-Honestly, no multi-agent scheme yet delivers gains that justify the cost after scale-up. But research on this technology for business automation, social simulation and AI alignment is only beginning, and how models interact, collaborate and show social behaviour inside an agent cluster still needs a great deal of effort and resources to observe.
+Honestly, no multi-agent scheme yet delivers gains that justify the cost after scale-up. But research on this technology for business automation, social simulation and AI alignment is only beginning. We still need to invest considerable effort and resources in observing and studying how models interact and collaborate inside an agent cluster, and what social behaviour they exhibit.
 
-agent memory is one road to RSI, but not by black-box injection inside the harness. Your files, code and document libraries are the memory. Before LLMs leave the stateless regime, most attempts to make an agent truly grow with you only drag the model down.
+Agent memory is one road to RSI, but not by black-box injection inside the harness. Your files, code and document libraries are the memory. Before LLMs leave the stateless regime, most attempts to make an agent truly grow with you only drag the model down.
 
-If you already have a harness you like, any harness that speaks ACP can join the city as a resident ([integrations](docs/integrations.md)). Beyond migrating the business skills, MCP and ACP you need, I suggest staying lean and adding rules by hand when a concrete problem shows up; the same model behaves completely differently under a different harness. kasanagi, another project I am preparing, helps build chat software, and will later work as an MCP server for remote collaboration between several sprawling instances.
+If you already have a harness you like, any harness that speaks ACP can join the city as a resident ([integrations](docs/integrations.md)). Beyond migrating the business skills, MCP and ACP you need, I suggest staying lean and adding rules by hand when a concrete problem shows up, since the same model behaves completely differently under a different harness. kasanagi, another project I am preparing, helps build chat software, and will later work as an MCP server for remote collaboration between several sprawling instances.
 
-Two more things are plain reality. My own computer is modest, so I will not let multi-agent work grow its cost exponentially, which also lets sprawling run on an old laptop or a cheap cloud box. I do not sell APIs and cannot afford a disk full of your data, so data stays local by default; the city has a confidential building that calls no remote model and starts no MCP server, and with a local model it can hold private data. The price is that I cannot run very large tests in the cloud.
+Two more things are plain reality. My own computer is modest, so I will not let multi-agent work grow its cost exponentially. That also lets sprawling run on an old laptop or a cheap cloud box. I do not sell APIs and cannot afford a disk full of your data, so data stays local by default; the city has a confidential building that calls no remote model and starts no MCP server, and with a local model it can hold private data. The price is that I cannot run very large tests in the cloud.
 
 <p align="center">
   <a href="docs/images/ai-jiahao.webp"><img alt="AI 嘉豪: looks very cutting-edge, actually accomplished nothing" src="docs/images/ai-jiahao.webp" width="90%"></a>
@@ -250,10 +246,17 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 
 ## Sources and credits
 
-Provider interfaces follow vendor documentation, and ACP agent launch commands follow the ACP registry bundled with each release; where a fact needs checking precisely, it is read from the vendor's client without copying its code. The interface controls are implemented here, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation. Source versions and full licences are in [third-party](docs/third-party.md).
-
-The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills; `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository; all four keep the MIT licence. Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
-
-To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Report vulnerabilities through the private channel in [SECURITY.md](docs/SECURITY.md).
-
-The project is licensed under [MPL-2.0](LICENSE); the shipped skills each carry their own licence with their files.
+- **Interfaces and interface controls**
+  - Provider interfaces follow vendor documentation, and ACP agent launch commands follow the ACP registry bundled with each release.
+  - Where a fact needs checking precisely, it is read from the vendor's client without copying its code.
+  - The interface controls are implemented here, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation.
+  - Source versions and full licences are in [third-party](docs/third-party.md).
+- **Bundled skills**
+  - `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills.
+  - `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository. All four keep the MIT licence.
+  - Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
+- **Contributing and licences**
+  - To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose).
+  - For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md).
+  - Report vulnerabilities through the private channel in [SECURITY.md](docs/SECURITY.md).
+  - The project is licensed under [MPL-2.0](LICENSE). The shipped skills each carry their own licence with their files.
