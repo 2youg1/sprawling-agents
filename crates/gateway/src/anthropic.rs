@@ -47,16 +47,13 @@ fn role_str(role: Role) -> &'static str {
     }
 }
 
-/// Keeps Anthropic tool ids and deterministically spells all others within
-/// the provider's accepted prefix and character set.
+/// Keeps ids Anthropic accepts and deterministically spells all others.
 fn tool_id_wire(id: &str) -> String {
-    let is_anthropic_id = id.strip_prefix("toolu_").is_some_and(|suffix| {
-        !suffix.is_empty()
-            && suffix
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-    });
-    if is_anthropic_id {
+    if !id.is_empty()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
         id.to_owned()
     } else {
         let fingerprint: String = kernel::B3Hash::digest(id.as_bytes())

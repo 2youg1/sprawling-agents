@@ -374,6 +374,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`crates/gateway/spec/Endpoint/Models.lean`
 - D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`crates/gateway/spec/Endpoint/Models.lean`
 - D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`crates/gateway/spec/Router.lean`
+- D49 Anthropic wire 边界保留非空 ASCII 字母、数字、下划线与连字符组成的工具 id；其他 id 确定性映射，避免 runtime 为工具 id 破坏统一脱敏规则：`crates/gateway/spec/Dialect.lean`
 -/
 
 /-! ## 13 依赖选型

@@ -356,6 +356,7 @@ mod tests {
     fn anthropic_rewrites_redacted_tool_ids_to_accepted_ids() {
         let mut req = sample_request();
         for id in [
+            "",
             "secret:redacted/0123456789abcdef",
             "call.secret:redacted/0123456789abcdef",
             "functions.read:0",
@@ -392,27 +393,29 @@ mod tests {
 
     #[test]
     fn anthropic_keeps_provider_tool_ids_unchanged() {
-        let mut req = sample_request();
-        let id = "toolu_01HZY6G7K9M2N4P6Q8R0S1T3";
-        if let ContentBlock::ToolUse { id: tool_id, .. } = &mut req.messages.to_mut()[1].content[1]
-        {
-            *tool_id = id.to_owned();
-        }
-        if let ContentBlock::ToolResult { tool_use_id, .. } =
-            &mut req.messages.to_mut()[2].content[0]
-        {
-            *tool_use_id = id.to_owned();
-        }
+        for id in ["toolu_01HZY6G7K9M2N4P6Q8R0S1T3", "tu_1", "call-1"] {
+            let mut req = sample_request();
+            if let ContentBlock::ToolUse { id: tool_id, .. } =
+                &mut req.messages.to_mut()[1].content[1]
+            {
+                *tool_id = id.to_owned();
+            }
+            if let ContentBlock::ToolResult { tool_use_id, .. } =
+                &mut req.messages.to_mut()[2].content[0]
+            {
+                *tool_use_id = id.to_owned();
+            }
 
-        let wire = request_wire(
-            DialectKind::Anthropic,
-            &req,
-            &ImageBytes::default(),
-            ChatSpelling::DOCUMENTED,
-        )
-        .unwrap();
-        assert_eq!(wire["messages"][1]["content"][1]["id"], id);
-        assert_eq!(wire["messages"][2]["content"][0]["tool_use_id"], id);
+            let wire = request_wire(
+                DialectKind::Anthropic,
+                &req,
+                &ImageBytes::default(),
+                ChatSpelling::DOCUMENTED,
+            )
+            .unwrap();
+            assert_eq!(wire["messages"][1]["content"][1]["id"], id);
+            assert_eq!(wire["messages"][2]["content"][0]["tool_use_id"], id);
+        }
     }
 
     #[test]
