@@ -1,10 +1,23 @@
 [package]
-name = "benchstat"
+name = "sprawling-benchstat"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-publish = false
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+publish.workspace = true
+description = "Deterministic statistical analysis, verification and reports for sprawling benchmark rounds."
+keywords = ["benchmarking", "statistics", "reproducibility", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "benchstat"
+
+[[bin]]
+name = "benchstat"
+path = "src/main.rs"
 
 [package.metadata.sprawling]
 role = "tool"

@@ -5,11 +5,12 @@
 
 import crates.benchstat.spec.Estimators
 
-/-! # benchstat 的规格
+/-! # sprawling-benchstat 的规格
 
-`crates/benchstat/` 是不发布、无产品 crate 依赖的基准分析器。它把一轮的
-`manifest.json` 与 `results.csv` 变成确定性的 `exports.json` 和权威 Markdown 报告；
-同一实现负责生成与验证，读者不需要产品二进制或另一套统计代码。
+`crates/benchstat/` 是可发布、无产品 crate 依赖的基准分析器，Cargo 包名为
+`sprawling-benchstat`，库名与命令名仍为 `benchstat`。它把一轮的 `manifest.json`
+与 `results.csv` 变成确定性的 `exports.json` 和权威 Markdown 报告；同一实现负责生成与验证，
+读者不需要产品二进制或另一套统计代码。
 -/
 
 /-! ## 1 需求分解
@@ -34,7 +35,9 @@ import crates.benchstat.spec.Estimators
 - 空 index 只给 iid sensitivity；有顺序时使用不跨 round/cohort 的 moving-block bootstrap。
 - `dip_p` 在没有已验证 dependent-null 校准时为 null/unavailable；不得把 iid uniform null 当作确认性校准。
 - coverage 的 deferred/failed 行全部进入 Markdown，依赖它们的 claim 标成 deferred。
-- `cargo nextest run -p benchstat`、`cargo clippy -p benchstat --all-targets --all-features -- -D warnings`、
+- `cargo nextest run -p sprawling-benchstat`、
+  `cargo clippy -p sprawling-benchstat --all-targets --all-features -- -D warnings`、
+  `cargo publish -p sprawling-benchstat --dry-run --locked` 与
   `lake build crates.benchstat.Spec` 通过；历史 `docs/benchmarks/v0.0.11/` 不变。
 -/
 
@@ -66,6 +69,7 @@ main 上的方法学已经绑定估计量和 schemas，但没有分析器；历�
 
 /-! ## 6 命名统一
 
+Cargo 包名是 `sprawling-benchstat`；Rust 库、可执行文件和报告受管标记沿用 `benchstat`。
 Rust 模块与 §1 同名；`CellKey`、`Observation`、`CoverageStatus`、`AnalysisStatus`、`Command` 是唯一拼法。
 Lean 的 `nearestRankIndex`、`boundedBlockLength`、`nextPilotSize` 对应 Rust 的同名规则。
 -/
@@ -161,8 +165,8 @@ statrs：正态和二项分布；rustfft（关闭默认 SIMD features）：KDE �
 
 /-! ## 15 影响面
 
-只新增仓库工具和方法学要求的未来轮次 artifacts；不改变产品依赖图、线上协议、客户端或历史轮次。
-方法学的导出精度、HTML 和工具位置描述必须与本包同步。
+包经 crates.io 分发，但仍不进入产品依赖图、产品二进制或 release archive；线上协议、客户端与历史轮次不变。
+方法学的导出精度、HTML、包名和工具位置描述必须与本包同步。
 -/
 
 /-! ## 16 测试与约束
@@ -180,6 +184,7 @@ statrs：正态和二项分布；rustfft（关闭默认 SIMD features）：KDE �
 -/
 
 -- D1 独立工具包而非并入 xtask：完整统计核心的泛用性、审计重要性和体量同时满足拆分准则；
--- 它仍不发布且不进入产品图。被否决的方案是 xtask 子命令，因为 xtask 的产品依赖会削弱分析器隔离。
+-- 它以 sprawling-benchstat 发布，让仓库外的分析者使用同一实现，但不进入产品图。
+-- 被否决的方案是 xtask 子命令，因为 xtask 的产品依赖会削弱分析器隔离；不发布则无法经 crates.io 分发。
 -- D2 本轮只生成 Markdown 与 JSON：HTML 可由 Agent  later 从报告派生，省掉第二视图和维护面；
 -- 被否决的是继续让 HTML 参与逐字节发布验证。

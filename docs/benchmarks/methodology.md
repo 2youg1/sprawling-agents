@@ -243,11 +243,11 @@ The manifest's coverage entries use the exact fields and status rules above. It 
 
 ## Reproduce a published round
 
-The round's analyzer is one Rust workspace package named `benchstat` under `crates/benchstat/`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. Its generality, audit importance and size justify a package separate from `xtask`; it remains `publish = false` until a consumer outside this tree exists.
+The round's analyzer is the Rust workspace package `sprawling-benchstat` under `crates/benchstat/`, holding validation, estimators, verification and report generation. Its library and executable are both named `benchstat`. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. Its generality, audit importance and size justify a package separate from `xtask`; crates.io distribution lets an outside analyzer use the same implementation without adding it to the product graph.
 
-To reproduce a future round, read `analysis_revision` from its manifest, run `git worktree add --detach <analysis-checkout> <analysis_revision>`, and build there with `cargo build --locked -p benchstat`, using that revision's recorded toolchain. Run its `target/debug/benchstat` with the commands below against an absolute path to a copy of the published round. The analysis revision must be an ancestor available in repository history; record round input digests separately so the analyzer commit need not contain its own SHA. Never use the latest analyzer as a substitute.
+To reproduce a future round, read `analysis_revision` from its manifest, run `git worktree add --detach <analysis-checkout> <analysis_revision>`, and build there with `cargo build --locked -p sprawling-benchstat`, using that revision's recorded toolchain. Run its `target/debug/benchstat` with the commands below against an absolute path to a copy of the published round. The analysis revision must be an ancestor available in repository history; record round input digests separately so the analyzer commit need not contain its own SHA. Never use the latest analyzer as a substitute.
 
-Build the package with `cargo build --locked -p benchstat`; its executable exposes:
+Build the package with `cargo build --locked -p sprawling-benchstat`; its executable exposes:
 
 ```sh
 benchstat export docs/benchmarks/<round> --write

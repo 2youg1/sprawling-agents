@@ -1,6 +1,6 @@
-# benchstat
+# sprawling-benchstat
 
-The analyzer for the benchmark rounds under [`docs/benchmarks/`](../../docs/benchmarks/README.md): it validates one round's manifest and raw observations, computes every statistic the method binds, publishes the canonical `exports.json`, and renders the round report's generated section from those exports. Generation and verification are one implementation, so a published round is checked against the analyzer that produced it rather than against a second statistics implementation. It is a workspace member and a repository tool only: its manifest marks it `role = "tool"` and `publish = false`, it depends on no product crate, and it enters neither the `sprawling` binary nor a release archive.
+The analyzer for the benchmark rounds under [`docs/benchmarks/`](../../docs/benchmarks/README.md): it validates one round's manifest and raw observations, computes every statistic the method binds, publishes the canonical `exports.json`, and renders the round report's generated section from those exports. Generation and verification are one implementation, so a published round is checked against the analyzer that produced it rather than against a second statistics implementation. The Cargo package is published as `sprawling-benchstat`, while its library and command are both named `benchstat`. It depends on no product crate and enters neither the `sprawling` binary nor a release archive.
 
 ## The round it reads
 
@@ -10,8 +10,10 @@ The analyzer reads no clock, environment variable or network. A missing manifest
 
 ## The three commands
 
+Install the published package with `cargo install sprawling-benchstat --locked`, or build this checkout with the first command below:
+
 ```bash
-cargo build --locked -p benchstat
+cargo build --locked -p sprawling-benchstat
 
 target/debug/benchstat export docs/benchmarks/<round> [--write]
 target/debug/benchstat verify docs/benchmarks/<round>
@@ -39,8 +41,8 @@ The SPEC is [`Spec.lean`](Spec.lean), with its part under [`spec/Estimators.lean
 ## Checking it
 
 ```bash
-cargo nextest run -p benchstat                        # the tests; `just test` runs them too
-cargo clippy -p benchstat --all-targets --all-features -- -D warnings
+cargo nextest run -p sprawling-benchstat              # the tests; `just test` runs them too
+cargo clippy -p sprawling-benchstat --all-targets --all-features -- -D warnings
 lake build crates.benchstat.Spec                       # the SPEC's proofs; `just models` builds every specification
 ```
 

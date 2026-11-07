@@ -8,7 +8,7 @@
 //
 //   just build-web
 //   cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
-//   bun crates/HotKeyE2E.ts
+//   cd client && bun scripts/HotKeyE2E.ts
 //
 // No product action below calls `focus()` or `click()`: pairing, forms,
 // disclosures, comboboxes, navigation and commands all arrive through
@@ -18,11 +18,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ORIGIN, phrase, prepareCity } from "../client/scripts/walk";
-import { FIGURED, PROBED, TYPED } from "../client/src/views/gallery/served";
-import { DevTools } from "../client/scripts/walk_devtools";
+import { ORIGIN, phrase, prepareCity } from "./walk";
+import { FIGURED, PROBED, TYPED } from "../src/views/gallery/served";
+import type { DevTools } from "./walk_devtools";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "..", "..");
 const OUT = join(ROOT, "target", "hotkey-e2e");
 const TASK = "Keyboard acceptance: describe the first ledger round.";
 const FRAME = { name: "1440x1000", width: 1440, height: 1000, dpr: 1, touch: false };

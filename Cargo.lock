@@ -228,20 +228,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
-name = "benchstat"
-version = "0.0.15"
-dependencies = [
- "csv",
- "rustfft",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "statrs",
- "tempfile",
- "thiserror 2.0.21",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3007,6 +2993,20 @@ dependencies = [
  "sprawling-gateway",
  "sprawling-kernel",
  "tempfile",
+]
+
+[[package]]
+name = "sprawling-benchstat"
+version = "0.0.15"
+dependencies = [
+ "csv",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "statrs",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
