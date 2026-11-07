@@ -319,4 +319,22 @@ fn pooled_memory_sizing_exports_precision_misses() {
     assert_eq!(sizing.get("precision_met").unwrap(), false);
     assert_eq!(sizing.get("status").unwrap(), "sizing_failed");
     assert!(sizing.get("achieved_half_width").unwrap().as_f64().unwrap() > 0.001);
+    let mut report_input = result.clone();
+    *report_input
+        .get_mut("memory_fits")
+        .unwrap()
+        .get_mut(key.id())
+        .unwrap()
+        .get_mut("sizing")
+        .unwrap() = serde_json::json!({
+        "status": "sizing_failed", "precision_met": false,
+        "target_half_width": 0.001, "achieved_half_width": 0.002,
+        "extra_diagnostic": "not part of the summary"
+    });
+    let report = benchstat::report::markdown(&report_input).unwrap();
+    assert!(report.contains(&format!(
+        "- `{}`: status=sizing_failed; precision_met=false; target_half_width=0.001; achieved_half_width=0.002\n",
+        key.id()
+    )));
+    assert!(!report.contains("extra_diagnostic"));
 }

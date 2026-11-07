@@ -219,9 +219,11 @@ pub fn markdown(exports: &Value) -> Result<String, BenchError> {
     {
         if let Some(sizing) = fitted.get("sizing") {
             text.push_str(&format!(
-                "- `{}`: {}\n",
-                escape(id),
-                escape(&display(sizing))
+                "- `{id}`: status={}; precision_met={}; target_half_width={}; achieved_half_width={}\n",
+                sizing.get("status").map(display).unwrap_or_else(|| "unavailable".to_owned()),
+                sizing.get("precision_met").map(display).unwrap_or_else(|| "unavailable".to_owned()),
+                sizing.get("target_half_width").map(display).unwrap_or_else(|| "unavailable".to_owned()),
+                sizing.get("achieved_half_width").map(display).unwrap_or_else(|| "unavailable".to_owned())
             ));
         }
     }

@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 
+use benchstat::error::{BenchError, Severity};
 use benchstat::estimators::{Quantile, nearest_rank, range};
 use benchstat::observation::CellKey;
 use serde_json::Value;
@@ -23,12 +24,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     check(Path::new(&source), Path::new(&exports))
 }
 
-fn check(source: &Path, exports: &Path) -> Result<(), Box<dyn Error>> {
-    let exports: Value = serde_json::from_slice(&std::fs::read(exports)?)?;
+fn check(source: &Path, exports_path: &Path) -> Result<(), Box<dyn Error>> {
+    let exports: Value = serde_json::from_slice(&std::fs::read(exports_path)?)?;
     let cells = exports
         .get("cells")
         .and_then(Value::as_object)
-        .ok_or("exports cells missing")?;
+        .ok_or_else(|| BenchError {
+            code: "E_INVALID_INPUT",
+            action: "read exported cells".to_owned(),
+            subject: format!(
+                "{}: cells is missing or not an object",
+                exports_path.display()
+            ),
+            recovery:
+                "regenerate exports.json with `benchstat export <round-dir> --write`, then retry"
+                    .to_owned(),
+            severity: Severity::Rejected,
+        })?;
     let mut reader = csv::Reader::from_path(source.join("results.csv"))?;
     let headers = reader.headers()?.clone();
     let mut pooled = BTreeMap::<String, Vec<f64>>::new();
@@ -195,4 +207,26 @@ fn field<'a>(row: &BTreeMap<&str, &'a str>, name: &str) -> Result<&'a str, Box<d
     row.get(name)
         .copied()
         .ok_or_else(|| format!("historical column {name} missing").into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check;
+
+    #[test]
+    fn invalid_cells_preserves_export_path_and_recovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("exports.json");
+        for json in ["{}", r#"{"cells":null}"#, r#"{"cells":[]}"#] {
+            std::fs::write(&path, json).unwrap();
+            let error = check(dir.path(), &path).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "E_INVALID_INPUT read exported cells: {}: cells is missing or not an object; regenerate exports.json with `benchstat export <round-dir> --write`, then retry",
+                    path.display()
+                )
+            );
+        }
+    }
 }

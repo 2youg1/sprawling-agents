@@ -115,7 +115,8 @@ verify：执行与 export 相同的重算，再比较 exports 字节和 README �
 用量不完整只排除 token 总量；终止证据独立保留。报告标签包含完整 cell 身份。
 只有 status=bca 的区间参与确认性定样和 P99 发布。未支持的 KDE 峰保留位置和支持率，
 无保留峰时摘要 unavailable，不生成切点或份额。内存定样用 sessions 为空的 pooled key
-关联 plan，导出目标、实际半宽和资源上限结果。自由文本声明不能自动解析证伪逻辑；
+关联 plan，导出目标、实际半宽和资源上限结果。Markdown 定样列表的代码片段保留 ID 中的 `|`，
+逐项显示 status、precision_met、target_half_width 和 achieved_half_width，不倾倒完整 JSON。自由文本声明不能自动解析证伪逻辑；
 导出所需观测、方向、阈值和限制，无法执行的声明 unavailable，不能仅凭 coverage 判 evaluated。
 结局比较使用候选 plan 的 baseline_key；所有 case 必须一致映射至同一基线汇总，且两组均合格。
 
@@ -136,6 +137,8 @@ OLS 少于四 cohort 或三 session level、BCa 分母为零、KDE 无正带宽�
 
 /-! ## 12 错误处理
 
+历史交叉验证示例遇到缺失或非对象 cells 时返回 BenchError，使用 E_INVALID_INPUT、
+读取动作、exports 文件路径与重新导出的恢复步骤。
 输入和分析拒绝保留原文件；verify 不匹配只报告首个不同文件与字段，不回写修正。
 写盘经同目录 `.part` 文件、flush、原子替换；失败保留既有发布文件并报告临时路径。
 数值不稳定不转成零或默认区间；可用 percentile sensitivity 必须与 BCa 分开标注。
