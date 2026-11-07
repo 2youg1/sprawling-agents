@@ -4,24 +4,34 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The type cards of the appearance group: the interface face, the
-  // mono face, the reading face with a sample set in it, the body size,
-  // and a preview of the interface and mono faces side by side.
+  // The type cards of the appearance group: the interface face, the mono
+  // face, the reading face with a sample set in it, the fallback chain, the
+  // body size, the three ratios that set a line, the features the bundled
+  // faces carry, and a preview of the interface and mono faces side by
+  // side.
   //
   // The record and its writing are the group's (`appearance.svelte`):
   // this file is handed the record as it stands, the one way to write a
   // change to it, and the receipt every card of the group ends with, so a
   // change made here lands through the same door, the same root element
   // and the same receipt as a change made on any other card. What it
-  // owns is the state these cards alone have - the size box mid-edit and
-  // the faces this machine has installed.
+  // owns is the state these cards alone have - the boxes mid-edit and the
+  // faces this machine has installed.
 
   import { onMount } from "svelte";
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { FACES, READING_FACES } from "../../core/appearance";
-  import type { Appearance } from "../../core/appearance";
+  import {
+    FACES,
+    FAMILY_SHAPE,
+    FEATURES,
+    READING_FACES,
+    WEIGHTS,
+    featuresOffered,
+  } from "../../core/appearance";
+  import type { Appearance, TypeFeature, Weight } from "../../core/appearance";
+  import { LINE_HEIGHT_FLOOR, TRACKING_FLOOR, ratioOf, spelledRatio } from "../../core/metrics";
   import { sizingOf } from "../../core/sizing";
   import { BODY_PX } from "../../wire";
   import { ui } from "../../ui";
@@ -30,10 +40,29 @@
   import Field from "../parts/field.svelte";
   import type { FieldProps } from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
-  import { FACE_WORDS, READING_WORDS, cellsOf, drawnSize, stackRefused } from "./appearance";
+  import {
+    FACE_WORDS,
+    FEATURE_WORDS,
+    READING_WORDS,
+    WEIGHT_WORDS,
+    cellsOf,
+    drawnLeading,
+    drawnSize,
+    stackRefused,
+  } from "./appearance";
   import type { Axis, Setting } from "./appearance";
   import type { ReceiptLook } from "./card";
   import Card from "./card.look.svelte";
+
+  // The two states of one feature switch. A word of this card rather than
+  // of the wire: the wire records which features are on, and a switch has
+  // exactly these two postures.
+  type Switch = "off" | "on";
+  const SWITCHES: readonly Switch[] = ["off", "on"];
+  const SWITCH_WORDS: Record<Switch, Key> = {
+    off: "appearance_feature_off",
+    on: "appearance_feature_on",
+  };
 
   interface Props {
     readonly look: Appearance;
@@ -48,8 +77,14 @@
   const said = (key: Key): string => say($lang, key);
 
   // What is in the size box, which is not the size: a box mid-edit holds
-  // text the page must not act on yet.
+  // text the page must not act on yet. The two fallback slots and the two
+  // ratio boxes are the same: a name half typed or a number half typed is
+  // text, not a value, so each keeps what was typed until it is one.
   let box = $state("");
+  let slot1 = $state("");
+  let slot2 = $state("");
+  let leading = $state("");
+  let tracking = $state("");
   // The faces this machine has, once a person asks for them and the
   // browser agrees. Empty until both happen.
   let installed = $state<readonly string[]>([]);
@@ -57,7 +92,19 @@
 
   onMount(() => {
     box = look.body === null ? drawnSize(document.documentElement) : String(look.body);
+    slot1 = look.fallbacks[0] ?? "";
+    slot2 = look.fallbacks[1] ?? "";
+    leading =
+      look.lineHeight === null
+        ? drawnLeading(document.documentElement)
+        : spelledRatio(look.lineHeight);
+    tracking = look.tracking === null ? "" : spelledRatio(look.tracking);
   });
+
+  // The features the faces in use declare, drawn as one set: a switch one
+  // of them declares moves that face's text, so it is live
+  // (`featuresOffered`, `core/appearance.ts`).
+  const live: ReadonlySet<TypeFeature> = $derived(featuresOffered([look.sans, look.mono]));
 
   // Every keystroke in the size box is read once, and only a whole
   // number from the floor up reaches the page.
@@ -84,6 +131,64 @@
         ? { ...look, sans: "custom", sansStack: family }
         : { ...look, mono: "custom", monoStack: family },
       axis === "sans" ? "face" : "mono",
+    );
+  };
+
+  // One fallback slot. A name that is not a name is kept in the box and
+  // not written: the field says why, and the chain keeps what it had.
+  // An empty slot is dropped from the chain, so the second one only takes
+  // a name once the first holds one.
+  const wearFallback = (slot: 0 | 1, typed: string): void => {
+    if (slot === 0) slot1 = typed;
+    else slot2 = typed;
+    const both = [slot === 0 ? typed : slot1, slot === 1 ? typed : slot2];
+    if (!both.every((name) => name === "" || FAMILY_SHAPE.test(name))) return;
+    write({ ...look, fallbacks: both.filter((name) => name !== "") }, "fallbacks");
+  };
+
+  // The two ratio boxes, read the way the size box is: only a value at or
+  // above the wire's floor reaches the page, and an empty box takes the
+  // page back to the ratio the theme draws.
+  const resizeLeading = (typed: string): void => {
+    leading = typed;
+    const said = ratioOf(typed, LINE_HEIGHT_FLOOR);
+    switch (said.kind) {
+      case "cleared":
+        write({ ...look, lineHeight: null }, "metrics");
+        return;
+      case "set":
+        write({ ...look, lineHeight: said.perMille }, "metrics");
+        return;
+      case "refused":
+        return;
+    }
+  };
+
+  const resizeTracking = (typed: string): void => {
+    tracking = typed;
+    const said = ratioOf(typed, TRACKING_FLOOR);
+    switch (said.kind) {
+      case "cleared":
+        write({ ...look, tracking: null }, "metrics");
+        return;
+      case "set":
+        write({ ...look, tracking: said.perMille }, "metrics");
+        return;
+      case "refused":
+        return;
+    }
+  };
+
+  // One switch. The set is written in the order `FEATURES` declares,
+  // which is the order the file and the stylesheet read it in.
+  const toggleFeature = (feature: TypeFeature, next: Switch): void => {
+    const on = next === "on";
+    write(
+      {
+        ...look,
+        features: FEATURES.filter((each) => (each === feature ? on : look.features.includes(each))),
+      },
+      "features",
     );
   };
 
@@ -119,6 +224,29 @@
 
   const sizeRefusal = (): Pick<FieldProps, "error"> =>
     sizingOf(box).kind === "refused" ? { error: sizeFloor() } : {};
+
+  // A fallback slot's one line of constraint: a family name and nothing
+  // that could splice a second one into the slot.
+  const slotRefusal = (typed: string): Pick<FieldProps, "error"> =>
+    typed !== "" && !FAMILY_SHAPE.test(typed)
+      ? { error: say($lang, "appearance_fallback_refused") }
+      : {};
+
+  const leadingFloor = (): string =>
+    fill(say($lang, "appearance_leading_floor"), {
+      min: spelledRatio(LINE_HEIGHT_FLOOR),
+    });
+
+  const trackingFloor = (): string =>
+    fill(say($lang, "appearance_tracking_floor"), {
+      min: spelledRatio(TRACKING_FLOOR),
+    });
+
+  const leadingRefusal = (): Pick<FieldProps, "error"> =>
+    ratioOf(leading, LINE_HEIGHT_FLOOR).kind === "refused" ? { error: leadingFloor() } : {};
+
+  const trackingRefusal = (): Pick<FieldProps, "error"> =>
+    ratioOf(tracking, TRACKING_FLOOR).kind === "refused" ? { error: trackingFloor() } : {};
 </script>
 
 {#snippet stackFor(axis: Axis, name: Key)}
@@ -215,11 +343,44 @@
   />
   <!-- The sample carries the card's own choice, so it shows the face this card holds wherever the card is drawn. -->
   <p
-    class="rounded-card bg-chrome p-base font-read text-body leading-relaxed text-text"
+    class="rounded-card bg-chrome p-base font-read text-body leading-read text-text"
     data-read={look.reading}
   >
     {say($lang, "appearance_reading_sample")}
   </p>
+</Card>
+
+<Card
+  title={say($lang, "appearance_fallbacks")}
+  note={say($lang, "appearance_fallbacks_note")}
+  constraint={say($lang, "appearance_fallbacks_help")}
+  receipt={receipt("fallbacks")}
+>
+  <div class="flex flex-col gap-tight">
+    <Field
+      label={say($lang, "appearance_fallback_first")}
+      {...slotRefusal(slot1)}
+      value={slot1}
+      onInput={(typed: string) => {
+        wearFallback(0, typed);
+      }}
+    />
+    <!-- A chain with no gap: the second name is taken once the first
+    holds one, so a name typed into the second slot is never read back in
+    the first. -->
+    <Field
+      label={say($lang, "appearance_fallback_second")}
+      {...slotRefusal(slot2)}
+      help={slot1.trim() === ""
+        ? say($lang, "appearance_fallback_needs_first")
+        : say($lang, "appearance_fallback_second_help")}
+      disabled={slot1.trim() === ""}
+      value={slot2}
+      onInput={(typed: string) => {
+        wearFallback(1, typed);
+      }}
+    />
+  </div>
 </Card>
 
 <Card
@@ -239,6 +400,71 @@
     value={box}
     onInput={resize}
   />
+</Card>
+
+<Card
+  title={say($lang, "appearance_metrics")}
+  note={say($lang, "appearance_metrics_note")}
+  receipt={receipt("metrics")}
+>
+  <div class="flex flex-col gap-base">
+    <div class="flex flex-col gap-tight">
+      <Field
+        label={say($lang, "appearance_leading")}
+        {...leadingRefusal()}
+        value={leading}
+        onInput={resizeLeading}
+      />
+      <p class="text-note text-text-faint">{leadingFloor()}</p>
+    </div>
+    <div class="flex flex-col gap-tight">
+      <Field
+        label={say($lang, "appearance_tracking")}
+        suffix={say($lang, "appearance_tracking_unit")}
+        {...trackingRefusal()}
+        value={tracking}
+        onInput={resizeTracking}
+      />
+      <p class="text-note text-text-faint">{trackingFloor()}</p>
+    </div>
+    <div class="flex min-w-0 flex-col gap-snug">
+      <span class="text-note text-text-quiet">{say($lang, "appearance_weight")}</span>
+      <Segmented
+        label={say($lang, "appearance_weight")}
+        options={cellsOf(WEIGHTS, WEIGHT_WORDS, said)}
+        held={look.weight}
+        onPick={(weight: Weight) => {
+          write({ ...look, weight }, "metrics");
+        }}
+      />
+    </div>
+  </div>
+</Card>
+
+<Card
+  title={say($lang, "appearance_features")}
+  note={say($lang, "appearance_features_note")}
+  receipt={receipt("features")}
+>
+  <div class="flex flex-col gap-snug">
+    {#each FEATURES as feature (feature)}
+      <!-- A switch the faces in use do not declare is left out of reach and
+      says why, and its drawn posture is the one the page draws: off. -->
+      {@const available = live.has(feature)}
+      {@const absent = available ? {} : { why: say($lang, "appearance_feature_absent") }}
+      <div class="flex flex-wrap items-center justify-between gap-base">
+        <span class="text-note text-text-quiet">{say($lang, FEATURE_WORDS[feature])}</span>
+        <Segmented
+          label={say($lang, FEATURE_WORDS[feature])}
+          options={cellsOf(SWITCHES, SWITCH_WORDS, said).map((cell) => ({ ...cell, ...absent }))}
+          held={available && look.features.includes(feature) ? "on" : "off"}
+          onPick={(next: Switch) => {
+            toggleFeature(feature, next);
+          }}
+        />
+      </div>
+    {/each}
+  </div>
 </Card>
 
 <Card title={say($lang, "appearance_preview")}>

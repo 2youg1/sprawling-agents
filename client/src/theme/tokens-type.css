@@ -7,15 +7,19 @@
   /* The faces: the shipped one first, then what a browser already has,
    * in the order it is likely to have it. A stack begins with
    * `--face-sans` or `--face-mono` so that choosing a face moves one
-   * value and keeps the whole fallback chain behind it. */
+   * value and keeps the whole fallback chain behind it; the faces the
+   * person named as a fallback stand between the two, each with the
+   * comma that follows it (`--face-fallback`, wire D124), so a chain
+   * nobody named leaves the list valid. */
   /* **No CJK family is named here.** Han glyphs reach whatever face the
    * machine has, because that is what an engine does with a glyph none of
    * the named families carries, and the platform's own choice is the only
    * one available on the terms this project can accept.
    *
    * Two terms, and either one alone decides it. A licence: this stack may
-   * name only families the client could redistribute (`fonts/OFL.txt`,
-   * `docs/third-party.md` section 4), and the faces a person actually has
+   * name only families the client could redistribute
+   * (`fonts/MapleMono-OFL.txt`, `fonts/PaperMono-OFL.txt`,
+   * `fonts/Libron-OFL.txt`, `docs/third-party.md` section 4), and the faces a person actually has
    * on Windows and macOS - Microsoft YaHei, PingFang, Hiragino - are
    * their vendors' and not ours to prefer. A size: the first family a
    * stack would sensibly name is 17,773,244 B as its vendor ships it and
@@ -27,7 +31,10 @@
    * differ from the shipped face's, which shows only where Latin and Han
    * share one line, and naming a CJK face would not have removed that on
    * a machine that lacks the named one - it would have made the result
-   * depend on which fonts happen to be installed. */
+   * depend on which fonts happen to be installed. **The person may name
+   * one**, and that is the difference: `--face-fallback` is a family this
+   * machine has, chosen by the person who installed it (wire D124), where
+   * a name written here would be a claim this build ships it. */
   /* The interface stack falls back through the monospaced faces a
    * machine is likely to have and ends on `sans-serif`, not `monospace`:
    * Han glyphs are looked up through the generic family last, and the
@@ -35,26 +42,35 @@
    * interface, where the generic monospace face is a serif one on some
    * platforms. */
   --font-sans:
-    var(--face-sans), ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono",
-    sans-serif;
+    var(--face-sans), var(--face-fallback,) ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
+    Consolas, "DejaVu Sans Mono", sans-serif;
   --font-mono:
-    var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono",
-    monospace;
+    var(--face-mono), var(--face-fallback,) ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
+    Consolas, "DejaVu Sans Mono", monospace;
   /* Mono text is text a person copies: a command, a path, a code. Maple
    * Mono's ligatures and contextual alternates draw ` --` and `->` as
    * other shapes, so what the screen shows is not what the shell runs.
    * Tailwind carries this to `font-mono` and to `code`, `kbd`, `samp`
-   * and `pre` alike. */
+   * and `pre` alike. A face whose features the person turned on states
+   * its own list in `theme/preference.css`, which overrides this one. */
   --font-mono--font-feature-settings: "liga" 0, "calt" 0;
   --font-sans--font-feature-settings: "liga" 0, "calt" 0;
   /* Reading text - a conversation's messages, documents, reports - in
    * the interface's own face until the person chooses Libron for it
    * (`theme/preference.css`, wire D52), so the default page is still
    * one face. The ligature rule follows the face: it is there so a
-   * command reads as typed, which holds for Maple Mono and has nothing to
-   * say about a serif paragraph. */
+   * command reads as typed, which holds for the bundled faces and has
+   * nothing to say about a serif paragraph. */
   --font-read: var(--font-sans);
   --font-read--font-feature-settings: var(--font-sans--font-feature-settings);
+
+  /* The leading of running text, named for where it is used: the
+   * messages, documents and reports set in `font-read`. 1.625 is what
+   * `leading-relaxed` drew before it had a token, so a page whose person
+   * has stated no leading is drawn exactly as it was. A stated leading
+   * replaces this one for every element that reads it
+   * (`crates/wire/spec/Preference.lean` D126). */
+  --leading-read: 1.625;
 
   /* The type scale: a step is named for its job, not its size.
    *

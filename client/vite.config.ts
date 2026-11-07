@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -13,22 +14,47 @@ import type { Plugin } from "vite";
 
 import { thirdPartyNotices } from "./scripts/notices.ts";
 
-// The files the shipped faces are made of: Maple Mono's regular,
-// semibold and bold woff2, Libron's four static ones, and the licence each is given
-// under. `theme/fonts.css` names every woff2 file, so the asset pipeline
-// emits them by itself; the licences are named by nothing, and OFL-1.1
-// requires each to travel with its font, so this plugin puts them in the
-// bundle beside them.
-const FACES = [
-  "MapleMono-Regular.woff2",
-  "MapleMono-SemiBold.woff2",
-  "MapleMono-Bold.woff2",
-  "Libron-Regular.woff2",
-  "Libron-Italic.woff2",
-  "Libron-Bold.woff2",
-  "Libron-BoldItalic.woff2",
-];
-const LICENCES = ["OFL.txt", "Libron-OFL.txt"];
+// The files the shipped faces are made of are the ones `theme/fonts.css`
+// names, and their licences are the `.txt` files beside them: two lists
+// that already exist in the tree, so adding a face adds its file and its
+// licence and this plugin needs no edit. OFL-1.1 requires each licence to
+// travel with its font, so every one of them is put in the bundle beside
+// the fonts, and a face whose licence is missing is named here rather
+// than shipped without one. A face's licence is named after the family it
+// belongs to — `PaperMono-OFL.txt` for `Paper Mono` — which is the one
+// rule this plugin states.
+const FONTS = fileURLToPath(new URL("./src/theme/fonts.css", import.meta.url));
+const FACES_DIR = fileURLToPath(new URL("./src/fonts/", import.meta.url));
+
+/// The letters a name's words are made of, so `Paper Mono` and
+/// `PaperMono-OFL.txt` compare equal.
+function letters(text: string): string {
+  return text.replaceAll(/[^\p{L}\p{N}]/gu, "").toLowerCase();
+}
+
+/// Every source a `@font-face` names, and every family one is declared
+/// under, read out of the stylesheet that owns both.
+function declaredFaces(): {
+  readonly files: readonly string[];
+  readonly families: readonly string[];
+} {
+  const css = readFileSync(FONTS, "utf8");
+  const files = [...css.matchAll(/url\(\s*"?\.\.\/fonts\/([^"')]+)"?\s*\)/g)].flatMap((match) =>
+    match[1] === undefined ? [] : [match[1]],
+  );
+  const families = [...css.matchAll(/font-family:\s*"([^"]+)"/g)].flatMap((match) =>
+    match[1] === undefined ? [] : [match[1]],
+  );
+  return { files: [...new Set(files)], families: [...new Set(families)] };
+}
+
+/// The licence files beside the fonts, sorted: every `.txt` in the
+/// directory, because a text file next to a font is that font's licence.
+function declaredLicences(): readonly string[] {
+  return readdirSync(FACES_DIR)
+    .filter((name) => name.endsWith(".txt"))
+    .sort();
+}
 
 // A face that is not in the tree is not a broken build: the fallback
 // chain draws the page with what the machine has. It is still a bundle
@@ -36,23 +62,28 @@ const LICENCES = ["OFL.txt", "Libron-OFL.txt"];
 // once per build, and the warning clears itself the moment the file is
 // dropped in.
 function shippedFace(): Plugin {
-  const at = (name: string) => fileURLToPath(new URL(`./src/fonts/${name}`, import.meta.url));
+  const at = (name: string) => join(FACES_DIR, name);
+  const licences = declaredLicences();
   return {
     name: "sprawling:shipped-face",
     apply: "build",
     generateBundle() {
-      for (const name of FACES) {
+      const { files, families } = declaredFaces();
+      for (const name of files) {
         if (!existsSync(at(name))) {
           this.warn(`client/src/fonts/${name} is absent; the page falls back to the system stack`);
         }
       }
-      for (const name of LICENCES) {
-        const path = at(name);
-        if (existsSync(path)) {
-          this.emitFile({ type: "asset", fileName: `fonts/${name}`, source: readFileSync(path) });
-        } else {
-          this.warn(`client/src/fonts/${name} is absent; a font may not be shipped without it`);
+      for (const family of families) {
+        const named = licences.some((name) => letters(name).startsWith(letters(family)));
+        if (!named) {
+          this.warn(
+            `client/src/fonts/ holds no licence for ${family}; a font may not be shipped without one`,
+          );
         }
+      }
+      for (const name of licences) {
+        this.emitFile({ type: "asset", fileName: `fonts/${name}`, source: readFileSync(at(name)) });
       }
     },
   };
@@ -75,7 +106,7 @@ export default defineConfig({
     tailwindcss(),
     svelte({ configFile: "../svelte.config.ts" }),
     shippedFace(),
-    thirdPartyNotices(),
+    thirdPartyNotices(declaredLicences()),
   ],
   build: {
     outDir: "../../crates/sprawling/web-dist",

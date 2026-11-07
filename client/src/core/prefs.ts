@@ -49,14 +49,18 @@ import {
   CHROMAS,
   DENSITIES,
   FACES,
+  FEATURES,
   GLASSES,
   LIGHTINGS,
   MOTIONS,
   READING_FACES,
+  WEIGHTS,
   blendOf,
   type Appearance,
 } from "./appearance";
 import { readBody, readLang, readOne, readStack, writeFigure } from "./prefs_values";
+import { readAtLeast, readFamily, readMany, writeNames } from "./prefs_values";
+import { LINE_HEIGHT_FLOOR, TRACKING_FLOOR } from "./metrics";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
 import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
@@ -78,7 +82,17 @@ const ROWS = {
   sansStack: "sprawling.appearance.sans_stack",
   monoStack: "sprawling.appearance.mono_stack",
   reading: "sprawling.appearance.reading",
+  // The two slots of the fallback chain, in the order they are tried; an
+  // empty slot has no row.
+  fallback1: "sprawling.appearance.fallback1",
+  fallback2: "sprawling.appearance.fallback2",
+  // The bundled face's features turned on, joined by commas.
+  features: "sprawling.appearance.features",
   body: "sprawling.appearance.body",
+  // A line box and a tracking in thousandths (wire D126).
+  lineHeight: "sprawling.appearance.line_height",
+  tracking: "sprawling.appearance.tracking",
+  weight: "sprawling.appearance.weight",
   density: "sprawling.appearance.density",
   chroma: "sprawling.appearance.chroma",
   motion: "sprawling.appearance.motion",
@@ -228,12 +242,23 @@ export interface PreferenceDoor {
 function readAppearance(rows: Rows): Appearance {
   return {
     lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
-    sans: readOne(FACES, rows.getItem(ROWS.sans), "maple"),
-    mono: readOne(FACES, rows.getItem(ROWS.mono), "maple"),
+    sans: readOne(FACES, rows.getItem(ROWS.sans), "paper"),
+    mono: readOne(FACES, rows.getItem(ROWS.mono), "paper"),
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
     monoStack: readStack(rows.getItem(ROWS.monoStack)),
     reading: readOne(READING_FACES, rows.getItem(ROWS.reading), "interface"),
+    // A slot with nothing in it is not a member of the chain: the two
+    // rows are read in order and the empty one is dropped, so the chain
+    // never holds a gap.
+    fallbacks: [
+      readFamily(rows.getItem(ROWS.fallback1)),
+      readFamily(rows.getItem(ROWS.fallback2)),
+    ].filter((name) => name !== ""),
+    features: readMany(FEATURES, rows.getItem(ROWS.features)),
     body: readBody(rows.getItem(ROWS.body)),
+    lineHeight: readAtLeast(rows.getItem(ROWS.lineHeight), LINE_HEIGHT_FLOOR),
+    tracking: readAtLeast(rows.getItem(ROWS.tracking), TRACKING_FLOOR),
+    weight: readOne(WEIGHTS, rows.getItem(ROWS.weight), "regular"),
     density: readOne(DENSITIES, rows.getItem(ROWS.density), "comfortable"),
     chroma: readOne(CHROMAS, rows.getItem(ROWS.chroma), "full"),
     motion: readOne(MOTIONS, rows.getItem(ROWS.motion), "system"),
@@ -249,7 +274,18 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.sansStack, next.sansStack);
   rows.setItem(ROWS.monoStack, next.monoStack);
   rows.setItem(ROWS.reading, next.reading);
+  // A slot with nothing in it has no row, so the chain is read back
+  // without a gap whatever order the two were emptied in.
+  const [first, second] = next.fallbacks;
+  if (first === undefined) rows.removeItem(ROWS.fallback1);
+  else rows.setItem(ROWS.fallback1, first);
+  if (second === undefined) rows.removeItem(ROWS.fallback2);
+  else rows.setItem(ROWS.fallback2, second);
+  writeNames(rows, ROWS.features, next.features);
   writeFigure(rows, ROWS.body, next.body);
+  writeFigure(rows, ROWS.lineHeight, next.lineHeight);
+  writeFigure(rows, ROWS.tracking, next.tracking);
+  rows.setItem(ROWS.weight, next.weight);
   rows.setItem(ROWS.density, next.density);
   rows.setItem(ROWS.chroma, next.chroma);
   rows.setItem(ROWS.motion, next.motion);

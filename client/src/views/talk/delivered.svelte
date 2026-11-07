@@ -39,7 +39,7 @@ the same words as its task once the city starts the run. -->
 <NotePlace rhythm="shape" data-local-feedback={delivery.kind}>
   <div class="flex flex-col items-end">
     <div
-      class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap text-text-quiet wrap-anywhere"
+      class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-read whitespace-pre-wrap text-text-quiet wrap-anywhere"
     >
       {delivery.words}
     </div>

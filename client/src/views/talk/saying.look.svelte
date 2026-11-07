@@ -19,7 +19,7 @@ still, so a stilled caret stands lit rather than vanishing. -->
 <div class="text-body">
   <div class="mb-tight text-note text-text-faint">{who}</div>
   {@render laid()}
-  <div class="whitespace-pre-wrap break-words font-read leading-relaxed">
+  <div class="whitespace-pre-wrap break-words font-read leading-read">
     {settled}<span class="text-text-faint">{edge}</span><span class="caret blink bg-accent"></span>
   </div>
 </div>

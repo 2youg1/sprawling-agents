@@ -9,7 +9,7 @@
 // reader of these; every reading here drops what this build cannot
 // read rather than repairing it, so the shipped posture stands for it.
 
-import { STACK_SHAPE } from "./appearance";
+import { FAMILY_SHAPE, STACK_SHAPE } from "./appearance";
 import { langOf, type Lang } from "./lang";
 import type { Rows } from "./rows";
 import { sizingOf } from "./sizing";
@@ -33,6 +33,32 @@ export function readStack(raw: string | null): string {
   return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
 }
 
+// One fallback slot's family name, or nothing when the row is empty or
+// holds something a family name may not: a name that could not be a
+// name is not repaired into one.
+export function readFamily(raw: string | null): string {
+  return raw !== null && FAMILY_SHAPE.test(raw) ? raw : "";
+}
+
+// A stored row of words read back as the subset this build offers, in
+// the order `offered` declares them: a word this build dropped, a repeat
+// and an empty row all leave nothing behind.
+export function readMany<T extends string>(
+  offered: readonly T[],
+  raw: string | null,
+): readonly T[] {
+  const said = new Set((raw ?? "").split(",").map((each) => each.trim()));
+  return offered.filter((each) => said.has(each));
+}
+
+// A whole number at or above a floor, or nothing: the row and the box of
+// a ratio or a size read their domain the same way.
+export function readAtLeast(raw: string | null, floor: number): number | null {
+  if (!/^-?[0-9]+$/.test(raw ?? "")) return null;
+  const said = Number(raw);
+  return said >= floor ? said : null;
+}
+
 export function readLang(raw: string | null, fallback: string): Lang {
   return raw === "en" || raw === "zh" ? raw : langOf(fallback);
 }
@@ -42,4 +68,11 @@ export function readLang(raw: string | null, fallback: string): Lang {
 export function writeFigure(rows: Rows, row: string, figure: number | null): void {
   if (figure === null) rows.removeItem(row);
   else rows.setItem(row, String(figure));
+}
+
+// The words a row holds, in the order the caller lists them; none of them
+// is the same as no row at all.
+export function writeNames(rows: Rows, row: string, names: readonly string[]): void {
+  if (names.length === 0) rows.removeItem(row);
+  else rows.setItem(row, names.join(","));
 }

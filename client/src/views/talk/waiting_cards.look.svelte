@@ -29,7 +29,7 @@ tainted mark. The cards are a pane apart. -->
       ]}
     >
       {#snippet body()}
-        <p class="text-body leading-relaxed">{card.action}</p>
+        <p class="text-body leading-read">{card.action}</p>
         {@render asked(card.locator)}
         <p class="mt-snug text-note text-text-faint">
           {card.keeps}

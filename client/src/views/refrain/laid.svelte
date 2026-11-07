@@ -152,7 +152,7 @@
         {@render drawn(block.heading.inline)}
       </p>
     {:else if "paragraph" in block}
-      <p data-start={start} class="my-snug leading-relaxed">
+      <p data-start={start} class="my-snug leading-read">
         {@render drawn(block.paragraph.inline)}
       </p>
     {:else if "list" in block}
@@ -174,7 +174,7 @@
              box sits beside them, in place of the bullet. -->
           <li
             class={[
-              "leading-relaxed",
+              "leading-read",
               block.list.spacing === "loose" ? "my-snug" : "my-tight [&_p]:my-0",
               item.check === "not_a_task" ? "" : "-ml-wide flex list-none items-baseline gap-snug",
             ]}
@@ -205,7 +205,7 @@
     {:else if "code" in block}
       <pre
         data-start={start}
-        class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet"><Inked
+        class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-read text-text-quiet"><Inked
           text={block.code.text}
           source={block.code.info}
         /></pre>

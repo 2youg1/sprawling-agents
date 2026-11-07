@@ -969,7 +969,7 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 
 /-! ## 8-174 Maple Mono NF CN 是可选的字体依赖（`bin::doctor::table`、`bin::doctor::probe`）
 
-客户端只内嵌 Maple Mono；Maple Mono NF CN 不进客户端包。doctor 的 Use 层新增 `maple-mono-nf-cn` 可选行，为要中文与 Nerd Font 图标的终端和工具提供系统字体：
+客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`crates/wire/spec/Preference.lean` D123）；Maple Mono NF CN 不进客户端包。doctor 的 Use 层有 `maple-mono-nf-cn` 可选行，为外观组的回退格与要中文和 Nerd Font 图标的终端提供系统字体：
 
 ```rust
 // bin::doctor（Detection 与 Absence 各多一臂）
@@ -983,7 +983,7 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 
 - **探测的是字体文件，不是 PATH 上的程序**：`file` 是 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。找到即 `Present { version: Silent }`，Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；候选的元数据或遍历目录不可读时答 `Broken(Unreadable)`。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取，取不到时在用户目录都查完之后答 `Broken(Unreadable)`，`at` 是那条注册表值的地址，由 `bin::privacy::windows` 自己给出，免得报告里写着一个它不再读的键。不存在版本号猜测，最新版仍由 `Upstream::GitHub("subframe7536/maple-font")` 读取。
 - **安装方式照上游安装文档**：Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`；macOS 经 Homebrew 安装 `font-maple-mono-nf-cn`，Linux 手动下载并安装到 `~/.local/share/fonts`。每条命令配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装。Linux 的 Homebrew cask 可写到该平台探测范围外，故改为手动安装。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
-- **它不是 Use 层必需项**：缺它不影响城市或客户端运行，只少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_maple_mono_nf_cn`，终端的 enables 与它同义。
+- **它不是 Use 层必需项**：缺它不影响城市或客户端运行，页面只是没有那一格可填的中文字体，终端也只是少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_maple_mono_nf_cn`（「为页面的回退字体与使用它的工具补齐中文字形和 Nerd Font 图标」），终端的 enables 与它同义。外观组的回退格填的就是这个家族名（`Maple Mono NF CN`，wire D124）。
 
 **本章测试**：需求表包含此行且三个平台都有配方；`font_at` 在临时目录上认出 Regular 文件、缺文件答 `NotInstalled`；表格完整性测试覆盖 `Detection::Font`。
 -/
@@ -992,9 +992,9 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 
 **决定**：doctor 新增可选的 Maple Mono NF CN 字体行，以 Regular 字体文件探测，Windows 用 Scoop、macOS 用 Homebrew 安装，Linux 手动安装到用户字体目录。
 
-**理由**：人要求内置 Maple Mono，并在 doctor 的依赖安装里为中文与图标补上 Maple Mono NF CN。两种字体职责不同：界面资源要保持小，系统字体的中文与图标覆盖则按需要安装，不能为了省一次探测让安装后复查永远报缺。
+**理由**：人的决定是内置西文面用 Paper Mono、随包保留 Maple Mono，并在 doctor 的依赖安装里为中文与图标补上 Maple Mono NF CN。两种字体职责不同：界面资源要保持小，系统字体的中文与图标覆盖则按需要安装，不能为了省一次探测让安装后复查永远报缺。
 
-**被否**：①复用 `Detection::Component` 指到 `~/.sprawling/components`——Scoop 与 Homebrew 不写到那里，装完必报缺；②把 NF CN 也嵌入客户端——完整 CJK 字体远超当前客户端资源预算，而且人明确要求只内嵌 Maple Mono；③Windows 用 winget——上游 v7.9 安装文档给出的 Windows 包管理器是 Scoop。
+**被否**：①复用 `Detection::Component` 指到 `~/.sprawling/components`——Scoop 与 Homebrew 不写到那里，装完必报缺；②把 NF CN 也嵌入客户端——完整 CJK 字体远超当前客户端资源预算，而回退格能让装了它的人得到同一结果；③Windows 用 winget——上游 v7.9 安装文档给出的 Windows 包管理器是 Scoop。
 -/
 
 /-! D6 doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id（`crates/wire/Spec.lean` §8-25）

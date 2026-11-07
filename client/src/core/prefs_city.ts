@@ -17,7 +17,7 @@ import { get } from "svelte/store";
 
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";
-import { blendOf, type Appearance } from "./appearance";
+import { blendOf, FAMILY_SHAPE, type Appearance } from "./appearance";
 import type { PreferenceDoor, Preferences } from "./prefs";
 import { themeOf } from "./theme_override";
 import type { Connection } from "./socket";
@@ -76,7 +76,12 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
     sans_stack: next.sansStack,
     mono_stack: next.monoStack,
     reading: next.reading,
+    fallbacks: [...next.fallbacks],
+    features: [...next.features],
     body_px: next.body,
+    line_height: next.lineHeight,
+    letter_spacing: next.tracking,
+    weight: next.weight,
     density: next.density,
     chroma: next.chroma,
     motion: next.motion,
@@ -98,7 +103,16 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     sansStack: stated.sans_stack,
     monoStack: stated.mono_stack,
     reading: stated.reading ?? held.reading,
+    // The chain and the features are the person's, and an answer that
+    // does not carry them is an older city rather than a new blank: the
+    // browser's stand, as they do for glass and the opacity. A name the
+    // page cannot write is dropped here, and one past the two slots too.
+    fallbacks: (stated.fallbacks ?? []).filter((name) => FAMILY_SHAPE.test(name)).slice(0, 2),
+    features: stated.features ?? held.features,
     body: stated.body_px ?? null,
+    lineHeight: stated.line_height ?? null,
+    tracking: stated.letter_spacing ?? null,
+    weight: stated.weight ?? held.weight,
     density: stated.density,
     chroma: stated.chroma,
     motion: stated.motion,
