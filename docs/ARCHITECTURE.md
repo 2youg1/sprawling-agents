@@ -262,7 +262,8 @@ A crate may **use** the interfaces of what it depends on and nothing
 more. When a module starts passing concrete types between two of those
 crates, that edge moves up into the assembly layer.
 
-`xtask` and `citysim` are workspace members outside the product graph.
+`xtask`, `citysim` and `benchstat` are workspace members outside the product graph.
+`benchstat` analyzes benchmark rounds without depending on a product crate.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
 — which is how a script reproduces a run. The worker a script would drive

@@ -103,7 +103,7 @@ n = ceil(n0 * (h / h_target)^2 / m) * m
 
 so that the target is a whole number of cohorts, each carrying the pilot's observation count.
 
-The target half-width is 10% of the pilot point estimate for P50 and 25% for P95 or P99. Before the first observation, register the headline quantile, its relative target, an absolute target for non-positive estimates, and the pilot-to-target calculation. A P95 headline uses its own pilot P95 interval and estimate to compute `n95`; a P99 headline registers both `n99` and fallback `n95` calculations. Freeze the resulting numerical width targets after the pilot, before stage two. The square-root scaling is a sizing rule derived from the pilot, not a claim that observations within a round are independent. A zero pilot half-width does not justify a zero sample target: add one fresh pilot-sized cohort and recompute, stopping with a sizing failure if the pre-registered resource ceiling is reached before a non-zero width is observed. A non-positive point estimate needs a pre-registered absolute width target instead of a relative one. Stage two adds fresh cohorts until the cell reaches `n` (for a P99 headline, `max(200, n99, n95)`); the final estimate and interval are recomputed from all eligible stages, and the achieved width is printed beside the target. A pilot that poorly represents the workload can therefore leave a visible miss rather than a hidden pass.
+The target half-width is 10% of the pilot point estimate for P50 and 25% for P95 or P99. Before the first observation, register the headline quantile, its relative target, an absolute target for non-positive estimates, and the pilot-to-target calculation. A P95 headline uses its own pilot P95 interval and estimate to compute `n95`; a P99 headline registers both `n99` and fallback `n95` calculations. Freeze the resulting numerical width targets after the pilot, before stage two. The square-root scaling is a sizing rule derived from the pilot, not a claim that observations within a round are independent. A zero or undefined pilot half-width does not justify a zero sample target: add one fresh pilot-sized cohort and recompute, stopping with a sizing failure if the pre-registered resource ceiling is reached before a valid non-zero width is observed. Retain the failed BCa analysis while that fresh evidence is missing; never relabel a substitute interval as BCa. A non-positive point estimate needs a pre-registered absolute width target instead of a relative one. Stage two adds fresh cohorts until the cell reaches `n` (for a P99 headline, `max(200, n99, n95)`); the final estimate and interval are recomputed from all eligible stages, and the achieved width is printed beside the target. A pilot that poorly represents the workload can therefore leave a visible miss rather than a hidden pass.
 
 A published P99 requires `n >= 200` and an interval half-width no greater than 25% of its point estimate. These are publication policies, not tests. If either fails, the export sets `p99_publishable: false` with the failed condition, and the headline reports P95 with its interval and the maximum instead. The fallback retains the pre-registered `n95` and frozen P95 width target; it neither substitutes `n99` for `n95` nor resizes after seeing the confirmatory result. A missed P95 count or width target is printed and permits description only, with no quantile ranking. The analyzer still retains the P99 estimate and interval in the exports for diagnosis; it cannot be used for a ranking.
 
@@ -217,8 +217,7 @@ docs/benchmarks/<round>/
   README.md        the authoritative Markdown report: prose, coverage and generated number spans
   manifest.json    claims, builds, environment, workload and fixture digests, coverage, method version and seed
   results.csv      raw observations and explicitly identified cell-level counts or flags
-  exports.json     every statistic consumed by either report
-  report.html      the derived self-contained chart report
+  exports.json     every statistic consumed by the report
 ```
 
 `results.csv` uses LF line endings and this header:
@@ -238,17 +237,17 @@ schema_version,observation_id,task_attempt_id,request_id,span_start,span_end,rou
 
 The manifest's coverage entries use the exact fields and status rules above. It also records an immutable `analysis_revision` (full Git commit SHA containing this method and the analyzer), input hashes, toolchain, machine class, estimator version, bootstrap unit, resampling count, block lengths, seed and balanced-order schedule. Unknown units, duplicate observation identifiers, inconsistent task ownership, orphan request spans, invalid span endpoints and non-finite estimates are validation errors.
 
-`exports.json` has sorted keys, six-decimal numeric formatting, LF line endings and no timestamp. Identical observations, manifest and estimator version therefore produce identical bytes; a diff identifies changed input or analysis rather than generation time.
+`exports.json` has sorted keys, integer counts, shortest-round-trip floating-point formatting, LF line endings and no timestamp. It does not round small non-zero slopes or interval endpoints to zero. Identical observations, manifest and estimator version therefore produce identical bytes; a diff identifies changed input or analysis rather than generation time.
 
-`README.md` is the authoritative Markdown report and holds the round's prose, claim ladder, coverage table and limits; its numbers live in generated spans that `benchstat export` rewrites and `benchstat verify` re-checks, so a hand-edited number fails verification instead of surviving as prose. `report.html` is generated from the same exports and manifest, contains inline SVG and no remote resource, and opens directly from a file. Every number in either report comes from `exports.json`, and deferred and failed coverage rows appear in both.
+`README.md` is the authoritative Markdown report and holds the round's prose, claim ladder, coverage table and limits; its numbers live in generated spans that `benchstat export` rewrites and `benchstat verify` re-checks, so a hand-edited number fails verification instead of surviving as prose. Every number in the generated spans comes from `exports.json`, and deferred and failed coverage rows appear there. An agent may derive HTML from the report and exports, but HTML is not a publication or verification artifact.
 
 ## Reproduce a published round
 
-The round's analyzer is one Rust workspace package named `benchstat`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. The ruling that tools live under `crates/` places it there with `publish = false`: it is a repository tool, and publishing waits until a consumer outside this tree exists.
+The round's analyzer is one Rust workspace package named `benchstat` under `tools/benchstat/`, holding validation, estimators, verification and report generation. It depends on no product crate, so an analysis cannot change what it measures, and its estimator core has no I/O beyond the round directory. Its generality, audit importance and size justify a package separate from `xtask`; it remains `publish = false` until a consumer outside this tree exists.
 
 To reproduce a future round, read `analysis_revision` from its manifest, run `git worktree add --detach <analysis-checkout> <analysis_revision>`, and build there with `cargo build --locked -p benchstat`, using that revision's recorded toolchain. Run its `target/debug/benchstat` with the commands below against an absolute path to a copy of the published round. The analysis revision must be an ancestor available in repository history; record round input digests separately so the analyzer commit need not contain its own SHA. Never use the latest analyzer as a substitute.
 
-The package is not written yet, so no round meets this contract today and `benchstat` is not yet a command a reader can run. The interface it must expose is the completion condition for the next stage:
+Build the package with `cargo build --locked -p benchstat`; its executable exposes:
 
 ```sh
 benchstat export docs/benchmarks/<round> --write
@@ -256,7 +255,7 @@ benchstat verify docs/benchmarks/<round>
 benchstat report docs/benchmarks/<round> --write
 ```
 
-`export` validates the manifest, registry coverage and observation schema, computes every exported statistic, then writes `exports.json`, the README's generated spans and `report.html`. `verify` recomputes every export from the published subset in a fresh invocation and compares `exports.json` byte for byte. `report` re-renders only exported values. A round is publishable only when all three succeed on its committed inputs, and its README names the analysis version and the commands that produced it.
+`export` validates the manifest, registry coverage and observation schema, computes every exported statistic, then writes `exports.json` and the README's generated spans. `verify` recomputes every export from the published subset in a fresh invocation and compares `exports.json` and the generated spans byte for byte. `report` re-renders only exported values into the README. A round is publishable only when all three succeed on its committed inputs, and its README names the analysis version and the commands that produced it.
 
 Historical artifacts, including the [v0.0.11 observations](v0.0.11/README.md), remain unchanged. Their historical verifier is not rewritten or presented as the next round's analyzer.
 
@@ -272,7 +271,7 @@ Historical artifacts, including the [v0.0.11 observations](v0.0.11/README.md), r
 
 **Outcome methods follow the independent unit.** Independent, unpaired trials permit Newcombe contrasts and exact binomial sizing at the allocated alpha. Repeated and paired attempts require joint round-aware sizing and inference; rankings wait for validated implementation. Interval overlap and independent-trial formulas cannot establish a correlated contrast.
 
-**One self-contained HTML view beside the Markdown report, not LaTeX or PDF.** Inline SVG carries the charts without network access, the Markdown remains reviewable as text, and both consume the same exports.
+**One authoritative Markdown report beside canonical JSON, not a second required view.** The JSON preserves full numeric precision and the Markdown remains reviewable as text. HTML may be derived later without becoming another input to verification.
 
 **One row per observation with explicit order and conditions.** The schema preserves the independent unit, censoring, failure class, counter source and configuration needed to reproduce or reject an analysis. An array packed into a CSV cell would hide the order and make row-level validation less direct.
 

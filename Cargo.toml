@@ -20,6 +20,7 @@ members = [
     "crates/sprawling",
     "tools/xtask",
     "tools/citysim",
+    "tools/benchstat",
 ]
 default-members = [
     "crates/kernel",
@@ -41,6 +42,7 @@ default-members = [
     "crates/sprawling",
     "tools/xtask",
     "tools/citysim",
+    "tools/benchstat",
 ]
 
 # What every package says about itself on a registry, and the one place
@@ -223,6 +225,11 @@ flate2 = "1"
 # citysim's `bench_startup`, whose install action digests the archive
 # the way the install path does.
 sha2 = "0.11"
+# Benchmark analysis only: quoted CSV, distribution functions, and scalar FFT
+# for deterministic KDE. None of these enters a product binary.
+csv = "1.4"
+statrs = { version = "0.19", default-features = false }
+rustfft = { version = "6.4", default-features = false }
 # The release archive's format, written by `cargo xtask package` and
 # read back by citysim's `bench_startup` install action. One version
 # authority for both.

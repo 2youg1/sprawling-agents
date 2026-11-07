@@ -111,6 +111,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
+| [csv](https://crates.io/crates/csv) | Unlicense OR MIT |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
 | [find-msvc-tools](https://crates.io/crates/find-msvc-tools) | MIT OR Apache-2.0 |
@@ -136,7 +137,9 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [self-replace](https://crates.io/crates/self-replace) | Apache-2.0 |
 | [serde](https://crates.io/crates/serde) | MIT OR Apache-2.0 |
 | [serde_json](https://crates.io/crates/serde_json) | MIT OR Apache-2.0 |
+| [rustfft](https://crates.io/crates/rustfft) | MIT OR Apache-2.0 |
 | [sha2](https://crates.io/crates/sha2) | MIT OR Apache-2.0 |
+| [statrs](https://crates.io/crates/statrs) | MIT |
 | [syn](https://crates.io/crates/syn) | MIT OR Apache-2.0 |
 | [sysinfo](https://crates.io/crates/sysinfo) | MIT |
 | [tempfile](https://crates.io/crates/tempfile) | MIT OR Apache-2.0 |
