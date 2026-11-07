@@ -25,6 +25,51 @@ block = block.replace('${{ github.event.repository.fork }}', 'false')
 pathlib.Path(sys.argv[1], 'prepare.sh').write_text(block, encoding='utf-8')
 PY
 
+# GitHub validates the complete reusable-workflow graph before job conditions
+# can skip its publication jobs. The call needs their grants as a ceiling,
+# while every job that can actually build or advise stays read-only.
+python - <<'PY'
+import pathlib, re
+
+
+def job(path, name):
+    text = pathlib.Path(path).read_text(encoding='utf-8')
+    match = re.search(
+        rf'(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [a-z][a-z0-9_-]*:\n|\Z)',
+        text,
+    )
+    if match is None:
+        raise AssertionError(f'{path} has no {name} job')
+    return match.group(1)
+
+
+def permissions(block):
+    lines = block.splitlines()
+    try:
+        start = lines.index('    permissions:')
+    except ValueError as error:
+        raise AssertionError('job has no explicit permissions') from error
+    grants = {}
+    for line in lines[start + 1:]:
+        if not line.startswith('      '):
+            break
+        key, value = line.strip().split(':', 1)
+        grants[key] = value.strip()
+    return grants
+
+
+caller = permissions(job('.github/workflows/nightly-release.yml', 'archive'))
+expected = {'contents': 'write', 'id-token': 'write', 'attestations': 'write'}
+if caller != expected:
+    raise AssertionError(f'nightly call ceiling is {caller}, expected {expected}')
+for name in ('verify', 'advisories', 'archive'):
+    block = job('.github/workflows/release.yml', name)
+    grants = permissions(block)
+    if grants != {'contents': 'read'}:
+        raise AssertionError(f'release {name} can inherit publication grants: {grants}')
+print('nightly reusable-call permissions passed')
+PY
+
 cat > "$root/bin/gh" <<'SH'
 #!/bin/sh
 set -eu

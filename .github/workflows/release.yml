@@ -75,6 +75,10 @@ jobs:
   advisories:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # A nightly caller's static ceiling also covers formal publication; this
+    # job never inherits it.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
@@ -110,6 +114,10 @@ jobs:
   # three, so their wall clock is the slowest branch rather than their sum.
   archive:
     timeout-minutes: 90
+    # Keep compilation read-only when a nightly caller must admit the formal
+    # publication jobs' grants during static graph expansion.
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -144,20 +152,9 @@ jobs:
       LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # A rustup home of its own, holding only the toolchain
-      # `rust-toolchain.toml` pins. rust-cache hashes every installed
-      # toolchain into the archive cache key, and the image's own stable
-      # moves whenever GitHub rolls a new image out, which takes days and
-      # mixes old and new runners; with it in the key, the tag run could miss
-      # the cache a build-only run on main saved an hour earlier. The path
-      # is under the runner's temp directory, which is the same on every run
-      # of a row, so the key stays a function of the tree.
-      - name: install pinned toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          RUSTUP_HOME="$RUNNER_TEMP/rustup" rustup show
+      # The same pinned, isolated toolchain and Windows work-drive Cargo home
+      # as CI, so the cache key and small-file writes follow D27's measurements.
+      - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with, on the Windows row; the
       # action installs nothing on the other two (`crates/desktop/Spec.lean` 8-12).
       - uses: ./.github/actions/zig
@@ -171,12 +168,12 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends musl-tools
-      # The client is built by bun, which `just build-web` drives; the
-      # release recipe depends on it, so the archive cannot be assembled
-      # without the bundle inside the binary.
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      # Reuse the bundle main built from these exact client inputs. On a miss
+      # the action builds it; --no-deps below then skips only dist's build-web
+      # prerequisite, never the binary or its bill of materials.
+      - uses: ./.github/actions/client-artifacts
         with:
-          bun-version-file: client/package.json
+          want: bundle
       - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
         with:
           tool: just
@@ -254,7 +251,7 @@ jobs:
           # same command, and `wait` reports it too.
           cargo build --locked -p xtask > target/release-evidence/xtask-build.log 2>&1 &
           xtask_build=$!
-          just dist "$ARCHIVE_TARGET"
+          just --no-deps dist "$ARCHIVE_TARGET"
           wait "$xtask_build"
           echo "build_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
       # Signing sits between the build and the packing, on the one row whose

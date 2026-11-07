@@ -1,7 +1,7 @@
 # The Rust toolchain `rust-toolchain.toml` pins, installed into a rustup
 # home that holds nothing else, and on Windows a Cargo home on the
-# runner's work drive. `ci.yml` is the one reader; `crates/xtask/Spec.lean`
-# D27 records the measurements behind both moves.
+# runner's work drive. `ci.yml` and `release.yml` share it;
+# `crates/xtask/Spec.lean` D27 records the measurements behind both moves.
 #
 # A home of its own because `Swatinem/rust-cache` hashes every toolchain
 # rustup has installed into its key. The image's preinstalled `stable` was

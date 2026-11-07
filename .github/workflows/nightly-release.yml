@@ -149,8 +149,13 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build == 'true'
     uses: ./.github/workflows/release.yml
+    # The ceiling admits the formal publication jobs during static graph
+    # expansion. The called verify, advisories and archive jobs each declare
+    # contents:read, so the nightly build itself receives no write or OIDC grant.
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     with:
       channel: nightly
       nightly-tag: ${{ needs.prepare.outputs.tag }}
