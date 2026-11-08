@@ -56,9 +56,9 @@
 
   // Hit a point on the ring: map pointer angle (from noon, clockwise) to
   // a bucket arc. The SVG is rotated -90deg so 0° is at twelve o'clock;
-  // the hit target is a button over the drawing so the keyboard path stays
-  // on the legend chips.
-  function hit(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
+  // the hit target is a non-focusable layer so the keyboard path stays
+  // on the legend chips and a pointer press cannot park focus here.
+  function hit(event: MouseEvent & { currentTarget: HTMLElement }): void {
     const box = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - box.left - box.width / 2;
     const y = event.clientY - box.top - box.height / 2;
@@ -97,15 +97,9 @@
   {#if look.buckets.length > 0}
     <div class="grid justify-items-center gap-base">
       <div class="relative size-[12rem]">
-        <!-- Pointer-only hit target: keyboard stays on the legend chips
-        (hit rejects synthesised centre clicks from Enter/Space). -->
-        <button
-          type="button"
-          tabindex="-1"
-          aria-hidden="true"
-          class="absolute inset-0 z-1 cursor-pointer rounded-pill"
-          onclick={hit}
-        ></button>
+        <!-- Pointer-only hit target: not a control, so a press cannot
+        park focus here; keyboard stays on the legend chips. -->
+        <div class="absolute inset-0 z-1 cursor-pointer rounded-pill" onclick={hit}></div>
         <svg class="pointer-events-none size-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
           <circle
             class="pointer-events-none fill-none stroke-track"

@@ -44,16 +44,18 @@
   <Tip text={ring.reading}>
     {#snippet children(hint: string)}
       <span class="relative grid size-key shrink-0 place-items-center">
-        <button
-          class="absolute inset-0 rounded-pill"
-          {...ring.meter}
-          aria-describedby={hint}
-          onclick={(event) => {
-            // Only the band: a press that landed on the coin is the coin's.
-            if (event.target !== event.currentTarget) return;
-            onOpen?.();
-          }}
-        ></button>
+        {#if onOpen !== null}
+          <button
+            class="absolute inset-0 rounded-pill"
+            {...ring.meter}
+            aria-describedby={hint}
+            onclick={(event) => {
+              // Only the band: a press that landed on the coin is the coin's.
+              if (event.target !== event.currentTarget) return;
+              onOpen();
+            }}
+          ></button>
+        {/if}
         <svg
           class="pointer-events-none absolute inset-0 -rotate-90"
           viewBox="0 0 40 40"
