@@ -3,18 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Where a page's back key at the top left leads (A3, A6). A page is
-// entered from the settings tree, so its way back is the settings panel,
-// which reopens at the group drawn last; a building is entered from the
-// city's overview, so its way back is the city. The key is one target,
-// not a step back through the browser's history, because a page opened
-// from a bookmark or a reload has no history entry to step back to.
+// Where a page's back key at the top left leads. A building is entered
+// from the city's overview, so its way back is the city. Pages reached
+// from the settings tree no longer draw a back key: the edge settings
+// key reopens the panel, and a click on either blank side of the frame
+// returns to the conversation. The key is one target, not a step back
+// through the browser's history, because a page opened from a bookmark
+// or a reload has no history entry to step back to.
 
 import type { View } from "../../core/route";
 
-// `null` where the page draws no back key: the conversation and the
-// settings panel are the places a back key leads to, and the gallery is
-// a bench.
+// `null` where the page draws no back key: the conversation, the
+// settings panel, every page the settings tree opens, and the gallery.
 export function backOf(page: View): View | null {
   switch (page.kind) {
     case "building":
@@ -27,9 +27,6 @@ export function backOf(page: View): View | null {
     case "registry":
     case "welcome":
     case "monitor":
-      return { kind: "setup" };
-    // A run is opened from a conversation or a building, whichever the
-    // reader came by, so it keeps the browser's own back.
     case "run":
     case "talk":
     case "setup":

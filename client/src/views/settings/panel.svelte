@@ -32,9 +32,10 @@
     readonly beneath: View;
     readonly onPick: (group: SetupGroup) => void;
     readonly onClose: () => void;
+    readonly onHome: () => void;
   }
 
-  const { group, beneath, onPick, onClose }: Props = $props();
+  const { group, beneath, onPick, onClose, onHome }: Props = $props();
 
   const uid = $props.id();
 
@@ -58,5 +59,5 @@
 </script>
 
 <Look dialog={dialogOf(`${uid}-title`, onClose, hold)}>
-  <Sheet {group} {beneath} {onPick} {onClose} titleId={`${uid}-title`} />
+  <Sheet {group} {beneath} {onPick} {onClose} {onHome} titleId={`${uid}-title`} />
 </Look>

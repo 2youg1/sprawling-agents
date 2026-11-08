@@ -42,9 +42,11 @@
   class="col-[2/12] row-start-2 flex min-h-0 min-w-0 flex-col overflow-y-auto narrow:col-span-full"
   aria-label={say($lang, "region_main")}
 >
-  <!-- One back key for every page, at the top left of the frame, so no
-       page draws its own (A3, A6); the welcome page, one column in the
-       middle of the frame, is handed the key to stand on that column. -->
+  <!-- A building keeps one back key to the city at the top left, so no
+       page draws its own; pages opened from the settings tree leave by
+       the edge settings key or a click on either blank side instead.
+       The welcome page is handed the key snippet so a future back still
+       stands on its one column. -->
   {#snippet backKey()}
     {#if back !== undefined}
       <div class="mb-snug">

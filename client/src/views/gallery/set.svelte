@@ -176,6 +176,7 @@
         {beneath}
         onPick={() => undefined}
         onClose={() => undefined}
+        onHome={() => undefined}
         titleId={`set-fixture-${String(index)}`}
       />
     </Stand>

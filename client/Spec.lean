@@ -305,6 +305,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! ## 9 工作流程
 
+### 主页侧栏返回控件
+
+`views/pages/home_side.svelte` 的两侧返回控件都是原生 `button`，以 `lang.json` 的 `page_home` 为可访问名称；Tab 与 Shift+Tab 按文档顺序进入和离开，Enter 与 Space 各按平台按钮行为触发一次 `onHome`。窄屏隐藏时不进入 Tab 顺序。两侧按钮调用外壳的 `homeTalk`，导航到 `DEFAULT_VIEW` 并保留当前图层；普通导航在新页面绘制后将焦点落在 `main h1`（`tabindex="-1"`，不加入 Tab 顺序），不返回已离开的侧栏按钮。设置面的主页键调用 `homeZen`：在导航前清除待落地的图层切换并设置 zen，后续 hashchange 不得用过期图层覆盖 zen。
+
 收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`，远程组的门开关与确认码输入框在 `client/spec/Views/Door.lean`，隐私组每一项的确认与结果在 `client/spec/Views/Privacy.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
 -/
 

@@ -7107,6 +7107,14 @@
     "en": "close settings",
     "zh": "关闭设置"
   },
+  "settings_home_zen": {
+    "en": "main menu · zen",
+    "zh": "主菜单 · 专注"
+  },
+  "page_home": {
+    "en": "return to the conversation",
+    "zh": "回到对话"
+  },
   "settings_branch_city": {
     "en": "city",
     "zh": "城市"
