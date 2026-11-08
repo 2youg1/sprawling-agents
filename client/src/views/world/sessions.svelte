@@ -102,8 +102,10 @@
     );
   }
 
+  // Subscribe to the page clock only while a row is running. Idle
+  // rebuilds take a fresh wall clock here so a later list rebuild does
+  // not keep a frozen snapshot from a standalone `$derived` (D112).
   const running = $derived(filtered.some((stretch) => dotOf(stretch) === "run"));
-  const now = $derived(running ? $clock : u.now());
 
   const look: SessionsLook = $derived({
     filter: filterOf(
@@ -122,7 +124,7 @@
       const going = newestWorking($belief, stretch.room);
       return rowOf(stretch, {
         lang: $lang,
-        now,
+        now: running ? $clock : u.now(),
         chosen: chosen(stretch),
         tags,
         pinning: pinningOf(stretch, tags),

@@ -1245,9 +1245,9 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! D112 对话页换会话：焦点进框，且不做 document view transition
 
-- **决策**：`app.svelte` 的 `settle` 在 talk→talk 且目标是当前一段（地址栏不带 `:session`）时，于下一帧把焦点交给 `main textarea`；只读过去一段仍交给 `main h1`。`follow` 对 talk→talk 一律不做 `document.startViewTransition`，即时 `settle`。会话栏的 100 ms 时钟只在有 `dot = run` 的行时订阅，空闲列表不再每十分之一秒重建整表。
-- **理由**：换会话仍是在同一对话页上说话；把焦点落到不可见的 `h1` 后，下一击键盘像卡住，刷新后首次 settle 又不抢焦，体感「刷新才好」。整页交叉淡入要吃一整段 `panel` 时长，而会话切换唯一命名的 view-transition 元素就是那个标题。空闲时每 100 ms 整表 `rowOf` 与会话切换抢主线程。
-- **被击败的备选**：①每次导航都 `focusTitle`——与图层键落地进框（D48）不一致，且吃掉键入；②保留 talk→talk 的 document transition、只缩短时长——标题几乎不动，淡入仍挡交互；③页面本地预判 `E_BUSY` 不发——城才是权威（D100 已否决）。
+- **决策**：`app.svelte` 的 `settle` 在 talk→talk 且目标是当前一段（地址栏不带 `:session`）时，于下一帧把焦点交给 `main textarea`；只读过去一段仍交给 `main h1`。`follow` 对 talk→talk 一律不做 `document.startViewTransition`，即时 `settle`。会话栏的 100 ms 时钟只在有 `dot = run` 的行时订阅；空闲时在造 `look` 的那次 `$derived` 里取 `u.now()`，不另立一份会冻住的 `now` 派生。
+- **理由**：换会话仍是在同一对话页上说话；把焦点落到不可见的 `h1` 后，下一击键盘像卡住，刷新后首次 settle 又不抢焦，体感「刷新才好」。整页交叉淡入要吃一整段 `panel` 时长，而会话切换唯一命名的 view-transition 元素就是那个标题。空闲时每 100 ms 整表 `rowOf` 与会话切换抢主线程；把 `u.now()` 提成单独 `$derived` 会在列表因 belief 重画时仍把冻结的快照喂给 `ago`。
+- **被击败的备选**：①每次导航都 `focusTitle`——与图层键落地进框（D48）不一致，且吃掉键入；②保留 talk→talk 的 document transition、只缩短时长——标题几乎不动，淡入仍挡交互；③页面本地预判 `E_BUSY` 不发——城才是权威（D100 已否决）；④空闲也订 100 ms 时钟——会话切换又与整表重建抢主线程。
 - **重开参数**：对话页换会话需要读屏器宣告整页标题时，或 view transition 能只粉会话栏而不挡输入框时。
 -/
 
