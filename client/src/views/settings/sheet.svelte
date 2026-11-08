@@ -55,9 +55,12 @@
       class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
     >
       <div class="flex items-center justify-between gap-snug px-snug">
+        <!-- Hover lifts the wash, a press yields by the theme's press
+        scale, release returns on the leave curve (§4-43): three distinct
+        answers so the key never feels still. -->
         <button
           type="button"
-          class="-ml-tight flex h-control-sm min-w-0 items-center gap-tight rounded-control pr-snug text-note text-text-faint transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive"
+          class="-ml-tight flex h-control-sm min-w-0 items-center gap-tight rounded-control pr-snug text-note text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100"
           aria-label={say($lang, "settings_home_zen")}
           onclick={onHome}
         >
@@ -66,7 +69,7 @@
         </button>
         <button
           type="button"
-          class="-mr-tight flex size-control-sm shrink-0 items-center justify-center rounded-control text-text-faint transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive"
+          class="-mr-tight flex size-control-sm shrink-0 items-center justify-center rounded-control text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100"
           aria-label={say($lang, "settings_close")}
           onclick={onClose}
         >

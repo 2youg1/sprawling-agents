@@ -25,10 +25,10 @@
         <div
           {...row.wire}
           class={[
-            "flex w-full cursor-pointer items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body transition-colors ease-leave aria-disabled:text-text-disabled",
+            "flex w-full cursor-pointer items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body transition-[background-color,color] ease-leave aria-disabled:text-text-disabled",
             row.wire["aria-selected"]
               ? "bg-raised-hover ease-arrive"
-              : "hover:bg-raised-hover hover:ease-arrive",
+              : "hover:bg-raised-hover hover:ease-arrive active:wash-strong active:ease-arrive",
           ]}
           style:padding-inline-start={`calc(${String(row.depth)} * var(--spacing-base) + var(--spacing-base))`}
         >

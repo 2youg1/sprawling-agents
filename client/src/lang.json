@@ -7109,7 +7109,7 @@
   },
   "settings_home_zen": {
     "en": "main menu · zen",
-    "zh": "主菜单 · 专注"
+    "zh": "主菜单 · Zen"
   },
   "page_home": {
     "en": "return to the conversation",
@@ -8492,16 +8492,16 @@
     "zh": "推理过程"
   },
   "talk_reasoning_length": {
-    "en": "{n} characters",
-    "zh": "{n} 字"
+    "en": "{n} bytes",
+    "zh": "{n} 字节"
   },
   "talk_record": {
-    "en": "speak",
-    "zh": "说"
+    "en": "dictate",
+    "zh": "听写"
   },
   "talk_recording": {
-    "en": "stop",
-    "zh": "停"
+    "en": "stop dictation",
+    "zh": "停止听写"
   },
   "talk_resident": {
     "en": "resident",

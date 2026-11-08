@@ -21,7 +21,7 @@ comes in the bags. -->
     <h2 class="contents">
       <button
         {...look.trigger}
-        class="-mx-snug flex h-control-sm items-center rounded-control px-snug text-note text-text-faint hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
+        class="-mx-snug flex h-control-sm items-center rounded-control px-snug text-note text-text-faint transition-[background-color,color,scale] ease-leave hover:wash hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive aria-expanded:wash aria-expanded:text-text still:transition-none still:active:scale-100"
       >
         {look.label}
       </button>
@@ -30,13 +30,13 @@ comes in the bags. -->
       <ul
         {...look.popup}
         {...look.list}
-        class="absolute top-full left-0 z-(--layer-popover) flex min-w-[16ch] flex-col rounded-card bg-raised p-tight shadow-float"
+        class="absolute top-full left-0 z-(--layer-popover) flex w-max min-w-[20ch] max-w-[36ch] max-h-palette flex-col overflow-y-auto rounded-card bg-raised p-tight shadow-float"
       >
         {#each look.items as item (item.key)}
           <li {...item.holder}>
             <button
               {...item.wire}
-              class="flex h-control-sm w-full items-center rounded-control px-snug text-left text-note text-text hover:wash focus-visible:wash disabled:text-text-disabled"
+              class="flex min-h-control-sm w-full items-center rounded-control px-snug py-tight text-left text-note text-pretty text-text transition-[background-color,color] ease-leave hover:wash hover:ease-arrive focus-visible:wash active:wash-strong active:ease-arrive disabled:text-text-disabled"
             >
               {item.word}
             </button>

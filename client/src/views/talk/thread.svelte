@@ -36,6 +36,7 @@
   import TurnView from "./turn.svelte";
   import AsideLink from "./aside_link.look.svelte";
   import Reasoning from "./reasoning.look.svelte";
+  import { lengthOf as reasoningLength } from "./reasoning";
   import Rule from "./rule.look.svelte";
   import SteerPin from "./steer_pin.look.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
@@ -340,7 +341,7 @@
     <div class="my-tight">
       <Reasoning
         label={say($lang, "talk_reasoning")}
-        length={fill(say($lang, "talk_reasoning_length"), { n: count(run.thinking.length) })}
+        length={reasoningLength($lang, run.thinking)}
         text={run.thinking}
         open
       />

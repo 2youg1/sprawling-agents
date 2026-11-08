@@ -26,6 +26,7 @@ bar and the thread cannot disagree about where a round is. -->
   import Head from "./head.svelte";
   import NoteLine from "./note_line.svelte";
   import Reasoning from "./reasoning.look.svelte";
+  import { lengthOf as reasoningLength } from "./reasoning";
   import { noteAt } from "./note_line";
   import { rhythmOf } from "./rhythm";
   import { cutOff, silentTurn } from "./silence";
@@ -99,7 +100,7 @@ bar and the thread cannot disagree about where a round is. -->
       {#if turn.thought && whole}
         <Reasoning
           label={say($lang, "talk_reasoning")}
-          length={fill(say($lang, "talk_reasoning_length"), { n: count(turn.thought.length) })}
+          length={reasoningLength($lang, turn.thought)}
           text={turn.thought}
           open={false}
         />

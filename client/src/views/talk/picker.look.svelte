@@ -45,7 +45,7 @@ already on the screen; a list opened in full scrolls inside that room. -->
       ? "wash-strong text-text"
       : item.cursor
         ? "bg-raised-hover text-text-quiet"
-        : "text-text-quiet",
+        : "text-text-quiet hover:bg-raised-hover hover:text-text",
     item.cursor ? "chosen" : "",
   ];
   // The window's height caps the panel, and so does the room on the side
@@ -104,7 +104,12 @@ already on the screen; a list opened in full scrolls inside that room. -->
       >
         {#each list.rows as item (item.key)}
           <li
-            class={[ROW, section.band ? "flex-1 justify-center" : "justify-between", ...tone(item)]}
+            class={[
+              ROW,
+              section.band ? "flex-1 justify-center" : "justify-between",
+              "transition-[background-color,color] ease-leave hover:ease-arrive active:wash-strong active:ease-arrive",
+              ...tone(item),
+            ]}
             aria-label={section.heard[item.row.id]}
             {...item.wire}
           >
