@@ -234,15 +234,15 @@ jobs:
         run: |
           set -euo pipefail
           notes="$RUNNER_TEMP/nightly-notes.md"
+          cat > "$notes" <<'MARKDOWN'
+          **This nightly is unstable and published automatically by the CI pipeline**: it has not been fully tested, nothing about its behaviour is guaranteed, and compatibility with any other version is not promised.
+          **这份 nightly 不稳定，由 CI 流水线自动发布**：它未经充分测试，行为不受任何保障，也不保证与任何其他版本兼容。
+
+          Protocols and stored-data formats change without notice, so **back up the city before you download, and check the archive's SHA256 after downloading**; rolling back the binary does not promise that an older binary can read data a newer one migrated. The release page publishes a SHA256 digest for each archive, which the installers compare, and the Sigstore build-provenance attestation says where the bytes were built. The tag dates the snapshot in UTC; a curated release tag carries the day it was cut in UTC+8. A nightly carries the code merged on the day it is built, so the newest changes are run and tested every day; it is where current usability is checked, and it sometimes holds optimizations and fixes that no curated release has yet. **You are welcome to download a nightly and help test usability and compatibility**; when one misbehaves, open an issue with what you ran, what you expected, what happened, and the complete SHA in the tag.
+
+          协议与存储格式可能随时改变，所以**下载前先备份城市，下载后校验归档的 SHA256**：把二进制退回旧版，并不保证旧版能读新版迁移过的数据。发布页为每个归档公布 SHA256 摘要，安装器会核对；页面上另有 Sigstore 构建来源证明，写明这些字节从哪里构建。nightly 的 tag 用 UTC 日期，正式发行的 tag 用切版当天的 UTC+8 日期。nightly 是构建当天已合并代码的快照，每天的改动在这里被运行和测试，当前的可用性也由它验证；它有时还带着正式发行没有的优化与修复。**欢迎下载 nightly 帮助测试可用性与兼容性**，遇到问题请开 issue 写明执行了什么、期望什么、实际发生了什么，以及 tag 里的完整 SHA。
+          MARKDOWN
           {
-            echo "## Nightly — unstable"
-            echo
-            echo "This is an automatically published experimental snapshot, not a curated release."
-            echo "No stability or usability is guaranteed. If you hit a problem, open an issue promptly."
-            echo "If you need stability, wait for a stable release."
-            echo "Behaviour, protocols and stored-data formats may change without notice."
-            echo "Back up the city before updating; rolling back the binary does not promise"
-            echo "that an older binary can read data a newer one migrated."
             echo
             echo "Source: [\`$SOURCE_SHA\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SOURCE_SHA)"
             echo "Baseline: [\`$BASELINE\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$BASELINE)"
@@ -252,7 +252,7 @@ jobs:
               echo "Previous nightly: [\`$PREVIOUS_TAG\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$PREVIOUS_TAG) · [compare]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS_SHA...$SOURCE_SHA)"
             fi
             echo
-          } > "$notes"
+          } >> "$notes"
           gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="$TAG" -f target_commitish="$SOURCE_SHA" \
             -f previous_tag_name="$BASELINE" --jq .body >> "$notes"
