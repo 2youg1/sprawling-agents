@@ -23,8 +23,9 @@
 )]
 
 use kernel::{
-    Address, AxError, Ceiling, ChatMessage, ContentBlock, Locator, Model, ModelRequest,
-    ModelReturn, Payload, Retries, RunId, Seq, TimeMs, ToolCall, ToolName, ToolOutcome,
+    Address, AxError, Ceiling, ChatMessage, ContentBlock, ImageRef, ImageType, Locator, Model,
+    ModelRequest, ModelReturn, Payload, Retries, RunId, Seq, TimeMs, ToolCall, ToolName,
+    ToolOutcome,
 };
 
 use crate::conversation::Opening;
@@ -65,7 +66,7 @@ fn says(text: &str, calls: Vec<ToolCall>) -> ModelReturn {
 }
 
 #[test]
-fn a_branch_first_request_opens_with_the_bytes_of_the_mothers_last() {
+fn a_branch_first_request_opens_with_the_same_bytes_pictures_included() {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
     let status = ToolCall {
@@ -80,10 +81,23 @@ fn a_branch_first_request_opens_with_the_bytes_of_the_mothers_last() {
         ],
         sent: Vec::new(),
     };
-    run(
+    let picture = ImageRef {
+        locator: Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
+        media_type: ImageType::Png,
+        width: 8,
+        height: 8,
+    };
+    run_answering(
         &mut ledger,
         &mut mother,
         plan(RunId::from_bytes([1; 16]), "measure the meter", Vec::new()),
+        &|_: &ToolCall| {
+            Ok(ToolOutcome {
+                result: Payload::of(&serde_json::json!({ "image": picture.locator.to_string() }))
+                    .unwrap(),
+                attachments: vec![picture.clone(), picture.clone()],
+            })
+        },
     );
 
     let mut index = storage::LedgerIndex::empty();
@@ -105,6 +119,15 @@ fn a_branch_first_request_opens_with_the_bytes_of_the_mothers_last() {
     );
 
     let last = mother.sent.last().unwrap();
+    let shown = last.join("\n");
+    assert!(
+        shown.contains(&picture.locator.to_string()),
+        "the mother actually sent the fixture's picture"
+    );
+    assert!(
+        shown.contains("[picture already in context:"),
+        "the repeated attachment exercised tail deduplication"
+    );
     let first = &daughter.sent[0];
     assert_eq!(first.get(..last.len()), Some(&last[..]));
 }

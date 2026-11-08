@@ -24,11 +24,16 @@ use crate::mismatch::mismatch;
 /// Keyed by the locator's canonical spelling, which is what makes the
 /// iteration order a fact about the content rather than about the run.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ImageBytes(BTreeMap<String, Vec<u8>>);
+pub struct ImageBytes(BTreeMap<String, String>);
 
 impl ImageBytes {
+    /// Encodes on arrival so the raw allocation can be released before the
+    /// next picture is read, and repeated wire positions reuse this text.
     pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>) {
-        self.0.insert(at.to_string(), bytes);
+        self.0.insert(
+            at.to_string(),
+            base64::engine::general_purpose::STANDARD.encode(bytes),
+        );
     }
 
     #[must_use]
@@ -47,13 +52,15 @@ impl ImageBytes {
     /// `E_WIRE_MISMATCH` when nobody resolved this locator. Sending the
     /// request without the picture would leave the model looking at a
     /// gap it was told about, so the whole call is refused instead.
-    pub(crate) fn encoded(&self, at: &Locator) -> Result<String, AxError> {
-        let bytes = self.0.get(&at.to_string()).ok_or_else(|| {
-            mismatch(
-                "content.image.locator",
-                "no bytes were resolved for this picture",
-            )
-        })?;
-        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    pub(crate) fn encoded(&self, at: &Locator) -> Result<&str, AxError> {
+        self.0
+            .get(&at.to_string())
+            .map(String::as_str)
+            .ok_or_else(|| {
+                mismatch(
+                    "content.image.locator",
+                    "no bytes were resolved for this picture",
+                )
+            })
     }
 }

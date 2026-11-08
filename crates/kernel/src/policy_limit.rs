@@ -30,9 +30,9 @@ fn exceeds(limit: u64, observed: usize) -> bool {
     }
 }
 
-/// How many pictures one turn may put on a provider request. The legal
-/// domain is `0..=max`: a turn carrying exactly the limit is sent, and
-/// one more picture is refused before any byte leaves for the provider.
+/// How many distinct pictures one provider request may carry. The legal
+/// domain is `0..=max`: a request carrying exactly the limit is sent, and
+/// one more distinct picture is refused before any byte leaves for the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ImagesPerTurn(u64);
 
@@ -56,10 +56,11 @@ impl ImagesPerTurn {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "put pictures on a provider request",
-                format!("this turn carries {found} pictures"),
+                format!("this request carries {found} distinct pictures"),
             )
             .with_recovery(format!(
-                "one turn carries at most {max} pictures; send the rest in a later turn"
+                "one request carries at most {max} distinct pictures; stop and fork from \
+                 before older pictures, or start a new session, to leave them out"
             )));
         }
         Ok(())
@@ -195,14 +196,17 @@ mod tests {
     /// refused, and the refusal is compared whole: the four parts are
     /// the contract, so a wording change has to be deliberate.
     #[test]
-    fn a_turn_carries_the_limit_and_one_picture_past_it_is_refused() {
+    fn a_request_carries_the_limit_and_one_distinct_picture_past_it_is_refused() {
         assert!(IMAGES_PER_TURN.admit(4).is_ok());
         let expected = AxError::failure(
             AxCode::InvalidArgs,
             "put pictures on a provider request",
-            "this turn carries 5 pictures",
+            "this request carries 5 distinct pictures",
         )
-        .with_recovery("one turn carries at most 4 pictures; send the rest in a later turn");
+        .with_recovery(
+            "one request carries at most 4 distinct pictures; stop and fork from before older \
+             pictures, or start a new session, to leave them out",
+        );
         assert_eq!(IMAGES_PER_TURN.admit(5).unwrap_err(), expected);
     }
 

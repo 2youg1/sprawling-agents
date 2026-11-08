@@ -60,6 +60,6 @@ impl Endpoint { pub fn new(config: EndpointConfig, redemption: Redemption) -> Re
 ```
 
 - **两个兑付闭包总是同行，所以它们是一个值**（`Redemption`），而不是构造子上多出来的第二个参数；`adapter_for` 的参数个数因此不变。探针用 `without_images`：一个只问「你服务哪些模型」的调用本就不该有图，它拿到图就是一个 bug，而不是一张要传的图。
-- **`wire_request` 三件事**：收齐本次请求的 Image 块与 tool_result 附件 → 数量超 `IMAGES_PER_TURN` 即 `E_INVALID_ARGS`（三段式，recovery 报出上限数）→ 逐张 `images(locator)` 取字节，单张超 `IMAGE_MAX_BYTES` 同样 `E_INVALID_ARGS`，然后交给 `request_wire`。上限住 `kernel::consts_policy`，不在这里手写。
+- **`wire_request` 三件事**：收齐本次请求的 Image 块与 tool_result 附件并按 locator 去重 → 不同图片数量超 `IMAGES_PER_TURN` 即 `E_INVALID_ARGS`（三段式，recovery 报出上限数）→ 每个 locator 只经 `images(locator)` 取一次并编码一次（D65），单张超 `IMAGE_MAX_BYTES` 同样 `E_INVALID_ARGS`，然后交给 `request_wire`。上限住 `kernel::consts_policy`，不在这里手写。已发送图片与原会话历史一起冻结、只能经 fork 改变路径的规则归 runtime D129，gateway 不自行淘汰。
 - **看不见图的模型恒拒而不静默丢图**：`config.pricing`（即选型点定下的 `ModelEntry`）的 `input` 为 `Text` 而请求带图，则 `E_INVALID_ARGS`，recovery 指名 `text_image` 这个口径。拒绝住 `endpoint/model.rs`（`call` 与 `call_streaming` 两扇门共用一句），与 confidential 那句拒词同位同形：拒绝写在泄漏会发生的那一格，才能活过一次路由失误。
 -/

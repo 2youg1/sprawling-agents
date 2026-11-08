@@ -173,9 +173,9 @@ pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;
 pub const IMAGE_MAX_BYTES: crate::policy_limit::ImageMaxBytes =
     crate::policy_limit::ImageMaxBytes::new(2_097_152);
 
-/// Four pictures in one turn. Past that the window is being spent on
-/// pixels rather than on the work, and a limit stated once is what a
-/// refusal can name.
+/// Four distinct pictures in one request. Past that the window is being
+/// spent on pixels rather than on the work, and a limit stated once is
+/// what a refusal can name.
 pub const IMAGES_PER_TURN: crate::policy_limit::ImagesPerTurn =
     crate::policy_limit::ImagesPerTurn::new(4);
 

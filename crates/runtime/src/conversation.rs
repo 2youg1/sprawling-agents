@@ -3,12 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The run's conversation history: the volatile half of a request.
+//! The run's conversation history: an unsent tail behind an immutable
+//! prefix of messages already sent.
 //!
-//! Frozen-prefix bytes never live here. What does is every message the
-//! run has exchanged since it started, folded forward turn by turn by
-//! the executor that owns it, and handed to the model beneath the
-//! prefix on each call.
+//! The four frozen system segments never live here. What does is every
+//! message the run has exchanged since it started, folded forward turn by
+//! turn by the executor that owns it, and handed to the model beneath those
+//! segments on each call.
 //!
 //! **One invariant, enforced at every entrance**: consecutive user
 //! content joins the message already open rather than opening a second
@@ -16,23 +17,29 @@
 //! the same rule, so none of them can produce the alternating shape a
 //! provider refuses.
 //!
-//! **A message already sent is never rewritten.** Text that arrives after
-//! the last assembly, while the open user message is on the wire, is held
-//! and lands after the next tool results, so the next request extends the
-//! last one instead of editing it. The one exception is tool results after
+//! **A message already sent is never rewritten.** Together with the four
+//! frozen system segments, these messages form the request's frozen prefix.
+//! Text that arrives after the last assembly, while the open user message
+//! is on the wire, is held and lands after the next tool results, so the
+//! next request extends the last one instead of editing it. Image references
+//! have no optimization exception. The one exception is tool results after
 //! an empty reply, which extend the sent message rather than open a second
-//! adjacent user message, and leave it open again (`crates/runtime/spec/Conversation.lean` §8-47).
+//! adjacent user message, and leave it open again
+//! (`crates/runtime/spec/Conversation.lean` §8-47).
+
+use std::collections::BTreeSet;
 
 use kernel::event::escape_markup;
-use kernel::{AxCode, AxError, ChatMessage, ContentBlock, Role, RunId};
+use kernel::{AxCode, AxError, ChatMessage, ContentBlock, ImageRef, Role, RunId};
 
 /// How the first user message opens: kernel's, because `run_started`
 /// records it (`crates/kernel/Spec.lean` §8-82-1).
 pub use kernel::event::record::Opening;
 
 /// The run's conversation history, owned by the executor and folded
-/// forward turn by turn. Frozen-prefix bytes never live here — the
-/// conversation is the volatile half of the request.
+/// forward turn by turn. The four frozen system segments never live here;
+/// sent messages join that frozen request prefix, and the unsent tail stays
+/// volatile.
 #[derive(Debug, Clone, Default)]
 pub struct Conversation {
     messages: Vec<ChatMessage>,
@@ -41,6 +48,9 @@ pub struct Conversation {
     /// User text that arrived while the open user message was already
     /// sent; it waits for the next tool results.
     held: Vec<ContentBlock>,
+    /// Locators already present, derived at each append rather than found
+    /// by walking the whole conversation whenever another picture arrives.
+    pictures: BTreeSet<String>,
 }
 
 impl Conversation {
@@ -106,11 +116,15 @@ impl Conversation {
     /// module owns. The caller pushes the new run's own lines afterwards,
     /// and those do join.
     pub fn push_inherited(&mut self, messages: &[ChatMessage]) {
+        for message in messages {
+            self.remember_pictures(&message.content);
+        }
         self.messages.extend_from_slice(messages);
     }
 
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>) {
         if !content.is_empty() {
+            self.remember_pictures(&content);
             self.messages.push(ChatMessage {
                 role: Role::Assistant,
                 content,
@@ -127,6 +141,7 @@ impl Conversation {
     /// message they extend is open again, so a steer before the next
     /// assembly joins it after them.
     pub fn push_tool_results(&mut self, mut results: Vec<ContentBlock>) {
+        self.deduplicate_new_pictures(&mut results);
         results.append(&mut self.held);
         if results.is_empty() {
             return;
@@ -144,8 +159,53 @@ impl Conversation {
         }
     }
 
-    /// Everything in `messages()` is now on the wire: later user text
-    /// joins none of it.
+    /// A repeated locator in a not-yet-sent result becomes text rather than
+    /// another image. Existing messages are only read: their bytes stay in
+    /// the frozen prefix (`crates/runtime/spec/Conversation.lean` §8-47-3).
+    fn deduplicate_new_pictures(&mut self, results: &mut [ContentBlock]) {
+        if !results.iter().any(|block| !pictures_in(block).is_empty()) {
+            return;
+        }
+        for block in results {
+            match block {
+                ContentBlock::Image(picture) => {
+                    let locator = picture.locator.to_string();
+                    if !self.pictures.insert(locator.clone()) {
+                        *block = ContentBlock::Text {
+                            text: duplicate_picture(&locator),
+                        };
+                    }
+                }
+                ContentBlock::ToolResult {
+                    content,
+                    attachments,
+                    ..
+                } => attachments.retain(|picture| {
+                    let locator = picture.locator.to_string();
+                    if self.pictures.insert(locator.clone()) {
+                        return true;
+                    }
+                    content.push('\n');
+                    content.push_str(&duplicate_picture(&locator));
+                    false
+                }),
+                ContentBlock::Text { .. }
+                | ContentBlock::Thinking { .. }
+                | ContentBlock::RedactedThinking { .. }
+                | ContentBlock::ToolUse { .. } => {}
+            }
+        }
+    }
+
+    /// Updates the derived locator index from blocks about to be appended.
+    fn remember_pictures(&mut self, blocks: &[ContentBlock]) {
+        for picture in blocks.iter().flat_map(pictures_in) {
+            self.pictures.insert(picture.locator.to_string());
+        }
+    }
+
+    /// Everything in `messages()` is now on the wire and joins the frozen
+    /// prefix: later text, compaction and image handling rewrite none of it.
     pub fn mark_sent(&mut self) {
         self.sent = self.messages.len();
     }
@@ -162,6 +222,7 @@ impl Conversation {
         if blocks.is_empty() {
             return;
         }
+        self.remember_pictures(&blocks);
         let open = self.messages.len() > self.sent;
         match self.messages.last_mut() {
             Some(last) if last.role == Role::User && open => last.content.extend(blocks),
@@ -172,6 +233,23 @@ impl Conversation {
             }),
         }
     }
+}
+
+/// The pictures one block carries, whichever canonical position holds them.
+fn pictures_in(block: &ContentBlock) -> &[ImageRef] {
+    match block {
+        ContentBlock::Image(picture) => std::slice::from_ref(picture),
+        ContentBlock::ToolResult { attachments, .. } => attachments,
+        ContentBlock::Text { .. }
+        | ContentBlock::Thinking { .. }
+        | ContentBlock::RedactedThinking { .. }
+        | ContentBlock::ToolUse { .. } => &[],
+    }
+}
+
+/// The text a repeated picture leaves in the new, not-yet-sent tail.
+fn duplicate_picture(locator: &str) -> String {
+    format!("[picture already in context: {locator}]")
 }
 
 /// Who said a steer's text (`crates/runtime/spec/Conversation.lean`
@@ -341,6 +419,7 @@ fn unreadable(source: &str) -> AxError {
 )]
 mod tests {
     use super::*;
+    use kernel::{ImageRef, ImageType, Locator};
     use proptest::prelude::*;
 
     /// What a resident might put in a letter to pass for the User or to
@@ -399,6 +478,76 @@ mod tests {
                 other => panic!("a steer is text, got {other:?}"),
             })
             .collect()
+    }
+
+    fn picture(tag: u8) -> ImageRef {
+        ImageRef {
+            locator: Locator::parse(&format!("cas:b3-{}", format!("{tag:02x}").repeat(32)))
+                .unwrap(),
+            media_type: ImageType::Png,
+            width: 8,
+            height: 8,
+        }
+    }
+
+    fn pictured_result(pictures: Vec<ImageRef>) -> ContentBlock {
+        ContentBlock::ToolResult {
+            tool_use_id: "tu_1".to_owned(),
+            content: "the screenshot and its locator".to_owned(),
+            is_error: false,
+            attachments: pictures,
+        }
+    }
+
+    #[test]
+    fn marking_a_picture_sent_freezes_its_reference_without_rewriting_it() {
+        let mut conversation = Conversation::new();
+        conversation.push_tool_results(vec![
+            pictured_result(vec![picture(1)]),
+            ContentBlock::Image(picture(2)),
+        ]);
+        let sent = conversation.messages().to_vec();
+
+        conversation.mark_sent();
+
+        assert_eq!(conversation.messages(), sent);
+    }
+
+    #[test]
+    fn a_duplicate_picture_in_the_unsent_result_becomes_text() {
+        let mut conversation = Conversation::new();
+        conversation.push_tool_results(vec![pictured_result(vec![picture(1)])]);
+        conversation.mark_sent();
+        let frozen = conversation.messages().to_vec();
+        conversation.push_assistant(vec![ContentBlock::Text {
+            text: "saw it".to_owned(),
+        }]);
+
+        conversation.push_tool_results(vec![pictured_result(vec![picture(1), picture(2)])]);
+
+        let mut latest = pictured_result(vec![picture(2)]);
+        let ContentBlock::ToolResult { content, .. } = &mut latest else {
+            panic!("the fixture is a tool result");
+        };
+        content.push_str(&format!(
+            "\n[picture already in context: {}]",
+            picture(1).locator
+        ));
+        let expected = vec![
+            frozen[0].clone(),
+            ChatMessage {
+                role: Role::Assistant,
+                content: vec![ContentBlock::Text {
+                    text: "saw it".to_owned(),
+                }],
+            },
+            ChatMessage {
+                role: Role::User,
+                content: vec![latest],
+            },
+        ];
+        assert_eq!(conversation.messages(), expected);
+        assert_eq!(&conversation.messages()[0], &frozen[0]);
     }
 
     proptest! {

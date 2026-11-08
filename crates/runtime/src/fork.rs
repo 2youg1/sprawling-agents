@@ -416,11 +416,10 @@ fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<Committ
 /// One tool result as the model reads it back, rebuilt from the record
 /// by the renderer the live wave drew it with (`crate::rendering`).
 ///
-/// The pictures a tool produced are not rebuilt: the record carries the
-/// payload a tool answered with, and the block's `attachments` are the
-/// references that payload held, which the next request re-resolves from
-/// the content store. A fork without them loses what the next call would
-/// have fetched anyway.
+/// The pictures a tool produced come back from the references the record
+/// carries (kernel D128). Their bytes stay in the content store and the
+/// next request resolves them there, so a branch preserves the frozen
+/// conversation instead of dropping every image its mother sent.
 fn result_block(result: &ToolResult) -> Result<ContentBlock, AxError> {
     Ok(ContentBlock::ToolResult {
         tool_use_id: result.tool_use_id.clone(),
@@ -433,7 +432,7 @@ fn result_block(result: &ToolResult) -> Result<ContentBlock, AxError> {
             ToolAnswer::Answered { .. } => false,
             ToolAnswer::Failed { .. } => true,
         },
-        attachments: Vec::new(),
+        attachments: result.attachments.clone(),
     })
 }
 

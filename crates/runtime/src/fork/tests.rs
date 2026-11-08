@@ -136,6 +136,7 @@ fn mother_drafts() -> Vec<EventDraft> {
                 took_us: None,
                 rendered: None,
                 shown_bytes: None,
+                attachments: Vec::new(),
             })
             .unwrap(),
         ),
@@ -165,6 +166,7 @@ fn read_result_with_text(id: &str, rooms: &[&str], text: &str) -> EventDraft {
             took_us: None,
             rendered: Some(kernel::event::record::Rendering::V4),
             shown_bytes: None,
+            attachments: Vec::new(),
         })
         .unwrap(),
     )
@@ -245,6 +247,7 @@ fn another_tools_rules_field_is_not_read_evidence() {
         took_us: None,
         rendered: Some(kernel::event::record::Rendering::V4),
         shown_bytes: None,
+        attachments: Vec::new(),
     })
     .unwrap();
     drafts[3] = result;
@@ -416,6 +419,7 @@ fn each_result_line_is_rebuilt_by_the_renderer_it_names() {
                 took_us: None,
                 rendered,
                 shown_bytes: None,
+                attachments: Vec::new(),
             })
             .unwrap(),
         );

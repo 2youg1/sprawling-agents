@@ -20,7 +20,7 @@
 
 | 类型 | 唯一实例（数的家仍是 `consts_policy`，§8-8） | `admit` | 越界时的四段 |
 |---|---|---|---|
-| `ImagesPerTurn` | `IMAGES_PER_TURN` | `admit(found: usize) -> Result<(), AxError>` | 动作 `put pictures on a provider request`；主体 `this turn carries {found} pictures`；recovery `one turn carries at most {max} pictures; send the rest in a later turn` |
+| `ImagesPerTurn` | `IMAGES_PER_TURN` | `admit(found: usize) -> Result<(), AxError>` | 动作 `put pictures on a provider request`；主体 `this request carries {found} distinct pictures`；recovery `one request carries at most {max} distinct pictures; stop and fork from before older pictures, or start a new session, to leave them out` |
 | `ImageMaxBytes` | `IMAGE_MAX_BYTES` | `admit(at: &Locator, size: usize) -> Result<(), AxError>` | 动作 `put a picture on a provider request`；主体 `{at} is {size} bytes`；recovery `one picture is at most {max} bytes; shrink it before attaching it` |
 | `ImageQuality` | `IMAGE_QUALITY` | `admit(asked: u32) -> Result<(), AxError>` | 动作 `encode a picture`；主体 `quality {asked} is outside 0..={max}`；recovery `pass a quality between 0 and {max}; an encoder has no others` |
 | `ClockZonesMax` | `CLOCK_ZONES_MAX` | `admit(configured: usize) -> Result<(), AxError>` | 动作 `format clock stamp`；主体 `{configured} zones exceed CLOCK_ZONES_MAX={max}`；recovery ``keep at most {max} rows in `[clock] zones`; the UTC row is added on top of them and is never one of them`` |

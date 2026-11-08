@@ -23,6 +23,7 @@ use crate::locator::Locator;
 /// one has to answer [`ImageType::mime`] in the same edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ImageType {
     Png,
     Jpeg,
@@ -53,9 +54,11 @@ impl ImageType {
 /// `width` and `height` are pixel counts, so they are integers; a
 /// display that wants a ratio computes it where the drawing happens.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ImageRef {
     /// A `cas:` locator. The bytes are fetched from the content store by
     /// whoever is about to send them, and never travel in the ledger.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub locator: Locator,
     pub media_type: ImageType,
     pub width: u32,

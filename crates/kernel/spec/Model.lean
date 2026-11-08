@@ -112,10 +112,12 @@ pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxEr
 
 ```rust
 #[derive(Serialize, Deserialize)] #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ImageType { Png, Jpeg, Webp, Gif }        // 封闭枚举：城内认得的四种图
 impl ImageType { pub fn mime(&self) -> &'static str; }   // "image/png" 等，两条 wire 共用
-pub struct ImageRef { pub locator: Locator, pub media_type: ImageType,
-                      pub width: u32, pub height: u32 }
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ImageRef { #[cfg_attr(feature = "schema", schemars(with = "String"))] pub locator: Locator,
+                      pub media_type: ImageType, pub width: u32, pub height: u32 }
 pub enum ContentBlock { /* …既有五变体… */
     Image(ImageRef),
     ToolResult { tool_use_id, content, is_error, #[serde(default)] attachments: Vec<ImageRef> } }

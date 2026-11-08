@@ -74,21 +74,28 @@ Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17
 
 ```rust
 // gateway::dialect::images（形状 2 value）
-pub struct ImageBytes(BTreeMap<String, Vec<u8>>);   // 键＝Locator 的规范拼写
+pub struct ImageBytes(BTreeMap<String, String>);   // 键＝Locator 的规范拼写，值＝标准 base64
 impl ImageBytes {
-    pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>);
+    pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>);   // 插入时编码一次，原始字节随即释放
     pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
-    pub(crate) fn encoded(&self, at: &Locator) -> Result<String, AxError>;  // 标准 base64
+    pub(crate) fn encoded(&self, at: &Locator) -> Result<&str, AxError>;  // 借用已编码文本
 }
 // request_wire 收 &ImageBytes，签名见上文 §8-1 那一块（第四个参数是 ChatSpelling）
 ```
 
 - **dialect 仍是数据的纯函数**。字节不在这里取：`ImageBytes` 是参数，不是一个 store 句柄。同一份 `(ChatRequest, ImageBytes)` 永远翻出同一串字节，重放因此仍能重推当时实发的请求。
-- **为何不是 `BTreeMap<Locator, Vec<u8>>`**：`Locator` 不实现 `Ord`（它内含的 `Range` 也不），而给 `kernel::locator` 加一对 derive 是在另一个模块的文件上改公共面。改成以规范拼写为键的 newtype：接口更窄（三个方法），排序仍然只取决于内容，且「解不出字节」这条失败路径归值本身拿着，而不是散在两家 dialect 里。
+- **为何以规范拼写和编码文本为键值**：`Locator` 不实现 `Ord`（它内含的 `Range` 也不），而给 `kernel::locator` 加一对 derive 是在另一个模块的文件上改公共面。以规范拼写为键让排序只取决于内容；值在插入时编码，使原始字节不必留到翻译结束。「解不出字节」这条失败路径归值本身拿着，而不是散在两家 dialect 里。
 - **位置**：`dialect/images.rs` 与 `mismatch` 同层——两家都读、谁都不回头指，所以依赖仍是单向的。
 - **locator 解不出字节即 `E_WIRE_MISMATCH`**（fail-closed）：一张描述存在、字节不在的图，发上线就是一个模型看不见的空位。
 - **Anthropic 侧**：Image 块→`{type:"image", source:{type:"base64", media_type:…, data:…}}`；带 `attachments` 的 tool_result 的 `content` 由字符串改写为块数组 `[{type:"text",text},{type:"image",…}…]`（无附件时仍写字符串，既有 golden 字节不变）。两处形状都是 provider 自己的：<https://platform.claude.com/docs/en/build-with-claude/vision>。
 - **OpenAI 侧**：user 消息的 `content` 由字符串改写为部件数组 `[{type:"text",text},{type:"image_url",image_url:{url:"data:<mime>;base64,…"}}]`。
 - **本兼容格式多一项记录性丢失：tool 消息拿不了图**。Chat Completions 的 `role:"tool"` 只收字符串 `content`，所以 tool_result 的 `attachments` 不随它走，而是落到紧跟其后的一条 user 消息里。图没丢，丢的是「这张图是那次工具调用的结果」这层归属；与断点位、思考块同一规则，**文档声明，不静默**，写在 `openai.rs` 顶上那张丢失清单里并由测试钉住。
 - **base64 依赖**：`base64 0.22` 本就在 `Cargo.lock` 的图里（reqwest／git2 一系已携），直接命名不向锁里添包；自己写一份编码器才是新权威。
+
+/-! D65 同一 locator 在一次请求里只兑付并编码一次，原始字节不随整次翻译驻留
+
+决定：`pictures_in` 按 locator 规范拼写去重并保留第一次出现的顺序，`pictures_for` 对不同图片的数量执行 `IMAGES_PER_TURN` 准入，同一 locator 只兑付一次；`ImageBytes::insert` 立即写成标准 base64，`encoded` 借用这段文本。重复出现的图片在 wire 上仍各守原位置，去重的是请求上限的计数对象、CAS 读取与编码工作，不改变图片块的数量或顺序。
+
+理由：同一张图重复引用不应重复读盘；四张图的原始字节也不必等所有图片都读完后仍与全部 base64 同时驻留。被否：①把原始字节保留到 `encoded` 每次现编——重复块重复付 CPU，峰值同时持有两族字节；②跨请求 LRU——单次请求的不同图片数量已有上限，缓存读取又要求已发送 Conversation 不变（runtime D129），没有测量证明值得再引进淘汰状态与容量规则。
+-/
 -/

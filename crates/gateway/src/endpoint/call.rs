@@ -32,20 +32,27 @@ use kernel::event::record::ModelFacts;
 /// trusting a far side whose `has_more` never turns false.
 const MODEL_LIST_PAGES: usize = 16;
 
-/// Every picture one conversation refers to, in the order the blocks
-/// name them: the blocks a person attached and the ones a tool produced
-/// are the same value, so they are collected the same way.
+/// Every distinct picture one conversation refers to, in the order the
+/// blocks first name its locator. The blocks a person attached and the
+/// ones a tool produced are the same value, so they are collected the
+/// same way; repeated wire positions share one CAS read and encoding.
 pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     let mut found = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     for message in chat.messages.iter() {
         for block in &message.content {
-            match block {
-                ContentBlock::Image(picture) => found.push(picture),
-                ContentBlock::ToolResult { attachments, .. } => found.extend(attachments.iter()),
+            let pictures: &[ImageRef] = match block {
+                ContentBlock::Image(picture) => std::slice::from_ref(picture),
+                ContentBlock::ToolResult { attachments, .. } => attachments,
                 ContentBlock::Text { .. }
                 | ContentBlock::Thinking { .. }
                 | ContentBlock::RedactedThinking { .. }
-                | ContentBlock::ToolUse { .. } => {}
+                | ContentBlock::ToolUse { .. } => &[],
+            };
+            for picture in pictures {
+                if seen.insert(picture.locator.to_string()) {
+                    found.push(picture);
+                }
             }
         }
     }
@@ -477,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn the_fifth_picture_in_one_turn_is_refused_before_any_byte_is_sent() {
+    fn the_fifth_distinct_picture_in_one_request_is_refused_before_any_byte_is_sent() {
         let endpoint =
             Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
         let err = endpoint.wire_request(&seeing(5)).unwrap_err();
@@ -486,6 +493,35 @@ mod tests {
         assert_eq!(err, IMAGES_PER_TURN.admit(5).unwrap_err());
         // Four is still a turn this endpoint will carry.
         assert!(endpoint.wire_request(&seeing(4)).is_ok());
+    }
+
+    #[test]
+    fn repeated_references_resolve_once_without_changing_their_wire_positions() {
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = std::sync::Arc::clone(&reads);
+        let endpoint = Endpoint::new(
+            config("http://127.0.0.1:1/v1/messages"),
+            Redemption::new(
+                resolver(),
+                std::sync::Arc::new(move |_at: &kernel::Locator| {
+                    counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Ok(b"the-pixels".to_vec())
+                }),
+            ),
+        )
+        .unwrap();
+        let mut repeated = seeing(1);
+        let picture = repeated.chat.messages.to_mut()[0].content[0].clone();
+        for _ in 1..5 {
+            repeated.chat.messages.to_mut()[0]
+                .content
+                .push(picture.clone());
+        }
+
+        let wire = endpoint.wire_request(&repeated).unwrap();
+
+        assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(wire.to_string().matches("\"type\":\"image\"").count(), 5);
     }
 
     #[test]

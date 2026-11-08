@@ -56,7 +56,7 @@ pub const DEFAULT_AT: &str = "127.0.0.1:2501";                       // 服务�
 
 ```rust
 pub const IMAGE_MAX_BYTES: ImageMaxBytes = ImageMaxBytes::new(2_097_152); // 2 MiB：一张图的字节上限
-pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // 一回合最多几张图
+pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // 一次请求最多几张不同的图
 pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // 有损编码的质量域：0..=100，域外即拒
 ```
 

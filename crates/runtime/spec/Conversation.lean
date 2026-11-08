@@ -212,3 +212,20 @@ theorem withoutEscape_closes : '<' ∈ (closeTag : List Char) := by
   simp [closeTag]
 
 end Runtime.Conversation
+
+/-!
+### 8-47-3 runtime::conversation：已发送图片同样冻结（形状 2 值类型）
+
+图片引用是已发送消息的一部分，不因图片 Token、CAS 读取或 base64 成本而获得改写例外。`mark_sent` 之后，`Image` 块与 `ToolResult.attachments` 与其他块一样逐字节冻结；普通回合只追加尚未发送的尾部。这样 FrozenPrefix 与已发送 Conversation 共同保留当前内容允许的最长缓存前缀，实际命中仍受 provider 的容量与寿命约束。
+
+- **改变历史的唯一路径是 fork**：确实不再需要旧图时，停止当前 run，并从既有分叉点重建一个对话；原 run 不做图片占位、滑动窗口或批次淘汰。`IMAGES_PER_TURN` 是单次请求上限，不是历史容量；超过它时不能用原地改写规避。
+- **fork 不丢图**：`tool_result.attachments`（kernel D128）记录实际入窗的引用，重建时交回同一个 `ContentBlock`。旧账本没有该键时读作空表，保持当时写下的历史。
+- **重复新图在首次入窗前只留文本**：`push_tool_results` 先读出现有消息（含按空回复规则重开的尾部）与这批新结果中已有的 locator；新结果的附件若指向其中之一，就从这份尚未发送的附件表移除，并在该结果的 `content` 末尾追加 `[picture already in context: <locator>]`。新出现的不同图片仍完整附上；冻结消息与它们已发送的工具结果文本一个字节也不改。`Conversation` 随追加维护只增的 locator 派生索引，判重不为每张新图遍历历史；索引可从消息重建，不是第二份内容。这样重复图片不再重复消耗 Token，原关联仍由新结果的文字说明。
+- **其余优化在翻译阶段**：gateway 按 locator 去重兑付并预编码（gateway D65），不改变任何 canonical 消息。CAS 不做 GC，也不为一次优化新增跨请求缓存。
+- **验收**：`Conversation::mark_sent` 的图片冻结测试；新结果中重复图片变文本、不同图片保留的测试；真实 `drive`＋Ledger＋`inherited_indexed` 场景断言分支与母亲已发送图片逐字节相同。
+-/
+
+/-! D129 已发送 Conversation 与 FrozenPrefix 一样不为优化改写，改变历史只走 fork
+
+决定：图片不使用 §8-47 的空回复例外，任何已发送内容都不因资源优化改变；重复附件只在新结果尚未发送时去重并留下文字。理由：缓存读取比前缀写入便宜，保留不可变前缀比在原会话淘汰图片更符合总成本；不可变历史也让重放与 fork 的语义保持单一，而新尾部的重复图片在第一次发送前去掉则直接省下 Token。被否：①单次送达后换占位——仍改写已发送尾部；②按图片容量或批次淘汰——把单次请求上限误当历史策略并打断缓存；③gateway 静默丢图——破坏纯函数翻译与账本可重建性。
+-/

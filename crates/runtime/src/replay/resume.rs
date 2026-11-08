@@ -102,6 +102,7 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
         // every answer with; nobody was shown it, so nothing was counted.
         rendered: Some(crate::rendering::CURRENT),
         shown_bytes: None,
+        attachments: Vec::new(),
     })?;
     Ok(EventDraft {
         run: call.run(),
