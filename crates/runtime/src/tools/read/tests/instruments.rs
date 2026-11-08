@@ -212,12 +212,12 @@ fn instrument_read_after_write_ab() {
 /// The ceiling CI holds (`crates/xtask/budgets.toml` `[read_handle_ratio]`):
 /// the handle read of a 20 KiB file, where the fixed cost of resolving
 /// and opening dominates, stays within this many resolved reads of it.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 const RATIO_CEILING: f64 = 1.5;
 
 /// Only where the engine reads through the handle: elsewhere the judged
 /// path is the read, and it is meant to cost more than a bare read.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #[test]
 fn a_read_costs_within_a_bound_of_a_resolved_read() {
     let bound = open_everywhere();

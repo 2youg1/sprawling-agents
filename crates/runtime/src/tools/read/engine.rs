@@ -18,6 +18,10 @@
 //! not UTF-8 — is answered again by the judged path, whose refusals and
 //! `nearby` lists are the ones a model has always been given. Only calls
 //! that end in an error or a directory take it.
+//!
+//! The one-handle path exists on Windows, Linux and macOS, because each
+//! can ask an open handle where it really lies. Every other platform
+//! reads through the judged path and never answers with a stub.
 
 use kernel::{Address, AxError, B3Hash, ReadVerdict};
 
@@ -145,8 +149,37 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     }
 }
 
+/// Resolves, judges, opens the judged location, and compares the
+/// opened handle with the file that location now names (macOS).
+///
+/// macOS has no procfs entry naming an open descriptor, so identity is
+/// asked the way `same_file` asks it: the volume and file number on
+/// each side. A file renamed under the path after the open therefore
+/// answers through the judged path, which names what is there.
+#[cfg(target_os = "macos")]
+fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let Ok(real) = std::fs::canonicalize(request.city.join(request.addr)) else {
+        return Ok(None);
+    };
+    let landed = request
+        .city
+        .judged_location(request.addr, &real, "read", request.bound)?;
+    let Ok(file) = std::fs::File::open(&real) else {
+        return Ok(None);
+    };
+    let (Ok(held), Ok(named)) = (file.metadata(), std::fs::metadata(&real)) else {
+        return Ok(None);
+    };
+    if (held.dev(), held.ino()) != (named.dev(), named.ino()) {
+        return Ok(None);
+    }
+    Ok(read_handle(file, landed, request))
+}
+
 /// Every other platform reads through the judged path.
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn handle_read(_request: Request<'_>) -> Result<Option<Looked>, AxError> {
     Ok(None)
 }
@@ -154,7 +187,7 @@ fn handle_read(_request: Request<'_>) -> Result<Option<Looked>, AxError> {
 /// Decides from the handle's first facts whether any bytes are needed.
 /// `Repeat` reads none. `Compare` reads once and returns a stub only
 /// when the stamps stayed equal and the complete content hash matches.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Option<Looked> {
     let facts = Stamp::facts(&file).ok()?;
     if !facts.is_file() {
@@ -191,7 +224,7 @@ fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Opti
 /// Reads the file once, sized by the length the handle reports, with a
 /// stamp on each side; `None` for a failed read or query or non-UTF-8
 /// bytes, which the judged path answers.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn read_text(mut file: std::fs::File, len: u64, before: Stamp) -> Option<(String, Stamp, Stamp)> {
     use std::io::Read as _;
 
