@@ -24,14 +24,12 @@
 <button
   type="button"
   class="home-side col-start-1 row-start-2 narrow:hidden"
-  tabindex="-1"
   aria-label={label}
   onclick={onHome}
 ></button>
 <button
   type="button"
   class="home-side col-start-12 row-start-2 narrow:hidden"
-  tabindex="-1"
   aria-label={label}
   onclick={onHome}
 ></button>

@@ -194,6 +194,7 @@
   // settings panel's home key, and a click on either blank side of a
   // page that offers them.
   function homeZen(): void {
+    tierOnLanding = null;
     u.prefs.setTier("zen");
     u.go(DEFAULT_VIEW);
   }
