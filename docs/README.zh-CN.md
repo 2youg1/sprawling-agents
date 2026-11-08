@@ -163,7 +163,7 @@ sprawling 在底层做了大量针对 Agent 行为特征（AX）与人类注意�
 ### 5. 单二进制的高性能与低资源开销
 
 - **单一原生进程，零外部数据库**：网页服务与整座城市的运行时都在同一个 Rust 二进制里（前端资源直接嵌在二进制中；终端渲染器与 Windows 平台叶子用 Zig 写，边界规则由 Rust 侧的参考实现对拍），不需要配 Postgres、Redis 或 Docker。
-- **只读工具流式推测与智能缓存保温**：模型还在流式生成回复时，打头的只读工具（`read`、`search`）已经提前并发起跑。上下文严格锁定 `City → Building → Resident → Run` 四段静态前缀，编译期禁止混入时间戳等易变字段，最大化命中服务商的 Prompt Cache，并支持根据实测首包提前量以 1 token 的最低代价自动续期保温。
+- **只读工具流式推测与智能缓存保温**：模型还在流式生成回复时，打头的只读工具（`read`、`search`）已经提前并发起跑。上下文严格锁定 `City → Building → Resident → Run` 四段静态前缀，编译期禁止混入时间戳等易变字段；已发送的消息也加入这个冻结前缀，后续回合只追加而不改写历史，需要改变较早内容时停止并从那里分叉。系统支持根据实测首包提前量以 1 token 的最低代价自动续期保温，最大化命中服务商的 Prompt Cache。
 - **主核优先与子进程降级礼让**：在“设置 → 性能”中可配置 CPU 放置策略（`soft` / `pinned` / `soft_shares`）与核心线程优先级。Agent 派出的所有构建、测试等子命令都默认以低于城市的系统优先级启动（Windows 下为 Below Normal，Unix 下为 `nice -n 10`），哪怕后台几个 Agent 同时跑全量编译，页面也照常响应。
 - **OS 级内存硬上限与整机预算排队**：支持为单次 run 设置内存上限（通过 Windows Job Object 或 Linux cgroups 强制执行），并配合整机内存预算队列（`memory = "auto"`）先预订后执行，超限任务自动排队而非把机器撑爆（[城市怎样使用你的硬件](performance.md#choose-how-the-city-uses-the-machine)）。
 - **内建性能监视与棘轮门禁**：网页监视器与命令行 `sprawling gauge`（别名 `top`）可在你自己的硬件上实时测量耗时分位数（floor / p50 / p95 / p99）、模型调用、token、精确到微美元的成本与进程树资源占用。项目的各项预算与历史基线均公示在 [性能登记表](../crates/xtask/budgets.toml) 中（[性能文档](performance.md)）。

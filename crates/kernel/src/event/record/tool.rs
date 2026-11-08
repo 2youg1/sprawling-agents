@@ -112,6 +112,12 @@ pub struct ToolResult {
     /// existed and every answer the city wrote rather than a tool.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shown_bytes: Option<u64>,
+    /// Pictures this result carried into the model window. Kept so a
+    /// fork rebuilds the same frozen conversation rather than dropping
+    /// the images; empty is absent so older and picture-free lines keep
+    /// their exact bytes (`crates/kernel/spec/Event/Record.lean` D128).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<crate::ImageRef>,
 }
 
 /// Which renderer turned a recorded answer into the text a model read.

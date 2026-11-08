@@ -312,6 +312,7 @@ pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 **被否**：①继续让 fork 丢掉附件——母亲最近一次请求看过的最新一批图在分支里无故消失；②从 `[picture attached: …]` 或截图工具的 JSON 反解——那是把某个渲染器或工具的私有形状变成第二个图片协议。
 -/
 
+/-!
 ### 8-75 回合记录多记的事：回复的首个内容几时到（形状 2 值类型）
 
 **(a) `model_returned.first_at`**
@@ -368,7 +369,7 @@ pub struct RunStarted {
 - **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime D14）。
 - **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
 - **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（`crates/runtime/Spec.lean` §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
-- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（`crates/sprawling/Spec.lean` §8-141）：写出的键经真实的派活与分叉读回。
+- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_same_bytes_pictures_included`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（`crates/sprawling/Spec.lean` §8-141）：写出的键经真实的派活与分叉读回。
 
 #### 8-82-2 进程死后冻结的那一行：`run_frozen.cause`
 

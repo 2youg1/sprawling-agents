@@ -87,6 +87,7 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                 took_us: None,
                 rendered: None,
                 shown_bytes: None,
+                attachments: Vec::new(),
             })
             .unwrap(),
         ),

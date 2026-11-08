@@ -353,6 +353,9 @@ impl<'h> Turn<'h, ToolWave> {
                 AxError::failure(AxCode::InvalidArgs, "count a shown answer", call.id.clone())
                     .with_recovery("this machine cannot count the answer's bytes in a u64")
             })?),
+            // The window and its rebuild read the same references; the
+            // content store continues to hold the bytes (kernel D128).
+            attachments: pictures.clone(),
         };
         exchange.push_result(ContentBlock::ToolResult {
             tool_use_id: call.id.clone(),

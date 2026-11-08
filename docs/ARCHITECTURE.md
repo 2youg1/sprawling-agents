@@ -365,6 +365,24 @@ than any diagram of boxes.
    `city::prompt_documents` owns the whole-document steps a person may take
    on a prompt document, so the page can show where the next run's context
    comes from without becoming another authority on it.
+
+   The frozen request prefix also includes the conversation already sent.
+   `runtime::conversation::Conversation` keeps its `sent` boundary beside
+   the messages: after a call returns, `mark_sent` commits every message
+   that call carried to the immutable part, and later turns change only
+   the unsent tail. Text and image references receive no optimization
+   exception; a history that must change is stopped and forked from an
+   earlier point instead. The one protocol exception is a tool wave after
+   an empty reply, whose results reopen the last user message rather than
+   create adjacent user messages (`crates/runtime/spec/Conversation.lean`
+   §8-47). Subject to that exception, the four system segments and the
+   sent conversation give a provider the longest prefix this content can
+   reuse; provider capacity and cache lifetime still decide whether a hit
+   results. Only the unsent tail is eligible for compaction before its
+   first send: a repeated image locator there becomes a short text note,
+   using a derived locator set rather than a scan through the history.
+   `runtime::fork` rebuilds the same frozen bytes from the Ledger rather
+   than copying a second in-memory history.
 6. **`runtime::catalog` decides what the model may see**: the built-in
    tools, the collaboration tools this building admits, the skills
    its reading room allows, and any MCP tools discovered from the

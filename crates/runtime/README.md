@@ -29,8 +29,10 @@ it. The crate is `runtime`; `cargo -p` takes `sprawling-runtime`.
 - `handoff` writes the crossing point a frozen run leaves for its successor, and
   `resume` consumes one into the next run's seed. It is never a second
   authority: on conflict, fresh reads and real execution win.
-- `conversation` holds the volatile half of a request. Consecutive user content
-  joins the message already open, whichever door it came through.
+- `conversation` holds an unsent tail behind messages already sent. Sending
+  freezes those messages into the request's cacheable prefix; only the tail
+  changes. Consecutive user content joins the message already open, whichever
+  door it came through.
 - `tools` is the surface a model calls — `exec`, `edit`, `read`, `search`,
   `status`, `succeed` and `tool`, the last of which lists, finds, details and
   runs a tool the run does not carry. `catalog` decides what a run is offered,
