@@ -19,7 +19,9 @@ use kernel::event::record::{
     ModelReturned, Rendering, RunStarted, SteerReceived, ToolAnswer, ToolResult,
 };
 use kernel::model::content_from_message;
-use kernel::{AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq};
+use kernel::{
+    Address, AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq,
+};
 
 use crate::compaction::Exchange;
 use crate::conversation::{Conversation, Opening};
@@ -71,6 +73,10 @@ pub struct Inherited {
     /// cut, because a provider refuses an assistant message whose tool
     /// uses nothing answers.
     pub at: Seq,
+    /// Rule rooms inherited from complete, unshortened read results.
+    pub delivered: std::collections::BTreeSet<Address>,
+    /// Recorded rule entries whose room was not a canonical address.
+    pub rule_warnings: Vec<String>,
 }
 
 /// The refusal for a run whose opening line this history does not hold.
@@ -266,6 +272,8 @@ fn fold_run<'a>(
     Ok(Inherited {
         messages: conversation.messages().to_vec(),
         at,
+        delivered: std::collections::BTreeSet::new(),
+        rule_warnings: Vec::new(),
     })
 }
 

@@ -91,6 +91,10 @@ pub trait ConcurrentInvoke {
         ticket: Ticket,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<ToolOutcome, AxError>;
+    /// Closes delivery bookkeeping after the wave's compaction, before
+    /// the compacted blocks enter the conversation. The default has no
+    /// delivery state, as citysim and closure-driven tests do not.
+    fn complete_wave(&mut self, _shortened: &std::collections::BTreeSet<String>) {}
 }
 
 /// What admitting one call decided.

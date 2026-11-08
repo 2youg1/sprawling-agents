@@ -142,6 +142,169 @@ fn mother_drafts() -> Vec<EventDraft> {
     ]
 }
 
+fn read_result(id: &str, rooms: &[&str]) -> EventDraft {
+    read_result_with_text(id, rooms, "fn main() {}\n")
+}
+
+fn read_result_with_text(id: &str, rooms: &[&str], text: &str) -> EventDraft {
+    let rules: Vec<serde_json::Value> = rooms
+        .iter()
+        .map(|room| serde_json::json!({"room": room, "text": "Use LF.\n"}))
+        .collect();
+    line(
+        EventKind::ToolResult,
+        Payload::of(&ToolResult {
+            tool_use_id: id.to_owned(),
+            name: kernel::ToolName::parse("read").unwrap(),
+            answer: ToolAnswer::Answered {
+                result: Payload::of(&serde_json::json!({
+                    "path": "lab/pkg/main.rs", "bytes": text.len(), "text": text, "rules": rules,
+                }))
+                .unwrap(),
+            },
+            took_us: None,
+            rendered: Some(kernel::event::record::Rendering::V4),
+            shown_bytes: None,
+        })
+        .unwrap(),
+    )
+}
+
+fn returned(calls: u64) -> EventDraft {
+    line(
+        EventKind::ModelReturned,
+        Payload::of(&ModelReturned {
+            message: kernel::model::message_payload(&[ContentBlock::Text {
+                text: "reading".to_owned(),
+            }])
+            .unwrap(),
+            calls,
+            usage: None,
+            stop: None,
+            billed_usd_micros: None,
+            first_at: None,
+            first_us: None,
+            took_us: None,
+        })
+        .unwrap(),
+    )
+}
+
+#[test]
+fn a_branch_inherits_rules_only_from_read_results_that_reached_the_window() {
+    let mut drafts = mother_drafts();
+    drafts[3] = read_result("tu_1", &["lab/pkg"]);
+    let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+    assert_eq!(
+        inherited.delivered,
+        [Address::parse("lab/pkg").unwrap()].into_iter().collect()
+    );
+    let shown = serde_json::to_string(&inherited.messages).unwrap();
+    assert!(shown.contains("## lab/pkg/AGENTS.md"), "{shown}");
+}
+
+#[test]
+fn an_unfinished_wave_contributes_neither_its_messages_nor_its_rule_rooms() {
+    let mut drafts = mother_drafts();
+    drafts[3] = read_result("tu_1", &["lab/first"]);
+    drafts.push(returned(2));
+    drafts.push(read_result("tu_2", &["lab/second"]));
+    let inherited = verified(drafts).inherited(Seq::new(5)).unwrap();
+    assert_eq!(inherited.at, Seq::new(3));
+    assert_eq!(
+        inherited.delivered,
+        [Address::parse("lab/first").unwrap()].into_iter().collect()
+    );
+}
+
+#[test]
+fn a_shortened_read_result_does_not_deliver_its_rule_rooms() {
+    let mut drafts = mother_drafts();
+    drafts[3] = read_result_with_text(
+        "tu_1",
+        &["lab/shortened"],
+        &"lorem ipsum dolor sit amet ".repeat(2_000),
+    );
+    let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+    assert!(inherited.delivered.is_empty());
+}
+
+#[test]
+fn another_tools_rules_field_is_not_read_evidence() {
+    let mut drafts = mother_drafts();
+    let mut result = read_result("tu_1", &["lab/pkg"]);
+    result.data = Payload::of(&ToolResult {
+        tool_use_id: "tu_1".to_owned(),
+        name: kernel::ToolName::parse("status").unwrap(),
+        answer: ToolAnswer::Answered {
+            result: Payload::of(&serde_json::json!({
+                "rules": [{"room": "lab/pkg", "text": "not a read rule"}],
+            }))
+            .unwrap(),
+        },
+        took_us: None,
+        rendered: Some(kernel::event::record::Rendering::V4),
+        shown_bytes: None,
+    })
+    .unwrap();
+    drafts[3] = result;
+    assert!(
+        verified(drafts)
+            .inherited(Seq::new(3))
+            .unwrap()
+            .delivered
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_malformed_rule_room_leaves_a_diagnostic_instead_of_vanishing() {
+    let mut drafts = mother_drafts();
+    drafts[3] = read_result("tu_1", &["not a room"]);
+    let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+    assert!(inherited.delivered.is_empty());
+    assert_eq!(inherited.rule_warnings.len(), 1);
+}
+
+#[test]
+fn a_grandchild_merges_the_rule_rooms_of_its_whole_lineage() {
+    let mut drafts = mother_drafts();
+    drafts[3] = read_result("tu_1", &["lab/grandmother"]);
+    let daughter = RunId::from_bytes([7; 16]);
+    let of_daughter = |mut draft: EventDraft| {
+        draft.run = daughter;
+        draft
+    };
+    drafts.push(of_daughter(line(
+        EventKind::RunForked,
+        Payload::of(&kernel::event::record::RunForked {
+            from: RunId::CITY,
+            at_seq: Seq::new(3),
+        })
+        .unwrap(),
+    )));
+    drafts.push(of_daughter(line(
+        EventKind::RunStarted,
+        Payload::of(&RunStarted {
+            task: "continue".to_owned(),
+            ..RunStarted::default()
+        })
+        .unwrap(),
+    )));
+    drafts.push(of_daughter(returned(1)));
+    drafts.push(of_daughter(read_result("tu_2", &["lab/mother"])));
+    let inherited = verified(drafts).inherited(Seq::new(6)).unwrap();
+    assert_eq!(
+        inherited.delivered,
+        [
+            Address::parse("lab/grandmother").unwrap(),
+            Address::parse("lab/mother").unwrap(),
+        ]
+        .into_iter()
+        .collect()
+    );
+}
+
 /// A mother run with a line of a newer kind inside it: the rebuild skips
 /// the line and reaches the conversation the same run holds without it,
 /// rather than refusing it.

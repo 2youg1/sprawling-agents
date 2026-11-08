@@ -21,6 +21,7 @@ use super::Entry;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TurnReport {
     pub(super) redacted: u32,
+    pub(super) shortened: std::collections::BTreeSet<String>,
     pub(super) model_returned: Entry,
     pub(super) calls_made: usize,
     pub(super) assistant: Vec<ContentBlock>,
@@ -32,6 +33,12 @@ pub struct TurnReport {
 impl TurnReport {
     /// What the provider counted for this call, when it said. The
     /// context gauge reads `input_tokens` from here and nowhere else.
+    /// The tool results whose window text became shorter at the closing
+    /// boundary. Delivery of their claims is not evidence of delivery.
+    pub fn shortened(&self) -> &std::collections::BTreeSet<String> {
+        &self.shortened
+    }
+
     pub fn usage(&self) -> Option<&ModelUsage> {
         self.usage.as_ref()
     }
