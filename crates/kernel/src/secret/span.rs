@@ -113,6 +113,14 @@ pub struct SecretSpan {
     pub provider: Option<&'static str>,
 }
 
+impl SecretSpan {
+    /// The reader-facing evidence class: the provider whose known shape
+    /// matched, or the lower-confidence entropy judgement. Never bytes.
+    pub fn reason(&self) -> &'static str {
+        self.provider.unwrap_or("high entropy")
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

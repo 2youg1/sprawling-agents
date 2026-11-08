@@ -132,7 +132,7 @@ fn read(diff: &git2::Diff<'_>) -> FilePatch {
             match hits.first() {
                 Some(hit) => withheld.push(Withheld {
                     number,
-                    reason: hit.provider.unwrap_or("high entropy").to_owned(),
+                    reason: hit.reason().to_owned(),
                 }),
                 None => lines.push(PatchLine {
                     number,

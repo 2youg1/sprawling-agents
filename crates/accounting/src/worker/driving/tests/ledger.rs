@@ -250,6 +250,135 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     };
     assert!(registry.assets.is_empty());
 }
+/// A real dispatch reaches the checkpoint through the production lane. An
+/// entropy-only example in a committed document is recorded, not a veto that
+/// freezes the run before its edit.
+#[test]
+fn an_entropy_only_document_does_not_block_a_real_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    std::fs::write(
+        dir.path().join("lab").join("SPEC.md"),
+        format!("Example: {token}\n"),
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("editing", Some(("tu_1", "lab/room1/notes.md"))),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "write one note beside the specification".to_owned(),
+            goal: "one edit, then stop".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"entropy"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let records = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap())
+        .collect::<Vec<_>>();
+    let checkpoint = records
+        .iter()
+        .filter(|record| record.kind() == EventKind::CheckpointCommitted)
+        .map(|record| {
+            record
+                .data()
+                .read::<kernel::event::record::CheckpointCommitted>()
+                .unwrap()
+        })
+        .find_map(|record| match record {
+            kernel::event::record::CheckpointCommitted::Committed(commit)
+                if !commit.withheld.is_empty() =>
+            {
+                Some(commit)
+            }
+            _ => None,
+        })
+        .expect("the production checkpoint records the entropy finding");
+    assert_eq!(checkpoint.withheld[0].path, "lab/SPEC.md");
+    assert_eq!(checkpoint.withheld[0].line, 1);
+    assert_eq!(checkpoint.withheld[0].reason, "high entropy");
+    let frozen = records
+        .iter()
+        .find(|record| record.kind() == EventKind::RunFrozen)
+        .unwrap()
+        .data()
+        .read::<kernel::event::record::RunFrozen>()
+        .unwrap();
+    assert_eq!(frozen.completion, "done");
+    assert!(!verified.raw_lines().iter().any(|line| {
+        line.windows(token.len())
+            .any(|window| window == token.as_bytes())
+    }));
+}
+
+/// The same production lane writes the structured refusal before freezing a
+/// run that met a known provider shape; the matched bytes reach no Ledger line.
+#[test]
+fn a_known_shape_refusal_is_queryable_after_a_real_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    std::fs::write(
+        dir.path().join("lab").join("SPEC.md"),
+        format!("KEY={token}\n"),
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![completion("editing", Some(("tu_1", "lab/room1/notes.md")))],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "attempt one edit beside a known key shape".to_owned(),
+            goal: "the checkpoint refuses and reports it".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"shape"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let blocked = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap())
+        .find(|record| record.kind() == EventKind::SecretEgressBlocked)
+        .expect("the production lane books the checkpoint refusal");
+    let report = blocked
+        .data()
+        .read::<kernel::event::record::SecretEgressBlocked>()
+        .unwrap();
+    assert_eq!(report.code, "E_SECRET_EGRESS");
+    assert_eq!(report.scope, vec!["lab"]);
+    assert_eq!(report.withheld[0].path, "lab/SPEC.md");
+    assert_eq!(report.withheld[0].line, 1);
+    assert_eq!(report.withheld[0].reason, "anthropic");
+    assert!(!verified.raw_lines().iter().any(|line| {
+        line.windows(token.len())
+            .any(|window| window == token.as_bytes())
+    }));
+}
+
 #[test]
 fn a_commit_the_city_made_says_which_run_wrote_it() {
     let dir = tempfile::tempdir().unwrap();

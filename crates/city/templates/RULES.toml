@@ -40,6 +40,11 @@ write = "everything"
 # subtree is outside every write domain and cannot be listed here.
 prefixes = []
 
+# Exact repository-relative file paths whose entropy-only checkpoint findings
+# may commit without a warning. This never exempts a known provider key shape.
+# Name only the file, never paste the matched text or its digest here.
+# checkpoint_entropy_allow = ["tavern/SPEC.md"]
+
 # Work here is offered for review before it lands.
 review = false
 

@@ -5,6 +5,8 @@
 > The form is the condensed version of the SPEC every sprawling crate is built from. Fill the sections in order; a section you cannot fill yet says so rather than being deleted, so the gap stays visible to the next reader.
 >
 > **A change that contradicts a decision below changes the decision first, with its reason, in the same change.**
+>
+> Keep credential-shaped examples and other long random-looking strings out of this committed file and `RULES.toml`: use a short name here and put the original in the ignored `Memo.md`, `Roadmap.md` or `JOB.md` when it is genuinely needed.
 
 <what>
 (One paragraph, then the units of work that can be accepted separately — each one a row in the acceptance table.)

@@ -138,6 +138,7 @@ impl Checkpoint {
             repo,
             last: None,
             index: IndexOwner::City,
+            entropy_allow: kernel::EntropyAllowlist::default(),
         })
     }
 
@@ -175,7 +176,15 @@ impl Checkpoint {
             repo,
             last: None,
             index: IndexOwner::Writer(own),
+            entropy_allow: kernel::EntropyAllowlist::default(),
         })
+    }
+
+    /// Applies the building's exact-path entropy exemptions. The default is
+    /// empty; known provider shapes never consult this list.
+    pub fn with_entropy_allowlist(mut self, allowed: kernel::EntropyAllowlist) -> Checkpoint {
+        self.entropy_allow = allowed;
+        self
     }
 
     /// Deletes this writer's index file once its run has landed. A handle on

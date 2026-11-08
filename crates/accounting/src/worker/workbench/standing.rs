@@ -162,6 +162,7 @@ impl Site {
                 run_id: self.run_id,
                 who: &self.who,
                 of: &of,
+                entropy_allow: self.rules.checkpoint_entropy_allow(),
             },
             placing,
             lines,
@@ -182,6 +183,7 @@ pub(in crate::worker) struct Lending<'a> {
     pub(in crate::worker) run_id: RunId,
     pub(in crate::worker) who: &'a str,
     pub(in crate::worker) of: &'a storage::Provenance,
+    pub(in crate::worker) entropy_allow: &'a kernel::EntropyAllowlist,
 }
 
 /// Lends a room its tree, kept between the room's runs: the city's
@@ -199,6 +201,7 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
 ) -> Result<storage::WorktreeLease, AxError> {
     storage::Checkpoint::open(placing.city_root)
         .map_err(storage::StorageError::into_ax)?
+        .with_entropy_allowlist(lending.entropy_allow.clone())
         .ensure_base(
             &[lending.addr.as_str().to_owned()],
             placing.clock.now()?,

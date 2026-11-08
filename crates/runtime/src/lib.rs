@@ -87,7 +87,7 @@ pub use prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 pub use prefix::{PrefixPlan, SegmentCaps, SegmentSource, SourceDoc, build_prefix};
 pub use reminder::{ContextGauge, ContextReading, ContextReminder};
 pub use replay::{VerifiedLedger, VerifiedLine};
-pub use run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};
+pub use run::{Advance, CheckpointFailure, Run, RunHooks, RunPlan, SafePoint, drive};
 pub use sieve::{CommandKey, FilterTable, SieveHistory, SieveRecord, Sieved, sieve};
 pub use transcript::{Transcript, TranscriptRecord};
 pub use turn::Admitted;

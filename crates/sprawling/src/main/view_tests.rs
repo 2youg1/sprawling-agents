@@ -12,7 +12,7 @@
     reason = "test code"
 )]
 
-use super::{Audience, Selection, kind_named, write_records, write_runs};
+use super::{Audience, Selection, kind_named, write_records, write_runs, write_secret_findings};
 use kernel::{Address, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -287,6 +287,90 @@ fn records_are_byte_for_byte_what_grep_finds_in_the_same_ledger() {
             "{chosen:?}"
         );
     }
+}
+
+/// The self-service command expands both successful and refused checkpoint
+/// records, preserving only their positions and reasons.
+#[test]
+fn secrets_lists_committed_and_refused_findings_without_the_matched_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let finding = kernel::event::record::CheckpointFinding {
+        path: "lab/SPEC.md".to_owned(),
+        offset: 9,
+        len: 24,
+        line: 1,
+        reason: "high entropy".to_owned(),
+    };
+    let committed =
+        kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit {
+            oid: kernel::GitOid::parse("0123456789abcdef0123456789abcdef01234567").unwrap(),
+            by: kernel::event::record::CommitAttribution::default(),
+            scope: vec!["lab".to_owned()],
+            files: vec!["lab/SPEC.md".to_owned()],
+            withheld: vec![finding.clone()],
+        });
+    let refused = kernel::event::record::SecretEgressBlocked::checkpoint(
+        vec!["lab".to_owned()],
+        vec![kernel::event::record::CheckpointFinding {
+            reason: "anthropic".to_owned(),
+            ..finding
+        }],
+    );
+    let records = [
+        (
+            EventKind::CheckpointCommitted,
+            Payload::of(&committed).unwrap(),
+        ),
+        (
+            EventKind::SecretEgressBlocked,
+            Payload::of(&refused).unwrap(),
+        ),
+    ];
+    let mut prev = kernel::GENESIS_PREV;
+    let mut bytes = Vec::new();
+    for (seq, (kind, data)) in records.into_iter().enumerate() {
+        let draft = EventDraft {
+            run: run(1),
+            t: TimeMs::new(u64::try_from(seq).unwrap()),
+            who: "tester".to_owned(),
+            addr: Some(Address::parse("lab/a").unwrap()),
+            kind,
+            data,
+            ig: false,
+        };
+        let line = EventRecord::from_draft(draft, Seq::new(u64::try_from(seq).unwrap()), prev)
+            .canonical_line()
+            .unwrap();
+        prev = B3Hash::digest(&line);
+        bytes.extend_from_slice(&line);
+        bytes.push(b'\n');
+    }
+    std::fs::write(dir.path().join("ledger-00000000000000000000.jsonl"), bytes).unwrap();
+
+    let mut out = Vec::new();
+    write_secret_findings(dir.path(), &mut out).unwrap();
+    let text = String::from_utf8(out).unwrap();
+    let lines = text
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        lines,
+        vec![
+            json!({
+                "run": run(1).to_string(), "seq": 0, "outcome": "committed",
+                "scope": ["lab"], "path": "lab/SPEC.md", "offset": 9,
+                "len": 24, "line": 1, "reason": "high entropy"
+            }),
+            json!({
+                "run": run(1).to_string(), "seq": 1, "outcome": "refused",
+                "code": "E_SECRET_EGRESS", "scope": ["lab"], "path": "lab/SPEC.md",
+                "offset": 9, "len": 24, "line": 1, "reason": "anthropic"
+            }),
+        ]
+    );
+    let matched = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    assert!(!text.contains(&matched));
 }
 
 /// At a terminal each line is led by its chain hash, which is the

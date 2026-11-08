@@ -8,7 +8,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::TimeMs;
-use kernel::secret::scan;
+use kernel::event::record::{CheckpointFinding, SecretEgressBlocked};
+use kernel::secret::{SecretSpan, scan};
 
 use crate::error::StorageError;
 
@@ -19,6 +20,51 @@ use super::provenance::Provenance;
 /// The index mode of a submodule entry: a commit of another repository,
 /// which this repository's object database does not hold.
 const GITLINK: u32 = 0o160_000;
+
+/// One staged blob and the index that proves whether a quoted path exists.
+struct StagedBlob<'a> {
+    id: git2::Oid,
+    path: &'a str,
+    index: &'a git2::Index,
+}
+
+/// Findings partitioned by the action their evidence justifies.
+#[derive(Default)]
+struct ScanFindings {
+    refused: Vec<CheckpointFinding>,
+    withheld: Vec<CheckpointFinding>,
+}
+
+/// Converts a scanner's native offset or length into the Ledger's integer
+/// shape without truncating it.
+fn checkpoint_size(value: usize, path: &str) -> Result<u64, StorageError> {
+    u64::try_from(value).map_err(|_| StorageError::Checkpoint {
+        op: "record a checkpoint scan",
+        detail: format!("{path}: a finding's offset or length exceeds u64"),
+    })
+}
+
+/// Whether the matched text is a relative path this index actually stages.
+/// This is deliberately a small byte predicate rather than a regex: every
+/// segment is non-empty and uses only ASCII alphanumerics, `.`, `_` or `-`.
+fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> bool {
+    let Some(bytes) = span
+        .start
+        .checked_add(span.len)
+        .and_then(|end| content.get(span.start..end))
+    else {
+        return false;
+    };
+    let Ok(path) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    path.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+    }) && index.get_path(std::path::Path::new(path), 0).is_some()
+}
 
 mod index_lock;
 pub(crate) mod pathspec;
@@ -41,17 +87,29 @@ pub(crate) struct CommitPlan<'a> {
 
 impl Checkpoint {
     /// Scans what this checkpoint would newly write into the tree.
-    /// Reports how many shapes matched and where, never what matched.
-    pub fn scan_staged(&mut self) -> Result<(), StorageError> {
+    /// Known provider shapes refuse; other entropy findings are returned for
+    /// the committed record. Positions and reasons only, never matched bytes.
+    pub fn scan_staged(
+        &mut self,
+        scopes: &[String],
+    ) -> Result<Vec<CheckpointFinding>, StorageError> {
         let index = self.repo.index().map_err(git_err("read index"))?;
-        let mut hits: Vec<String> = Vec::new();
+        let mut findings = ScanFindings::default();
         match self.last_tree()? {
             // No previous tree to compare against: this checkpoint is
             // writing all of it, so all of it is read.
             None => {
                 for entry in index.iter() {
                     if entry.mode != GITLINK {
-                        self.scan_blob(entry.id, &String::from_utf8_lossy(&entry.path), &mut hits)?;
+                        let path = String::from_utf8_lossy(&entry.path);
+                        self.scan_blob(
+                            StagedBlob {
+                                id: entry.id,
+                                path: &path,
+                                index: &index,
+                            },
+                            &mut findings,
+                        )?;
                     }
                 }
             }
@@ -72,20 +130,29 @@ impl Checkpoint {
                     }
                     let path = String::from_utf8_lossy(staged.path_bytes().unwrap_or_default())
                         .replace('\\', "/");
-                    self.scan_blob(staged.id(), &path, &mut hits)?;
+                    self.scan_blob(
+                        StagedBlob {
+                            id: staged.id(),
+                            path: &path,
+                            index: &index,
+                        },
+                        &mut findings,
+                    )?;
                 }
             }
         }
-        if hits.is_empty() {
-            return Ok(());
+        if findings.refused.is_empty() {
+            return Ok(findings.withheld);
         }
-        Err(StorageError::SecretEgress {
-            locations: hits.join(" "),
-        })
+        Err(StorageError::SecretEgress(SecretEgressBlocked::checkpoint(
+            scopes.to_vec(),
+            findings.refused,
+        )))
     }
 
-    /// One blob against the secret shapes, appending `path:start+len` per
-    /// match.
+    /// One blob against the secret shapes. The line cursor follows the
+    /// scanner's ordered starts, so locating every hit still reads the blob
+    /// once rather than once per hit.
     ///
     /// # Errors
     /// A blob the object database will not hand back: a byte that enters
@@ -94,19 +161,42 @@ impl Checkpoint {
     /// is refused rather than the blob skipped.
     fn scan_blob(
         &self,
-        id: git2::Oid,
-        path: &str,
-        hits: &mut Vec<String>,
+        staged: StagedBlob<'_>,
+        findings: &mut ScanFindings,
     ) -> Result<(), StorageError> {
         let blob = self
             .repo
-            .find_blob(id)
+            .find_blob(staged.id)
             .map_err(|err| StorageError::Checkpoint {
                 op: "scan a staged file",
-                detail: format!("{path}: {}", err.message()),
+                detail: format!("{}: {}", staged.path, err.message()),
             })?;
-        for span in scan(blob.content()) {
-            hits.push(format!("{path}:{}+{}", span.start, span.len));
+        let content = blob.content();
+        let mut cursor = 0usize;
+        let mut line = 1u64;
+        for span in scan(content) {
+            let newlines = content
+                .iter()
+                .skip(cursor)
+                .take(span.start.saturating_sub(cursor))
+                .filter(|byte| **byte == b'\n')
+                .count();
+            line = line.saturating_add(u64::try_from(newlines).unwrap_or(u64::MAX));
+            cursor = span.start;
+            let finding = CheckpointFinding {
+                path: staged.path.to_owned(),
+                offset: checkpoint_size(span.start, staged.path)?,
+                len: checkpoint_size(span.len, staged.path)?,
+                line,
+                reason: span.reason().to_owned(),
+            };
+            if span.provider.is_some() {
+                findings.refused.push(finding);
+            } else if !self.entropy_allow.allows(staged.path)
+                && !names_staged_path(content, &span, staged.index)
+            {
+                findings.withheld.push(finding);
+            }
         }
         Ok(())
     }
@@ -348,7 +438,9 @@ impl Checkpoint {
     ) -> Result<String, StorageError> {
         let _head_moves = super::opening::moving_head()?;
         self.stage_scopes(scopes)?;
-        self.scan_staged()?;
+        // The run's closing wave checkpoint already recorded these entropy
+        // findings; landing needs only the hard refusal, not a duplicate line.
+        drop(self.scan_staged(scopes)?);
         let oid = self.commit(&CommitPlan {
             t,
             of,

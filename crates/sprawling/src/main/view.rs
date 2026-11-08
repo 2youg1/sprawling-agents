@@ -15,8 +15,10 @@
 
 use super::city::report;
 use super::grammar::{Arguments, nearest};
+use kernel::event::record::{CheckpointCommitted, CheckpointFinding, SecretEgressBlocked};
 use kernel::{AxError, EventKind, EventRecord, RunId, Seq};
 use runtime::clock::{UtcSpan, parse_iso};
+use serde::Serialize;
 use std::io::{BufWriter, ErrorKind, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -329,6 +331,125 @@ fn write_walk(
         }
     }
     Ok(())
+}
+
+/// Whether a finding's checkpoint committed or was refused.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FindingOutcome {
+    Committed,
+    Refused,
+}
+
+/// The CLI's one-finding projection. It flattens the kernel's finding
+/// unchanged, so no second definition of its location fields can drift.
+#[derive(Serialize)]
+struct FindingLine<'a> {
+    run: RunId,
+    seq: Seq,
+    outcome: FindingOutcome,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'a str>,
+    scope: &'a [String],
+    #[serde(flatten)]
+    finding: &'a CheckpointFinding,
+}
+
+/// One event's findings and the facts they share.
+struct FindingBatch<'a> {
+    outcome: FindingOutcome,
+    code: Option<&'a str>,
+    scope: &'a [String],
+    findings: &'a [CheckpointFinding],
+}
+
+/// Writes every checkpoint finding in Ledger order, one JSON object per
+/// finding. Only record payloads are read; the worktree and matched bytes
+/// are never opened.
+pub(super) fn write_secret_findings(dir: &Path, out: &mut impl Write) -> Result<(), ViewError> {
+    let index = storage::LedgerIndex::rebuild(dir)?;
+    let mut reader = index.reader(dir);
+    for seq in index.seqs() {
+        let record = EventRecord::parse_line(&reader.line_at(seq)?)?;
+        match record.kind() {
+            EventKind::CheckpointCommitted => {
+                if let CheckpointCommitted::Committed(commit) =
+                    record.data().read::<CheckpointCommitted>()?
+                {
+                    write_finding_lines(
+                        &record,
+                        FindingBatch {
+                            outcome: FindingOutcome::Committed,
+                            code: None,
+                            scope: &commit.scope,
+                            findings: &commit.withheld,
+                        },
+                        out,
+                    )?;
+                }
+            }
+            EventKind::SecretEgressBlocked => {
+                let refused = record.data().read::<SecretEgressBlocked>()?;
+                write_finding_lines(
+                    &record,
+                    FindingBatch {
+                        outcome: FindingOutcome::Refused,
+                        code: Some(&refused.code),
+                        scope: &refused.scope,
+                        findings: &refused.withheld,
+                    },
+                    out,
+                )?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Writes one event's findings, preserving their order inside the payload.
+fn write_finding_lines(
+    record: &EventRecord,
+    batch: FindingBatch<'_>,
+    out: &mut impl Write,
+) -> Result<(), ViewError> {
+    for finding in batch.findings {
+        serde_json::to_writer(
+            &mut *out,
+            &FindingLine {
+                run: record.run(),
+                seq: record.seq(),
+                outcome: batch.outcome,
+                code: batch.code,
+                scope: batch.scope,
+                finding,
+            },
+        )
+        .map_err(std::io::Error::from)?;
+        out.write_all(b"\n")?;
+    }
+    Ok(())
+}
+
+/// `sprawling secrets <city>`: the self-service read of checkpoint findings.
+pub(super) fn secrets(read: &Arguments) -> ExitCode {
+    let Some(city) = read.positional(1) else {
+        eprintln!("usage: sprawling secrets <city>");
+        return ExitCode::from(2);
+    };
+    let dir = kernel::layout::CityLayout::new(Path::new(city)).ledger();
+    let mut out = BufWriter::new(std::io::stdout().lock());
+    let written =
+        write_secret_findings(&dir, &mut out).and_then(|()| out.flush().map_err(ViewError::Write));
+    match written {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(ViewError::Write(err)) if err.kind() == ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+        Err(ViewError::Write(err)) => {
+            eprintln!("sprawling: secrets: stdout: {err}");
+            ExitCode::FAILURE
+        }
+        Err(ViewError::Ledger(err)) => report(err),
+    }
 }
 
 /// Writes one JSON line per run, oldest first.

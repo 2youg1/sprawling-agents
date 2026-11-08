@@ -396,15 +396,20 @@ impl RunWorker {
             },
         );
         let t = crate::Clock::now(&*self.clock)?;
+        let entropy_allow = city::load(&self.city_root, addr)?
+            .checkpoint_entropy_allow()
+            .clone();
         storage::Checkpoint::open(&self.city_root)
             .and_then(|checkpoint| {
-                checkpoint.base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
-                    self.note(
-                        runtime::diagnostics::Level::Effect,
-                        "storage::checkpoint",
-                        &format!("{}: base checkpoint {step:?}", addr.as_str()),
-                    );
-                })
+                checkpoint
+                    .with_entropy_allowlist(entropy_allow)
+                    .base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+                        self.note(
+                            runtime::diagnostics::Level::Effect,
+                            "storage::checkpoint",
+                            &format!("{}: base checkpoint {step:?}", addr.as_str()),
+                        );
+                    })
             })
             .map(drop)
             .map_err(storage::StorageError::into_ax)

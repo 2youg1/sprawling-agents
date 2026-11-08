@@ -64,13 +64,30 @@ fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
     // two short fragments rather than the credential-shaped fixture.
     let quoted = ["work/Zx9yQ2mK4pL7", "vB1n"].join("/");
     write(tmp.path(), &quoted, "fixture\n");
-    write(tmp.path(), "work/SPEC.md", &format!("Read {quoted} first.\n"));
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
     assert!(
         outcome.is_ok(),
         "a quoted path already in the staged tree must not block the wave: {outcome:?}"
     );
+    assert!(!outcome.unwrap().as_map().contains_key("withheld"));
+
+    // Existence is load-bearing: once that name leaves the index, the same
+    // bytes are an ordinary entropy finding rather than a path exemption.
+    std::fs::remove_file(tmp.path().join(&quoted)).unwrap();
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} again.\n"),
+    );
+    let changed = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    let payload = changed.unwrap();
+    assert_eq!(payload.as_map()["withheld"].as_array().unwrap().len(), 1);
 }
 
 /// Entropy without a known provider shape is evidence to retain, not a
@@ -95,7 +112,31 @@ fn an_entropy_hit_is_committed_and_recorded_without_echoing_the_line() {
     assert_eq!(withheld[0]["offset"], 9);
     assert_eq!(withheld[0]["len"], token.len());
     assert_eq!(withheld[0]["reason"], "high entropy");
-    assert!(!serde_json::to_string(&payload).unwrap().contains(token));
+    assert!(!serde_json::to_string(&payload).unwrap().contains(&token));
+}
+
+/// The User can exempt one file's entropy findings by its exact path. That
+/// exemption never reaches a known provider shape in the same file.
+#[test]
+fn an_entropy_allowlist_is_file_exact_and_never_exempts_a_known_shape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let allowed = [Address::parse("work/SPEC.md").unwrap()]
+        .into_iter()
+        .collect();
+    let mut checkpoint = Checkpoint::open(tmp.path())
+        .unwrap()
+        .with_entropy_allowlist(allowed);
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    assert!(!payload.as_map().contains_key("withheld"));
+
+    let known = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("KEY={known}\n"));
+    let refused = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    assert!(matches!(refused, Err(StorageError::SecretEgress(_))));
 }
 
 /// Five trailers, in the order and the spelling a reader outside the
@@ -260,7 +301,7 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     let mut checkpoint = Checkpoint::open(first.path()).unwrap();
     checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
     lose_the_object_of(first.path(), "work/a.md");
-    let on_first = checkpoint.scan_staged();
+    let on_first = checkpoint.scan_staged(&["work".to_owned()]);
 
     let later = tempfile::tempdir().unwrap();
     write(later.path(), "work/a.md", "a");
@@ -271,9 +312,9 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     write(later.path(), "work/b.md", "b");
     checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
     lose_the_object_of(later.path(), "work/b.md");
-    let on_later = checkpoint.scan_staged();
+    let on_later = checkpoint.scan_staged(&["work".to_owned()]);
 
-    let refused = |result: Result<(), StorageError>| matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file");
+    let refused = |result: Result<Vec<CheckpointFinding>, StorageError>| matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file");
     assert_eq!((refused(on_first), refused(on_later)), (true, true));
 }
 

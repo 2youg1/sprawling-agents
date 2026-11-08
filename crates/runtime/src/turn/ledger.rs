@@ -57,6 +57,8 @@ pub(crate) enum RunLine {
     PromptShapeCompared,
     /// The commit taken before a wave that may write.
     CheckpointCommitted,
+    /// A known provider shape refused that checkpoint, with no matched bytes.
+    SecretEgressBlocked,
 }
 
 impl RunLine {
@@ -64,6 +66,7 @@ impl RunLine {
         match self {
             RunLine::PromptShapeCompared => EventKind::PromptShapeCompared,
             RunLine::CheckpointCommitted => EventKind::CheckpointCommitted,
+            RunLine::SecretEgressBlocked => EventKind::SecretEgressBlocked,
         }
     }
 }

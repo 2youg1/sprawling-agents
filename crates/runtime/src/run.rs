@@ -156,6 +156,38 @@ pub enum Advance {
     Concluded(Completion),
 }
 
+/// A checkpoint failure, optionally carrying the structured scan refusal
+/// that must reach the Ledger before the run freezes.
+#[derive(Debug)]
+pub struct CheckpointFailure {
+    cause: AxError,
+    refusal: Option<kernel::event::record::SecretEgressBlocked>,
+}
+
+impl CheckpointFailure {
+    /// A known-shape refusal with the finding payload to record before
+    /// `cause` travels back to the caller.
+    pub fn secret_egress(
+        cause: AxError,
+        refusal: kernel::event::record::SecretEgressBlocked,
+    ) -> Self {
+        CheckpointFailure {
+            cause,
+            refusal: Some(refusal),
+        }
+    }
+}
+
+impl From<AxError> for CheckpointFailure {
+    /// An ordinary checkpoint failure has no scan report to add.
+    fn from(cause: AxError) -> Self {
+        CheckpointFailure {
+            cause,
+            refusal: None,
+        }
+    }
+}
+
 /// The things the driver cannot decide for itself. Closures rather
 /// than traits: no second implementation exists yet, and this
 /// library introduces a trait at a seam that already has one.
@@ -177,7 +209,7 @@ pub struct RunHooks<'a> {
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,
     /// The pre-wave checkpoint. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
-    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
+    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, CheckpointFailure>>,
     /// What a call may write, by its declared effect, asked before the
     /// wave runs: a wave whose every call answers `Nothing` changes no
     /// file, so it needs no checkpoint of its own (§8-45).

@@ -73,8 +73,8 @@ impl Checkpoint {
     /// Staged-diff secret scan。已知形状命中拒绝提交（E_SECRET_EGRESS）；
     /// 未豁免的熵命中提交并返回 withheld finding。只扫这一次会新提交进去的
     /// blob——基线那一次仍然全扫。finding 只携 path/offset/len/line/reason。
-    pub fn scan_staged(&mut self) -> Result<Vec<CheckpointFinding>, StorageError>;
-    /// 配置只对熵判据生效的精确路径允许清单；默认空，已知形状不受影响。
+    pub fn scan_staged(&mut self, scopes: &[String]) -> Result<Vec<CheckpointFinding>, StorageError>;
+    /// 配置只对熵命中生效的精确路径允许清单；默认空，已知形状不受影响。
     pub fn with_entropy_allowlist(self, allowed: EntropyAllowlist) -> Checkpoint;
 }
 ```
@@ -148,11 +148,11 @@ impl Checkpoint {
 
 **决定**：扫描按证据分三类：已知厂商形状拒绝；普通熵命中提交并在 `checkpoint_committed.withheld` 记账；命中文本是本次 index 中已有的合法相对路径，或所在文件由 User 写入 `checkpoint_entropy_allow`，则视为普通内容。允许清单只作用于熵，不能豁免形状。
 
-**理由**：熵判据有意接受误报；把它变成每次写入前都失败的门，会让一份文档里的路径使后续工作反复停止，并把恢复成本交给 User。已知形状提供可行动的硬证据；熵命中保留可查询的审计记录与补丁扣行，不再冒充同等确定性。路径是否存在于 index 是可判定事实，允许清单住在 agent 写不到的保留子树，两个出口都不扩大 agent 的权限。
+**理由**：熵规则有意接受误报；把它变成每次写入前都失败的门，会让一份文档里的路径使后续工作反复停止，并把恢复成本交给 User。已知形状提供可行动的硬证据；熵命中保留可查询的审计记录与补丁扣行，不再冒充同等确定性。路径是否存在于 index 是可判定事实，允许清单住在 agent 写不到的保留子树，两个出口都不扩大 agent 的权限。
 
 **被否**：所有命中一律拒绝（本次锁死的根因）；一律忽略熵命中（丢掉审计）；按命中正文或摘要配置允许清单（把触发串或它的永久指纹写进治理文件）；让 agent 经普通写门修改清单（被门判的人自己改尺子）。
 
-**重开参数**：出现一种比现有形状表更能确认未知密钥、且误报率有实测依据的判据时，先给它独立的证据类型与处置，而不是把熵阈值重新变成硬门。
+**重开参数**：出现一种比现有形状表更能确认未知密钥、且误报率有实测依据的规则时，先给它独立的证据类型与处置，而不是把熵阈值重新变成硬门。
 -/
 
 /-!

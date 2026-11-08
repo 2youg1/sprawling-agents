@@ -317,6 +317,29 @@ fn a_confidential_building_reaches_nothing_public() {
 }
 
 #[test]
+fn the_checkpoint_entropy_allowlist_is_exact_validated_paths_and_empty_by_default() {
+    let empty = evaluate(&addr("lab"), &ordinary("")).unwrap();
+    assert!(!empty.checkpoint_entropy_allow().allows("lab/SPEC.md"));
+
+    let rules = evaluate(
+        &addr("lab"),
+        &ordinary("checkpoint_entropy_allow = [\"lab/SPEC.md\", \"shared/NOTES.md\"]\n"),
+    )
+    .unwrap();
+    assert!(rules.checkpoint_entropy_allow().allows("lab/SPEC.md"));
+    assert!(rules.checkpoint_entropy_allow().allows("shared/NOTES.md"));
+    assert!(!rules.checkpoint_entropy_allow().allows("lab"));
+    assert!(!rules.checkpoint_entropy_allow().allows("lab/other.md"));
+
+    let refused = evaluate(
+        &addr("lab"),
+        &ordinary("checkpoint_entropy_allow = [\"../outside.md\"]\n"),
+    )
+    .unwrap_err();
+    assert_eq!(refused.code(), &AxCode::InvalidArgs);
+}
+
+#[test]
 fn an_ordinary_building_may_declare_prefixes_beyond_itself() {
     let rules = evaluate(
         &addr("lab"),

@@ -109,7 +109,7 @@ pub use registry::{Artifact, Claim, RegisterVerdict, Registry, ResidentId};
 pub use release::{Maturity, Release, ReleaseVerdict};
 pub use repair::RepairVerdict;
 pub use retries::Retries;
-pub use secret::{Sealed, SecretRef, SecretSpan};
+pub use secret::{EntropyAllowlist, Sealed, SecretRef, SecretSpan};
 pub use share::{Share, WHOLE_PPB};
 pub use skill::{SkillItem, SkillItemKind, SkillManifest};
 pub use spine::{EvidenceCell, NewChild, ROADMAP_COLUMNS};

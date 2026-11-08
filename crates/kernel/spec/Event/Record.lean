@@ -60,7 +60,7 @@ pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution
                     pub scope: Vec<String>, pub files: Vec<String>,
                     #[serde(default, skip_serializing_if = "Vec::is_empty")]
                     pub withheld: Vec<CheckpointFinding> }
-    // 已提交但由熵判据扣下正文的行；旧记录无这一键，读作空
+    // 已提交但由熵规则扣下正文的行；旧记录无这一键，读作空
 pub struct SecretEgressBlocked { pub code: String, pub scope: Vec<String>,
                                  pub withheld: Vec<CheckpointFinding> }
     // checkpoint 因已知厂商密钥形状而拒；code 为 E_SECRET_EGRESS

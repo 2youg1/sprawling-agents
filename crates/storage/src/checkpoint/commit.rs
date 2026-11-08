@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use kernel::event::record::{CheckpointCommitted, Commit, FileRestored};
+use kernel::event::record::{CheckpointCommitted, CheckpointFinding, Commit, FileRestored};
 use kernel::{Address, GitOid, Payload, TimeMs};
 
 use crate::alias::WriteTarget;
@@ -46,11 +46,16 @@ pub(super) fn checkpoint_ref(of: &Provenance, oid: git2::Oid) -> String {
 /// It carries what the commit's own trailers carry that the record
 /// cannot say for itself: the model and the effort. The run and the
 /// actor are the record's identity and are not repeated here.
+pub(super) struct CommitDetails<'a> {
+    pub(super) of: &'a Provenance,
+    pub(super) scopes: &'a [String],
+    pub(super) files: Vec<String>,
+    pub(super) withheld: Vec<CheckpointFinding>,
+}
+
 pub(super) fn committed(
     oid: git2::Oid,
-    of: &Provenance,
-    scopes: &[String],
-    files: Vec<String>,
+    details: CommitDetails<'_>,
 ) -> Result<Payload, StorageError> {
     let spelled = oid.to_string();
     let oid = GitOid::parse(&spelled).ok_or_else(|| StorageError::Checkpoint {
@@ -59,9 +64,10 @@ pub(super) fn committed(
     })?;
     let record = CheckpointCommitted::Committed(Commit {
         oid,
-        by: of.attribution(),
-        scope: scopes.to_vec(),
-        files,
+        by: details.of.attribution(),
+        scope: details.scopes.to_vec(),
+        files: details.files,
+        withheld: details.withheld,
     });
     Payload::of(&record).map_err(|source| StorageError::Draft { source })
 }
@@ -73,6 +79,8 @@ pub struct Checkpoint {
     pub(crate) last: Option<git2::Oid>,
     /// Which index this handle stages into (`checkpoint::opening`).
     pub(crate) index: super::opening::IndexOwner,
+    /// Exact paths whose entropy-only findings may commit without a record.
+    pub(crate) entropy_allow: kernel::EntropyAllowlist,
 }
 
 pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
@@ -156,7 +164,7 @@ impl Checkpoint {
         of: &Provenance,
     ) -> Result<Payload, StorageError> {
         let files = self.stage_scopes(scopes)?;
-        self.scan_staged()?;
+        let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
@@ -171,7 +179,15 @@ impl Checkpoint {
                 "sprawling: a wave checkpoint",
             )
             .map_err(git_err("file a wave checkpoint"))?;
-        committed(oid, of, scopes, files)
+        committed(
+            oid,
+            CommitDetails {
+                of,
+                scopes,
+                files,
+                withheld,
+            },
+        )
     }
 
     /// The way back a `file_discarded` names: the blob at `address` in

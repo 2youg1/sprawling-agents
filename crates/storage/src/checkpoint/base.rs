@@ -11,7 +11,7 @@ use kernel::{Payload, TimeMs};
 
 use crate::error::StorageError;
 
-use super::commit::{Checkpoint, checkpoint_ref, committed, git_err, subject_of};
+use super::commit::{Checkpoint, CommitDetails, checkpoint_ref, committed, git_err, subject_of};
 use super::opening::{HeadMove, IndexOwner, commit_refused};
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
@@ -98,6 +98,7 @@ impl Checkpoint {
             repo,
             last: None,
             index,
+            entropy_allow: self.entropy_allow.clone(),
         })
     }
 
@@ -129,7 +130,7 @@ impl Checkpoint {
         let BaseOf { scopes, t, of } = *base;
         let files = self.stage_scopes_held(scopes)?;
         progress(BaseProgress::Staged { files: files.len() });
-        self.scan_staged()?;
+        let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
@@ -195,7 +196,15 @@ impl Checkpoint {
         }
         held.reset()
             .map_err(git_err("release the base checkpoint"))?;
-        committed(oid, of, scopes, files)
+        committed(
+            oid,
+            CommitDetails {
+                of,
+                scopes,
+                files,
+                withheld,
+            },
+        )
     }
 }
 

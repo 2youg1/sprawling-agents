@@ -55,6 +55,7 @@ impl RunWorker {
                             who,
                             addr,
                             run_id,
+                            entropy_allow: site.rules.checkpoint_entropy_allow(),
                         },
                         branch,
                     )?,
@@ -162,6 +163,7 @@ pub(super) struct Offering<'a> {
     pub(super) who: &'a str,
     pub(super) addr: &'a kernel::Address,
     pub(super) run_id: kernel::RunId,
+    pub(super) entropy_allow: &'a kernel::EntropyAllowlist,
 }
 
 impl RunWorker {
@@ -179,6 +181,7 @@ impl RunWorker {
     pub(super) fn offer(&mut self, offering: &Offering<'_>, branch: String) -> Result<(), AxError> {
         let commit = storage::Checkpoint::open(offering.tree)
             .map_err(storage::StorageError::into_ax)?
+            .with_entropy_allowlist(offering.entropy_allow.clone())
             .land(
                 offering.scopes,
                 self.clock.now()?,
