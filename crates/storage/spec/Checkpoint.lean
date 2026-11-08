@@ -10,7 +10,7 @@ import crates.storage.spec.Checkpoint.Concurrent
 
 规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`crates/storage/src/` 下同名的文件）；`checkpoint::opening` 的写者 index 住 `crates/storage/spec/Checkpoint/Concurrent.lean` §8-39，`checkpoint::provenance` 住 `crates/storage/spec/Checkpoint/Provenance.lean` §8-17、§8-18。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。检查点的并发性质是被证明的，住 `crates/storage/spec/Checkpoint/Concurrent.lean`。
+本部分开头的接口文字由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）；扫描证据到处置的映射由本文件末尾的 Lean 定义与定理证明，检查点的并发性质住 `crates/storage/spec/Checkpoint/Concurrent.lean`。
 -/
 
 /-!
@@ -70,10 +70,12 @@ impl Checkpoint {
     /// 把 `scopes` 之下的工作树提交到**当前分支**（HEAD 移动），供一次评审运行
     /// 在自己的 worktree 里献出成果时使用；scope 之外的索引项原样进树。返回落地的 oid。
     pub fn land(&mut self, scopes: &[String], t: TimeMs, of: &Provenance, subject: &str) -> Result<String, StorageError>;
-    /// Staged-diff secret scan; a hit refuses the commit (E_SECRET_EGRESS,
-    /// positions only, never the bytes). 只扫这一次会新提交进去的
-    /// blob——基线那一次仍然全扫。
-    pub fn scan_staged(&mut self) -> Result<(), StorageError>;
+    /// Staged-diff secret scan。已知形状命中拒绝提交（E_SECRET_EGRESS）；
+    /// 未豁免的熵命中提交并返回 withheld finding。只扫这一次会新提交进去的
+    /// blob——基线那一次仍然全扫。finding 只携 path/offset/len/line/reason。
+    pub fn scan_staged(&mut self) -> Result<Vec<CheckpointFinding>, StorageError>;
+    /// 配置只对熵判据生效的精确路径允许清单；默认空，已知形状不受影响。
+    pub fn with_entropy_allowlist(self, allowed: EntropyAllowlist) -> Checkpoint;
 }
 ```
 
@@ -107,6 +109,8 @@ impl Checkpoint {
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，检查点不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让检查点静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
 
+- **按证据置信度处置，不让低置信度门禁卡住工作区**：已知厂商形状命中仍以 `E_SECRET_EGRESS` 拒绝提交；其他熵命中不拒绝，`checkpoint_committed.withheld` 逐处记下 `path`、`offset`、`len`、`line` 与 `reason`，不记命中字节。这样补丁仍按 `storage::hunks` 的规则扣下该行，而 run 可以继续。`RULES.toml` 的 `checkpoint_entropy_allow` 是精确仓库相对路径的允许清单，只豁免熵命中；命中文本本身是合法相对路径且该路径已在本次 index 中时，它是文档引用而不是凭据，不产生 finding。路径判定不用正则：逐段非空，每段只含 ASCII 字母、数字、`.`、`_`、`-`，以 `/` 分段，再查 index；绝对路径、空段、其它字符与不存在的路径都不豁免。
+- **拒绝也可自查出**：`StorageError::SecretEgress` 携带完整的 `SecretEgressBlocked { code, scope, withheld }`；错误正文逐处写 `path:line:offset+len (reason)`。lane 在传播错误前把同一值写成 `secret_egress_blocked`，`sprawling secrets <city>` 同时列出这类拒绝与成功 checkpoint 的 withheld finding，不重扫、不读命中字节。
 - **扫改动过的 blob，不扫整棵树**：遍历 git index 里的**每一个** blob、对**整份内容**跑 `kernel::secret::scan` 且**每一次工具波都跑一遍**时，每波都付整棵树的扫描与 zlib 解压——**改了一个文件的波，付整棵树的钱**。
   - 扫描因此走 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。它问的是 git 而不是自己逐文件推，于是「什么会进树」由暂存与扫描共用的一个机制回答。
   - **无 HEAD 时全扫**：基线那一次没有「上一棵树」可比，扫的就是全部。
@@ -118,7 +122,7 @@ impl Checkpoint {
   - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次检查点自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
   - 树里一个不是 UTF-8 的名字拒掉整次 sweep（`Checkpoint { op: "sweep the working tree" }`）：地址是 UTF-8 的，这样的路径拼不成 `file:` 地址，而把它读成所在目录会让一次删除不被报出。
-- `open` 只在**没有仓库**（libgit2 的 `NotFound`）时 `init`；仓库在而打不开（`.git` 损坏、权限被拒）是 `Checkpoint { op: "open the city repository" }`，因为在它上面 init 会把它的历史藏起来。`open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 checkpoint 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `StorageError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- `open` 只在**没有仓库**（libgit2 的 `NotFound`）时 `init`；仓库在而打不开（`.git` 损坏、权限被拒）是 `Checkpoint { op: "open the city repository" }`，因为在它上面 init 会把它的历史藏起来。`open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 checkpoint 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob；已知形状命中即拒，熵命中按 D95 提交并记账，两者都只报位置与原因——回显字节本身即泄漏。`StorageError::Checkpoint{op,detail}` 映到 `E_WORKTREE_BUSY`，`SecretEgress(SecretEgressBlocked)` 映到 `E_SECRET_EGRESS`。
 - **index 锁的等待有界。** 同一栋楼的两个 run 同时暂存时，`.git/index.lock` 只在一次写的时间里被持有，`checkpoint::scan::write_index` 因此遇到这把锁就隔一小段再试，有上限；上限与间隔只写在那个函数里。到了上限仍被拒，就是一个真卡住的锁（例如持锁的进程已经死了），照常报 `Checkpoint { op: "write index" }`——那才是人能处理的事实。
 - **检查点的持久性弱于账本，三个平台相同。** 检查点的对象、index 与引用经 libgit2 写入，本 crate 不打开它的 fsync 选项，所以「落盘」在这里的意思是交给了操作系统，不是掉电之后仍在：Windows、Linux、macOS 上都不调 `FlushFileBuffers`／`fdatasync`／`F_FULLFSYNC`。掉电可能丢掉最近一道检查点；账本里那一行的 oid 于是指向一个不在的提交，`restore` 答「找不到提交」，而账本本身不受影响（它的屏障见 `crates/storage/spec/Jsonl/Barrier.lean`）。（推断：这依据 libgit2 默认不 fsync 对象目录；本 crate 没有设置它的地方，`rg fsync crates/storage/src` 只命中 jsonl。）
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
@@ -140,6 +144,17 @@ impl Checkpoint {
 **重开参数。** 写者改用不在写域里的暂存位置，或 libgit2 给出在读失败时跳过一个路径的选项。
 -/
 
+/-! D95 checkpoint 只对已知密钥形状硬拒绝，熵命中提交并留下不含正文的 finding
+
+**决定**：扫描按证据分三类：已知厂商形状拒绝；普通熵命中提交并在 `checkpoint_committed.withheld` 记账；命中文本是本次 index 中已有的合法相对路径，或所在文件由 User 写入 `checkpoint_entropy_allow`，则视为普通内容。允许清单只作用于熵，不能豁免形状。
+
+**理由**：熵判据有意接受误报；把它变成每次写入前都失败的门，会让一份文档里的路径使后续工作反复停止，并把恢复成本交给 User。已知形状提供可行动的硬证据；熵命中保留可查询的审计记录与补丁扣行，不再冒充同等确定性。路径是否存在于 index 是可判定事实，允许清单住在 agent 写不到的保留子树，两个出口都不扩大 agent 的权限。
+
+**被否**：所有命中一律拒绝（本次锁死的根因）；一律忽略熵命中（丢掉审计）；按命中正文或摘要配置允许清单（把触发串或它的永久指纹写进治理文件）；让 agent 经普通写门修改清单（被门判的人自己改尺子）。
+
+**重开参数**：出现一种比现有形状表更能确认未知密钥、且误报率有实测依据的判据时，先给它独立的证据类型与处置，而不是把熵阈值重新变成硬门。
+-/
+
 /-!
 ### 8-20 重启后凭证扫描的比较基准
 
@@ -147,6 +162,59 @@ impl Checkpoint {
 
 **一条断言守着它**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、checkpoint 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 checkpoint，第二次 checkpoint 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 checkpoint。
 -/
+
+/-! ### 扫描证据到处置（`storage::checkpoint::scan` 的模型）
+
+`Evidence` 是扫描器对一段字节给出的证据；`Exemption` 只描述熵命中的两个出口。`Disposition` 区分无 finding、提交但 withheld、拒绝。Rust 的逐 blob 扫描可产生多处 finding，任一 `Refused` 都使整次提交拒绝；只有全部不是 `Refused` 时才提交，所有未豁免熵命中都保留为 withheld。
+-/
+
+namespace Storage.Checkpoint
+
+inductive Evidence where
+  | NoHit
+  | KnownShape
+  | Entropy
+  deriving DecidableEq, Repr
+
+inductive Exemption where
+  | None
+  | ExistingPath
+  | Allowed
+  deriving DecidableEq, Repr
+
+inductive Disposition where
+  | Clear
+  | Withheld
+  | Refused
+  deriving DecidableEq, Repr
+
+/-- 单处命中的处置；与 Rust `scan_blob` 的分支一一对应。 -/
+def disposition : Evidence → Exemption → Disposition
+  | .NoHit, _ => .Clear
+  | .KnownShape, _ => .Refused
+  | .Entropy, .None => .Withheld
+  | .Entropy, .ExistingPath | .Entropy, .Allowed => .Clear
+
+/-- 已知形状的硬拒绝不被任何熵允许清单或路径事实削弱。 -/
+theorem a_known_shape_is_always_refused (exemption : Exemption) :
+    disposition .KnownShape exemption = .Refused := by
+  cases exemption <;> rfl
+
+/-- 熵命中在任何出口下都不再拒绝提交。 -/
+theorem entropy_never_refuses (exemption : Exemption) :
+    disposition .Entropy exemption ≠ .Refused := by
+  cases exemption <;> decide
+
+/-- 未豁免熵命中不是无声通过：它留下 withheld finding。 -/
+theorem an_unexempted_entropy_hit_is_withheld :
+    disposition .Entropy .None = .Withheld := by
+  rfl
+
+/-- 没有命中的普通输入确实可走通，保证不是全拒绝的空头性质。 -/
+example (exemption : Exemption) : disposition .NoHit exemption = .Clear := by
+  rfl
+
+end Storage.Checkpoint
 
 /-!
 ### 8-33 从检查点取回一个文件进城自己的工作树（`storage::checkpoint::commit`，形状 4 适配器）

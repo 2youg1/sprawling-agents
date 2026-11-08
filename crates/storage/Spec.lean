@@ -85,7 +85,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
 - 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
 - 各维度归因之和恒等于同期权威计费额之和（逐维度断言，整数精确无余无溢）。
-- 检查点：波前 checkpoint_committed 携 oid；波后删除逐条补记 file_discarded{restoration=Tracked(波前 oid)}；含 secret shape 的 staged diff 拒提交（E_SECRET_EGRESS，恒不回显字节）；queue 去重先于副作用＋shed 不丢已入队项；digest_cache 同哈希二次 put 幂等。
+- 检查点：波前 checkpoint_committed 携 oid；波后删除逐条补记 file_discarded{restoration=Tracked(波前 oid)}；含已知 secret shape 的 staged diff 拒提交（E_SECRET_EGRESS，错误携行号与原因，恒不回显字节）；文档引用本次 index 已有的相对路径不拒提交；普通熵命中提交并写 withheld finding；queue 去重先于副作用＋shed 不丢已入队项；digest_cache 同哈希二次 put 幂等。
 
 分部里的定理是模型对性质的证明：
 
@@ -101,6 +101,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 - `spec/Worktree/Back.lean`：回到过去的树恰在那一点、拒绝活树、只动自己的树、账本只增不减（§8-27）。
 - `spec/Index.lean`：从某个 seq 往后读，答的是索引里不小于它的每一条（`seqs_from_answers_the_held_seqs_at_or_after`），与从头读再跳过前面的相同（`seqs_from_is_the_walk_past_the_smaller`），答案不取决于它之前的任何一格（`seqs_from_reads_no_slot_before_its_start`）。
 - `spec/Error.lean`：账本介质的失败答 `E_STORAGE_FATAL`（`code` 的分支本身，不另立定理），只有两个变体原样交出它们带着的错误（`only_two_variants_carry`）。
+- `spec/Checkpoint.lean`：已知形状在一切豁免下都拒绝（`a_known_shape_is_always_refused`）；熵命中在任何豁免下都不拒绝（`entropy_never_refuses`），未豁免时必留 withheld（`an_unexempted_entropy_hit_is_withheld`）。
 
 每个模型都带一个可实现的正常路径（走得通的两行账本、一次没有打扰的 `put`、恰触界的范围、没有断掉的接管、Lean 里的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
@@ -298,6 +299,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D34 | JSONL 的三条整段读路径使用有界内存的流式扫描 | `crates/storage/spec/Jsonl.lean` |
 | D35 | 保温续期在归因里单独报数，按 kernel 的一条读法分四格 | `crates/storage/spec/Attribution.lean` |
 | D36 | 续期花费进总额与每一个维度，在每一维都有带名字的去处 | `crates/storage/spec/Attribution.lean` |
+| D95 | checkpoint 只对已知密钥形状硬拒绝，熵命中提交并留下不含正文的 finding | `crates/storage/spec/Checkpoint.lean` |
 -/
 
 /-! ## 13 依赖选型

@@ -43,11 +43,59 @@ fn a_staged_secret_refuses_the_commit_and_never_echoes_it() {
     let rendered = err.to_string();
     assert!(rendered.contains("work/leak.env"), "{rendered}");
     assert!(
+        rendered.contains("work/leak.env:1:") && rendered.contains("(anthropic)"),
+        "the refusal names the line and the reason: {rendered}"
+    );
+    assert!(
         !rendered.contains(&token) && !rendered.contains("Zx9yQ2mK4pL7"),
         "positions only, never the bytes: {rendered}"
     );
     let ax = err.into_ax();
     assert_eq!(*ax.code(), kernel::AxCode::SecretEgress);
+}
+
+/// A document can quote a path that this same checkpoint stages. The
+/// mixed-alphabet, 22-byte path reaches the entropy detector on the old
+/// rule; an existing repository path is not a credential.
+#[test]
+fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Assembled at runtime so the repository's own source scanner sees
+    // two short fragments rather than the credential-shaped fixture.
+    let quoted = ["work/Zx9yQ2mK4pL7", "vB1n"].join("/");
+    write(tmp.path(), &quoted, "fixture\n");
+    write(tmp.path(), "work/SPEC.md", &format!("Read {quoted} first.\n"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "a quoted path already in the staged tree must not block the wave: {outcome:?}"
+    );
+}
+
+/// Entropy without a known provider shape is evidence to retain, not a
+/// reason to stop every later write. The record identifies the withheld
+/// line without carrying its bytes.
+#[test]
+fn an_entropy_hit_is_committed_and_recorded_without_echoing_the_line() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "an entropy-only hit must not block the wave: {outcome:?}"
+    );
+    let payload = outcome.unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1);
+    assert_eq!(withheld[0]["path"], "work/SPEC.md");
+    assert_eq!(withheld[0]["line"], 1);
+    assert_eq!(withheld[0]["offset"], 9);
+    assert_eq!(withheld[0]["len"], token.len());
+    assert_eq!(withheld[0]["reason"], "high entropy");
+    assert!(!serde_json::to_string(&payload).unwrap().contains(token));
 }
 
 /// Five trailers, in the order and the spelling a reader outside the

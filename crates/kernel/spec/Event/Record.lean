@@ -53,8 +53,17 @@ pub struct FileRestored { pub name: String, pub path: String, pub point: GitOid 
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
+pub struct CheckpointFinding { pub path: String, pub offset: u64, pub len: u64,
+                               pub line: u64, pub reason: String }
+    // 一处扫描命中；path 是仓库相对路径，line 从 1 起；恒不携命中字节
 pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution,
-                    pub scope: Vec<String>, pub files: Vec<String> }
+                    pub scope: Vec<String>, pub files: Vec<String>,
+                    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+                    pub withheld: Vec<CheckpointFinding> }
+    // 已提交但由熵判据扣下正文的行；旧记录无这一键，读作空
+pub struct SecretEgressBlocked { pub code: String, pub scope: Vec<String>,
+                                 pub withheld: Vec<CheckpointFinding> }
+    // checkpoint 因已知厂商密钥形状而拒；code 为 E_SECRET_EGRESS
 #[serde(untagged)]
 pub enum CheckpointCommitted { JobPinned { job: Locator }, Committed(Commit) }
 
