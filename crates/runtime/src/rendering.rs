@@ -28,7 +28,7 @@ mod search;
 pub use read::{Copied, Numbering};
 
 /// The renderer every answer this build writes is drawn with.
-pub const CURRENT: Rendering = Rendering::V3;
+pub const CURRENT: Rendering = Rendering::V4;
 
 /// The text `rendering` draws for one answer of the tool `name`.
 ///
@@ -53,17 +53,20 @@ pub fn shown(
             .map_or_else(|_| json(error), |refused| Ok(refusal::line(&refused))),
         (Rendering::V2 | Rendering::V3 | Rendering::V4, ToolAnswer::Answered { result }) => {
             match name.as_str() {
-            crate::tools::ReadTool::NAME => {
-                read::text(result, Numbering::of(rendering)).map_or_else(|| json(result), Ok)
-            }
-            crate::tools::SearchTool::NAME => {
-                search::text(result, Numbering::of(rendering)).map_or_else(|| json(result), Ok)
-            }
-            crate::tools::ToolTool::NAME => result
-                .as_map()
-                .get("text")
-                .and_then(serde_json::Value::as_str)
-                .map_or_else(|| json(result), |text| Ok(text.to_owned())),
+                crate::tools::ReadTool::NAME if rendering == Rendering::V4 => {
+                    read::text_v4(result).map_or_else(|| json(result), Ok)
+                }
+                crate::tools::ReadTool::NAME => {
+                    read::text(result, Numbering::of(rendering)).map_or_else(|| json(result), Ok)
+                }
+                crate::tools::SearchTool::NAME => {
+                    search::text(result, Numbering::of(rendering)).map_or_else(|| json(result), Ok)
+                }
+                crate::tools::ToolTool::NAME => result
+                    .as_map()
+                    .get("text")
+                    .and_then(serde_json::Value::as_str)
+                    .map_or_else(|| json(result), |text| Ok(text.to_owned())),
                 _ => json(result),
             }
         }

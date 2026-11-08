@@ -98,8 +98,12 @@ impl Exchange {
         let mut texts = Vec::new();
         for block in self.assistant.iter_mut().chain(self.results.iter_mut()) {
             match block {
-                ContentBlock::Text { text } => texts.push(text),
-                ContentBlock::ToolResult { content, .. } => texts.push(content),
+                ContentBlock::Text { text } => texts.push((None, text)),
+                ContentBlock::ToolResult {
+                    tool_use_id,
+                    content,
+                    ..
+                } => texts.push((Some(tool_use_id.as_str()), content)),
                 ContentBlock::Thinking { .. }
                 | ContentBlock::RedactedThinking { .. }
                 | ContentBlock::ToolUse { .. }
@@ -117,11 +121,13 @@ impl Exchange {
 /// against [`super::plan`] rather than re-decided here. An empty text
 /// counts for neither — it occupies no window and would only dilute the
 /// shares of texts that do.
-fn compact_texts(texts: Vec<&mut String>) -> Result<std::collections::BTreeSet<String>, AxError> {
+fn compact_texts(
+    texts: Vec<(Option<&str>, &mut String)>,
+) -> Result<std::collections::BTreeSet<String>, AxError> {
     let budget = ByteLen::new(EXCHANGE_BUDGET_BYTES);
     let mut total = 0u64;
     let mut count = 0u64;
-    for text in &texts {
+    for (_, text) in &texts {
         if text.is_empty() {
             continue;
         }
@@ -133,7 +139,8 @@ fn compact_texts(texts: Vec<&mut String>) -> Result<std::collections::BTreeSet<S
     }
     let share = budget.get().checked_div(count).ok_or_else(uncountable)?;
     let share = ByteLen::new(share);
-    for text in texts {
+    let mut shortened = std::collections::BTreeSet::new();
+    for (id, text) in texts {
         if text.is_empty() {
             continue;
         }
@@ -142,11 +149,16 @@ fn compact_texts(texts: Vec<&mut String>) -> Result<std::collections::BTreeSet<S
             Shrink::Keep | Shrink::MustOffload => {}
             Shrink::Cut(strategy) => {
                 let cut = shorten(text, strategy, share);
+                if cut.text.len() < text.len()
+                    && let Some(id) = id
+                {
+                    shortened.insert(id.to_owned());
+                }
                 *text = cut.text;
             }
         }
     }
-    Ok(std::collections::BTreeSet::new())
+    Ok(shortened)
 }
 
 fn bytes(text: &str) -> Result<u64, AxError> {

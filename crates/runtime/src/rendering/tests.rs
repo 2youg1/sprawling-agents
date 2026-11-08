@@ -253,6 +253,45 @@ fn version_four_draws_an_unchanged_reply_as_a_reference() {
     );
 }
 
+#[test]
+fn version_four_distinguishes_empty_and_past_end_unchanged_replies() {
+    let empty = answered(json!({
+        "path":"a.md", "unchanged":true, "offset":0, "lines":0, "total_lines":0,
+    }));
+    let past = answered(json!({
+        "path":"a.md", "unchanged":true, "offset":9, "lines":0, "total_lines":4,
+    }));
+    assert_eq!(
+        [
+            shown(Rendering::V4, &read(), &empty).unwrap(),
+            shown(Rendering::V4, &read(), &past).unwrap(),
+        ],
+        [
+            "a.md is empty: unchanged since your earlier read; not repeated\n".to_owned(),
+            "a.md has 4 lines; offset 10 is past the end: unchanged since your earlier read; not repeated\n".to_owned(),
+        ]
+    );
+}
+
+/// Other tools keep V3's rendering under V4.
+#[test]
+fn version_four_leaves_other_tools_byte_identical_to_version_three() {
+    let search = answered(json!({
+        "count": 1, "truncated": false, "unreadable": 0, "unread": [],
+        "matches": [{"path": "a.rs", "line": 9, "from": 8, "text": "x\ny\nz"}],
+    }));
+    let tool = answered(json!({"text":"a guide\n"}));
+    for (name, answer) in [
+        (ToolName::parse("search").unwrap(), search),
+        (ToolName::parse("tool").unwrap(), tool),
+    ] {
+        assert_eq!(
+            shown(Rendering::V4, &name, &answer).unwrap(),
+            shown(Rendering::V3, &name, &answer).unwrap()
+        );
+    }
+}
+
 /// A search hit block is numbered the way a V3 read from its first line
 /// is, so its line numbers are the offsets `read` takes.
 #[test]

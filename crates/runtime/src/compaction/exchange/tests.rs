@@ -80,10 +80,7 @@ fn compaction_reports_only_the_tool_results_whose_text_it_shortened() {
     exchange.push_result(result_id("prose", &prose(40_000)));
     exchange.push_result(result_id("structured", &printed(40_000)));
     let shortened = exchange.compact().unwrap();
-    assert_eq!(
-        shortened,
-        ["prose".to_owned()].into_iter().collect()
-    );
+    assert_eq!(shortened, ["prose".to_owned()].into_iter().collect());
 }
 
 #[test]
