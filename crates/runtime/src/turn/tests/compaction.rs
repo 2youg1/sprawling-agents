@@ -248,7 +248,10 @@ fn the_run_hands_shortened_ids_to_delivery_bookkeeping_after_compaction() {
     crate::run::drive(run_plan(), &mut ledger, &mut model, &mut hooks, &handoff).unwrap();
     assert_eq!(
         observed.completed,
-        vec![["call-1".to_owned()].into_iter().collect()]
+        vec![
+            ["call-1".to_owned()].into_iter().collect(),
+            std::collections::BTreeSet::new(),
+        ]
     );
 }
 

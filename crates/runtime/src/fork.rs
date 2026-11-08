@@ -97,6 +97,8 @@ fn fold_run<'a>(
     records: impl Iterator<Item = &'a EventRecord>,
 ) -> Result<Inherited, AxError> {
     let mut at = Seq::FIRST;
+    let mut delivered = std::collections::BTreeSet::new();
+    let mut rule_warnings = Vec::new();
     let mut open: Option<Wave> = None;
     for record in records {
         match record.kind() {
@@ -116,7 +118,9 @@ fn fold_run<'a>(
                 // answered, which a run cannot produce. Reading it as
                 // the start of a new turn is what keeps a damaged
                 // history from being silently rewound.
-                commit(&mut conversation, open.take())?;
+                let committed = commit(&mut conversation, open.take())?;
+                delivered.extend(committed.rooms);
+                rule_warnings.extend(committed.warnings);
                 let returned = record.data().read::<ModelReturned>()?;
                 let assistant = content_from_message(&returned.message)?;
                 let mut exchange = Exchange::new();
@@ -124,9 +128,13 @@ fn fold_run<'a>(
                 open = Some(Wave {
                     exchange,
                     expect: usize::try_from(returned.calls).unwrap_or(usize::MAX),
+                    rules: std::collections::BTreeMap::new(),
+                    warnings: Vec::new(),
                 });
                 if returned.calls == 0 {
-                    commit(&mut conversation, open.take())?;
+                    let committed = commit(&mut conversation, open.take())?;
+                    delivered.extend(committed.rooms);
+                    rule_warnings.extend(committed.warnings);
                     at = record.seq();
                 }
             }
@@ -134,8 +142,11 @@ fn fold_run<'a>(
                 let result = record.data().read::<ToolResult>()?;
                 if let Some(wave) = open.as_mut() {
                     wave.exchange.push_result(result_block(&result)?);
+                    wave.remember_rules(&result);
                     if wave.exchange.results().len() >= wave.expect {
-                        commit(&mut conversation, open.take())?;
+                        let committed = commit(&mut conversation, open.take())?;
+                        delivered.extend(committed.rooms);
+                        rule_warnings.extend(committed.warnings);
                         at = record.seq();
                     }
                 }
@@ -272,8 +283,8 @@ fn fold_run<'a>(
     Ok(Inherited {
         messages: conversation.messages().to_vec(),
         at,
-        delivered: std::collections::BTreeSet::new(),
-        rule_warnings: Vec::new(),
+        delivered,
+        rule_warnings,
     })
 }
 
@@ -322,20 +333,84 @@ fn rebuilt(started: &RunStarted) -> Opening {
 struct Wave {
     exchange: Exchange,
     expect: usize,
+    rules: std::collections::BTreeMap<String, std::collections::BTreeSet<Address>>,
+    warnings: Vec<String>,
+}
+
+impl Wave {
+    /// Remembers candidate delivery on the open wave. It becomes
+    /// inherited evidence only if this whole wave commits.
+    fn remember_rules(&mut self, result: &ToolResult) {
+        if result.name.as_str() != crate::tools::ReadTool::NAME {
+            return;
+        }
+        let ToolAnswer::Answered { result: payload } = &result.answer else {
+            return;
+        };
+        let Some(rules) = payload
+            .as_map()
+            .get("rules")
+            .and_then(serde_json::Value::as_array)
+        else {
+            return;
+        };
+        let mut rooms = std::collections::BTreeSet::new();
+        for (index, rule) in rules.iter().enumerate() {
+            let room = rule.get("room").and_then(serde_json::Value::as_str);
+            let text = rule.get("text").and_then(serde_json::Value::as_str);
+            match (room, text) {
+                (Some(room), Some(_)) => match Address::parse(room) {
+                    Ok(address) => {
+                        rooms.insert(address);
+                    }
+                    Err(err) => self.warnings.push(format!(
+                        "read result {} rule {} has room {room:?}: {}",
+                        result.tool_use_id,
+                        index.saturating_add(1),
+                        err.subject()
+                    )),
+                },
+                _ => self.warnings.push(format!(
+                    "read result {} rule {} has no room and text strings",
+                    result.tool_use_id,
+                    index.saturating_add(1)
+                )),
+            }
+        }
+        self.rules.insert(result.tool_use_id.clone(), rooms);
+    }
+}
+
+/// The delivery evidence one committed wave adds to its descendants.
+struct Committed {
+    rooms: std::collections::BTreeSet<Address>,
+    warnings: Vec<String>,
 }
 
 /// Folds one whole turn into the window, at the same boundary the live
 /// turn compacts at: the wave is complete here or it is dropped whole,
 /// so the compaction meets what the turn boundary met and answers the
-/// same bytes.
-fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<(), AxError> {
+/// same bytes. Only results left unshortened deliver their rule rooms.
+fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<Committed, AxError> {
     let Some(mut wave) = wave else {
-        return Ok(());
+        return Ok(Committed {
+            rooms: std::collections::BTreeSet::new(),
+            warnings: Vec::new(),
+        });
     };
-    wave.exchange.compact()?;
+    let shortened = wave.exchange.compact()?;
     conversation.push_assistant(wave.exchange.assistant().to_vec());
     conversation.push_tool_results(wave.exchange.results().to_vec());
-    Ok(())
+    let rooms = wave
+        .rules
+        .into_iter()
+        .filter(|(id, _)| !shortened.contains(id))
+        .flat_map(|(_, rooms)| rooms)
+        .collect();
+    Ok(Committed {
+        rooms,
+        warnings: wave.warnings,
+    })
 }
 
 /// One tool result as the model reads it back, rebuilt from the record

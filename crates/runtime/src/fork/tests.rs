@@ -260,7 +260,7 @@ fn another_tools_rules_field_is_not_read_evidence() {
 #[test]
 fn a_malformed_rule_room_leaves_a_diagnostic_instead_of_vanishing() {
     let mut drafts = mother_drafts();
-    drafts[3] = read_result("tu_1", &["not a room"]);
+    drafts[3] = read_result("tu_1", &["../room"]);
     let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
     assert!(inherited.delivered.is_empty());
     assert_eq!(inherited.rule_warnings.len(), 1);
@@ -293,7 +293,7 @@ fn a_grandchild_merges_the_rule_rooms_of_its_whole_lineage() {
     )));
     drafts.push(of_daughter(returned(1)));
     drafts.push(of_daughter(read_result("tu_2", &["lab/mother"])));
-    let inherited = verified(drafts).inherited(Seq::new(6)).unwrap();
+    let inherited = verified(drafts).inherited(Seq::new(7)).unwrap();
     assert_eq!(
         inherited.delivered,
         [
@@ -301,7 +301,8 @@ fn a_grandchild_merges_the_rule_rooms_of_its_whole_lineage() {
             Address::parse("lab/mother").unwrap(),
         ]
         .into_iter()
-        .collect()
+        .collect(),
+        "{inherited:?}"
     );
 }
 

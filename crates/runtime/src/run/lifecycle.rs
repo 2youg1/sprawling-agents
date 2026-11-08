@@ -312,6 +312,10 @@ impl Run<Active> {
             PhaseOutcome::Advanced(report) => report,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
+        // Compaction is the last point at which a result could cease to
+        // be complete in the window. Only now may its claims become
+        // evidence for a later read or a branched run.
+        hooks.invoke.complete_wave(report.shortened());
         self.state.turns = self.state.turns.saturating_add(1);
         self.state
             .conversation
