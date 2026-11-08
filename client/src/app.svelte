@@ -135,16 +135,17 @@
   // The settings panel takes the focus itself, inside the top layer;
   // closing it gives the focus back to the control that opened it. A
   // move to another session of the conversation is timed to the frame
-  // that draws it.
+  // that draws it, and lands in the composer so the next keystroke is
+  // not swallowed by the invisible page title (client D112).
   function settle(): void {
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
     const back = hostSettled(was, view, arrived);
-    if (
+    const switchedSession =
       was.kind === "talk" &&
       view.kind === "talk" &&
-      (was.address !== view.address || was.session !== view.session)
-    ) {
+      (was.address !== view.address || was.session !== view.session);
+    if (switchedSession) {
       markStart("session_switch");
       markEndAtFrame("session_switch");
     }
@@ -153,11 +154,20 @@
       tierOnLanding = null;
       markEndAtFrame("layer_drawn");
       void tick().then(focusComposer);
-    } else if (arrived && view.kind !== "setup")
+    } else if (arrived && view.kind !== "setup") {
+      // Live talk keeps the box; a read-only past view has none, so its
+      // heading is still the landing. Captured now: the tick callback
+      // would otherwise lose the talk narrowing on `view`.
+      const intoComposer = switchedSession && view.kind === "talk" && view.session === undefined;
       void tick().then(() => {
-        if (back === null) focusTitle();
-        else back.focus();
+        if (back !== null) {
+          back.focus();
+          return;
+        }
+        if (intoComposer) focusComposer();
+        else focusTitle();
       });
+    }
     arrived = true;
   }
 
@@ -166,12 +176,17 @@
   // write, because `hashchange` arrives in a later task - which also
   // covers the back button and every `<a href="#/…">`. Firefox lacks the
   // API, and motion turned off asks for no travel: both take a plain swap.
+  // Talk-to-talk session switches skip the document transition: the
+  // cross-fade costs a panel of latency on every row click while the
+  // title is the only named element that moves (client D112).
   function follow(): void {
+    const next = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
     // The panel has its own CSS arrival; a document transition would
     // delay its close and can overlap the next group navigation.
     if (
       view.kind === "setup" ||
-      Option.getOrElse(current(u.bar), () => DEFAULT_VIEW).kind === "setup" ||
+      next.kind === "setup" ||
+      (view.kind === "talk" && next.kind === "talk") ||
       !("startViewTransition" in document) ||
       motionOff(document.documentElement)
     ) {
