@@ -143,6 +143,30 @@ fn an_oversized_rule_file_is_bounded_and_carries_its_omission() {
 }
 
 #[test]
+fn a_rule_cut_inside_a_multibyte_character_keeps_its_valid_prefix() {
+    let dir = project();
+    let remaining =
+        kernel::consts_policy::INTERVAL_CAP_BYTES.saturating_sub("package rules\n".len());
+    let mut bytes = vec![b'x'; remaining.saturating_sub(1)];
+    bytes.extend_from_slice("界".as_bytes());
+    bytes.extend_from_slice(b"later\n");
+    write(dir.path(), "lab/pkg/probe/AGENTS.md", &bytes);
+
+    let candidates = nested_rules(
+        scope(dir.path()),
+        &at("lab/pkg/probe/a.rs"),
+        &at("lab/pkg/probe/a.rs"),
+    );
+    let probe = candidates
+        .iter()
+        .find(|candidate| candidate.room == at("lab/pkg/probe"))
+        .unwrap();
+    assert!(probe.text.len() < remaining);
+    assert!(probe.text.ends_with('x'));
+    assert!(probe.dropped > 0);
+}
+
+#[test]
 fn non_utf8_after_the_kept_prefix_skips_the_rule_instead_of_leaking_it() {
     let dir = project();
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
