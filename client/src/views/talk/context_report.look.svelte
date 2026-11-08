@@ -39,8 +39,11 @@
 
   const active = $derived(picked?.id ?? null);
 
+  // Compare against the effective selection (`active`), not only `held`:
+  // first paint leaves `held` undefined while the largest bucket still
+  // shows as pressed, and that first press must clear rather than stick.
   function pick(id: BucketId): void {
-    held = held === id ? null : id;
+    held = active === id ? null : id;
   }
 
   function ink(tone: number, on: boolean): string {
@@ -94,10 +97,13 @@
   {#if look.buckets.length > 0}
     <div class="grid justify-items-center gap-base">
       <div class="relative size-[12rem]">
+        <!-- Pointer-only hit target: keyboard stays on the legend chips
+        (hit rejects synthesised centre clicks from Enter/Space). -->
         <button
           type="button"
+          tabindex="-1"
+          aria-hidden="true"
           class="absolute inset-0 z-1 cursor-pointer rounded-pill"
-          aria-label={look.title}
           onclick={hit}
         ></button>
         <svg class="pointer-events-none size-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
@@ -186,7 +192,7 @@
         </div>
         {#if picked.children.length > 0}
           <ul class="grid gap-tight text-caption text-text-quiet" role="list">
-            {#each picked.children as child (child.name + String(child.bytes))}
+            {#each picked.children as child (child.key)}
               <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-snug">
                 <span class="truncate font-mono">{child.name}</span>
                 <span class="figure tabular-nums">{child.bytesSaid}</span>

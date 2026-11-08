@@ -42,39 +42,42 @@
   <span class="grid size-key shrink-0 place-items-center">{@render key()}</span>
 {:else}
   <Tip text={ring.reading}>
-    <span class="relative grid size-key shrink-0 place-items-center">
-      <button
-        class="absolute inset-0 rounded-pill"
-        {...ring.meter}
-        onclick={(event) => {
-          // Only the band: a press that landed on the coin is the coin's.
-          if (event.target !== event.currentTarget) return;
-          onOpen?.();
-        }}
-      ></button>
-      <svg
-        class="pointer-events-none absolute inset-0 -rotate-90"
-        viewBox="0 0 40 40"
-        aria-hidden="true"
-      >
-        <!-- r is 18 of the view box's 40 units, the share of the key's
-        square `checkpoint.look.svelte` turns its dots out to. -->
-        <circle
-          class="left fill-none stroke-text"
-          cx="20"
-          cy="20"
-          r="18"
-          stroke-width="1"
-          pathLength="100"
-          stroke-dasharray={ring.arc.dasharray}
-          stroke-dashoffset={ring.arc.dashoffset}
-        />
-      </svg>
-      {#each ring.checkpoints as checkpoint (checkpoint.reminder)}
-        <Checkpoint {...checkpoint} along="ring" />
-      {/each}
-      <span class="relative z-1 grid place-items-center">{@render key()}</span>
-    </span>
+    {#snippet children(hint: string)}
+      <span class="relative grid size-key shrink-0 place-items-center">
+        <button
+          class="absolute inset-0 rounded-pill"
+          {...ring.meter}
+          aria-describedby={hint}
+          onclick={(event) => {
+            // Only the band: a press that landed on the coin is the coin's.
+            if (event.target !== event.currentTarget) return;
+            onOpen?.();
+          }}
+        ></button>
+        <svg
+          class="pointer-events-none absolute inset-0 -rotate-90"
+          viewBox="0 0 40 40"
+          aria-hidden="true"
+        >
+          <!-- r is 18 of the view box's 40 units, the share of the key's
+          square `checkpoint.look.svelte` turns its dots out to. -->
+          <circle
+            class="left fill-none stroke-text"
+            cx="20"
+            cy="20"
+            r="18"
+            stroke-width="1"
+            pathLength="100"
+            stroke-dasharray={ring.arc.dasharray}
+            stroke-dashoffset={ring.arc.dashoffset}
+          />
+        </svg>
+        {#each ring.checkpoints as checkpoint (checkpoint.reminder)}
+          <Checkpoint {...checkpoint} along="ring" />
+        {/each}
+        <span class="relative z-1 grid place-items-center">{@render key()}</span>
+      </span>
+    {/snippet}
   </Tip>
 {/if}
 

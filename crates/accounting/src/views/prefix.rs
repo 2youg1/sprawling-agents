@@ -23,7 +23,7 @@ use kernel::{Address, B3Hash, EventKind, EventRecord, Locator, RunId, Seq};
 
 use super::document::read_bytes;
 use super::holding::Views;
-use super::prepared::{LedgerAsk, unavailable};
+use super::prepared::{LedgerAsk, unavailable, unavailable_because};
 
 /// What a `Prefix` question takes out of the views: where the run's
 /// first prompt sits on the ledger, and the ledger that holds the line.
@@ -64,27 +64,39 @@ pub struct PromptShapeAsk {
 impl PromptShapeAsk {
     /// The tool table and conversation of the run's latest request.
     ///
-    /// `Unavailable` when this run has not compared a shape yet, or
-    /// when the ledger line will not open.
+    /// `Unavailable` without a reason when this run has not compared a
+    /// shape yet; with the ledger or parse reason when the line will
+    /// not open or will not read as a compared shape.
     pub(super) fn read(self) -> wire::Answer {
-        match self.shape() {
-            Some(answer) => wire::Answer::PromptShape(Box::new(answer)),
-            None => unavailable(format!("PromptShape({})", self.run)),
+        let Some(seq) = self.latest else {
+            return unavailable(format!("PromptShape({})", self.run));
+        };
+        match self.shape_at(seq) {
+            Ok(answer) => wire::Answer::PromptShape(Box::new(answer)),
+            Err(stopped) => unavailable_because(format!("PromptShape({})", self.run), &stopped),
         }
     }
 
-    fn shape(&self) -> Option<wire::PromptShapeAnswer> {
-        let seq = self.latest?;
-        let line = {
-            let (index, dir) = self.ledger.indexed().ok()?;
-            index.reader(&dir).line_at(seq).ok()?
-        };
-        let record = EventRecord::parse_line(&line)
-            .ok()
-            .filter(|record| record.kind() == EventKind::PromptShapeCompared)?;
-        let compared: kernel::event::record::PromptShapeCompared =
-            record.data().read().ok()?;
-        Some(wire::PromptShapeAnswer {
+    fn shape_at(&self, seq: Seq) -> Result<wire::PromptShapeAnswer, kernel::AxError> {
+        let (index, dir) = self
+            .ledger
+            .indexed()
+            .map_err(storage::StorageError::into_ax)?;
+        let line = index
+            .reader(&dir)
+            .line_at(seq)
+            .map_err(storage::StorageError::into_ax)?;
+        let record = EventRecord::parse_line(&line)?;
+        if record.kind() != EventKind::PromptShapeCompared {
+            return Err(kernel::AxError::failure(
+                kernel::AxCode::InvalidArgs,
+                "read PromptShapeCompared",
+                format!("seq {}", seq.value()),
+            )
+            .with_recovery("the indexed line is not a prompt_shape_compared record"));
+        }
+        let compared: kernel::event::record::PromptShapeCompared = record.data().read()?;
+        Ok(wire::PromptShapeAnswer {
             run: self.run,
             tools: compared.tools,
             conversation: compared.run,

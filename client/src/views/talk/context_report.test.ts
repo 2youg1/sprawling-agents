@@ -128,6 +128,43 @@ describe("reportOf", () => {
     expect(look.warning).toContain("65");
   });
 
+  test("does not trip the handoff when only the rounded display reaches it", () => {
+    // 64.6% rounds to 65 for the header figure, but the raw share is still
+    // below the 65% handoff — only the earlier filling line may sound.
+    const look = reportOf("en", RUN, prefix, shape, {
+      used: 165_376,
+      window: 256_000,
+      first: 30,
+      second: 65,
+    });
+    expect(look.fullPercent).toBe(65);
+    expect(look.warning).toContain("30");
+    expect(look.warning).not.toContain("65");
+  });
+
+  test("keeps a non-empty bucket that rounded to zero percent", () => {
+    const tiny: PrefixAnswer = {
+      ...prefix,
+      segments: [
+        { slot: "city", hash: HASH.city, bytes: 100, text: "", stored: true, sources: [] },
+        { slot: "building", hash: HASH.building, bytes: 0, text: "", stored: true, sources: [] },
+        { slot: "resident", hash: HASH.resident, bytes: 0, text: "", stored: true, sources: [] },
+        { slot: "run", hash: HASH.run, bytes: 0, text: "", stored: true, sources: [] },
+      ],
+      tools: null,
+    };
+    const heavy: PromptShapeAnswer = {
+      run: RUN,
+      tools: { bytes: 0, hash: HASH.tools },
+      conversation: { bytes: 100_000, hash: HASH.conversation },
+      upper_bound: 100_100,
+    };
+    const look = reportOf("en", RUN, tiny, heavy, null);
+    const city = look.buckets.find((bucket) => bucket.id === "city");
+    expect(city?.bytes).toBe(100);
+    expect(city?.share).toBe(0);
+  });
+
   test("waits honestly when nothing has assembled", () => {
     const look = reportOf("en", RUN, null, null, null);
     expect(look.buckets).toEqual([]);

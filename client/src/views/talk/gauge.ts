@@ -123,8 +123,10 @@ export function checkpointsOf(reminders: Reminders): readonly Checkpoint[] {
 // What the ring's focusable element carries, spread onto it as it is.
 // It is a disclosure control that still reports a meter reading: press
 // (or Enter / Space) opens the context report on the right; the tip on
-// hover and focus spells the same words as `aria-valuetext`. The coin
-// key paints above it and keeps send / stop / steer.
+// hover and focus spells the same words as `aria-valuetext`, and the
+// look wires that tip through `aria-describedby` (client/spec/Views/
+// Workspace.lean §7-11). The coin key paints above it and keeps send /
+// stop / steer.
 export interface MeterWire {
   readonly role: "button";
   readonly type: "button";

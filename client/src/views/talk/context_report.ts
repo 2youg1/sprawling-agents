@@ -42,6 +42,8 @@ const BUCKETS: readonly BucketId[] = [
 const CHILD_CAP = 8;
 
 export interface ReportChild {
+  /** Stable list key: tool name, or the source's full address. */
+  readonly key: string;
   readonly name: string;
   readonly bytes: number;
   readonly bytesSaid: string;
@@ -99,8 +101,9 @@ export function reportOf(
     const row = byId.get(id);
     const bytes = row?.bytes ?? 0;
     const share = row?.share ?? 0;
-    // A remainder of zero would only clutter the ring and the legend.
-    if (bytes <= 0 || share <= 0) return [];
+    // Empty of bytes stays out; a non-empty row that rounded to 0% still
+    // stays so the person can open its sources (shown as 0% on the chip).
+    if (bytes <= 0) return [];
     const children = childrenOf(id, prefix);
     return [
       {
@@ -175,7 +178,9 @@ function bucketKey(id: BucketId): "context_bucket_tools" | "context_bucket_city"
 
 function warningOf(lang: Lang, fullness: Context | null): string | null {
   if (fullness === null) return null;
-  const used = usedPercent(fullness);
+  // Compare the raw share so a 64.6% window does not trip a 65% handoff
+  // just because the displayed percent rounds up.
+  const used = (fullness.used / fullness.window) * 100;
   if (fullness.second !== null && used >= fullness.second) {
     return fill(say(lang, "context_report_handoff"), { n: String(fullness.second) });
   }
@@ -228,7 +233,7 @@ function toolChildren(rows: readonly PromptTool[]): readonly ReportChild[] {
     .filter((row) => row.exposure !== "off" && row.len > 0)
     .sort((a, b) => b.len - a.len || a.name.localeCompare(b.name))
     .slice(0, CHILD_CAP)
-    .map((row) => ({ name: row.name, bytes: row.len, bytesSaid: kilo(row.len) }));
+    .map((row) => ({ key: row.name, name: row.name, bytes: row.len, bytesSaid: kilo(row.len) }));
 }
 
 function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[] {
@@ -237,6 +242,7 @@ function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[
     .sort((a, b) => b.kept - a.kept || a.addr.localeCompare(b.addr))
     .slice(0, CHILD_CAP)
     .map((source) => ({
+      key: source.addr,
       name: source.addr.slice(source.addr.lastIndexOf("/") + 1) || source.addr,
       bytes: source.kept,
       bytesSaid: kilo(source.kept),
