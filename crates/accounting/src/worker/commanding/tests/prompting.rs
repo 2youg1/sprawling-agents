@@ -46,6 +46,7 @@ fn city() -> (tempfile::TempDir, RunWorker) {
             addr: at("lab"),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: key(b"lab"),
         })
         .unwrap();

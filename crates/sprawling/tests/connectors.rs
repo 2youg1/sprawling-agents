@@ -361,6 +361,7 @@ fn lab_city(
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: idem(b"create"),
         })
         .unwrap();

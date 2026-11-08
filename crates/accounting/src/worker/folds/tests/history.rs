@@ -26,6 +26,7 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
                 template: wire::TemplateName::parse("minimal").unwrap(),
                 rules: None,
+                source: None,
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();
@@ -97,6 +98,7 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
                 template: wire::TemplateName::parse("minimal").unwrap(),
                 rules: None,
+                source: None,
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();
@@ -161,6 +163,7 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
                 template: wire::TemplateName::parse("minimal").unwrap(),
                 rules: None,
+                source: None,
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();

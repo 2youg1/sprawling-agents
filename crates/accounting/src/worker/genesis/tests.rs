@@ -187,6 +187,7 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
         addr: Address::parse("vault").unwrap(),
         template: wire::TemplateName::parse(name).unwrap(),
         rules: None,
+        source: None,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
     };
 
@@ -255,6 +256,7 @@ fn a_folder_raised_from_the_control_surface_is_adopted_and_its_files_kept() {
             addr: Address::parse("notes").unwrap(),
             template: wire::TemplateName::parse("confidential").unwrap(),
             rules: None,
+            source: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"adopt"),
         })
         .unwrap();
@@ -276,6 +278,90 @@ fn a_folder_raised_from_the_control_surface_is_adopted_and_its_files_kept() {
             .unwrap()
             .policy()
             .confidential
+    );
+}
+
+/// A person imports an existing workspace by its absolute path on the
+/// machine running the city: the source stays put, the target holds the
+/// same files, and the history records an adoption without the host path.
+#[test]
+fn an_absolute_host_folder_is_copied_into_a_building_without_moving_the_source() {
+    let city_dir = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    let report = init_city(city_dir.path()).unwrap();
+    std::fs::create_dir_all(source.path().join("src")).unwrap();
+    std::fs::write(source.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+    let mut worker = RunWorker::new(
+        city_dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("imported").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
+            source: Some(source.path().to_string_lossy().into_owned()),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"import"),
+        })
+        .unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(city_dir.path().join("imported/src/main.rs")).unwrap(),
+        "fn main() {}\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(source.path().join("src/main.rs")).unwrap(),
+        "fn main() {}\n"
+    );
+    let line = created_line(&report.ledger_dir, "imported");
+    assert_eq!(line["data"]["adopted"], serde_json::json!(true));
+    assert!(line["data"].get("source").is_none());
+}
+
+/// A relative source is not resolved against a working directory the
+/// person cannot see, and an occupied target is never overwritten.
+#[test]
+fn a_workspace_import_refuses_a_relative_source_or_an_occupied_target() {
+    let city_dir = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    init_city(city_dir.path()).unwrap();
+    std::fs::write(source.path().join("KEEP.md"), "source\n").unwrap();
+    let mut worker = RunWorker::new(
+        city_dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+    let import = |addr: &str, source_path: String, tag: &[u8]| wire::Command::CreateBuilding {
+        addr: Address::parse(addr).unwrap(),
+        template: wire::TemplateName::parse("minimal").unwrap(),
+        rules: None,
+        source: Some(source_path),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
+    };
+
+    let relative = worker
+        .handle(import("relative", "elsewhere".to_owned(), b"relative"))
+        .unwrap_err();
+    assert_eq!(relative.code(), &kernel::AxCode::InvalidArgs);
+    assert!(!city_dir.path().join("relative").exists());
+
+    std::fs::create_dir(city_dir.path().join("occupied")).unwrap();
+    std::fs::write(city_dir.path().join("occupied/KEEP.md"), "target\n").unwrap();
+    let occupied = worker
+        .handle(import(
+            "occupied",
+            source.path().to_string_lossy().into_owned(),
+            b"occupied",
+        ))
+        .unwrap_err();
+    assert_eq!(occupied.code(), &kernel::AxCode::InvalidArgs);
+    assert_eq!(
+        std::fs::read_to_string(city_dir.path().join("occupied/KEEP.md")).unwrap(),
+        "target\n"
     );
 }
 
@@ -304,6 +390,7 @@ fn a_refused_adoption_leaves_the_folder_waiting_to_be_adopted_again() {
         addr: addr.clone(),
         template: wire::TemplateName::parse("minimal").unwrap(),
         rules: None,
+        source: None,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, press),
     };
 
@@ -344,6 +431,7 @@ fn written_rules_govern_the_new_building_and_refused_ones_lay_nothing() {
         addr: Address::parse(addr).unwrap(),
         template: wire::TemplateName::parse("minimal").unwrap(),
         rules,
+        source: None,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, addr.as_bytes()),
     };
     // A confidential building's rules, as a person would paste them.
@@ -352,6 +440,7 @@ fn written_rules_govern_the_new_building_and_refused_ones_lay_nothing() {
             addr: Address::parse("model").unwrap(),
             template: wire::TemplateName::parse("confidential").unwrap(),
             rules: None,
+            source: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"model"),
         })
         .unwrap();

@@ -247,8 +247,14 @@ impl RunWorker {
                 addr,
                 template,
                 rules,
+                source,
                 ..
-            } => self.raise_building(&addr, template.as_str(), rules.as_deref()),
+            } => self.raise_building(
+                &addr,
+                template.as_str(),
+                rules.as_deref(),
+                source.as_deref().map(std::path::Path::new),
+            ),
             wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
             // The person's entrance, so the answerer is a human; a delegate has its own tool.
             wire::Command::Approve { item, verdict, .. } => {

@@ -150,19 +150,20 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 -/
 
 /-!
-### 8-34 页面写的两处：楼规带基线、城一层的两个键（`city::policy`、`city::config_layers::city_layer`，形状 4 adapter）
+### 8-34 页面写的两处：楼规带基线、城一层的配置键（`city::policy`、`city::config_layers::city_layer`，形状 4 adapter）
 
 ```rust
 pub fn write_rules_against(city_root: &Path, addr: &Address, base: &str, text: &str) -> Result<BuildingRules, AxError>;
 pub struct RulesEdit<'a> { pub base: &'a str, pub text: &'a str }   // 页面提议的正文与它先读到的那一版
 pub fn write_rules_against_with(city_root: &Path, addr: &Address, edit: RulesEdit<'_>,
     validate: impl FnOnce(&BuildingRules) -> Result<(), AxError>) -> Result<BuildingRules, AxError>; // 同一次求值后先过端点簿，再守 base 并落盘
-pub enum CitySetting<'a> { KeepWarm(KeepWarm), Effort(Effort), Catalog(&'a ExposureTable) }   // [catalog] 见 ConfigLayers §8-4g
+pub enum CitySetting<'a> { KeepWarm(KeepWarm), Effort(Effort), Catalog(&'a ExposureTable),
+                           SkillShelves(&'a [String]) }   // [catalog] 见 ConfigLayers §8-4g；书架见 Library §8-8
 pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<(), AxError>;
 ```
 
 - **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。它是楼规唯一的写门（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）；`rules` 工具只读，没有写面（§8-2b，D23），所以「盘上的楼规永远读得懂」只有一条规则。
-- **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
+- **城一层：每个配置键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`，`Catalog` 写 `[catalog]`，`SkillShelves` 整表写 `[skills] shelves`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
 - 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
 -/
 

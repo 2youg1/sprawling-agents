@@ -251,6 +251,7 @@ fn settled(round: &Round, key: &str, city_root: &Path) -> Result<RunWorker, AxEr
         addr: Address::parse(BUILDING)?,
         template: wire::TemplateName::parse("minimal")?,
         rules: None,
+        source: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-create"),
     })?;
     Ok(worker)

@@ -175,6 +175,7 @@ pub fn raise(
     addr: &Address,
     template: BuildingTemplate,
     rules: RulesText<'_>,
+    _source: Option<&Path>,
 ) -> Result<(Building, Founding), AxError> {
     let building = own_address(addr, "raise a building")?;
     let text = match rules {

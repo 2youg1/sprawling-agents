@@ -81,6 +81,8 @@ private def fieldsOf (index : Nat) : Action y → List String
   | .raise addr template =>
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"
     , s!"template: wire::TemplateName::parse({quoted template.name}).unwrap(),"
+    , "rules: None,"
+    , "source: None,"
     , idemField index ]
   | .work addr session =>
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"

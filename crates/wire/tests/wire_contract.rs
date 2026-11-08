@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 76,
+        WIRE_V, 77,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -426,6 +426,7 @@ fn sample_of_every_command() -> Vec<Command> {
             effort: None,
             search: Some(kernel::config::SearchConfiguration::Off),
             catalog: None,
+            skill_shelves: None,
             idem,
         }),
         Command::PutRange(wire::RangeWrite {
@@ -546,6 +547,7 @@ title = \"a window\"
             addr: addr.clone(),
             template: wire::TemplateName::parse("workshop").unwrap(),
             rules: None,
+            source: None,
             idem,
         },
         Command::RemoveBuilding {

@@ -158,6 +158,11 @@ pub enum Command<Secret = Sealed<String>> {
         /// The building's `RULES.toml` as the person wrote it, evaluated
         /// before anything lands; `None` lays the template's own bytes.
         rules: Option<String>,
+        /// An existing directory on the host to copy to `addr` before
+        /// adopting the copy. `None` creates or adopts at `addr` itself.
+        /// The path is used for this action and never written to the Ledger.
+        #[serde(default)]
+        source: Option<String>,
         idem: IdemKey,
     },
     /// Take a building out of the city. Its files move under the reserved subtree and its history

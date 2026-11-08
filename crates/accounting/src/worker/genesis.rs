@@ -288,6 +288,7 @@ impl RunWorker {
         addr: &Address,
         template: &str,
         rules: Option<&str>,
+        source: Option<&std::path::Path>,
     ) -> Result<(), AxError> {
         let template = city::BuildingTemplate::parse(template)?;
         if let Some(text) = rules {
@@ -295,7 +296,8 @@ impl RunWorker {
             self.validate_workspace_models(&evaluated)?;
         }
         let written = rules.map_or(city::RulesText::Template, city::RulesText::Written);
-        let (building, founding) = city::raise_building(&self.city_root, addr, template, written)?;
+        let (building, founding) =
+            city::raise_building(&self.city_root, addr, template, written, source)?;
         match founding {
             city::Founding::Built => self.built(&building, template),
             city::Founding::Adopted => self.adopted(&building, template),

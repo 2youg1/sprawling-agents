@@ -123,6 +123,7 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();

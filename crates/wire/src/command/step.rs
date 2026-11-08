@@ -171,6 +171,10 @@ pub struct CitySettings {
     /// The city's whole `[catalog]` table, the default every building
     /// that states nothing follows (`crates/wire/spec/Answer/Catalog.lean` §8-99).
     pub catalog: Option<kernel::config::ExposureTable>,
+    /// The city's whole ordered `[skills] shelves` table. `None` leaves
+    /// it alone; an empty list explicitly mounts no outside shelf.
+    #[serde(default)]
+    pub skill_shelves: Option<Vec<String>>,
     pub idem: IdemKey,
 }
 

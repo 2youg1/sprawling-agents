@@ -90,6 +90,7 @@ pub(super) fn skills_answer(
         building: building.clone(),
         skills,
         missing: shelves.missing(&admitted),
+        external_shelves: Vec::new(),
     })
 }
 

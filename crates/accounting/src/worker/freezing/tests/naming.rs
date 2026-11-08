@@ -102,6 +102,7 @@ fn a_new_session_freezes_the_name_the_page_shows() {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: idem("create"),
         })
         .unwrap();

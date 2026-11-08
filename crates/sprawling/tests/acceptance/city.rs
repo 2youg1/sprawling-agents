@@ -103,6 +103,7 @@ pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, temp
             addr: Address::parse(addr).unwrap(),
             template: wire::TemplateName::parse(template).unwrap(),
             rules: None,
+            source: None,
             idem: idem(addr.as_bytes()),
         })
         .unwrap();

@@ -214,6 +214,7 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
         addr: Address::parse("lab")?,
         template: wire::TemplateName::parse("minimal")?,
         rules: None,
+        source: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"bench-create"),
     })?;
     let room = Address::parse("lab/room1")?;
