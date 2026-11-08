@@ -15,8 +15,8 @@
 ### 8-63 runtime::rendering（形状 1 判定）
 
 ```rust
-pub const CURRENT: Rendering = Rendering::V3;
-pub enum Numbering { FromZero, FromOne }   // 一版渲染器怎样给行编号；V1、V2 从 0，V3 从 1
+pub const CURRENT: Rendering = Rendering::V4;
+pub enum Numbering { FromZero, FromOne }   // 一版渲染器怎样给行编号；V1、V2 从 0，V3、V4 从 1
 impl Numbering { pub fn of(rendering: Rendering) -> Numbering; }
 pub fn shown(rendering: Rendering, name: &ToolName, answer: &ToolAnswer) -> Result<String, AxError>;
 pub struct Copied<'a>;   // 从 read 答里抄出的段落，每行带它可能有的标记
@@ -42,6 +42,13 @@ impl Copied<'_> {
 - **载荷不是渲染器认得的形状**（例如 read 的 `text` 不是串）时画成 JSON：模型仍读到每个字节，载荷形状的变动也不会让一条已记下的答重建失败。
 
 **V3**：与 V2 只差行号——read 的头、续读点、越过末尾的那句、每 10 行的标记，与 search 命中块的标记，都按 1 基行号画：下标 `i` 画成 `i + 1`，标记画在首行与 1 基行号是 10 的倍数的行上。拒绝、`tool` 与其余工具同 V2。理由与被否见 D119。
+
+**V4**：行号、拒绝、search、`tool` 与其他工具同 V3，只给普通 read 结果加两种行内材料：
+
+- `rules` 是 `{room, text}` 对象数组。正文之后先留一个空行，再逐份画 `## <room>/AGENTS.md`、与冻结阶段完全相同的项目约定及优先级声明、原样 `text`。附注不经 `push_line`，所以没有行号，也不进入 `text` 或 `bytes`。缺失或空数组不追加任何字节；畸形数组让整个 read 载荷照旧退回 JSON。
+- `{path, unchanged: true, offset, lines, total_lines}` 是没有 `text` 与 `bytes` 的未变桩。`offset`、`lines` 是本次请求实际覆盖的 0 基下标与行数，`total_lines` 总是给出。桩沿用普通头的数字与空文件／越过末尾的读法，写成 `<path> lines <a>-<b> of <total>: unchanged since your earlier read; not repeated`。V1–V3 不认这个形状，仍退回各自的旧行为；V4 遇到它时不虚构空文件正文。桩之后也可带 `rules`，分隔与上一条相同。
+
+没有这两种材料的 read 在 V3 与 V4 下逐字节相同。渲染只读行内字段，不重读文件。live 在账本脱敏之前渲染；脱敏若改写正文或 `rules`，重建字节可以不同。附注与桩都随结果块参与 exchange 压缩，没有豁免；压缩后的 id 集合决定哪些结果算完整递送（§8-44），而不是仅凭载荷里存在字段就认定模型看过。
 
 **剥标记**：标记是行首的一个或多个 ASCII 数字加 `|`，语法只写在 `rendering::read` 一处，画与剥不会分歧。`edit` 按 `CURRENT` 的编号剥：模型这一回合抄的是这一版画出的段落；升级之前画出、又被抄进升级之后的 `old_string` 的标记剥不掉，那次 edit 零命中，拒词让模型再读一次。行首长成这样的行可能是渲染器画的标记，也可能是文件本来的文本，单看段落分不出；分得出的是位置：read 只在标记所写的那个行号的行上画它，且只画在答（或搜索命中块）的首行或行号为 10 的倍数的行；这条位置规则只写在 `rendering::read::is_marked` 一处，画（read、search）与剥（`Copied`）都问它。`edit` 先按原样匹配 `old_string`；零命中时，对 `Copied::starts` 给出的每个可能的首行号 `start`，取 `drawn_from(start)` 剥掉的文本，只有它恰好从文件的第 `start` 行行首开始出现时才算被文件证实；恰有一个 `start` 被证实时，用剥掉的 `old_string`，`new_string` 只剥掉与 `old_string` 剥掉的号相同的标记，其余行原样（`tools::edit::as_the_file_spells`）。之后的唯一匹配判定照旧。
 -/
@@ -79,4 +86,15 @@ impl Copied<'_> {
 **被否**：①保留 0 基，把出入写进 D114——模型每次照报错读文件都差一行，这是每天都会撞上的；②载荷也改成 1 基——账本里同一个键两种含义，读它的视图与页面都得先问版本；③V3 只改 read 不改 search——search 的行号是 read 的续读点，两者不同基就要模型自己换算。
 
 **重开参数**：Claude Code 的参考把 `offset` 改成别的含义；或读数显示模型在 V3 下系统性地差一。
+-/
+
+/-! D126 V4 把深层规则与未变桩放在 read 的行内材料里，无附加材料时与 V3 同字节
+
+**决定**：`CURRENT` 进到 V4。V4 复用 V3 的全部文本，只在 read 结果携带 `rules` 或 `unchanged` 时增加上述读法；两种材料都从 `tool_result` 的结构化载荷重画，不拼进 `text`，也不另立 V5 分别承载。
+
+**理由**：规则是项目目录而不是被读文件的行，unchanged 桩是对先前完整窗口的引用；两者若拼进 `text` 都会被行号标记伪装成文件内容。它们又必须能从账本重画，否则 fork 的首个请求失去母亲历史的字节。两种材料同属一次 read 结果契约，共用一个版本避免同一工具出现组合版本矩阵。无附加材料时与 V3 逐字节相同，所以未使用这两条能力的 run 只改变行上的版本标签，不改变模型读到的内容。
+
+**被否**：①把规则塞进冻结前缀或工具数组——每个后续请求都失去 provider 缓存；②把附注或桩拼进 `text`——编号与 `edit` 的剥标记语法把它们误当文件行；③只在 live 拼接、账上不记材料——fork 无法重建；④V3 遇桩画成空文件——把「没有重复正文」误述为「文件为空」。
+
+**重开参数**：渲染需要行以外的输入时，先把那些输入记入 `tool_result`；压缩或脱敏需要保证规则完整重建时，为其增加可验证的记录，而不是跳过压缩。
 -/

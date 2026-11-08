@@ -28,12 +28,13 @@ pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, A
 // 一个真实位置在城里的判定，land 与 read 的引擎（§8-29-4）共用这一处：不在锚定的城根之下＝E_GATE_DENIED
 // （恢复语说出链接要留在城里）；它在城里的拼写不是 addr（路上有链接）＝把那个拼写再交给 admit。
 impl CityRoot { pub(crate) fn judged_location(&self, addr: &Address, real: &Path, action: &'static str,
-    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<(), AxError>; }
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>; }
 // 已准入的地址在盘上真正落到哪里：解析真实路径（沿途每一个 symlink 或 junction），把它在城里的地址
-// 再交给 admit 判一次，返回真实路径。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
+// 再交给 admit 判一次，同时返回真实路径与落点地址。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
 // 文件不存在也同样判，真实位置由 real_location 求出，答 Located::Absent；解析失败于别的原因＝E_STORAGE_FATAL。
+pub(crate) struct Judged { pub location: Located, pub addr: Address }  // 两个事实来自同一次判定，不能分别重猜
 pub(crate) fn land(city: &CityRoot, addr: &Address, action: &'static str,
-    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Located, AxError>;
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Judged, AxError>;
 pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 一条路径在盘上的真实位置，末尾几段不存在也算：盘解析最深的那个存在的祖先（沿途链接全解开），
 // 其下不存在的段原样接上——不存在的段不可能是链接。接上的段不是普通名字（`..` 在内）＝E_GATE_DENIED；
@@ -166,20 +167,20 @@ structure Disk (Address : Type) where
 
 /-- `chosen_path::land`：判的是盘打开的那个地址，不只是模型写下的那个。真实位置落在城外是 `E_GATE_DENIED`；落在城里，再过一次同一道判定。 -/
 def land {Address : Type} (rules : Rules Address) (disk : Disk Address) (addr : Address) :
-    Except Code (Located Address) :=
+    Except Code (Address × Located Address) :=
   match disk.real addr with
   | .outside => .error .GateDenied
   | .inside real => match judge rules real with
     | .error code => .error code
-    | .ok _ => .ok (if disk.present real then .Present real else .Absent real)
+    | .ok landed => .ok (landed, if disk.present real then .Present real else .Absent real)
 
 /-- **落下的地方也被判过。** `land` 交回的真实位置不在保留区里、读界说开着，不论模型写下的地址经过了什么链接。 -/
 theorem what_lands_was_judged_where_it_lands {Address : Type} (rules : Rules Address)
-    (disk : Disk Address) (addr : Address) (located : Located Address)
+    (disk : Disk Address) (addr : Address) (located : Address × Located Address)
     (landed : land rules disk addr = .ok located) :
     ∃ real, disk.real addr = .inside real ∧ rules.is_reserved real = false ∧
       rules.bound real = .Open ∧
-      located = (if disk.present real then .Present real else .Absent real) := by
+      located = (real, if disk.present real then .Present real else .Absent real) := by
   unfold land at landed
   cases where_ : disk.real addr with
   | outside => simp [where_] at landed
@@ -188,8 +189,9 @@ theorem what_lands_was_judged_where_it_lands {Address : Type} (rules : Rules Add
     | error _ => simp [where_, judged] at landed
     | ok answer =>
       simp only [where_, judged] at landed
-      obtain ⟨_, notReserved, open_⟩ :=
+      obtain ⟨sameAddress, notReserved, open_⟩ :=
         judge_answers_the_address_it_was_given rules real answer judged
+      subst answer
       have same := Except.ok.inj landed
       exact ⟨real, rfl, notReserved, open_, same.symm⟩
 

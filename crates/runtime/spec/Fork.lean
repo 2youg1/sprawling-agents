@@ -28,12 +28,21 @@ pub fn fork_draft(origin: Origin, new_run: RunId, addr: Address, t: TimeMs, who:
 /// then that run's own lines, and nothing else read.
 pub fn inherited_indexed(index: &storage::LedgerIndex, dir: &Path, at_seq: Seq)
     -> Result<Inherited, AxError>;
-pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
+pub struct Inherited {
+    pub messages: Vec<ChatMessage>,
+    pub at: Seq,
+    /// 已提交波次中、压缩后仍完整到达模型的规则房间；按地址有序去重。
+    pub delivered: BTreeSet<Address>,
+    /// 不能作为房间地址读回的规则项，供派活方写诊断；不让分叉静默失去规则。
+    pub rule_warnings: Vec<String>,
+}
 ```
 
 **`inherited_indexed` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 conversation 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Conversation` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
 
 **切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以折叠（`fold_run`）维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
+
+**规则递送集合与消息来自同一次波次选择。** `Wave` 只暂存 read 载荷 `rules[].room`；`commit` 先经 `Exchange::compact` 得到被裁切的 id，再合并其余 id 的房间。截在波中的未完成波次连消息和房间一起丢弃，非 read 工具的同名字段不参与。多代分支按祖母到母亲的次序合并集合并去重。 malformed `room` 不进入集合，而化为 `rule_warnings`，派活方逐条写诊断；这样旧评审中「半个波次也消耗规则」与「畸形地址静默消失」两类缺陷都不会复现。脱敏可能改变 `rules` 或正文时，规格不承诺重建逐字节相同；exchange 压缩不再成为漏继承的理由。
 
 **上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`fold_run` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 

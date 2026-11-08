@@ -17,7 +17,12 @@
 ```rust
 // crates/runtime/src/tools/stamp.rs
 pub struct Stamp { /* len、modified、identity —— 私有 */ }
-impl Stamp { pub(crate) fn of(path: &Path) -> std::io::Result<Option<Stamp>>; }   // None＝路径上没有文件
+pub struct FileFacts { /* stamp、is_file —— 私有；长度从 stamp 读 */ }
+impl Stamp {
+    pub(crate) fn of(path: &Path) -> std::io::Result<Option<Stamp>>;   // None＝路径上没有文件
+    pub(crate) fn facts(file: &File) -> std::io::Result<FileFacts>;   // 一次句柄查询，供 read 的快路径
+    pub(crate) fn racy_at(&self, now: TimeMs) -> bool;               // 未来或 2 秒内为真；时间不可表示时保守为真
+}
 #[derive(Clone, Default)]
 pub struct ReadStamps { /* Arc<Mutex<BTreeMap<Address, Stamp>>> —— 私有 */ }      // 每个 run 一张，read 与 edit 共用
 pub(crate) enum Intent { Replace, Create }                                      // Create＝old_string 为空

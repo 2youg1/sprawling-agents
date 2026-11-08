@@ -137,6 +137,292 @@ pub fn admit_external(package: &Path,
 - **一件 skill 在 catalog 里只有一个名字**：书架扫描按「近架盖远架」留下一个候选（`crates/city/Spec.lean` §8-8），catalog 的 `admit_skill` 对重名仍拒。所有来源共用同一个 manifest 读取与包内文件路径，不再有只能读 `SKILL.md` 的外部特例。
 -/
 
+/-!
+#### 8-29-7 深层项目约定：普通路径成功读取时候选，按 run 有序递送一次
+
+```rust
+pub struct RuleCandidate { pub room: Address, pub text: String, pub dropped: u64 }
+pub type RuleCandidates = Arc<dyn Fn(&Address, &Address) -> Vec<RuleCandidate> + Send + Sync>;
+pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
+impl ReadTool {
+    pub fn ruling(self, candidates: RuleCandidates) -> ReadTool;
+    pub fn recalling(self, shown: ReadShown) -> ReadTool;
+    pub fn clocking(self, clock: ReadClock) -> ReadTool;
+}
+```
+
+- **只有普通城市路径成功读取才取候选。** locator、catalog、skill、目录与失败读取不取。候选闭包只读，不标记递送；参数是受准地址与落点地址，两者都在 home building 内、受准文件目录是 run 房间严格后代时才非空。规则链按受准地址，覆盖 run 房间之下到文件目录的各级 `AGENTS.md`，顺序由 `city::room_agents_paths` 给出。邻楼和跨楼链接不生成附注。
+- **候选不是窗口证据。** runtime 只把 `{room, text, dropped}` 带上结果；accounting 的 `Placing` 在串行 `account` 中过滤已递送与同波 pending，定稿后先写进 `ToolBench.seen`，再交给回合渲染。最终 `rules` 只含 `{room, text}`；没有选择结果时整个字段缺席。`Duplicate` 因此仍逐字回答第一次定稿的结果，符合 §8-35。
+- **预算与读取边界**：全部附注文本不超过 `INTERVAL_CAP_BYTES`。首个超限文件在 UTF-8 边界切下并带 `[truncated: N bytes]`，标记预留最坏宽度；切下的文件算递送，后续文件推迟到下一次 read。每个候选文件经与冻结相同的读界读取，但 Absent、Withheld、其他错误与任何位置的非 UTF-8 都只跳过该文件，不让合法 read 失败。嵌套读取有界：最多保留 64 KiB 正文，继续读到 EOF 只验证 UTF-8 并累计省略量；候选正文总量同界，不把项目里的大规则文件整份读进内存。
+- **递送状态**：confirmed 与同波 pending 共同去重；`complete_wave` 只把未被 exchange 裁切的 pending 并入 confirmed，被裁切的规则可在后续 read 重新递送。fork 从与继承消息相同的已提交波次继承 confirmed 集合（§8-2）， successor、delegate 子 run 从空集合开始。
+
+#### 8-29-8 未变文件只追加 unchanged 桩（`tools::shown`，形状 1 判定）
+
+```rust
+pub struct Span { pub offset: u64, pub lines: u64 }       // 0 基下标与实际返回行数
+pub struct Claim { /* addr、stamp、covered、total_lines、bytes、digest、generation —— 私有 */ }
+pub struct ReadShown { /* Arc<Mutex<…>>；每个 run 一张，confirmed、staged、pending 分开 */ }
+pub enum Recall { Fresh, Repeat(Answer), Compare { digest: B3Hash, answer: Answer } }
+pub struct Answer { pub lines: u64, pub total_lines: u64 }
+impl ReadShown {
+    pub(crate) fn recall(&self, addr: &Address, now: &Stamp, want: Span, stub_bytes: usize) -> Recall;
+    pub(crate) fn stage(&self, call: &str, claim: Claim);
+    pub(crate) fn admit(&self, call: &str);                 // staged → pending，只在有序 account
+    pub(crate) fn confirm(&self, shortened: &BTreeSet<String>); // pending → confirmed；清 staged
+}
+```
+
+- **I1**：只有本 run 的窗口里存在一条完整、未裁切、覆盖本次请求且内容与当前文件相同的普通路径 read 结果，才回 `unchanged`。`seen` 回答 edit 能否落盘，`IdemKey` 回答同一次调用怎样重放，`shown` 回答窗口里有什么；三者互不写入。edit 不写 `shown`，落盘换文件身份使旧记录失效。
+- **Staged → Pending → Confirmed**：工具成功读完后只 stage 私有 claim，不带进结果载荷或账本；`Placing::account` 按调用序 admit；`complete_wave` 只确认未被 exchange 裁切的 pending，并清空未获准入的 staged。同一 wave 内重复读不看 confirmed 之外的新 claim，所以两条都回全文。`ahead` 后未放行的读不影响后续。
+- **覆盖**：整文件未截断的读记 `Whole`；显式窗口只记实际交付区间，最多 8 段，超出丢最旧。未给 `offset`／`limit` 而被行数或字节上限截断的整读不 stage。窗口读 → 更大范围或整读覆盖不足时回全文；截断整读 → 再整读也回全文。空文件与越过末尾只在已知总行数且覆盖成立时回桩。`lines` 是本次请求实际覆盖的行数，`total_lines` 恒给出。
+- **快路径**：参数先经 `Interval::asked_for` 验证，再走 canonicalize／读界／open／句柄复核；失败优先级中参数错误因此先于 IO。Windows 与 Linux 由 `Stamp::facts` 一次句柄查询同时给出文件类型、长度与戳。`Repeat` 不读文件字节，跳过 UTF-8 校验与 `cut`；`Compare` 仍读字节，只有前后戳相等且 BLAKE3 与已确认内容相同才回桩。其他平台仍走 `judged_read`，不发桩，因为没有同一个句柄快路径可挂。
+- **racy 判据**：`Stamp` 不含内容。初次读完时若 `now - mtime < 2,000 ms`（mtime 在未来也算）或时钟不可用，claim 记录已读文本的 BLAKE3；之后同戳读到该记录必须走 `Compare`。无摘要的记录才可仅凭戳走 `Repeat`。时间由工作台注入的同一 clock 给出；clock 失败不使合法 read 失败，而是保守地总是记录并比较摘要。常规本地文件系统上，普通写会改戳，racy 写由摘要兜底；网络卷与刻意伪造元数据不在保证范围内，绝不把该判据说成内容哈希的替代品。
+- **成本阈值与有界状态**：`stub_bytes` 由 V4 实际桩文本长度给出，只有先前正文至少为桩的两倍才去重；小文件仍回全文。`SHOWN_MAX_PATHS = 64`，`SHOWN_MAX_PENDING = 256`，按单调 generation 淘汰最旧，路径与 id 都用 `BTreeMap`，决策不读哈希序。表只存戳、区间与可选摘要，不存正文。fork、successor、delegate 子 run 从空表开始；fork 中继承的旧桩仍由 V4 重画，但不会凭空成为新 run 的窗口证据。
+- **载荷与渲染**：`{path, unchanged: true, offset, lines, total_lines}`，不带 `text`、`bytes`，V4 画成一行未变桩（§8-63）。候选规则可在同一次桩上继续递送，规则是否完整进入窗口同样由压缩 id 决定。
+-/
+
+/-! D127 未变桩以完整窗口证据为准，规则递送与 read 去重共用压缩确认
+
+**决定**：`ReadTool` 只产生文件事实与私有 claim，`Placing` 在有序结算点定稿规则和 admit claim，`Exchange::compact` 报告裁切 id，run 在折入窗口前确认。规则最终载荷在 `IdemKey` 缓存之前定稿；unchanged claim 不进载荷。racy 文件按已读文本的 BLAKE3 比较，其他平台不发桩。
+
+**理由**：`invoke` 能并发和推测执行，账本存的是结构化答案，模型真正看到的是渲染后再经 exchange 压缩的文本。提前标记会把没放行的读或被裁掉的附注当成已交付；复用 `seen` 又会在 edit 后把新戳误当窗口里的旧内容。共用压缩 id 让规则继承与 unchanged 都遵守同一个「模型确实收到」定义。
+
+**被否**：①只比较戳直接回桩——同长度、同 mtime 的原地改写会静默陈旧；②每次 read 都算哈希——为可能永不重复的文件付固定成本；③把窗口里旧结果改写成桩——破坏已发送前缀与缓存；④复用 `seen` 或 `IdemKey`——它们分别服务 edit 准入与同一次调用重放，不证明完整内容进入窗口；⑤在工具描述里劝模型别重读——既不强制也不省 token。
+
+**重开参数**：网络卷必须提供同等保证时，改为每次内容比较或引入可验证的内容版本；快路径测量不能覆盖状态时，先保留全文路径。
+-/
+
+namespace Runtime.Tools.Read
+
+/-- 请求或交付的一段行区间；`Whole` 另由 `Claim.whole` 表示。 -/
+structure Span where
+  offset : Nat
+  lines : Nat
+  deriving DecidableEq, Repr
+
+/-- 一次成功读产生的私有 claim。`digest = true` 表示同戳重读必须比较内容。 -/
+structure Claim where
+  content : Nat
+  stamp : Nat
+  cover : Span
+  whole : Bool
+  digest : Bool
+  deriving DecidableEq, Repr
+
+/-- 单个文件的窗口状态；`delivered` 只装未裁切确认过的 claim。 -/
+structure World where
+  currentContent : Nat
+  currentStamp : Nat
+  delivered : List Claim
+  pending : List Claim
+  staged : Option Claim
+  deriving Repr
+
+inductive Recall where
+  | fresh
+  | repeat
+  | compare
+  deriving DecidableEq, Repr
+
+/-- 一次整读覆盖任意请求，窗口则只覆盖自己的闭区间。 -/
+def covers (claim : Claim) (want : Span) : Bool :=
+  claim.whole ||
+    (claim.cover.offset ≤ want.offset ∧
+      want.offset + want.lines ≤ claim.cover.offset + claim.cover.lines)
+
+/-- 当前读产生的 claim；内容 digest 由 racy 判据决定是否必须比较。 -/
+def claimOf (w : World) (want : Span) (racy : Bool) : Claim :=
+  { content := w.currentContent, stamp := w.currentStamp, cover := want,
+    whole := want.offset = 0, digest := racy }
+
+/-- 一次 read：confirmed 只读 `latest`，同波 staged/pending 不参与回答。 -/
+def look (w : World) (want : Span) (racy : Bool) : World × Recall :=
+  match w.delivered.head? with
+  | some claim =>
+    if claim.stamp = w.currentStamp ∧ covers claim want then
+      (w, if claim.digest then .compare else .repeat)
+    else
+      ({ w with staged := some (claimOf w want racy) }, .fresh)
+  | none => ({ w with staged := some (claimOf w want racy) }, .fresh)
+
+/-- racy 路径的内容比较：只有内容与 confirmed 相同才回 `Repeat`。 -/
+def compare (w : World) (want : Span) (racy sameContent : Bool) : World × Recall :=
+  match w.delivered.head? with
+  | some claim =>
+    if claim.digest ∧ claim.stamp = w.currentStamp ∧ covers claim want ∧
+        claim.content = w.currentContent ∧ sameContent then
+      (w, .repeat)
+    else
+      ({ w with staged := some (claimOf w want racy) }, .fresh)
+  | none => ({ w with staged := some (claimOf w want racy) }, .fresh)
+
+inductive Step where
+  | look (want : Span) (racy : Bool)
+  | compare (want : Span) (racy sameContent : Bool)
+  | account
+  | settle (shortened : Bool)
+  | write (content : Nat)
+  deriving Repr
+
+/-- 一步世界迁移；`account` 是有序结算，`settle false` 是未裁切确认。 -/
+def step (w : World) : Step → World × Recall
+  | .look want racy => look w want racy
+  | .compare want racy sameContent => compare w want racy sameContent
+  | .account =>
+    ({ w with pending := w.staged.toList ++ w.pending, staged := none }, .fresh)
+  | .settle shortened =>
+    if shortened then
+      ({ w with pending := [], staged := none }, .fresh)
+    else
+      ({ w with
+        delivered := w.pending ++ w.delivered,
+        pending := [],
+        staged := none }, .fresh)
+  | .write content =>
+    ({ w with currentContent := content, currentStamp := w.currentStamp + 1 }, .fresh)
+
+/-- 先跑完一段迹，再询问一次 read；迹中的 read 答案也可逐步观察。 -/
+def run (w : World) (ts : List Step) : World :=
+  ts.foldl (fun now event => (step now event).1) w
+
+/-- 一个 claim 的戳不晚于当前戳；同戳时，它记录的就是当前内容。 -/
+def Versioned (w : World) (claim : Claim) : Prop :=
+  claim.stamp ≤ w.currentStamp ∧
+    (claim.stamp = w.currentStamp → claim.content = w.currentContent)
+
+/-- pending 与 delivered 都有版本证据；staged 只在读成功时出现；普通写递增戳。 -/
+def Inv (w : World) : Prop :=
+  (∀ claim, claim ∈ w.pending → Versioned w claim) ∧
+    (∀ claim, claim ∈ w.delivered → Versioned w claim) ∧
+    (∀ claim, w.staged = some claim → Versioned w claim)
+
+/-- 空 run 没有任何窗口证据。 -/
+def empty : World :=
+  { currentContent := 0, currentStamp := 0, delivered := [], pending := [], staged := none }
+
+/-- 空世界满足不变量。 -/
+theorem empty_inv : Inv empty := by
+  simp [Inv, Versioned, empty]
+
+/-- 每一步保持证据链不变量；裁切只丢弃 staged/pending，不伪造 delivered。 -/
+theorem step_keeps_inv (w : World) (s : Step) (h : Inv w) : Inv (step w s).1 := by
+  cases s with
+  | look want racy =>
+    simp only [step]
+    unfold look
+    split
+    · rename_i claim latest
+      split
+      · exact h
+      · refine ⟨h.1, h.2.1, ?_⟩
+        intro c staged
+        injection staged with same
+        subst c
+        exact ⟨Nat.le_refl _, fun _ => rfl⟩
+    · refine ⟨h.1, h.2.1, ?_⟩
+      intro c staged
+      injection staged with same
+      subst c
+      exact ⟨Nat.le_refl _, fun _ => rfl⟩
+  | compare want racy sameContent =>
+    simp only [step]
+    unfold compare
+    split
+    · rename_i claim latest
+      split
+      · exact h
+      · refine ⟨h.1, h.2.1, ?_⟩
+        intro c staged
+        injection staged with same
+        subst c
+        exact ⟨Nat.le_refl _, fun _ => rfl⟩
+    · refine ⟨h.1, h.2.1, ?_⟩
+      intro c staged
+      injection staged with same
+      subst c
+      exact ⟨Nat.le_refl _, fun _ => rfl⟩
+  | account =>
+    simp only [step]
+    refine ⟨?_, h.2.1, ?_⟩
+    · intro claim mem
+      simp at mem
+      cases mem with
+      | inl found => exact h.2.2 claim found
+      | inr found => exact h.1 claim found
+    · intro claim staged
+      cases staged
+  | settle shortened =>
+    cases shortened with
+    | true =>
+      simp [step]
+      refine ⟨?_, h.2.1, ?_⟩
+      · intro claim mem
+        cases mem
+      · intro claim staged
+        cases staged
+    | false =>
+      simp [step]
+      refine ⟨?_, ?_, ?_⟩
+      · intro claim mem
+        cases mem
+      · intro claim mem
+        simp at mem
+        cases mem with
+        | inl found => exact h.1 claim found
+        | inr found => exact h.2.1 claim found
+      · intro claim staged
+        cases staged
+  | write content =>
+    simp only [step]
+    refine ⟨?_, ?_, ?_⟩
+    · intro claim mem
+      have old := h.1 claim mem
+      have earlier := Nat.lt_of_le_of_lt old.1 (Nat.lt_succ_self _)
+      exact ⟨Nat.le_of_lt earlier, by intro same; rw [same] at earlier; exact (Nat.lt_irrefl _ earlier).elim⟩
+    · intro claim mem
+      have old := h.2.1 claim mem
+      have earlier := Nat.lt_of_le_of_lt old.1 (Nat.lt_succ_self _)
+      exact ⟨Nat.le_of_lt earlier, by intro same; rw [same] at earlier; exact (Nat.lt_irrefl _ earlier).elim⟩
+    · intro claim staged
+      have old := h.2.2 claim staged
+      have earlier := Nat.lt_of_le_of_lt old.1 (Nat.lt_succ_self _)
+      exact ⟨Nat.le_of_lt earlier, by intro same; rw [same] at earlier; exact (Nat.lt_irrefl _ earlier).elim⟩
+
+/-- 任意迹都保持证据链：confirmed 只能由未裁切的 pending 产生。 -/
+theorem trace_keeps_inv (w : World) (ts : List Step) (h : Inv w) : Inv (run w ts) := by
+  induction ts generalizing w with
+  | nil => exact h
+  | cons event rest ih => exact ih (step w event).1 (step_keeps_inv w event h)
+
+/-- `Repeat` 必有未裁切的同内容、同戳、覆盖请求的完整窗口证据。 -/
+theorem repeat_is_backed_by_unshortened_evidence (w : World) (ts : List Step)
+    (want : Span) (racy : Bool) (h : Inv w)
+    (answer : (look (run w ts) want racy).2 = .repeat) :
+    ∃ claim, claim ∈ (run w ts).delivered ∧
+      claim.content = (run w ts).currentContent ∧
+      claim.stamp = (run w ts).currentStamp ∧ covers claim want := by
+  have valid := trace_keeps_inv w ts h
+  unfold look at answer
+  split at answer
+  · rename_i claim latest
+    split at answer
+    · rename_i matched
+      have head : claim ∈ (run w ts).delivered.head? := by rw [latest]; exact rfl
+      have delivered := List.mem_of_mem_head? head
+      have version := valid.2.1 claim delivered
+      exact ⟨claim, delivered, version.2 matched.1, matched.1, matched.2⟩
+    · contradiction
+  · contradiction
+
+/-- racy 摘要不同就不能回 `Repeat`，而是产生新的全文 claim。 -/
+theorem racy_mismatch_never_repeats (w : World) (want : Span) (racy : Bool)
+    (answer : (compare w want racy false).2 = .repeat) : False := by
+  cases latest : w.delivered.head? with
+  | none => simp [compare, latest] at answer
+  | some claim => simp [compare, latest] at answer
+
+end Runtime.Tools.Read
+
 /-! D9 城外 skill 在准入时复制进 CAS，run 只读 pin 的 manifest
 
 **决定**：阅览室准入的一件城外书架上的 skill 经 `city::admit_external` 把完整包复制进本城 CAS，再经 `Catalog::admit_skill` 以同一个 `Expansion::Skill` 进入 catalog。`read <名>` 与包内文件都按 admitted manifest digest 完整校验读取（§8-29-3、§8-29-6）。
