@@ -80,7 +80,9 @@
   }
 </script>
 
-<article class="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] content-start gap-wide overflow-auto px-wide py-wide">
+<article
+  class="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] content-start gap-wide overflow-auto px-wide py-wide"
+>
   <header class="grid gap-snug">
     <p class="text-caption text-text-faint">{look.title}</p>
     <p class="text-figure font-figure figure text-text">
@@ -102,7 +104,11 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="absolute inset-0 z-1 cursor-pointer rounded-pill" onclick={hit}></div>
-        <svg class="pointer-events-none size-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
+        <svg
+          class="pointer-events-none size-full -rotate-90"
+          viewBox="0 0 40 40"
+          aria-hidden="true"
+        >
           <circle
             class="pointer-events-none fill-none stroke-track"
             cx="20"
@@ -141,7 +147,9 @@
           <p class="text-center">
             {#if picked !== null}
               <span class="block text-title font-figure figure text-text">{picked.share}%</span>
-              <span class="block max-w-[8rem] truncate text-caption text-text-faint">{picked.said}</span>
+              <span class="block max-w-[8rem] truncate text-caption text-text-faint"
+                >{picked.said}</span
+              >
             {:else}
               <span class="block text-title font-figure figure text-text">{look.fullPercent}%</span>
               <span class="block text-caption text-text-faint">{look.fullLabel}</span>

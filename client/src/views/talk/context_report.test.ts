@@ -30,15 +30,21 @@ describe("splitPercents", () => {
       ["conversation", 0],
     ]);
     expect(shares.reduce((sum, row) => sum + row.share, 0)).toBe(100);
-    expect(shares.filter((row) => row.bytes > 0).map((row) => row.share).sort()).toEqual([
-      33, 33, 34,
-    ]);
+    expect(
+      shares
+        .filter((row) => row.bytes > 0)
+        .map((row) => row.share)
+        .sort(),
+    ).toEqual([33, 33, 34]);
   });
 
   test("is all zeros when every weight is zero", () => {
-    expect(splitPercents([["tools", 0], ["conversation", 0]]).every((row) => row.share === 0)).toBe(
-      true,
-    );
+    expect(
+      splitPercents([
+        ["tools", 0],
+        ["conversation", 0],
+      ]).every((row) => row.share === 0),
+    ).toBe(true);
   });
 });
 
@@ -109,13 +115,14 @@ describe("reportOf", () => {
     expect(look.buckets[0]?.id).toBe("conversation");
     expect(look.buckets.every((bucket) => bucket.bytes > 0)).toBe(true);
     expect(look.insight).toBe(
-      fill(say("en", "context_report_insight"), { bucket: say("en", "context_bucket_conversation"), share: String(look.buckets[0]?.share) }),
+      fill(say("en", "context_report_insight"), {
+        bucket: say("en", "context_bucket_conversation"),
+        share: String(look.buckets[0]?.share),
+      }),
     );
-    expect(look.buckets.find((bucket) => bucket.id === "tools")?.children.map((c) => c.name)).toEqual([
-      "core/read",
-      "core/search",
-      "core/sleeping",
-    ]);
+    expect(
+      look.buckets.find((bucket) => bucket.id === "tools")?.children.map((c) => c.name),
+    ).toEqual(["core/read", "core/search", "core/sleeping"]);
   });
 
   test("warns past the handoff mark", () => {

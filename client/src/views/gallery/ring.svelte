@@ -81,7 +81,14 @@
   const REPORT_PREFIX: PrefixAnswer = {
     run: REPORT_RUN,
     segments: [
-      { slot: "city", hash: B3Hash.make("1".repeat(64)), bytes: 1_640, text: "", stored: true, sources: [] },
+      {
+        slot: "city",
+        hash: B3Hash.make("1".repeat(64)),
+        bytes: 1_640,
+        text: "",
+        stored: true,
+        sources: [],
+      },
       {
         slot: "building",
         hash: B3Hash.make("2".repeat(64)),
@@ -98,7 +105,14 @@
         stored: true,
         sources: [],
       },
-      { slot: "run", hash: B3Hash.make("4".repeat(64)), bytes: 1_100, text: "", stored: true, sources: [] },
+      {
+        slot: "run",
+        hash: B3Hash.make("4".repeat(64)),
+        bytes: 1_100,
+        text: "",
+        stored: true,
+        sources: [],
+      },
     ],
     tools: {
       hash: B3Hash.make("5".repeat(64)),

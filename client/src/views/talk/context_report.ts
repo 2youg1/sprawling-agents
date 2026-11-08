@@ -159,7 +159,15 @@ export function reportOf(
   };
 }
 
-function bucketKey(id: BucketId): "context_bucket_tools" | "context_bucket_city" | "context_bucket_building" | "context_bucket_resident" | "context_bucket_run" | "context_bucket_conversation" {
+function bucketKey(
+  id: BucketId,
+):
+  | "context_bucket_tools"
+  | "context_bucket_city"
+  | "context_bucket_building"
+  | "context_bucket_resident"
+  | "context_bucket_run"
+  | "context_bucket_conversation" {
   switch (id) {
     case "tools":
       return "context_bucket_tools";
@@ -235,7 +243,10 @@ function childrenOf(id: BucketId, prefix: PrefixAnswer | null): readonly ReportC
 function toolChildren(rows: readonly PromptTool[]): readonly ReportChild[] {
   return [...rows]
     .filter((row) => row.exposure !== "off" && row.len > 0)
-    .sort((a, b) => b.len - a.len || a.name.localeCompare(b.name) || a.namespace.localeCompare(b.namespace))
+    .sort(
+      (a, b) =>
+        b.len - a.len || a.name.localeCompare(b.name) || a.namespace.localeCompare(b.namespace),
+    )
     .slice(0, CHILD_CAP)
     .map((row) => {
       // Namespace + name: two catalogs can ship the same tool spelling.
