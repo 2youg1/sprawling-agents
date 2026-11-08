@@ -50,7 +50,9 @@ pub struct SecretEgressBlocked {
     pub code: String,
     /// The checkpoint's staging scope.
     pub scope: Vec<String>,
-    /// Every finding, with positions and reasons only.
+    /// Every finding of the refused scan, with positions and reasons only:
+    /// the known shapes that refused it first, then the entropy hits it also
+    /// met, which never reached the tree.
     pub withheld: Vec<CheckpointFinding>,
 }
 

@@ -332,7 +332,7 @@ pub fn run_scenario_on(
             );
             let mut checkpoint = |t: TimeMs| {
                 net.wave_pre(scope, t, &of)
-                    .map_err(storage::StorageError::into_ax)
+                    .map_err(runtime::CheckpointFailure::from)
             };
             let mut hooks = RunHooks {
                 now: &mut now,

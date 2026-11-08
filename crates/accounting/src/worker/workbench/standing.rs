@@ -8,7 +8,8 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError, EventKind, RunId};
+use kernel::event::record::CheckpointCommitted;
+use kernel::{Address, AxError, EventKind, Payload, RunId};
 
 use crate::effect;
 
@@ -199,7 +200,7 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
     placing: &Placing<'_>,
     lines: &mut Stamping<'_, L>,
 ) -> Result<storage::WorktreeLease, AxError> {
-    storage::Checkpoint::open(placing.city_root)
+    let base = storage::Checkpoint::open(placing.city_root)
         .map_err(storage::StorageError::into_ax)?
         .with_entropy_allowlist(lending.entropy_allow.clone())
         .ensure_base(
@@ -208,6 +209,20 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
             lending.of,
         )
         .map_err(storage::StorageError::into_ax)?;
+    // The city's first commit is the one checkpoint no run's wave made, and
+    // its scan findings have nowhere else to live: record it for the run
+    // that needed the tree.
+    if let Some(base) = base {
+        lines.record_for(
+            lending.run_id,
+            effect::Line {
+                who: lending.who.to_owned(),
+                addr: lending.addr.clone(),
+                kind: EventKind::CheckpointCommitted,
+                data: Payload::of(&CheckpointCommitted::Committed(base))?,
+            },
+        )?;
+    }
     let claimed = storage::Worktrees::open(placing.city_root)
         .map_err(storage::StorageError::into_ax)?
         .claim(

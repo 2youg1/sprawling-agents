@@ -555,15 +555,8 @@ fn a_refused_checkpoint_records_its_scope_and_findings_before_the_run_freezes() 
         }],
     );
     let mut checkpoint = |_: TimeMs| {
-        let cause = kernel::AxError::failure(
-            kernel::AxCode::SecretEgress,
-            "commit checkpoint",
-            report.locations(),
-        )
-        .with_recovery("remove the known key shape");
-        Err(runtime::CheckpointFailure::secret_egress(
-            cause,
-            report.clone(),
+        Err(runtime::CheckpointFailure::from(
+            storage::StorageError::SecretEgress(report.clone()),
         ))
     };
     let mut hooks = RunHooks {

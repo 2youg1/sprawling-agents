@@ -90,6 +90,83 @@ fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
     assert_eq!(payload.as_map()["withheld"].as_array().unwrap().len(), 1);
 }
 
+/// The scanner stops an entropy run at `.`, so a quoted file name with an
+/// extension arrives as its stem alone. The exemption asks the index about
+/// the path token around the hit, not the truncated run.
+#[test]
+fn a_quoted_path_with_an_extension_is_recognised_by_its_whole_spelling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let name = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    let quoted = format!("work/{name}.md");
+    write(tmp.path(), &quoted, "fixture\n");
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "the quoted file name is a path this index holds: {outcome:?}"
+    );
+    assert!(!outcome.unwrap().as_map().contains_key("withheld"));
+}
+
+/// An allowlist matches the path the index holds, never a spelling this
+/// build normalised out of it: on Unix `docs/a\b.md` is one file, and an
+/// entry for `docs/a/b.md` says nothing about it.
+#[cfg(unix)]
+#[test]
+fn an_allowlist_entry_matches_only_a_path_the_index_spells_the_same_way() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/clean.md", "nothing here");
+    let allowed = [Address::parse("work/a/b.md").unwrap()]
+        .into_iter()
+        .collect();
+    let mut checkpoint = Checkpoint::open(tmp.path())
+        .unwrap()
+        .with_entropy_allowlist(allowed);
+    checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/a\\b.md", &format!("Example: {token}\n"));
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1, "{payload:?}");
+    assert_eq!(withheld[0]["path"], "work/a\\b.md");
+}
+
+/// One scan can meet a known shape and an ordinary entropy hit. The refusal
+/// carries both, so `sprawling secrets` lists everything this checkpoint
+/// met without waiting for a later commit to report the rest.
+#[test]
+fn a_refusal_reports_the_entropy_findings_it_also_met() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let known = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/leak.env", &format!("KEY={known}\n"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let refused = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap_err();
+    let StorageError::SecretEgress(report) = refused else {
+        panic!("a known shape refuses the commit: {refused:?}");
+    };
+    let reasons: Vec<&str> = report
+        .withheld
+        .iter()
+        .map(|finding| finding.reason.as_str())
+        .collect();
+    assert_eq!(reasons, vec!["anthropic", "high entropy"]);
+    assert!(!report.locations().contains(&token));
+}
+
 /// Entropy without a known provider shape is evidence to retain, not a
 /// reason to stop every later write. The record identifies the withheld
 /// line without carrying its bytes.

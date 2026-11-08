@@ -57,19 +57,32 @@ pub(super) fn committed(
     oid: git2::Oid,
     details: CommitDetails<'_>,
 ) -> Result<Payload, StorageError> {
+    let record = commit_record(oid, details)?;
+    Payload::of(&CheckpointCommitted::Committed(record))
+        .map_err(|source| StorageError::Draft { source })
+}
+
+/// The record of one commit, in the shape the Ledger and the callers of
+/// [`Checkpoint::land`] both read.
+///
+/// One builder for a commit's record, so the payload a checkpoint writes and
+/// the value a landing hands back cannot describe the same commit differently.
+pub(super) fn commit_record(
+    oid: git2::Oid,
+    details: CommitDetails<'_>,
+) -> Result<Commit, StorageError> {
     let spelled = oid.to_string();
     let oid = GitOid::parse(&spelled).ok_or_else(|| StorageError::Checkpoint {
         op: "record a checkpoint commit",
         detail: format!("git named this commit {spelled}, which is not 40 hex digits"),
     })?;
-    let record = CheckpointCommitted::Committed(Commit {
+    Ok(Commit {
         oid,
         by: details.of.attribution(),
         scope: details.scopes.to_vec(),
         files: details.files,
         withheld: details.withheld,
-    });
-    Payload::of(&record).map_err(|source| StorageError::Draft { source })
+    })
 }
 
 pub struct Checkpoint {
@@ -110,7 +123,7 @@ impl Checkpoint {
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
-    ) -> Result<Option<Payload>, StorageError> {
+    ) -> Result<Option<Commit>, StorageError> {
         if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
@@ -129,7 +142,7 @@ impl Checkpoint {
             .and_then(|mut index| index.read(true))
             .map_err(git_err("read the index the base wrote"))?;
         match made {
-            Ok(payload) => Ok(Some(payload)),
+            Ok(record) => Ok(Some(record)),
             // Another writer made the base between the read and the swap:
             // the same city as if it had gone first (storage §8-39).
             Err(_) if Self::head_commit(&self.repo)?.is_some() => Ok(None),

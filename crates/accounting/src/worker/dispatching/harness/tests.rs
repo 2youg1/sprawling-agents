@@ -45,7 +45,7 @@ enum Step {
         otherwise: Value,
     },
     /// Write a file into the directory the session was opened in.
-    Write(&'static str, &'static str),
+    Write(&'static str, String),
     /// Read everything the session still sends, until it closes its end.
     Drain,
 }

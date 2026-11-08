@@ -371,37 +371,35 @@ pub(super) fn write_secret_findings(dir: &Path, out: &mut impl Write) -> Result<
     let mut reader = index.reader(dir);
     for seq in index.seqs() {
         let record = EventRecord::parse_line(&reader.line_at(seq)?)?;
-        match record.kind() {
-            EventKind::CheckpointCommitted => {
-                if let CheckpointCommitted::Committed(commit) =
-                    record.data().read::<CheckpointCommitted>()?
-                {
-                    write_finding_lines(
-                        &record,
-                        FindingBatch {
-                            outcome: FindingOutcome::Committed,
-                            code: None,
-                            scope: &commit.scope,
-                            findings: &commit.withheld,
-                        },
-                        out,
-                    )?;
-                }
-            }
-            EventKind::SecretEgressBlocked => {
-                let refused = record.data().read::<SecretEgressBlocked>()?;
-                write_finding_lines(
-                    &record,
-                    FindingBatch {
-                        outcome: FindingOutcome::Refused,
-                        code: Some(&refused.code),
-                        scope: &refused.scope,
-                        findings: &refused.withheld,
-                    },
-                    out,
-                )?;
-            }
-            _ => {}
+        // Two kinds carry findings and the rest carry none; asking each in
+        // turn keeps this reader from having to list the whole vocabulary.
+        if record.kind() == EventKind::CheckpointCommitted
+            && let CheckpointCommitted::Committed(commit) =
+                record.data().read::<CheckpointCommitted>()?
+        {
+            write_finding_lines(
+                &record,
+                FindingBatch {
+                    outcome: FindingOutcome::Committed,
+                    code: None,
+                    scope: &commit.scope,
+                    findings: &commit.withheld,
+                },
+                out,
+            )?;
+        }
+        if record.kind() == EventKind::SecretEgressBlocked {
+            let refused = record.data().read::<SecretEgressBlocked>()?;
+            write_finding_lines(
+                &record,
+                FindingBatch {
+                    outcome: FindingOutcome::Refused,
+                    code: Some(&refused.code),
+                    scope: &refused.scope,
+                    findings: &refused.withheld,
+                },
+                out,
+            )?;
         }
     }
     Ok(())

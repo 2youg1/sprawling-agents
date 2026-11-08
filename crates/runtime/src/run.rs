@@ -165,15 +165,33 @@ pub struct CheckpointFailure {
 }
 
 impl CheckpointFailure {
-    /// A known-shape refusal with the finding payload to record before
-    /// `cause` travels back to the caller.
-    pub fn secret_egress(
-        cause: AxError,
-        refusal: kernel::event::record::SecretEgressBlocked,
-    ) -> Self {
+    /// The scan report a refused checkpoint carries, when the failure was
+    /// one. A caller that holds a Ledger writes it as
+    /// `secret_egress_blocked` before the run freezes.
+    pub fn refusal(&self) -> Option<&kernel::event::record::SecretEgressBlocked> {
+        self.refusal.as_ref()
+    }
+
+    /// The error the run reports once any refusal report is booked.
+    pub fn into_cause(self) -> AxError {
+        self.cause
+    }
+}
+
+impl From<storage::StorageError> for CheckpointFailure {
+    /// A refused checkpoint keeps its structured report, which is the only
+    /// reason this wrapper exists; every other storage failure travels as
+    /// the error it already is. One conversion, so a caller cannot lose the
+    /// report by mapping the error itself.
+    fn from(err: storage::StorageError) -> Self {
+        let refusal = if let storage::StorageError::SecretEgress(report) = &err {
+            Some(report.clone())
+        } else {
+            None
+        };
         CheckpointFailure {
-            cause,
-            refusal: Some(refusal),
+            cause: err.into_ax(),
+            refusal,
         }
     }
 }

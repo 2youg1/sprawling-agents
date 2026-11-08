@@ -63,7 +63,8 @@ pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution
     // 已提交但由熵规则扣下正文的行；旧记录无这一键，读作空
 pub struct SecretEgressBlocked { pub code: String, pub scope: Vec<String>,
                                  pub withheld: Vec<CheckpointFinding> }
-    // checkpoint 因已知厂商密钥形状而拒；code 为 E_SECRET_EGRESS
+    // checkpoint 因已知厂商密钥形状而拒；code 为 E_SECRET_EGRESS；withheld 列出
+    // 同一次扫描的全部 finding（拒绝的形状在前，同时遇到的熵命中在后）
 #[serde(untagged)]
 pub enum CheckpointCommitted { JobPinned { job: Locator }, Committed(Commit) }
 

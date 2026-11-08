@@ -313,7 +313,15 @@ fn drive_turn<L: Ledger>(
                         clock.now()?,
                     );
                 }
-                Err(uncommitted) => uncommitted,
+                Err(uncommitted) => {
+                    // A known-shape refusal is the run's own fact, and the
+                    // ledger is where a person reads it back: book it before
+                    // the freeze that ends the run.
+                    if let Some(report) = uncommitted.refusal() {
+                        run.refusal(&mut *ledger, report, clock.now()?)?;
+                    }
+                    uncommitted.into_cause()
+                }
             }
         }
         // A line the turn could not book outranks what the session said:
@@ -334,13 +342,25 @@ struct HarnessCheckpoint<'a> {
     entropy_allow: &'a kernel::EntropyAllowlist,
 }
 
-fn commit(plan: &HarnessCheckpoint<'_>, context: &DriveContext) -> Result<Payload, AxError> {
+fn commit(
+    plan: &HarnessCheckpoint<'_>,
+    context: &DriveContext,
+) -> Result<Payload, runtime::CheckpointFailure> {
     let mut own = storage::Checkpoint::open_writer(plan.root, plan.of.run())
-        .map_err(storage::StorageError::into_ax)?
+        .map_err(runtime::CheckpointFailure::from)?
         .with_entropy_allowlist(plan.entropy_allow.clone());
     let committed = own
         .wave_pre(plan.scope, context.clock.now()?, plan.of)
-        .map_err(storage::StorageError::into_ax)?;
-    own.close_writer().map_err(storage::StorageError::into_ax)?;
-    Ok(committed)
+        .map_err(runtime::CheckpointFailure::from);
+    // The writer's index goes back whatever the checkpoint said; the
+    // checkpoint's own refusal outranks a cleanup failure, because it is the
+    // fact the ledger has to carry.
+    let closed = own.close_writer().map_err(runtime::CheckpointFailure::from);
+    match committed {
+        Ok(payload) => {
+            closed?;
+            Ok(payload)
+        }
+        Err(refused) => Err(refused),
+    }
 }

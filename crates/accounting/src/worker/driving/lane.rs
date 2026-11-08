@@ -196,18 +196,9 @@ pub(crate) fn drive_run<L: Ledger>(
             .resolving(std::sync::Arc::clone(&workbench.catalog));
         let mut checkpoint = |t: TimeMs| {
             let scope = checkpointing.take_scope(&checkpoint_scope);
-            let payload = checkpoint_handle.wave_pre(&scope, t, &of).map_err(|err| {
-                let refusal = if let storage::StorageError::SecretEgress(report) = &err {
-                    Some(report.clone())
-                } else {
-                    None
-                };
-                let cause = err.into_ax();
-                match refusal {
-                    Some(report) => runtime::CheckpointFailure::secret_egress(cause, report),
-                    None => runtime::CheckpointFailure::from(cause),
-                }
-            })?;
+            let payload = checkpoint_handle
+                .wave_pre(&scope, t, &of)
+                .map_err(runtime::CheckpointFailure::from)?;
             if let Some(oid) = payload
                 .as_map()
                 .get("oid")

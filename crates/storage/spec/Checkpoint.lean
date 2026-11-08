@@ -24,7 +24,7 @@ impl Checkpoint {
     /// A worktree branches from a commit, so a city that was never
     /// checkpointed cannot lend a tree; committing on every dispatch instead
     /// would move the trunk under every request already waiting.
-    pub fn ensure_base(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Option<Payload>, StorageError>;
+    pub fn ensure_base(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Option<Commit>, StorageError>;
     /// Pre-wave checkpoint: add -A within scope, then a **dangling** commit
     /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
@@ -56,7 +56,7 @@ impl Checkpoint {
     /// 无 HEAD 时，判定与建分支都在 `HEAD_MOVES` 之下：先读 `head_commit`，取锁后再读一次，
     /// 建分支用 `reference(<分支>, oid, force = false)`——分支已在即拒，
     /// 即 HEAD 只从读到的「无」移动（`Concurrent.lean` 的 `a_held_base_moves_head_only_from_what_it_read`）。
-    pub fn base_checkpoint(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, StorageError>;
+    pub fn base_checkpoint(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Commit, StorageError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, StorageError>;
@@ -68,11 +68,15 @@ impl Checkpoint {
     /// `StorageError::Alias`。
     pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), StorageError>;
     /// 把 `scopes` 之下的工作树提交到**当前分支**（HEAD 移动），供一次评审运行
-    /// 在自己的 worktree 里献出成果时使用；scope 之外的索引项原样进树。返回落地的 oid。
-    pub fn land(&mut self, scopes: &[String], t: TimeMs, of: &Provenance, subject: &str) -> Result<String, StorageError>;
+    /// 在自己的 worktree 里献出成果时使用；scope 之外的索引项原样进树。返回这一道
+    /// 落地的 `checkpoint_committed` 记录（`Commit`）：这次落地自己的扫描 finding
+    /// 只在它里面，调用方丢掉它就等于丢掉「这次提交扫到了什么」。
+    pub fn land(&mut self, scopes: &[String], t: TimeMs, of: &Provenance, subject: &str) -> Result<Commit, StorageError>;
     /// Staged-diff secret scan。已知形状命中拒绝提交（E_SECRET_EGRESS）；
     /// 未豁免的熵命中提交并返回 withheld finding。只扫这一次会新提交进去的
     /// blob——基线那一次仍然全扫。finding 只携 path/offset/len/line/reason。
+    /// 拒绝携带的那份报告列出**同一次扫描的全部** finding：一处已知形状拒绝时，
+    /// 同一次遇到的熵命中一起列出，否则它们要等下一道提交才出现在 `sprawling secrets`。
     pub fn scan_staged(&mut self, scopes: &[String]) -> Result<Vec<CheckpointFinding>, StorageError>;
     /// 配置只对熵命中生效的精确路径允许清单；默认空，已知形状不受影响。
     pub fn with_entropy_allowlist(self, allowed: EntropyAllowlist) -> Checkpoint;
@@ -109,8 +113,8 @@ impl Checkpoint {
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，检查点不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让检查点静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
 
-- **按证据置信度处置，不让低置信度门禁卡住工作区**：已知厂商形状命中仍以 `E_SECRET_EGRESS` 拒绝提交；其他熵命中不拒绝，`checkpoint_committed.withheld` 逐处记下 `path`、`offset`、`len`、`line` 与 `reason`，不记命中字节。这样补丁仍按 `storage::hunks` 的规则扣下该行，而 run 可以继续。`RULES.toml` 的 `checkpoint_entropy_allow` 是精确仓库相对路径的允许清单，只豁免熵命中；命中文本本身是合法相对路径且该路径已在本次 index 中时，它是文档引用而不是凭据，不产生 finding。路径判定不用正则：逐段非空，每段只含 ASCII 字母、数字、`.`、`_`、`-`，以 `/` 分段，再查 index；绝对路径、空段、其它字符与不存在的路径都不豁免。
-- **拒绝也可自查出**：`StorageError::SecretEgress` 携带完整的 `SecretEgressBlocked { code, scope, withheld }`；错误正文逐处写 `path:line:offset+len (reason)`。lane 在传播错误前把同一值写成 `secret_egress_blocked`，`sprawling secrets <city>` 同时列出这类拒绝与成功 checkpoint 的 withheld finding，不重扫、不读命中字节。
+- **按证据置信度处置，不让低置信度门禁卡住工作区**：已知厂商形状命中仍以 `E_SECRET_EGRESS` 拒绝提交；其他熵命中不拒绝，`checkpoint_committed.withheld` 逐处记下 `path`、`offset`、`len`、`line` 与 `reason`，不记命中字节。这样补丁仍按 `storage::hunks` 的规则扣下该行，而 run 可以继续。`RULES.toml` 的 `checkpoint_entropy_allow` 是精确仓库相对路径的允许清单，只豁免熵命中；命中文本本身是合法相对路径且该路径已在本次 index 中时，它是文档引用而不是凭据，不产生 finding。路径判定不用正则：逐段非空，每段只含 ASCII 字母、数字、`.`、`_`、`-`，以 `/` 分段，再查 index；绝对路径、空段、其它字符与不存在的路径都不豁免。**整条路径以命中为中心取前后同字母表的字节**：熵扫描器在 `.` 上停，所以 `docs/glossary.md` 到这条判定时只剩 `docs/glossary`，而被查的必须是整条拼写；路径的拼写以 index 为准，调用方不做分隔符改写（Unix 上 `docs/a\b` 是一个文件，不是 `docs/a/b`）。句号在句尾与文件名里一样常见，所以从最长拼写开始，逐次去掉尾部的 `.` 再查。
+- **拒绝也可自查出**：`StorageError::SecretEgress` 携带完整的 `SecretEgressBlocked { code, scope, withheld }`，其中列出同一次扫描的全部 finding（拒绝的与未拒绝的）；错误正文逐处写 `path:line:offset+len (reason)`。每一处提交都在写它的那条记录里留下自己的 finding：波前 checkpoint 的 `checkpoint_committed`、拒绝时的 `secret_egress_blocked`（lane 与 harness 的收尾提交各写一次，都是同一个事件），以及基线提交与落地提交各自的 `checkpoint_committed`（`ensure_base` / `base_checkpoint` 的记录由借出树的 lane 或收楼的 genesis 写入，`land` 的记录由开请求的 `offer` 写入）。`sprawling secrets <city>` 只读这些记录，不重扫、不读命中字节。
 - **扫改动过的 blob，不扫整棵树**：遍历 git index 里的**每一个** blob、对**整份内容**跑 `kernel::secret::scan` 且**每一次工具波都跑一遍**时，每波都付整棵树的扫描与 zlib 解压——**改了一个文件的波，付整棵树的钱**。
   - 扫描因此走 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。它问的是 git 而不是自己逐文件推，于是「什么会进树」由暂存与扫描共用的一个机制回答。
   - **无 HEAD 时全扫**：基线那一次没有「上一棵树」可比，扫的就是全部。

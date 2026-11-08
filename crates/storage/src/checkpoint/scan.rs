@@ -8,12 +8,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::TimeMs;
-use kernel::event::record::{CheckpointFinding, SecretEgressBlocked};
+use kernel::event::record::{CheckpointFinding, Commit, SecretEgressBlocked};
 use kernel::secret::{SecretSpan, scan};
 
 use crate::error::StorageError;
 
-use super::commit::{Checkpoint, git_err};
+use super::commit::{Checkpoint, CommitDetails, commit_record, git_err};
 use super::opening::{HeadMove, commit_refused};
 use super::provenance::Provenance;
 
@@ -47,23 +47,58 @@ fn checkpoint_size(value: usize, path: &str) -> Result<u64, StorageError> {
 /// Whether the matched text is a relative path this index actually stages.
 /// This is deliberately a small byte predicate rather than a regex: every
 /// segment is non-empty and uses only ASCII alphanumerics, `.`, `_` or `-`.
+///
+/// The scanner stops the entropy run at the first byte no token charset
+/// holds, and `.` is one of those, so a quoted `docs/glossary.md` arrives as
+/// `docs/glossary`: the path is the token around the span, not the span itself.
+/// A trailing `.` may also be the sentence's, so the longest spelling that
+/// names a staged file wins.
 fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> bool {
-    let Some(bytes) = span
-        .start
-        .checked_add(span.len)
-        .and_then(|end| content.get(span.start..end))
-    else {
+    let Some(span_end) = span.start.checked_add(span.len) else {
         return false;
     };
-    let Ok(path) = std::str::from_utf8(bytes) else {
+    if span_end > content.len() {
         return false;
-    };
-    path.split('/').all(|segment| {
-        !segment.is_empty()
-            && segment
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-    }) && index.get_path(std::path::Path::new(path), 0).is_some()
+    }
+    let mut first = span.start;
+    while let Some(before) = first.checked_sub(1) {
+        if !content.get(before).copied().is_some_and(path_byte) {
+            break;
+        }
+        first = before;
+    }
+    let mut end = span_end;
+    while content.get(end).copied().is_some_and(path_byte) {
+        end = end.saturating_add(1);
+    }
+    loop {
+        let named = content
+            .get(first..end)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+            .is_some_and(|path| {
+                path.split('/').all(|segment| {
+                    !segment.is_empty()
+                        && segment.bytes().all(|byte| {
+                            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
+                        })
+                }) && index.get_path(std::path::Path::new(path), 0).is_some()
+            });
+        if named {
+            return true;
+        }
+        // Only a dot beyond the span can be the sentence's.
+        let last = end.checked_sub(1).and_then(|at| content.get(at));
+        if end <= span_end || last != Some(&b'.') {
+            return false;
+        }
+        end = end.saturating_sub(1);
+    }
+}
+
+/// The bytes a relative path this repository could stage is spelled with:
+/// the segment alphabet plus the `/` between segments.
+fn path_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'/')
 }
 
 mod index_lock;
@@ -129,7 +164,7 @@ impl Checkpoint {
                         continue;
                     }
                     let path = String::from_utf8_lossy(staged.path_bytes().unwrap_or_default())
-                        .replace('\\', "/");
+                        .into_owned();
                     self.scan_blob(
                         StagedBlob {
                             id: staged.id(),
@@ -141,12 +176,18 @@ impl Checkpoint {
                 }
             }
         }
-        if findings.refused.is_empty() {
-            return Ok(findings.withheld);
+        let ScanFindings { refused, withheld } = findings;
+        if refused.is_empty() {
+            return Ok(withheld);
         }
+        // The refusal carries every finding of the same scan: a person
+        // reading `sprawling secrets` should not have to wait for a later
+        // checkpoint to learn about the entropy hits this one also met.
+        let mut all = refused;
+        all.extend(withheld);
         Err(StorageError::SecretEgress(SecretEgressBlocked::checkpoint(
             scopes.to_vec(),
-            findings.refused,
+            all,
         )))
     }
 
@@ -429,25 +470,40 @@ impl Checkpoint {
     ///
     /// # Errors
     /// Propagates staging, the staged-secret scan, and the commit.
+    ///
+    /// The record it answers with is the `checkpoint_committed` value for the
+    /// commit it wrote, its `files` and its findings included: a run that
+    /// wrote after its last wave checkpoint has its work committed here, and
+    /// a caller that dropped this record would drop the only account of what
+    /// this landing scanned.
     pub fn land(
         &mut self,
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
         subject: &str,
-    ) -> Result<String, StorageError> {
+    ) -> Result<Commit, StorageError> {
         let _head_moves = super::opening::moving_head()?;
-        self.stage_scopes(scopes)?;
-        // The run's closing wave checkpoint already recorded these entropy
-        // findings; landing needs only the hard refusal, not a duplicate line.
-        drop(self.scan_staged(scopes)?);
+        let files = self.stage_scopes(scopes)?;
+        // The run's closing wave checkpoint already recorded the entropy
+        // findings of what it scanned; this landing's own scan may see more,
+        // and its record is where they live.
+        let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
             subject,
             head: HeadMove::Advance,
         })?;
-        Ok(oid.to_string())
+        commit_record(
+            oid,
+            CommitDetails {
+                of,
+                scopes,
+                files,
+                withheld,
+            },
+        )
     }
 }
 
