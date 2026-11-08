@@ -223,7 +223,9 @@ pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
                         #[serde(flatten)] pub answer: ToolAnswer,
                         pub took_us: Option<u64>,          // D20；缺席即省略
                         pub rendered: Option<Rendering>,   // D64；缺席读作 V1
-                        pub shown_bytes: Option<u64> }     // D64；缺席即没有记
+                        pub shown_bytes: Option<u64>,      // D64；缺席即没有记
+                        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+                        pub attachments: Vec<ImageRef> }   // D128；这次结果交给窗口的图片引用
 #[serde(untagged)]
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 #[serde(rename_all = "lowercase")]
@@ -301,7 +303,15 @@ pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 -/
 
-/-!
+/-! D128 `tool_result` 记下它交给窗口的图片引用，空表不写
+
+**决定**：`ToolResult` 多 `attachments: Vec<ImageRef>`，写方是 `runtime::turn::wave`，内容就是它放进 canonical `ContentBlock::ToolResult.attachments` 的同一份引用；`runtime::fork` 从这一格重建附件。键带 `#[serde(default, skip_serializing_if = "Vec::is_empty")]`，旧行与无图结果的字节不变，读回为空表。
+
+**理由**：图片字节住 CAS，账本只记 locator、媒体类型与整数宽高；但通用 `ToolAnswer` 并不必有可辨识的图片字段，fork 若从渲染文本或某个工具的私有载荷猜附件，同一历史就会有两种窗口。记下实际交给窗口的引用，已发送内容不可改写的规则（runtime D129）才能在 live 与分支上重放出同一批字节。
+
+**被否**：①继续让 fork 丢掉附件——母亲最近一次请求看过的最新一批图在分支里无故消失；②从 `[picture attached: …]` 或截图工具的 JSON 反解——那是把某个渲染器或工具的私有形状变成第二个图片协议。
+-/
+
 ### 8-75 回合记录多记的事：回复的首个内容几时到（形状 2 值类型）
 
 **(a) `model_returned.first_at`**

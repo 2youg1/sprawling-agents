@@ -255,6 +255,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-47 | `crates/runtime/spec/Conversation.lean` |
 | 8-47-1 | `crates/runtime/spec/Conversation.lean` |
 | 8-47-2 | `crates/runtime/spec/Conversation.lean` |
+| 8-47-3 | `crates/runtime/spec/Conversation.lean` |
 | 8-52 | `crates/runtime/spec/Run.lean` |
 | 8-63 | `crates/runtime/spec/Rendering.lean` |
 -/
@@ -366,6 +367,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D120 | `pattern` 是 ripgrep 语法的正则，由 `regex` crate 逐行判 | `crates/runtime/spec/Tools/Search.lean` |
 | D121 | 本城答不了的 Grep 参数：会让答案误导的拒，只改篇幅的不读 | `crates/runtime/spec/Tools/Search.lean` |
 | D123 | 生成配置是 CallShape 的一部分，与模型和 effort 同时比较 | `crates/runtime/spec/Turn.lean` |
+| D129 | 已发送 Conversation 与 FrozenPrefix 一样不为优化改写，改变历史只走 fork | `crates/runtime/spec/Conversation.lean`（§8-47-3） |
 -/
 
 /-! ## 13 依赖选型

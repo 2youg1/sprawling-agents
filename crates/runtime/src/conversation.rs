@@ -341,6 +341,7 @@ fn unreadable(source: &str) -> AxError {
 )]
 mod tests {
     use super::*;
+    use kernel::{ImageRef, ImageType, Locator};
     use proptest::prelude::*;
 
     /// What a resident might put in a letter to pass for the User or to
@@ -399,6 +400,41 @@ mod tests {
                 other => panic!("a steer is text, got {other:?}"),
             })
             .collect()
+    }
+
+    fn picture(tag: u8) -> ImageRef {
+        ImageRef {
+            locator: Locator::parse(&format!("cas:b3-{}", format!("{tag:02x}").repeat(32)))
+                .unwrap(),
+            media_type: ImageType::Png,
+            width: 8,
+            height: 8,
+        }
+    }
+
+    fn pictured_result(pictures: Vec<ImageRef>) -> ContentBlock {
+        ContentBlock::ToolResult {
+            tool_use_id: pictures
+                .first()
+                .map_or_else(|| "none".to_owned(), |picture| picture.locator.to_string()),
+            content: "the screenshot and its locator".to_owned(),
+            is_error: false,
+            attachments: pictures,
+        }
+    }
+
+    #[test]
+    fn marking_a_picture_sent_freezes_its_reference_without_rewriting_it() {
+        let mut conversation = Conversation::new();
+        conversation.push_tool_results(vec![
+            pictured_result(vec![picture(1)]),
+            ContentBlock::Image(picture(2)),
+        ]);
+        let sent = conversation.messages().to_vec();
+
+        conversation.mark_sent();
+
+        assert_eq!(conversation.messages(), sent);
     }
 
     proptest! {

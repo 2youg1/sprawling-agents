@@ -489,6 +489,35 @@ mod tests {
     }
 
     #[test]
+    fn repeated_references_resolve_once_without_changing_their_wire_positions() {
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = std::sync::Arc::clone(&reads);
+        let endpoint = Endpoint::new(
+            config("http://127.0.0.1:1/v1/messages"),
+            Redemption::new(
+                resolver(),
+                std::sync::Arc::new(move |_at: &kernel::Locator| {
+                    counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Ok(b"the-pixels".to_vec())
+                }),
+            ),
+        )
+        .unwrap();
+        let mut repeated = seeing(1);
+        let picture = repeated.chat.messages.to_mut()[0].content[0].clone();
+        for _ in 1..5 {
+            repeated.chat.messages.to_mut()[0]
+                .content
+                .push(picture.clone());
+        }
+
+        let wire = endpoint.wire_request(&repeated).unwrap();
+
+        assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(wire.to_string().matches("\"type\":\"image\"").count(), 5);
+    }
+
+    #[test]
     fn a_picture_larger_than_the_ceiling_is_refused_with_the_ceiling_named() {
         let endpoint = Endpoint::new(
             config("http://127.0.0.1:1/v1/messages"),
