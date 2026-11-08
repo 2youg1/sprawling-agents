@@ -17,6 +17,9 @@
   // over a whole ring leaves a fringe where the two meet. The arc moves
   // rather than jumps, over the page duration, because it crosses the
   // ring the way the eye crosses a page.
+  //
+  // The band outside the coin is the disclosure control; the coin paints
+  // above it and keeps send / stop / steer.
   import type { Snippet } from "svelte";
 
   import Tip from "../parts/tip.svelte";
@@ -28,9 +31,11 @@
     // the key stands alone.
     readonly ring: RingLook | null;
     readonly children: Snippet;
+    // Opens the context report; absent when there is no run to open for.
+    readonly onOpen: (() => void) | null;
   }
 
-  const { ring, children: key }: Props = $props();
+  const { ring, children: key, onOpen }: Props = $props();
 </script>
 
 {#if ring === null}
@@ -38,7 +43,15 @@
 {:else}
   <Tip text={ring.reading}>
     <span class="relative grid size-key shrink-0 place-items-center">
-      <span class="absolute inset-0 rounded-pill" {...ring.meter}></span>
+      <button
+        class="absolute inset-0 rounded-pill"
+        {...ring.meter}
+        onclick={(event) => {
+          // Only the band: a press that landed on the coin is the coin's.
+          if (event.target !== event.currentTarget) return;
+          onOpen?.();
+        }}
+      ></button>
       <svg
         class="pointer-events-none absolute inset-0 -rotate-90"
         viewBox="0 0 40 40"
@@ -60,7 +73,7 @@
       {#each ring.checkpoints as checkpoint (checkpoint.reminder)}
         <Checkpoint {...checkpoint} along="ring" />
       {/each}
-      {@render key()}
+      <span class="relative z-1 grid place-items-center">{@render key()}</span>
     </span>
   </Tip>
 {/if}

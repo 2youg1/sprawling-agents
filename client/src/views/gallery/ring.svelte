@@ -66,12 +66,64 @@
   import Glyph from "../parts/glyph.svelte";
   import Ring from "../talk/gauge.look.svelte";
   import { barOf, ringOf } from "../talk/gauge";
+  import Report from "../talk/context_report.look.svelte";
+  import { reportOf } from "../talk/context_report";
   import Sparkline from "../talk/sparkline.svelte";
   import Wear from "../talk/wear.look.svelte";
   import Bar from "../world/context_bar.look.svelte";
   import Case from "./case.svelte";
+  import type { PrefixAnswer, PromptShapeAnswer } from "../../wire";
+  import { B3Hash, RunId } from "../../wire";
 
   const { lang } = ui();
+
+  const REPORT_RUN = RunId.make("00000000-0000-4000-8000-0000000000c1");
+  const REPORT_PREFIX: PrefixAnswer = {
+    run: REPORT_RUN,
+    segments: [
+      { slot: "city", hash: B3Hash.make("1".repeat(64)), bytes: 1_640, text: "", stored: true, sources: [] },
+      {
+        slot: "building",
+        hash: B3Hash.make("2".repeat(64)),
+        bytes: 8_500,
+        text: "",
+        stored: true,
+        sources: [],
+      },
+      {
+        slot: "resident",
+        hash: B3Hash.make("3".repeat(64)),
+        bytes: 4_000,
+        text: "",
+        stored: true,
+        sources: [],
+      },
+      { slot: "run", hash: B3Hash.make("4".repeat(64)), bytes: 1_100, text: "", stored: true, sources: [] },
+    ],
+    tools: {
+      hash: B3Hash.make("5".repeat(64)),
+      index: 0,
+      len: 3_500,
+      rows: [
+        { name: "Shell", namespace: "core", exposure: "core", from: "default", hint: "", len: 700 },
+        { name: "Grep", namespace: "core", exposure: "core", from: "default", hint: "", len: 560 },
+      ],
+    },
+  };
+  const REPORT_SHAPE: PromptShapeAnswer = {
+    run: REPORT_RUN,
+    tools: { bytes: 3_500, hash: B3Hash.make("5".repeat(64)) },
+    conversation: { bytes: 188_600, hash: B3Hash.make("6".repeat(64)) },
+    upper_bound: 207_340,
+  };
+  const report = $derived(
+    reportOf($lang, REPORT_RUN, REPORT_PREFIX, REPORT_SHAPE, {
+      used: 211_100,
+      window: 256_000,
+      first: 30,
+      second: 65,
+    }),
+  );
 </script>
 
 {#snippet key()}
@@ -81,13 +133,13 @@
 {#each RINGS as { label, context } (label)}
   <Case {label} width={120}>
     <div class="flex justify-center py-wide">
-      <Ring ring={ringOf($lang, context)} children={key} />
+      <Ring ring={ringOf($lang, context)} children={key} onOpen={null} />
     </div>
   </Case>
 {/each}
 <Case label="context ring · a model that states no window draws the key alone" width={120}>
   <div class="flex justify-center py-wide">
-    <Ring ring={null} children={key} />
+    <Ring ring={null} children={key} onOpen={null} />
   </div>
 </Case>
 
@@ -99,6 +151,12 @@
         <Bar {...bar} />
       {/if}
     {/each}
+  </div>
+</Case>
+
+<Case label="context report · ring picks a bucket; detail unfolds under it" width={360}>
+  <div class="h-[34rem] overflow-hidden rounded-panel border border-edge-panel bg-page">
+    <Report look={report} />
   </div>
 </Case>
 

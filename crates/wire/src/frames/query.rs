@@ -275,6 +275,16 @@ pub enum Query {
     Prefix {
         run: RunId,
     },
+    /// The tool table and conversation sizes of one run's latest request.
+    ///
+    /// Answered from the newest `prompt_shape_compared` for that run.
+    /// The four frozen segments stay on [`Query::Prefix`]: this question
+    /// is only the two regions that grow after the prefix freezes, so a
+    /// context report can weigh the whole payload from the two answers
+    /// without a second home for the segments.
+    PromptShape {
+        run: RunId,
+    },
     /// One object of the content store, bounded, with the cut stated.
     ///
     /// The general read behind [`Query::Prefix`], and the door every

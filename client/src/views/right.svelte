@@ -56,6 +56,7 @@
   import Split from "./inspect/split.svelte";
   import Strip from "./inspect/strip.svelte";
   import RefRain from "./refrain/refrain.svelte";
+  import ContextReport from "./talk/context_report.svelte";
 
   interface Props {
     // What the side shows while nobody has opened an item.
@@ -135,6 +136,7 @@
     if (item.kind === "document") return item.path.slice(item.path.lastIndexOf("/") + 1);
     if (item.kind === "changes") return item.head.slice(0, SHORT);
     if (item.kind === "letter") return item.doc.slice(item.doc.lastIndexOf("/") + 1);
+    if (item.kind === "context") return say($lang, "context_report_tab");
     const call = callOf(item)?.call ?? null;
     if (call === null) return "…";
     const entry = call.render === "terminal" ? commandOf(call) : null;
@@ -171,6 +173,7 @@
         });
       case "changes":
       case "letter":
+      case "context":
         return null;
     }
   }
@@ -232,6 +235,10 @@
   {:else if item.kind === "changes"}
     <div class="min-h-0 flex-1 overflow-auto bg-page px-wide py-snug">
       <Changes base={item.base} head={item.head} {talk} />
+    </div>
+  {:else if item.kind === "context"}
+    <div class="min-h-0 flex-1 overflow-auto bg-page">
+      <ContextReport run={item.run} room={item.room} />
     </div>
   {:else}
     {@const found = callOf(item)}

@@ -75,6 +75,26 @@ pub struct PrefixAnswer {
     pub tools: Option<kernel::event::record::PromptTools>,
 }
 
+/// The two growing halves of one request's cache shape, as the run's
+/// latest `prompt_shape_compared` recorded them.
+///
+/// The four frozen segments stay on [`PrefixAnswer`]: this answer names
+/// only what that record adds — the tool table and the conversation —
+/// so a context report can weigh the whole payload without a second
+/// home for the segments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PromptShapeAnswer {
+    pub run: RunId,
+    /// Tool schemas carried on the request, in the encoding the shape
+    /// measured.
+    pub tools: kernel::event::record::ShapePart,
+    /// The conversation messages of that request (`prompt_shape_compared.run`).
+    pub conversation: kernel::event::record::ShapePart,
+    /// Upper bound on billed input bytes for that request.
+    pub upper_bound: u64,
+}
+
 /// One object of the content store, cut to what travels.
 ///
 /// The same bound and the same text judgement `Document` puts on a file

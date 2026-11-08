@@ -10427,6 +10427,86 @@
     "en": "context",
     "zh": "上下文"
   },
+  "context_report_title": {
+    "en": "Context usage",
+    "zh": "上下文用量"
+  },
+  "context_report_full": {
+    "en": "full",
+    "zh": "已满"
+  },
+  "context_report_insight": {
+    "en": "{bucket} is the largest at {share}% of the payload.",
+    "zh": "最大的是{bucket}，占载荷的 {share}%。"
+  },
+  "context_report_empty": {
+    "en": "No payload measured yet.",
+    "zh": "还没有可测的载荷。"
+  },
+  "context_report_waiting": {
+    "en": "Waiting for the first prompt to assemble.",
+    "zh": "等第一次提示装配完成。"
+  },
+  "context_report_no_window": {
+    "en": "This model stated no context window.",
+    "zh": "这个模型没有声明上下文窗口。"
+  },
+  "context_report_filling": {
+    "en": "Past the {n}% reminder — the window is filling.",
+    "zh": "已过 {n}% 提醒——窗口在变满。"
+  },
+  "context_report_handoff": {
+    "en": "Past the {n}% handoff mark — leave room to succeed.",
+    "zh": "已过 {n}% 交接线——请留出收尾的空间。"
+  },
+  "context_report_open_prompt": {
+    "en": "Open the prompt lens",
+    "zh": "打开提示透镜"
+  },
+  "context_report_pick": {
+    "en": "Click a segment on the ring to inspect it.",
+    "zh": "点圆环上的一段来查看。"
+  },
+  "context_report_conversation_note": {
+    "en": "Messages and tool results grow each turn.",
+    "zh": "消息与工具结果随每一回合变长。"
+  },
+  "context_report_no_parts": {
+    "en": "No finer parts recorded for this bucket.",
+    "zh": "这一桶没有更细的分项。"
+  },
+  "context_report_tab": {
+    "en": "Context",
+    "zh": "上下文"
+  },
+  "context_report_open": {
+    "en": "Open context usage",
+    "zh": "打开上下文用量"
+  },
+  "context_bucket_tools": {
+    "en": "Tools",
+    "zh": "工具"
+  },
+  "context_bucket_city": {
+    "en": "City",
+    "zh": "城"
+  },
+  "context_bucket_building": {
+    "en": "Building",
+    "zh": "楼"
+  },
+  "context_bucket_resident": {
+    "en": "Resident",
+    "zh": "居民"
+  },
+  "context_bucket_run": {
+    "en": "Run",
+    "zh": "本跑"
+  },
+  "context_bucket_conversation": {
+    "en": "Conversation",
+    "zh": "对话"
+  },
   "settings_branch_extensions": {
     "en": "extensions",
     "zh": "扩展"

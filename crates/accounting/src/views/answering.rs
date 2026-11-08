@@ -213,6 +213,9 @@ impl Views {
             // What an agent was told, and the store read that recovers it. A run with no prompt
             // yet and an object this city no longer holds are both "I could not look".
             wire::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
+            wire::Query::PromptShape { run } => {
+                return Prepared::PromptShape(self.prompt_shape_ask(*run));
+            }
             // Read at every asking rather than held: each file is one a person also edits or
             // another page also writes, and a copy kept in this fold would answer with what it
             // said the last time somebody used a page.

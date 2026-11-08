@@ -25,13 +25,15 @@ describe("the context ring's look", () => {
     ].join(" · ");
     expect(ringOf("en", BOTH)).toEqual({
       meter: {
-        role: "meter",
+        role: "button",
+        type: "button",
         tabindex: 0,
-        "aria-label": say("en", "ring_name"),
+        "aria-label": say("en", "context_report_open"),
         "aria-valuemin": 0,
         "aria-valuemax": 200_000,
         "aria-valuenow": 82_400,
         "aria-valuetext": reading,
+        "aria-haspopup": "dialog",
       },
       reading,
       arc: { dasharray: "59 100", dashoffset: "-41" },

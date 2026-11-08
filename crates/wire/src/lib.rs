@@ -57,6 +57,7 @@ pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_M
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, Renewals};
 pub use answer::{ConfigAnswer, ConfigLayer, GenerationAnswer, ModelFactsSummary, ParameterAnswer};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
+pub use answer::PromptShapeAnswer;
 pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use answer::{DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUse};

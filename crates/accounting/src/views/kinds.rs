@@ -42,6 +42,8 @@ pub(super) enum Holding {
     Document,
     /// A run's first prompt.
     Prompt,
+    /// A run's request shape compared for this turn.
+    PromptShape,
     /// Nothing the views hold beyond the folds every record passes.
     Nothing,
 }
@@ -62,12 +64,12 @@ impl Holding {
             EventKind::ApprovalResolved => Holding::Ruling,
             EventKind::DocumentWritten => Holding::Document,
             EventKind::PromptAssembled => Holding::Prompt,
+            EventKind::PromptShapeCompared => Holding::PromptShape,
             EventKind::BuildingCreated
             | EventKind::BuildingConfigured
             | EventKind::BuildingRemoved
             | EventKind::SessionOpened
             | EventKind::RunForked
-            | EventKind::PromptShapeCompared
             | EventKind::ModelCalled
             | EventKind::ModelReturned
             | EventKind::ToolCalled

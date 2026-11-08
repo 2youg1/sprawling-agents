@@ -60,11 +60,18 @@ export interface LetterItem {
   readonly card: B3Hash;
 }
 
+// One run's context usage report, opened from the ring (not the coin).
+export interface ContextItem {
+  readonly run: RunId;
+  readonly room: Address | null;
+}
+
 export type RightItem =
   | ({ readonly kind: "call" } & CallItem)
   | ({ readonly kind: "document" } & DocumentItem)
   | ({ readonly kind: "changes" } & ChangesItem)
-  | ({ readonly kind: "letter" } & LetterItem);
+  | ({ readonly kind: "letter" } & LetterItem)
+  | ({ readonly kind: "context" } & ContextItem);
 
 // Tabs a person keeps open before the oldest is closed for them: enough
 // for a file, its diff and two commands on each side of a comparison.
@@ -100,6 +107,8 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
       return b.kind === "changes" && a.base === b.base && a.head === b.head;
     case "letter":
       return b.kind === "letter" && a.doc === b.doc && a.card === b.card;
+    case "context":
+      return b.kind === "context" && a.run === b.run;
   }
 }
 
@@ -115,6 +124,8 @@ export function itemKey(item: RightItem): string {
       return `changes ${item.base} ${item.head}`;
     case "letter":
       return `letter ${item.doc} ${item.card}`;
+    case "context":
+      return `context ${item.run}`;
   }
 }
 
@@ -165,6 +176,11 @@ export function openLetter(letter: LetterItem, comeBack: () => void): void {
   opener = null;
   back = comeBack;
   showItem({ kind: "letter", doc: letter.doc, card: letter.card });
+}
+
+export function openContext(context: ContextItem): void {
+  rememberOpener();
+  showItem({ kind: "context", run: context.run, room: context.room });
 }
 
 // Bring an item forward, opening it when it is not open yet.

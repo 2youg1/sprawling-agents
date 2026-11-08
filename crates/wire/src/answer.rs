@@ -111,7 +111,9 @@ pub use model_figures::{
     CeilingLine, FigureFrom, FiguresAsked, FiguresLine, ModelFiguresAnswer, WindowLine,
 };
 pub use note::{HandbackNote, Note, ReplyEnd, ReplyEnded, Speaker};
-pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
+pub use prefix::{
+    ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource, PromptShapeAnswer,
+};
 pub use preview::PreviewAnswer;
 pub use proposals::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use range::RangeAnswer;
@@ -252,6 +254,8 @@ pub enum Answer {
     Doctor(Box<DoctorAnswer>),
     Upstream(Box<DoctorUpstream>),
     Prefix(Box<PrefixAnswer>),
+    /// The latest request shape for one run (`Query::PromptShape`).
+    PromptShape(Box<PromptShapeAnswer>),
     Content(Box<ContentAnswer>),
     Skills(Box<SkillsAnswer>),
     /// What a template would write as a building's rules (`Query::Template`).
