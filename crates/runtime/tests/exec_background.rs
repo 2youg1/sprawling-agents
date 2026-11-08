@@ -22,7 +22,7 @@
 use std::path::PathBuf;
 
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
-use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel, PollBudget};
+use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel, PollBudget, PythonGuest};
 use serde_json::{Value, json};
 
 const MARK: &str = "only-for-the-run-that-started-it";
@@ -34,7 +34,7 @@ fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Pat
         // The sandbox is the echo double, which never reads this path:
         // the python arm is here as a call that settles without a child
         // process, so it reads the table and nothing else.
-        python_wasm: Some(PathBuf::from("python.wasm")),
+        python_wasm: Some(PythonGuest::at(PathBuf::from("python.wasm"))),
         shell: runtime::Shell::Absent,
         fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),

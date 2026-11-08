@@ -29,7 +29,7 @@ type Completion = Result<(String, Duration), String>;
 pub(super) fn calls(guest: &Guest) -> Result<Vec<Sample>, String> {
     (0..COLD_SAMPLES)
         .map(|index| {
-            call(guest.digest, &guest.path).map(|took| Sample {
+            call(guest.digest, &guest.path, &guest.stdlib.host).map(|took| Sample {
                 took,
                 round: index.saturating_add(1),
                 metric: "latency",
@@ -42,7 +42,7 @@ pub(super) fn calls(guest: &Guest) -> Result<Vec<Sample>, String> {
     clippy::disallowed_methods,
     reason = "a developer bench spawns its own executable; it is not a city child"
 )]
-fn call(guest: B3Hash, snapshot: &Path) -> Result<Duration, String> {
+fn call(guest: B3Hash, snapshot: &Path, stdlib: &Path) -> Result<Duration, String> {
     let started = super::super::stamp();
     let executable = std::env::current_exe()
         .map_err(|why| cold_process("locate the cold benchmark executable", why.to_string()))?;
@@ -50,6 +50,7 @@ fn call(guest: B3Hash, snapshot: &Path) -> Result<Duration, String> {
         .arg(COLD_COMMAND)
         .arg(guest.to_string())
         .arg(snapshot)
+        .arg(stdlib)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

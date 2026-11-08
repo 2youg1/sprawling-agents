@@ -53,13 +53,13 @@ pub struct ExecSetup { /* …既有字段… */ pub policy: crate::mode::PolicyR
 
 ```rust
 // crates/runtime/src/tools/exec.rs —— 三臂（ExecArm 住 kernel::tool）
-pub struct ExecTool { /* workdir、mounts、python_wasm: Option<PathBuf>、sandbox: Box<dyn Sandbox>、
+pub struct ExecTool { /* workdir、mounts、python_wasm: Option<PythonGuest>、sandbox: Box<dyn Sandbox>、
                         shell: Shell（§8-13-2 D30）、fuel —— 私有；全由装配／执行器注入 */ }
 impl ExecTool { pub fn new(…) -> ExecTool; }
 impl Tool for ExecTool { /* meta：name=exec、effect=Write{domain}、temporal=Timestamped、render=Terminal */ }
 // Program 臂：std::process::Command（workdir 钉定、环境变量白名单——secret 恒不透传）；唯一真子进程产地
 //            缺省在 §8-13-2 的 confinement 副本里跑；`where: host` 才在原地（那条路是一条命令碰得到人那棵树的路）
-// Python 臂：sandbox.run(python_wasm, argv=["python","-c",code], mounts)；组件缺失→E_TOOL_UNAVAILABLE＋alternative＝Program 臂
+// Python 臂：sandbox.run(python_wasm.wasm, argv=["python","-c",code], mounts＋一个只读 stdlib mount)；组件缺失→E_TOOL_UNAVAILABLE＋alternative＝Program 臂
 // Shell 臂：探测缺失即拒（E_TOOL_UNAVAILABLE，不是降级；楼要了 pwsh 而没有时点名 pwsh 7）；存在则 sh -c／cmd /C／pwsh -NoLogo -NoProfile -NonInteractive -Command（D30）；placement 与 Program 臂同一权威（§8-13-2）
 
 // crates/runtime/src/tools/edit.rs —— 读戳准入（§8-64）＋写域双闸＋创建臂

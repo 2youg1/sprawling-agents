@@ -30,7 +30,7 @@ pub use exec::parse_arm;
 pub use exec::parse_placement;
 pub(crate) use exec::program_line;
 pub use exec::{ContainerEngine, ContainerLaunch, ContainerRuntime};
-pub use exec::{ExecSetup, ExecTool};
+pub use exec::{ExecSetup, ExecTool, PythonGuest};
 pub use exec::{FailureClass, Shell, ShellCount, ShellTally};
 pub use exec::{Placed, Placement};
 pub use path_lock::PathLocks;

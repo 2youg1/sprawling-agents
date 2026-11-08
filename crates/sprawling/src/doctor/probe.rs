@@ -117,7 +117,12 @@ impl Machine for ThisMachine {
             },
             Detection::Component { variable, file } => {
                 let dir = super::host::components_dir().map(|dir| dir.join(requirement.name));
-                component_at(variable, std::env::var_os(variable), dir, file)
+                let value = std::env::var_os(variable);
+                if *variable == super::table::PYTHON_WASM_VARIABLE {
+                    super::host::python_component(value, dir, file)
+                } else {
+                    component_at(variable, value, dir, file)
+                }
             }
             Detection::Interpreter { variable, fallback } => {
                 let Some(platform) = self.platform else {

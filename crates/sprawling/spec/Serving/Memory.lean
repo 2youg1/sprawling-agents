@@ -28,6 +28,7 @@
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
 | playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`crates/accounting/Spec.lean` §3） | 选中的记录数 |
 | doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`crates/sprawling/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
+| guest 的内容 pin | `bin::doctor::host` | 默认组件每进程首次选择时读入完整 wasm、算完 BLAKE3 即释放；`OnceLock` 只留判定，不留字节 | 无 |
 | 已编译的 guest 模块（`Compiled`） | `runtime::sandbox::engine` | 一格：同一进程里所有 `WasmtimeSandbox` 的克隆共用一份编译产物，换 guest 时替换（`crates/runtime/spec/Sandbox.lean` D101） | 无 |
 | guest 的线性内存 | `runtime::sandbox::engine` | run 的 `[core] memory_bytes`（`soft_shares` 臂时，与这个 run 的子进程同一个数，`crates/runtime/spec/Sandbox.lean` D102）；没填时 wasm32 的 4 GiB；调用结束即释放 | 同时在跑的 python 调用数 |
 

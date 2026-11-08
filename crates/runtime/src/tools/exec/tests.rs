@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
+#[cfg(feature = "wasm")]
+use crate::WasmtimeSandbox;
 use crate::sandbox::{EchoSandbox, FaultSandbox};
 use kernel::Address;
 
@@ -66,7 +68,7 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
     ExecSetup {
         workdir: workdir.to_path_buf(),
         mounts: Vec::new(),
-        python_wasm: python,
+        python_wasm: python.map(PythonGuest::at),
         shell: shell.map_or(Shell::Absent, |program| Shell::Found {
             program,
             interpreter: kernel::Interpreter::System,
@@ -280,6 +282,65 @@ fn a_call_names_a_command_or_a_script_and_nothing_else() {
             )),
         ]
     );
+}
+
+#[test]
+fn python_mounts_follow_the_selected_guests_stdlib_layout() {
+    struct Capture(std::sync::Arc<Mutex<Vec<Mount>>>);
+    impl Sandbox for Capture {
+        fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError> {
+            *self.0.lock().unwrap() = job.mounts.clone();
+            EchoSandbox::new().run(job)
+        }
+    }
+    let chamber = tempfile::tempdir().unwrap();
+    let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+    let wasm = chamber.path().join("python.wasm");
+    let authorized = Mount {
+        host: chamber.path().to_path_buf(),
+        guest: "/work".to_owned(),
+        writable: false,
+    };
+    for external in [false, true] {
+        if external {
+            std::fs::create_dir(chamber.path().join("lib")).unwrap();
+        }
+        let mut config = setup(chamber.path(), Some(wasm.clone()), None);
+        config.mounts.push(authorized.clone());
+        let guest = config.python_wasm.clone().unwrap();
+        let tool = ExecTool::new(config, Box::new(Capture(seen.clone())), patient()).unwrap();
+        tool.invoke(&call(python("print(1)"))).unwrap();
+        let expected = if external {
+            vec![authorized.clone(), guest.stdlib().clone()]
+        } else {
+            vec![authorized.clone()]
+        };
+        assert_eq!(*seen.lock().unwrap(), expected);
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[test]
+fn the_python_guest_imports_the_advertised_stdlib() {
+    let Some(wasm) = std::env::var_os("SPRAWLING_PYTHON_WASM").map(PathBuf::from) else {
+        eprintln!("skip: SPRAWLING_PYTHON_WASM does not name a real CPython-WASI guest");
+        return;
+    };
+    let chamber = tempfile::tempdir().unwrap();
+    let setup = ExecSetup {
+        fuel: Fuel(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
+        ..setup(chamber.path(), Some(wasm), None)
+    };
+    let sandbox = WasmtimeSandbox::new().unwrap();
+    let tool = ExecTool::new(setup, Box::new(sandbox), patient()).unwrap();
+    let outcome = tool
+        .invoke(&call(python(
+            "import collections, difflib, itertools, re; print('stdlib-ok')",
+        )))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert_eq!(result["exit_code"], 0, "{result}");
+    assert_eq!(result["stdout"], "stdlib-ok\n", "{result}");
 }
 
 #[test]

@@ -23,13 +23,19 @@ use std::path::PathBuf;
 use kernel::AxError;
 
 use super::family::GECKO;
-use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON_WASI, REQUIREMENTS, SHELL};
+use super::table::{
+    CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON_GUEST_B3, PYTHON_WASI, PYTHON_WASM_VARIABLE,
+    REQUIREMENTS, SHELL,
+};
 use super::{Absence, Fault, Machine, PATIENCE, Platform, Presence, ThisMachine, Version};
 
 /// Whether this binary was built with the `sandbox` feature. The one
 /// spelling of that fact; the table reads it and the engine below
 /// selects on it.
 pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
+
+/// The default guest's once-per-process content verdict; no guest bytes are retained.
+static PYTHON_GUEST_CHECK: std::sync::OnceLock<Result<(), Fault>> = std::sync::OnceLock::new();
 
 /// The machine-level directory this city keeps components in, or
 /// nothing when this environment states no home directory.
@@ -148,6 +154,89 @@ pub(crate) fn chromedriver() -> Presence {
 /// component directory.
 pub(crate) fn python_wasm() -> Presence {
     look(PYTHON_WASI)
+}
+
+/// The component probe and execution entry share this non-recursive provenance door.
+pub(super) fn python_component(
+    variable: Option<OsString>,
+    dir: Option<PathBuf>,
+    file: &str,
+) -> Presence {
+    let source = variable
+        .as_ref()
+        .filter(|value| !value.is_empty())
+        .map_or(PythonGuestSource::Pinned, |_| PythonGuestSource::Override);
+    let found = super::probe::component_at(PYTHON_WASM_VARIABLE, variable, dir, file);
+    judge_python_guest(found, source, PYTHON_GUEST_B3, &PYTHON_GUEST_CHECK)
+}
+
+/// Whether the component came through the pinned install or the developer override.
+#[derive(Clone, Copy)]
+pub(super) enum PythonGuestSource {
+    Pinned,
+    Override,
+}
+
+/// Applies the selected guest's provenance rule to a presence answer.
+pub(super) fn judge_python_guest(
+    found: Presence,
+    source: PythonGuestSource,
+    expected: &str,
+    checked: &std::sync::OnceLock<Result<(), Fault>>,
+) -> Presence {
+    let Presence::Present { at, version } = found else {
+        return found;
+    };
+    if matches!(source, PythonGuestSource::Override) {
+        return Presence::Present {
+            at,
+            version: Version::Said("unpinned override".to_owned()),
+        };
+    }
+    match checked
+        .get_or_init(|| verify_python_guest(&at, expected))
+        .clone()
+    {
+        Ok(()) => {
+            let lib = runtime::PythonGuest::at(at.clone())
+                .stdlib()
+                .host
+                .join("python3.14");
+            let installed = [
+                "encodings/__init__.py",
+                "collections/__init__.py",
+                "difflib.py",
+                "re/__init__.py",
+                "os.py",
+            ]
+            .iter()
+            .all(|name| lib.join(name).is_file());
+            if installed {
+                Presence::Present { at, version }
+            } else {
+                Presence::Broken {
+                    at,
+                    fault: Fault::HalfWritten,
+                }
+            }
+        }
+        Err(fault) => Presence::Broken { at, fault },
+    }
+}
+
+/// Checks the whole file against the registered content identity.
+fn verify_python_guest(at: &std::path::Path, expected: &str) -> Result<(), Fault> {
+    let expected = expected.parse::<kernel::B3Hash>().map_err(|why| {
+        Fault::Unreadable(format!("the registered Python guest pin is invalid: {why}"))
+    })?;
+    let bytes = std::fs::read(at)
+        .map_err(|why| Fault::Unreadable(format!("read pinned guest {}: {why}", at.display())))?;
+    let found = kernel::B3Hash::digest(&bytes);
+    if found == expected {
+        Ok(())
+    } else {
+        Err(Fault::DigestMismatch { expected, found })
+    }
 }
 
 /// The interpreter this platform calls a shell.
