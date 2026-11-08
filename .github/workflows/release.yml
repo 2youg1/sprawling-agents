@@ -81,6 +81,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # A `workflow_run` caller (release-warm) has github.sha on tip of
+          # main, not the green commit; prefer an explicit source-sha.
+          ref: ${{ inputs.source-sha || github.sha }}
       - name: install pinned toolchain
         run: rustup show
       - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
@@ -152,6 +156,10 @@ jobs:
       LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nightly and release-warm pass `source-sha`; a `workflow_run`
+          # caller's github.sha is tip of main, not that green commit.
+          ref: ${{ inputs.source-sha || github.sha }}
       # The same pinned, isolated toolchain and Windows work-drive Cargo home
       # as CI, so the cache key and small-file writes follow D27's measurements.
       - uses: ./.github/actions/toolchain
@@ -203,12 +211,14 @@ jobs:
         with:
           shared-key: release
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: the checkout is the commit a nightly names
-        if: env.RELEASE_CHANNEL == 'nightly'
+      - name: the checkout is the commit a caller named
+        if: env.SOURCE_SHA != ''
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$NIGHTLY_TAG"
+          if [ "$RELEASE_CHANNEL" = nightly ]; then
+            test -n "$NIGHTLY_TAG"
+          fi
           checked_out=$(git rev-parse HEAD)
           test "$checked_out" = "$SOURCE_SHA" || {
             echo "::error::this run names $SOURCE_SHA but checked out $checked_out"
