@@ -14,14 +14,21 @@ permissions:
   contents: read
   actions: read
 
+# `workflow_run` is a low-trust trigger: without an explicit write-capable
+# cache-mode the three-platform `release` save is skipped and the warm
+# does nothing. `decide` still admits only a successful `push` CI on main
+# (`crates/xtask/Spec.lean` D27).
+cache-mode: write
+
 concurrency:
   # Keep an in-flight warm that will write the release cache; a later main
   # push whose `decide` sets `warm` false would otherwise abort it under
   # `cancel-in-progress: true` and leave tag builds without the three
-  # platform entries. Concurrent decide jobs are cheap; concurrent warms
-  # share the same cache key inputs when both run.
+  # platform entries. `queue: max` keeps pending warms that a later
+  # docs-only run would otherwise replace under the default single slot.
   group: release-warm-main
   cancel-in-progress: false
+  queue: max
 
 jobs:
   decide:
@@ -60,8 +67,13 @@ jobs:
     needs: decide
     if: ${{ needs.decide.outputs.warm == 'true' }}
     uses: ./.github/workflows/release.yml
+    # Same static ceiling as nightly-release: GitHub expands the called
+    # graph before job `if`, and archive still declares contents:read so
+    # this warm receives no publish or OIDC grant (`crates/xtask/Spec.lean` D27).
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     with:
       channel: source
       source-sha: ${{ needs.decide.outputs.sha }}

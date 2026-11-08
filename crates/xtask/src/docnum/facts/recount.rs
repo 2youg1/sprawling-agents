@@ -118,23 +118,25 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
 
 /// How many citysim scenario modules the suite harness loads.
 ///
-/// `main.rs` is the one integration binary that owns the suite; it is not
-/// a scenario. Counting it would raise the document's number when the
-/// scenarios themselves did not move.
+/// The harness's `mod` list is the authority: a helper file under
+/// `scenarios/` is not a scenario, and `main.rs` itself is not one either.
 pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
-    let dir = "crates/citysim/tests/scenarios";
-    let base = root.join(dir);
-    if !base.is_dir() {
-        return Err(XtaskError::Doc {
-            file: dir.to_owned(),
-            msg: "no such directory, so no scenario file can be counted".to_owned(),
-        });
-    }
-    let found = walk::files_with_ext(&base, &["rs"])?
-        .into_iter()
-        .filter(|path| path.file_name().and_then(|name| name.to_str()) != Some("main.rs"))
+    let harness = "crates/citysim/tests/scenarios/main.rs";
+    let text = walk::read_text(&root.join(harness))?;
+    let found = text
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            line.strip_prefix("mod ")?.strip_suffix(';')
+        })
+        .filter(|name| {
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        })
         .count();
-    refuse_if_empty(found, dir, "scenario file")
+    refuse_if_empty(found, harness, "scenario file")
 }
 
 /// The version this workspace pins for one crate.
