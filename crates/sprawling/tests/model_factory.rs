@@ -157,6 +157,7 @@ fn city_on(
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse(template).unwrap(),
             rules: None,
+            source: None,
             idem: idem(b"create"),
         })
         .unwrap();

@@ -50,6 +50,25 @@ export function waiting(buildings: readonly BuildingProgress[]): readonly Addres
   return buildings.filter((each) => each.adoptable).map((each) => each.addr);
 }
 
+// The path the import box offers the city, or nothing when it is empty.
+// The city reads it with its own rule; this only decides whether a frame
+// carries a source at all.
+export function sourceOf(written: string): string | null {
+  const text = written.trim();
+  return text === "" ? null : text;
+}
+
+// What the import box holds that no machine could read as a folder.
+// Only the shapes the frame's own reader refuses: whether the folder is
+// there, inside the city, or linked is the city's to see, because only it
+// can look.
+export function sourceRefusal(written: string): Key | null {
+  const text = written.trim();
+  if (text === "") return null;
+  const absolute = text.startsWith("/") || text.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(text);
+  return absolute ? null : "raise_source_relative";
+}
+
 // The waiting folders the page offers to fill in: the one already in the
 // box is not offered again, since the box says it.
 export function fillable(

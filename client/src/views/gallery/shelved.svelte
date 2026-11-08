@@ -44,6 +44,7 @@
 
   export const SHELVED: SkillsAnswer = {
     building: HALL,
+    external_shelves: ["~/.claude/skills"],
     skills: [
       {
         name: "diagnosing-bugs",
@@ -110,7 +111,7 @@
   // empty line has to turn into a next step rather than a dead end.
   function bare(query: Query): Answer | undefined {
     return typeof query === "object" && "skills" in query
-      ? { skills: { building: HALL, skills: [], missing: [] } }
+      ? { skills: { building: HALL, external_shelves: [], skills: [], missing: [] } }
       : undefined;
   }
 </script>

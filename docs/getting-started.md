@@ -128,7 +128,7 @@ A name on that list that no shelf holds is reported rather than promised. This k
 shelves = ["~/.claude/skills"]
 ```
 
-The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. This repository ships nine skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
+The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. Its **folders from this computer** box takes an absolute path — `~/.claude/skills`, or a Windows drive — and mounts the whole folder read-only: every folder inside it holding a `SKILL.md` becomes a skill, nothing is copied, and the list above shows it once the city answers. This repository ships nine skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
 
 **MCP** (Model Context Protocol) is how a building reaches outside applications — mail, GitHub, Figma, a document converter — through a tool server. A server is one entry in the building's `CONFIG.toml`: a `command` for a program on this computer, or a `url` for a hosted one; the **MCP** page writes the same entries for you. A confidential building starts none.
 
@@ -385,7 +385,7 @@ Write the idea in one sentence — *rewrite the ledger reader so a cold read of 
 
 The Mayor reads every building's `Roadmap.md`, `Memo.md` and `Handoff.md` first, and City Hall's own. It writes the city's plan into `<city>/hall/Roadmap.md` through its `plan` tool, one row per line of work, and hands each building its part through the same tool. When no existing building should hold the work, it asks you to raise one or to adopt a folder you point it at — how the city grows is your decision — and it never asks for two buildings for one project. Once you set a building's part as its standing goal, the city keeps that building working until the part is done. The Mayor records what it decided in `<city>/hall/Memo.md` before it reports back.
 
-**You can also go around the Mayor.** `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one); open one of its rooms from the command palette or with `/room <address>`, and your message goes straight there. `/raise` with no words opens the raise page: choose the template there, inspect and change the `RULES.toml` it is about to write, and either raise a new building or adopt a folder already in the city without overwriting its files.
+**You can also go around the Mayor.** `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one); open one of its rooms from the command palette or with `/room <address>`, and your message goes straight there. `/raise` with no words opens the raise page: choose the template there, inspect and change the `RULES.toml` it is about to write, and either raise a new building, adopt a folder already in the city without overwriting its files, or name an absolute path on this machine and have that folder copied in.
 
 **take this conversation to…** in the same palette branches the current conversation into another room that can take it, with the reason shown beside a room that cannot — moving the context does not mean copying and pasting it.
 

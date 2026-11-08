@@ -77,4 +77,8 @@ pub struct SkillsAnswer {
     /// Shown to the person who wrote the list, since only they can fix
     /// it.
     pub missing: Vec<String>,
+    /// The city layer's ordered `[skills] shelves` entries as written,
+    /// including mounts that currently hold no skills. Older answers omit it.
+    #[serde(default)]
+    pub external_shelves: Vec<String>,
 }

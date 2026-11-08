@@ -183,6 +183,7 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: idem(b"create"),
         })
         .unwrap();

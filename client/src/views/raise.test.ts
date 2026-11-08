@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Address } from "../wire";
 import type { BuildingProgress } from "../wire";
-import { fillable, raisingOf, waiting } from "./raise";
+import { fillable, raisingOf, sourceOf, sourceRefusal, waiting } from "./raise";
 
 const IDLE: BuildingProgress["progress"] = {
   planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 },
@@ -48,6 +48,22 @@ describe("the raise page", () => {
       [Address.make("notes")],
       [Address.make("notes")],
       [],
+    ]);
+  });
+
+  test("the import box carries an absolute path, keeps an empty box out of the frame, and refuses a relative one", () => {
+    expect(
+      ["", "  ", "C:\\work\\lab", "/work/lab", "\\\\host\\share\\lab", "lab", "~/lab"].map(
+        (written) => [sourceOf(written), sourceRefusal(written)],
+      ),
+    ).toEqual([
+      [null, null],
+      [null, null],
+      ["C:\\work\\lab", null],
+      ["/work/lab", null],
+      ["\\\\host\\share\\lab", null],
+      ["lab", "raise_source_relative"],
+      ["~/lab", "raise_source_relative"],
     ]);
   });
 });

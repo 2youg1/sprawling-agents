@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 76 as const;
+export const WIRE_V = 77 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "44851afe6192e806d5889e0e26a060c2a4f0242fc28d8fa1ca7c80c63f88b716" as const;
+export const WIRE_HASH = "52e31a20c358090e18deed1e04fc3e32f408d400501cab5ceb49ef9361e2c628" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -4970,6 +4970,7 @@ export type SkillLine = typeof SkillLine.Type;
  */
 export const SkillsAnswer = Schema.Struct({
   building: Address,
+  external_shelves: Schema.optional(Schema.Array(Schema.String)),
   missing: Schema.Array(Schema.String),
   skills: Schema.Array(SkillLine),
 }).annotate({ identifier: "SkillsAnswer" });
@@ -5728,6 +5729,7 @@ export const CitySettings = Schema.Struct({
   idem: IdemKey,
   keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
   search: Schema.optional(Schema.NullOr(SearchConfiguration)),
+  skill_shelves: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 }).annotate({ identifier: "CitySettings" });
 export type CitySettings = typeof CitySettings.Type;
 
@@ -6122,6 +6124,7 @@ export const Command = Schema.Union([
       addr: Address,
       idem: IdemKey,
       rules: Schema.optional(Schema.NullOr(Schema.String)),
+      source: Schema.optional(Schema.NullOr(Schema.String)),
       template: TemplateName,
     }),
   }),

@@ -98,6 +98,7 @@ fn configure(search: SearchConfiguration, tag: &[u8]) -> wire::Command {
         effort: None,
         search: Some(search),
         catalog: None,
+        skill_shelves: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, tag),
     })
 }
@@ -139,6 +140,83 @@ fn a_city_search_setting_lands_in_the_city_layer_and_reads_back() {
             }],
         }
     );
+}
+
+/// The skills page mounts a whole directory another harness already
+/// keeps, then reads both the configured path and the skills back through
+/// the same query that draws the shelf.
+#[test]
+fn a_local_skill_library_is_mounted_and_read_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let library = tempfile::tempdir().unwrap();
+    let mut worker = opened(dir.path());
+    let lab = Address::parse("lab").unwrap();
+    city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
+    std::fs::create_dir_all(library.path().join("review")).unwrap();
+    std::fs::write(
+        library.path().join("review/SKILL.md"),
+        "# Review a change\n\nRead the evidence first.\n",
+    )
+    .unwrap();
+    let path = library.path().to_string_lossy().into_owned();
+
+    worker
+        .handle(wire::Command::ConfigureCity(wire::CitySettings {
+            keep_warm: None,
+            effort: None,
+            search: None,
+            catalog: None,
+            skill_shelves: Some(vec![path.clone()]),
+            idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"skill-library"),
+        }))
+        .unwrap();
+    let wire::Answer::Skills(answer) = crate::views::ask(
+        dir.path(),
+        &wire::Query::Skills {
+            building: lab.clone(),
+        },
+    )
+    .unwrap() else {
+        panic!("the skills shelf is answered");
+    };
+
+    assert_eq!(answer.external_shelves, vec![path.clone()]);
+    assert!(answer.skills.iter().any(|skill| {
+        skill.name == "review"
+            && skill.shelf
+                == (wire::SkillShelf::External {
+                    index: 0,
+                    path: "review/SKILL.md".to_owned(),
+                })
+    }));
+    assert_eq!(
+        city::city_shelves(dir.path(), library.path().parent().unwrap()).unwrap(),
+        vec![library.path().to_path_buf()]
+    );
+}
+
+/// A relative shelf is refused before another setting in the same frame
+/// lands; the city's working directory is not a recovery the page can see.
+#[test]
+fn a_refused_skill_shelf_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut worker = opened(dir.path());
+    let file = kernel::layout::CityLayout::new(dir.path()).city_config();
+    let before = std::fs::read(&file).ok();
+
+    let refused = worker
+        .handle(wire::Command::ConfigureCity(wire::CitySettings {
+            keep_warm: Some(kernel::KeepWarm::FiveMinute),
+            effort: None,
+            search: None,
+            catalog: None,
+            skill_shelves: Some(vec!["relative/skills".to_owned()]),
+            idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"relative-shelf"),
+        }))
+        .unwrap_err();
+
+    assert_eq!(refused.code(), &kernel::AxCode::ConfigInvalid);
+    assert_eq!(std::fs::read(&file).ok(), before);
 }
 
 /// A `[search]` the city refuses refuses the whole frame before a byte

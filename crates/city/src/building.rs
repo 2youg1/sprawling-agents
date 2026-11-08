@@ -157,6 +157,17 @@ pub enum Founding {
     Adopted,
 }
 
+/// What one raise is decided by: the address, the template whose bytes
+/// the rules come from unless the person wrote them, and, when the
+/// files come from somewhere else on this machine, the folder to copy.
+pub struct Raising<'a> {
+    pub addr: &'a Address,
+    pub template: BuildingTemplate,
+    pub rules: RulesText<'a>,
+    /// An existing host directory to copy to `addr` before adopting it.
+    pub source: Option<&'a Path>,
+}
+
 /// Raises the building a person asked for at `addr`: laid out where no
 /// directory stands, or drawn over the one already there, and says which.
 ///
@@ -165,17 +176,20 @@ pub enum Founding {
 /// "create" itself would be a second answer, and the two could disagree.
 /// Written rules are evaluated by the reader every dispatch uses
 /// (`crate::policy::evaluate`) before anything is laid out, so a refused
-/// text leaves no directory and no file behind.
+/// text leaves no directory and no file behind. A `source` is the person's
+/// other choice: that folder is copied in first, and the copy is adopted.
 ///
 /// # Errors
-/// Refuses what [`create`] refuses, and written rules the evaluator
-/// refuses, with the evaluator's reason.
-pub fn raise(
-    city_root: &Path,
-    addr: &Address,
-    template: BuildingTemplate,
-    rules: RulesText<'_>,
-) -> Result<(Building, Founding), AxError> {
+/// Refuses what [`create`] refuses, a source that is not an absolute
+/// directory outside the city, a source that already holds building
+/// rules, and written rules the evaluator refuses.
+pub fn raise(city_root: &Path, asking: Raising<'_>) -> Result<(Building, Founding), AxError> {
+    let Raising {
+        addr,
+        template,
+        rules,
+        source,
+    } = asking;
     let building = own_address(addr, "raise a building")?;
     let text = match rules {
         RulesText::Template => template.rules(addr)?,
@@ -184,6 +198,10 @@ pub fn raise(
             text.to_owned()
         }
     };
+    if let Some(source) = source {
+        import(city_root, &building, source, &text)?;
+        return Ok((building, Founding::Adopted));
+    }
     let founding = if building.root(city_root).is_dir() {
         Founding::Adopted
     } else {
@@ -191,6 +209,176 @@ pub fn raise(
     };
     lay_out(city_root, &building, &text)?;
     Ok((building, founding))
+}
+
+/// Copies one host directory into a new building, lays its rules into
+/// the private staging tree, then makes the whole copy visible at once.
+fn import(
+    city_root: &Path,
+    building: &Building,
+    source: &Path,
+    rules: &str,
+) -> Result<(), AxError> {
+    let source = import_source(city_root, source)?;
+    let target = building.root(city_root);
+    match std::fs::symlink_metadata(&target) {
+        Ok(_) => {
+            return Err(invalid_import(
+                &target,
+                "the target already exists; choose another address or adopt that folder without a source",
+            ));
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(import_io(&target, &err)),
+    }
+    refuse_governed_source(&source)?;
+    let staged = target.with_file_name(format!(".{}.importing", building.addr().as_str()));
+    remove_staging(&staged)?;
+    let placed = copy_directory(&source, &staged, 0)
+        .and_then(|()| lay_out_at(&staged, building.addr(), rules))
+        .and_then(|()| std::fs::rename(&staged, &target).map_err(|err| import_io(&target, &err)));
+    if let Err(error) = placed {
+        return Err(cleanup_import(&staged, error));
+    }
+    Ok(())
+}
+
+/// Reads the source's identity before copying and excludes every tree
+/// that would make the copy read its own destination or another city.
+fn import_source(city_root: &Path, source: &Path) -> Result<PathBuf, AxError> {
+    if !source.is_absolute() {
+        return Err(invalid_import(
+            source,
+            "the source must be an absolute path on the machine running the city",
+        ));
+    }
+    let metadata = std::fs::symlink_metadata(source).map_err(|err| import_io(source, &err))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(invalid_import(
+            source,
+            "the source must be a real directory, not a file or a link",
+        ));
+    }
+    let source = std::fs::canonicalize(source).map_err(|err| import_io(source, &err))?;
+    let city = std::fs::canonicalize(city_root).map_err(|err| import_io(city_root, &err))?;
+    if source == city || source.starts_with(&city) || city.starts_with(&source) {
+        return Err(invalid_import(
+            &source,
+            "choose a directory outside the city; a folder already in the city is adopted without copying",
+        ));
+    }
+    Ok(source)
+}
+
+/// A source that already holds building rules cannot be imported.
+/// Adoption refuses to overwrite that file, so the refusal happens
+/// before the copy and names the file in the source. A link at the same
+/// path is left to the copy, which refuses every link with one sentence.
+fn refuse_governed_source(source: &Path) -> Result<(), AxError> {
+    let rules = source.join(kernel::RESERVED_PREFIX).join(RULES_FILE);
+    match std::fs::symlink_metadata(&rules) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Ok(()),
+        Ok(_) => Err(invalid_import(
+            &rules,
+            "this folder already has building rules; import a directory that is not already a building, or remove that rules file and import again",
+        )),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(import_io(&rules, &err)),
+    }
+}
+
+/// One directory copy, bounded against cycles and refusing links rather
+/// than following them into content the person did not name.
+fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxError> {
+    const DEPTH_MAX: u32 = 64;
+    if depth > DEPTH_MAX {
+        return Err(invalid_import(
+            source,
+            "the directory nests deeper than 64 levels",
+        ));
+    }
+    std::fs::create_dir(target).map_err(|err| import_io(target, &err))?;
+    let entries = std::fs::read_dir(source).map_err(|err| import_io(source, &err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| import_io(source, &err))?;
+        let from = entry.path();
+        let into = target.join(entry.file_name());
+        let metadata = std::fs::symlink_metadata(&from).map_err(|err| import_io(&from, &err))?;
+        if metadata.file_type().is_symlink() {
+            return Err(invalid_import(
+                &from,
+                "links are not copied; replace this link with a real file or directory",
+            ));
+        }
+        if metadata.is_dir() {
+            let deeper = depth.checked_add(1).ok_or_else(|| {
+                invalid_import(&from, "the directory depth cannot be represented")
+            })?;
+            copy_directory(&from, &into, deeper)?;
+        } else if metadata.is_file() {
+            std::fs::copy(&from, &into).map_err(|err| import_io(&from, &err))?;
+        } else {
+            return Err(invalid_import(
+                &from,
+                "only ordinary files and directories can be imported",
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// A previous interrupted import may leave its private staging tree;
+/// it never became the target, so replacing that staging is safe.
+fn remove_staging(staged: &Path) -> Result<(), AxError> {
+    match std::fs::symlink_metadata(staged) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            std::fs::remove_dir_all(staged).map_err(|err| import_io(staged, &err))
+        }
+        Ok(_) => std::fs::remove_file(staged).map_err(|err| import_io(staged, &err)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(import_io(staged, &err)),
+    }
+}
+
+/// A failed import keeps the original refusal and adds the staging path
+/// if cleaning the private copy also failed.
+fn cleanup_import(staged: &Path, error: AxError) -> AxError {
+    match std::fs::remove_dir_all(staged) {
+        Ok(()) => error,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => error,
+        Err(err) => {
+            let recovery = error.recovery().to_owned();
+            error.rewrite_recovery(format!(
+                "{recovery}; remove the incomplete staging directory {} before trying again: {err}",
+                staged.display()
+            ))
+        }
+    }
+}
+
+fn invalid_import(path: &Path, recovery: &str) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "import a workspace",
+        path.display().to_string(),
+    )
+    .with_recovery(recovery)
+}
+
+fn import_io(path: &Path, err: &std::io::Error) -> AxError {
+    let code = if err.kind() == std::io::ErrorKind::NotFound {
+        AxCode::PathNotFound
+    } else {
+        AxCode::StorageFatal
+    };
+    AxError::failure(
+        code,
+        "import a workspace",
+        format!("{}: {err}", path.display()),
+    )
+    .with_recovery(
+        "check that the source exists and is readable, that the city is writable, and that the disk has room",
+    )
 }
 
 /// The `RULES.toml` `template` lays a building out with at `addr`: what
@@ -269,8 +457,12 @@ fn own_address(addr: &Address, action: &str) -> Result<Building, AxError> {
 /// Refuses a building that already has rules, and a path that will not
 /// take the write.
 fn lay_out(city_root: &Path, building: &Building, rules: &str) -> Result<(), AxError> {
-    let addr = building.addr();
-    let root = building.root(city_root);
+    lay_out_at(&building.root(city_root), building.addr(), rules)
+}
+
+/// Lays out a building at a chosen root. Imports use a private staging
+/// root; every other caller passes the building's actual root.
+fn lay_out_at(root: &Path, addr: &Address, rules: &str) -> Result<(), AxError> {
     // The building's own reserved subtree, made before the file that
     // lives in it: what governs a building is not writable by what runs
     // inside it (`crates/kernel/Spec.lean` §8-28).
@@ -289,11 +481,11 @@ fn lay_out(city_root: &Path, building: &Building, rules: &str) -> Result<(), AxE
                 .map_err(|err| storage(&file, &err))?;
             // After the refusal point, not before it: a building that
             // was refused leaves nothing of itself behind.
-            crate::spine_files::lay_out(&root, addr)?;
+            crate::spine_files::lay_out(root, addr)?;
             // Last, and appending rather than writing: a directory being
             // adopted usually has ignore rules of its own, and those are
             // the bytes adoption promises not to touch.
-            crate::gitignore::place(&root)?;
+            crate::gitignore::place(root)?;
             Ok(())
         }
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Err(AxError::failure(

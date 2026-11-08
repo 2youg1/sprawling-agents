@@ -32,8 +32,9 @@ pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError>;    // city::build
 pub(crate) fn names_a_building(name: &str) -> Option<Address>;   // all 与 wizard::survey 共用
 pub enum RulesText<'a> { Template, Written(&'a str) }
 pub enum Founding { Built, Adopted }
-pub fn raise(city_root: &Path, addr: &Address, template: BuildingTemplate, rules: RulesText<'_>)
-    -> Result<(Building, Founding), AxError>;                 // city::raise_building
+pub fn raise(city_root: &Path, asking: Raising<'_>) -> Result<(Building, Founding), AxError>; // city::raise_building；Raising 收来源
+pub struct Raising<'a> { pub addr: &'a Address, pub template: BuildingTemplate,
+                        pub rules: RulesText<'a>, pub source: Option<&'a Path> }
 pub fn template_rules(addr: &Address, template: BuildingTemplate) -> Result<String, AxError>;
 pub fn has_rules(city_root: &Path, building: &Building) -> Result<bool, AxError>;
 pub fn create(city_root: &Path, addr: &Address, template: BuildingTemplate)
@@ -71,20 +72,21 @@ pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         /
 - **只写不读的 payload**：`created_payload` 只有写面，因为没有读它的投影——楼列表读盘（`city::buildings`）。读面随第一个真正需要它的投影落地，不提前建。
 - **占位符只有一个家**：`NAME_PLACEHOLDER` 住 `building::template`，`pub(crate)`；楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。
 - **哪个目录名是一栋楼，只有一条规则**：`names_a_building` 拒点开头的目录（保留子树在其中）、地址文法拼不出的名字与保留名；`all` 按它列楼，`wizard::survey` 按它向新城提供可收编的文件夹，所以新城提供的与旧城列出的不会不一致。`all` 不要求 `RULES.toml`：一个还没有规则的顶层文件夹也被列出，`has_rules` 答它有没有规则，页面据此把它标为可收编（`wire::BuildingProgress.adoptable`）。
-- **`raise` 是人从页面立楼的门**（`Command::CreateBuilding`）：目录在就收编、不在就新建，由 `Founding` 说是哪一种（D32）。`rules` 为 `Written` 时先经 `policy::evaluate`（每次派活读规则的同一个读者）求值，被拒就什么都不落：没有目录、没有文件、没有账本行。`Template` 照模板的字节。`template_rules` 答一个模板在一个地址会写下的 `RULES.toml`，页面在立楼之前给人看；它与 `create` 拒同样的地址（房间、保留子树）。
-- **adopt（兑现「导入一个已有目录」这件事）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录先由人搬入城内再收编，本体不做拷贝。`adopted_payload` 记规则来自哪个模板：命令行与开城时的收编是 `minimal`，页面上的收编是人选的那个。
+- **`raise` 是人从页面立楼的门**（`Command::CreateBuilding`）：`source = None` 时目录在就收编、不在就新建，由 `Founding` 说是哪一种（D32）；`source = Some(path)` 时先把主机一个已有目录复制到 `addr`，再按收编落地。`rules` 为 `Written` 时先经 `policy::evaluate`（每次派活读规则的同一个读者）求值，被拒就什么都不落：没有目录、没有文件、没有账本行。`Template` 照模板的字节。`template_rules` 答一个模板在一个地址会写下的 `RULES.toml`，页面在立楼之前给人看；它与 `create` 拒同样的地址（房间、保留子树）。
+- **主机目录导入是复制，不是移动或引用**：`source` 必须是运行城市的主机上的绝对路径，且是城根之外的一个实际目录；相对路径、城内目录、城的祖先目录、文件、链接与不存在者各拒，目标已有任何目录项也拒。源目录的保留子树里 `RULES.toml` 这个路径已被一个非链接的目录项占用时，复制开始前拒，恢复语点名那条路径：导入按收编落地，而收编不覆盖已有规则。链接仍由复制时的那一条拒绝说出。源目录保持原样，账本与事件不携它的路径。复制先落在城根下点开头的固定暂存目录，逐层只收普通目录与文件、拒绝链接，深度至多 64；文件经 `std::fs::copy` 流式复制，不把整棵树读进内存。成功后一次 `rename` 换到目标，失败删掉本次暂存树；目标从不在复制中被覆盖。随后按 `Founding::Adopted` 走同一收编、base checkpoint 与 `building_created.adopted = true` 路径。
+- **adopt（收编城内一个已有目录）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录由页面的主机导入路径复制入城。`adopted_payload` 记规则来自哪个模板：命令行与开城时的收编是 `minimal`，页面上的收编或导入是人选的那个。
 - **收编没做完就撤回规则**：规则落下之后，sprawling 先做 base checkpoint 再记 `building_created`。checkpoint 被拒时（例如暂存扫描在目录里找到一个像凭据的文件），sprawling 调 `withdraw_adoption` 删掉这一次写下的 `RULES.toml`，目录回到可收编，人移走那个文件后再按一次就完成收编。不撤回的话，目录有了规则，却没有 `building_created` 行、也没有 base checkpoint，再按一次又被「已有规则」拒。只删规则文件：它是 `lay_out` 以 `create_new` 新写的，此前不在，删掉不丢人的字节；补上的 spine 文件与 `.gitignore` 规则留下，因为两者都是缺才写，第二次收编不会再写一遍。删不掉时，checkpoint 的拒绝照样返回，恢复里写明要人先删哪个文件。
 -/
 
-/-! D32 人从页面立楼时，目录在不在由城看：在就收编，不在就新建
+/-! D32 人从页面立楼时，目录在不在由城看；主机导入则复制人点名的目录
 
-**决定**：`Command::CreateBuilding` 不带「新建还是收编」的字段。城在 `raise` 里看地址上有没有目录：有就收编（`building_created.adopted = true`，做 base checkpoint，目录里的文件一个不改），没有就新建。
+**决定**：`Command::CreateBuilding` 不带「新建还是收编」的布尔或枚举。`source = None` 时城在 `raise` 里看地址上有没有目录：有就收编（`building_created.adopted = true`，做 base checkpoint，目录里的文件一个不改），没有就新建。`source = Some(绝对路径)` 是人的另一种明确选择：把那个城外目录复制到城内一个空地址，再收编复制件；源目录不动，路径不入账。
 
-**理由**：目录在不在是磁盘上的事实，城是它的读者；帧里再带一个 `source`，就是同一个事实的第二个答案，页面读到的城答与人按下的那一刻之间目录可能已经变了，两份就会不一致。改之前，页面对一个已有目录 `/raise` 会在它上面铺一栋楼、记成 `adopted: false`、不做 base checkpoint，历史声称城建了它只是找到的东西。
+**理由**：新建与收编的分别是磁盘上的事实，帧不重复回答。导入回答的是另一个问题——文件从城外哪里来——所以它需要来源路径，而不是把同一个事实再答一遍。复制保留城市的自包含性：楼的读取、写入、检查点与整体搬迁都不依赖原目录。
 
-**被否**：帧带 `source: Empty | Adopt`，城核对与目录是否一致——多一个必须与磁盘同步的字段，不一致时只能拒，而人并没有做错什么。
+**被否**：①帧带 `source: Empty | Adopt`，城核对与目录是否一致——多一个必须与磁盘同步的字段；②给目标目录建指向来源的链接或让 run 直接读来源——城市不再能作为一棵独立目录复制，来源变化也会绕开基线与 pin；③移动源目录——导入不该改变人正在使用的那份工作。
 
-**重开参数**：若要支持「从仓库克隆」或「从别的楼复制」这类目录尚不存在、却不是空楼的来源，那时来源成了人的选择而不再是磁盘的事实，帧再加字段。
+**重开参数**：若要支持从远程仓库克隆，需要另定网络来源、审核与失败语义；主机路径门不因此携带 URL。
 -/
 
 /-!

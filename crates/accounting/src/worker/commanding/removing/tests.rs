@@ -27,6 +27,7 @@ fn create(worker: &mut RunWorker, name: &str) {
             addr: addr(name),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, name.as_bytes()),
         })
         .unwrap();

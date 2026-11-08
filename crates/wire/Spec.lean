@@ -402,7 +402,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `crates/wire/spec/Reception/Entry.lean` |
 | D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `crates/wire/spec/Frames.lean` |
 | D58 | 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举 | `crates/wire/spec/Answer/ModelFigures.lean` |
-| D59 | 建楼页：`CreateBuilding` 带人写的规则，楼行标出可收编的文件夹，模板字节可先问 | `crates/wire/spec/Frames.lean` |
+| D59 | 建楼页：`CreateBuilding` 带人写的规则与可缺的主机导入源，楼行标出可收编的文件夹，模板字节可先问 | `crates/wire/spec/Frames.lean` |
 | D60 | 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版 | `crates/wire/spec/Frames.lean` |
 | D61 | 能力：一问答一栋楼每件工具的档位、来源与使用证据，两张 `[catalog]` 表各走已有的配置帧 | `crates/wire/spec/Frames.lean` |
 | D65 | 模型高级设置复用 AttachEndpoint 的 tuning，不新增模型设置命令 | `crates/wire/spec/Command/Tuning.lean` |

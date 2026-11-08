@@ -255,6 +255,8 @@ pub(super) enum Change<'a> {
     Mcp(&'a [McpServer]),
     McpReferences(&'a [McpReference]),
     SkillPins(&'a std::collections::BTreeMap<String, B3Hash>),
+    /// The city layer's whole ordered external shelf table.
+    SkillShelves(&'a [String]),
     MigrateMcpReference(&'a McpReference),
     MigrateSkillPin {
         name: &'a str,
@@ -376,6 +378,17 @@ impl Change<'_> {
                     .collect();
                 table(document, "skills", file)?
                     .insert("pins".to_owned(), toml::Value::Table(spelled));
+            }
+            Change::SkillShelves(shelves) => {
+                table(document, "skills", file)?.insert(
+                    "shelves".to_owned(),
+                    toml::Value::Array(
+                        shelves
+                            .iter()
+                            .map(|path| toml::Value::String(path.clone()))
+                            .collect(),
+                    ),
+                );
             }
             Change::MigrateMcpReference(reference) => {
                 migrate_reference(document, reference, file)?;

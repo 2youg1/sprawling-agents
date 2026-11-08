@@ -207,12 +207,18 @@ export type Template = (typeof TEMPLATES)[number];
 // `rules` is the `RULES.toml` the person wrote; `null` lays the
 // template's own bytes. Whether `addr` is a folder to adopt is the city's
 // to see (city D32).
-export function createBuilding(addr: Address, template: Template, rules: string | null): Command {
+export function createBuilding(
+  addr: Address,
+  template: Template,
+  rules: string | null,
+  source: string | null = null,
+): Command {
   return {
     create_building: {
       addr,
       template: TemplateNameSchema.make(template),
       rules,
+      ...(source === null ? {} : { source }),
       idem: mintIdem(),
     },
   };
@@ -424,6 +430,11 @@ export function configureSearch(search: SearchConfiguration): Command {
 // nothing follows (`crates/wire/Spec.lean` §8-99).
 export function configureCityCatalog(catalog: ExposureTable): Command {
   return { configure_city: { catalog, idem: mintIdem() } };
+}
+
+// The city's whole ordered list of read-only skill libraries on this host.
+export function configureSkillShelves(shelves: readonly string[]): Command {
+  return { configure_city: { skill_shelves: [...shelves], idem: mintIdem() } };
 }
 
 // One of a building's own spine documents. `base` is the text the

@@ -51,6 +51,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             addr: Address::parse("acme").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step1"),
         })
         .unwrap();

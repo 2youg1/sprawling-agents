@@ -114,6 +114,7 @@ fn a_close_lands_between_commands_and_never_inside_one() {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
             rules: None,
+            source: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         },
         wire::Reply::nowhere(),

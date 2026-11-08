@@ -294,6 +294,9 @@ impl RunWorker {
         if let Some(table) = &settings.catalog {
             city::check_catalog(table)?;
         }
+        if let Some(shelves) = settings.skill_shelves.as_deref() {
+            city::check_skill_shelves(shelves, crate::home::Home::detect()?.path())?;
+        }
         let search = settings
             .search
             .map(|search| city::write_search(&self.city_root, &search));
@@ -303,7 +306,13 @@ impl RunWorker {
             .map(city::CitySetting::Catalog)
             .into_iter()
             .chain(settings.keep_warm.map(city::CitySetting::KeepWarm))
-            .chain(settings.effort.map(city::CitySetting::Effort));
+            .chain(settings.effort.map(city::CitySetting::Effort))
+            .chain(
+                settings
+                    .skill_shelves
+                    .as_deref()
+                    .map(city::CitySetting::SkillShelves),
+            );
         let mut written = search.transpose()?.is_some();
         for setting in others {
             city::write_city_setting(&self.city_root, setting)?;
