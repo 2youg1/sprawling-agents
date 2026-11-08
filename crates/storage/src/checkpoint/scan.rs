@@ -24,7 +24,10 @@ const GITLINK: u32 = 0o160_000;
 /// One staged blob and the index that proves whether a quoted path exists.
 struct StagedBlob<'a> {
     id: git2::Oid,
-    path: &'a str,
+    /// The path as the repository records it, never a lossy respelling: a
+    /// finding reports the lossy text, but an `Address` cannot spell any
+    /// bytes but UTF-8, so only a valid path may match an allowlist entry.
+    path: &'a [u8],
     index: &'a git2::Index,
 }
 
@@ -70,6 +73,13 @@ fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> 
     let mut end = span_end;
     while content.get(end).copied().is_some_and(path_byte) {
         end = end.saturating_add(1);
+    }
+    // A backslash just outside the token belongs to the same reference on
+    // one platform and is a legal file-name byte on another. Reading the
+    // token as the whole reference would exempt `other\docs/glossary.md` on the
+    // strength of `docs/glossary.md`, so the backslash boundary is refused.
+    if content.get(first.saturating_sub(1)) == Some(&b'\\') || content.get(end) == Some(&b'\\') {
+        return false;
     }
     loop {
         let named = content
@@ -136,11 +146,10 @@ impl Checkpoint {
             None => {
                 for entry in index.iter() {
                     if entry.mode != GITLINK {
-                        let path = String::from_utf8_lossy(&entry.path);
                         self.scan_blob(
                             StagedBlob {
                                 id: entry.id,
-                                path: &path,
+                                path: &entry.path,
                                 index: &index,
                             },
                             &mut findings,
@@ -163,12 +172,10 @@ impl Checkpoint {
                     if staged.id().is_zero() || staged.mode() == git2::FileMode::Commit {
                         continue;
                     }
-                    let path = String::from_utf8_lossy(staged.path_bytes().unwrap_or_default())
-                        .into_owned();
                     self.scan_blob(
                         StagedBlob {
                             id: staged.id(),
-                            path: &path,
+                            path: staged.path_bytes().unwrap_or_default(),
                             index: &index,
                         },
                         &mut findings,
@@ -205,13 +212,19 @@ impl Checkpoint {
         staged: StagedBlob<'_>,
         findings: &mut ScanFindings,
     ) -> Result<(), StorageError> {
+        let path = String::from_utf8_lossy(staged.path);
         let blob = self
             .repo
             .find_blob(staged.id)
             .map_err(|err| StorageError::Checkpoint {
                 op: "scan a staged file",
-                detail: format!("{}: {}", staged.path, err.message()),
+                detail: format!("{path}: {}", err.message()),
             })?;
+        // An allowlist entry is an `Address`, and an `Address` is UTF-8:
+        // a path the repository spells in other bytes cannot be the one the
+        // User entered, so it is never silently exempt.
+        let allowed =
+            std::str::from_utf8(staged.path).is_ok_and(|path| self.entropy_allow.allows(path));
         let content = blob.content();
         let mut cursor = 0usize;
         let mut line = 1u64;
@@ -225,17 +238,15 @@ impl Checkpoint {
             line = line.saturating_add(u64::try_from(newlines).unwrap_or(u64::MAX));
             cursor = span.start;
             let finding = CheckpointFinding {
-                path: staged.path.to_owned(),
-                offset: checkpoint_size(span.start, staged.path)?,
-                len: checkpoint_size(span.len, staged.path)?,
+                path: path.to_string(),
+                offset: checkpoint_size(span.start, &path)?,
+                len: checkpoint_size(span.len, &path)?,
                 line,
                 reason: span.reason().to_owned(),
             };
             if span.provider.is_some() {
                 findings.refused.push(finding);
-            } else if !self.entropy_allow.allows(staged.path)
-                && !names_staged_path(content, &span, staged.index)
-            {
+            } else if !allowed && !names_staged_path(content, &span, staged.index) {
                 findings.withheld.push(finding);
             }
         }

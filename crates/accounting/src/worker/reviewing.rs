@@ -180,16 +180,39 @@ impl RunWorker {
     /// Propagates a tree that will not commit, a branch that is not a
     /// node id, and the ledger's refusal of the line.
     pub(super) fn offer(&mut self, offering: &Offering<'_>, branch: String) -> Result<(), AxError> {
-        let landed = storage::Checkpoint::open(offering.tree)
-            .map_err(storage::StorageError::into_ax)?
-            .with_entropy_allowlist(offering.entropy_allow.clone())
-            .land(
-                offering.scopes,
-                self.clock.now()?,
-                offering.of,
-                &format!("offer: {}", offering.scopes.join(" ")),
-            )
-            .map_err(storage::StorageError::into_ax)?;
+        let landed = match storage::Checkpoint::open(offering.tree)
+            .map_err(storage::StorageError::into_ax)
+            .and_then(|checkpoint| {
+                let at = self.clock.now()?;
+                checkpoint
+                    .with_entropy_allowlist(offering.entropy_allow.clone())
+                    .land(
+                        offering.scopes,
+                        at,
+                        offering.of,
+                        &format!("offer: {}", offering.scopes.join(" ")),
+                    )
+                    .map_err(storage::StorageError::into_ax)
+            }) {
+            Ok(landed) => landed,
+            Err(err) => {
+                // The refusal names `sprawling secrets`; book its report
+                // before the error travels, or that command cannot show it.
+                let failure = runtime::CheckpointFailure::from(err);
+                if let Some(report) = failure.refusal() {
+                    self.record_for(
+                        offering.run_id,
+                        effect::Line {
+                            who: offering.who.to_owned(),
+                            addr: offering.addr.clone(),
+                            kind: EventKind::SecretEgressBlocked,
+                            data: Payload::of(report)?,
+                        },
+                    )?;
+                }
+                return Err(failure.into_cause());
+            }
+        };
         // The landing's own scan is the only account of what it committed:
         // a run that wrote after its last wave checkpoint has those findings
         // here and nowhere else.

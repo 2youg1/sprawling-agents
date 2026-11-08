@@ -141,6 +141,32 @@ fn an_allowlist_entry_matches_only_a_path_the_index_spells_the_same_way() {
     assert_eq!(withheld[0]["path"], "work/a\\b.md");
 }
 
+/// A reference whose prefix this repository does not hold is not the file
+/// its suffix names. The backslash is refused as a path boundary, so the
+/// exemption cannot be claimed through the suffix alone.
+#[test]
+fn a_reference_before_a_backslash_does_not_borrow_a_suffix_exemption() {
+    let tmp = tempfile::tempdir().unwrap();
+    let name = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    let path = format!("work/{name}.md");
+    write(tmp.path(), &path, "fixture\n");
+    // The reference is `other\work/...`: the backslash is the
+    // boundary this test asks about, and it reaches the file as one byte.
+    let quoted = format!("other\\{path}");
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1, "{payload:?}");
+    assert_eq!(withheld[0]["path"], "work/SPEC.md");
+}
+
 /// One scan can meet a known shape and an ordinary entropy hit. The refusal
 /// carries both, so `sprawling secrets` lists everything this checkpoint
 /// met without waiting for a later commit to report the rest.

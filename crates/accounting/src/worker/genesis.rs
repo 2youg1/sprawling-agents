@@ -414,20 +414,33 @@ impl RunWorker {
         let entropy_allow = city::load(&self.city_root, addr)?
             .checkpoint_entropy_allow()
             .clone();
-        storage::Checkpoint::open(&self.city_root)
-            .and_then(|checkpoint| {
-                checkpoint
-                    .with_entropy_allowlist(entropy_allow)
-                    .base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
-                        self.note(
-                            runtime::diagnostics::Level::Effect,
-                            "storage::checkpoint",
-                            &format!("{}: base checkpoint {step:?}", addr.as_str()),
-                        );
-                    })
-            })
-            .map(Some)
-            .map_err(storage::StorageError::into_ax)
+        let made = storage::Checkpoint::open(&self.city_root).and_then(|checkpoint| {
+            checkpoint
+                .with_entropy_allowlist(entropy_allow)
+                .base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+                    self.note(
+                        runtime::diagnostics::Level::Effect,
+                        "storage::checkpoint",
+                        &format!("{}: base checkpoint {step:?}", addr.as_str()),
+                    );
+                })
+        });
+        match made {
+            Ok(record) => Ok(Some(record)),
+            Err(err) => {
+                // A refusal tells the person to run `sprawling secrets`; the
+                // report it names has to be in the ledger before that.
+                let failure = runtime::CheckpointFailure::from(err);
+                if let Some(report) = failure.refusal() {
+                    self.record_at(
+                        EventKind::SecretEgressBlocked,
+                        addr.clone(),
+                        Payload::of(report)?,
+                    )?;
+                }
+                Err(failure.into_cause())
+            }
+        }
     }
 
     /// The startup scan: closes the account of every
