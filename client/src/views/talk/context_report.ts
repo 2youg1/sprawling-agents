@@ -243,7 +243,8 @@ function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[
     .slice(0, CHILD_CAP)
     .map((source) => ({
       key: source.addr,
-      name: source.addr.slice(source.addr.lastIndexOf("/") + 1) || source.addr,
+      // Full address: two nested AGENTS.md files would otherwise look alike.
+      name: source.addr,
       bytes: source.kept,
       bytesSaid: kilo(source.kept),
     }));
