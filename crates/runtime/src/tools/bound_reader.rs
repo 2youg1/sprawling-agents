@@ -79,7 +79,7 @@ impl BoundReader {
         // root inside `land` used to cost on every call
         // (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
         let city = chosen_path::CityRoot::anchor(&self.city_root, action)?;
-        let real = match chosen_path::land(&city, &addr, action, &*self.bound)? {
+        let real = match chosen_path::land(&city, &addr, action, &*self.bound)?.location {
             Located::Present(real) if real.is_file() => real,
             Located::Present(_) => {
                 return Err(AxError::failure(

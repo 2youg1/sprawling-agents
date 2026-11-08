@@ -39,8 +39,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -53,6 +53,56 @@ use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
+
+/// One nested convention a read may carry. `dropped` is the number of
+/// source bytes already known to be omitted from `text`; accounting
+/// removes it from the final payload after it applies the shared budget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuleCandidate {
+    pub room: Address,
+    pub text: String,
+    pub dropped: u64,
+}
+
+impl RuleCandidate {
+    /// The candidate's JSON shape. A zero `dropped` is omitted, so the
+    /// final delivery carries only `room` and `text`.
+    #[must_use]
+    pub fn into_json(self) -> Value {
+        let mut rule = Map::new();
+        rule.insert(
+            "room".to_owned(),
+            Value::String(self.room.as_str().to_owned()),
+        );
+        rule.insert("text".to_owned(), Value::String(self.text));
+        if self.dropped != 0 {
+            rule.insert("dropped".to_owned(), self.dropped.into());
+        }
+        Value::Object(rule)
+    }
+
+    /// Reads a candidate produced by `into_json`; malformed input is not
+    /// a candidate and never becomes delivery evidence.
+    #[must_use]
+    pub fn from_json(value: &Value) -> Option<RuleCandidate> {
+        let room = value.get("room")?.as_str()?;
+        let room = match Address::parse(room) {
+            Ok(room) => room,
+            Err(_) => return None,
+        };
+        let text = value.get("text")?.as_str()?.to_owned();
+        let dropped = value.get("dropped").and_then(Value::as_u64).unwrap_or(0);
+        Some(RuleCandidate {
+            room,
+            text,
+            dropped,
+        })
+    }
+}
+
+/// A stateless, read-only source of candidates. Delivery state belongs
+/// to accounting's ordered settlement, never to this closure.
+pub type RuleCandidates = Arc<dyn Fn(&Address, &Address) -> Vec<RuleCandidate> + Send + Sync>;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -225,6 +275,7 @@ pub struct ReadTool {
     /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
     /// §8-64).
     seen: ReadStamps,
+    rules: Option<RuleCandidates>,
     meta: ToolMeta,
 }
 
@@ -288,6 +339,7 @@ impl ReadTool {
             reader: BoundReader::new(city_root, bound, block_store),
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
+            rules: None,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Reads a file by its path, or a skill by the name the catalog \
@@ -360,6 +412,17 @@ impl ReadTool {
     pub fn noting(self, seen: ReadStamps) -> ReadTool {
         ReadTool { seen, ..self }
     }
+
+    /// Supplies the nested conventions a successful ordinary read may
+    /// carry. No delivery is marked here: calls can be speculative and
+    /// concurrent, while only accounting sees their ordered admission.
+    #[must_use]
+    pub fn ruling(self, candidates: RuleCandidates) -> ReadTool {
+        ReadTool {
+            rules: Some(candidates),
+            ..self
+        }
+    }
 }
 
 impl Tool for ReadTool {
@@ -399,12 +462,14 @@ impl Tool for ReadTool {
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
         let mut looked = None;
+        let mut opened = None;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
             Found::Chosen(addr) => {
-                let (text, before, after) =
+                let (text, before, after, landed) =
                     engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?;
-                looked = Some((addr, before, after));
+                looked = Some((addr.clone(), before, after));
+                opened = Some((addr, landed));
                 text
             }
         };
@@ -415,6 +480,22 @@ impl Tool for ReadTool {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
         let taken = interval.cut(&text);
+        let candidates = opened.map_or_else(Vec::new, |(admitted, landed)| {
+            self.rules
+                .as_ref()
+                .map_or_else(Vec::new, |candidates| candidates(&admitted, &landed))
+        });
+        if !candidates.is_empty() {
+            out.insert(
+                "rules".to_owned(),
+                Value::Array(
+                    candidates
+                        .into_iter()
+                        .map(RuleCandidate::into_json)
+                        .collect(),
+                ),
+            );
+        }
         // A whole answer is a look, and so is a window the caller asked
         // for by offset or limit; a whole read the cap truncated is not,
         // because the caller believes it saw the file (§8-64).

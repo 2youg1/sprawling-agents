@@ -25,8 +25,10 @@ use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
 use crate::tools::stamp::Stamp;
 
-/// A file's text, and its stamp before and after the bytes were read.
-pub(super) type Looked = (String, Stamp, Stamp);
+/// A file's text, its stamps before and after the bytes were read, and
+/// the judged city address whose file supplied them.
+pub(super) type Looked = (String, Stamp, Stamp, Address);
+type RawText = (String, Stamp, Stamp);
 
 /// The whole text at the admitted address `addr`, which the model wrote
 /// as `asked`, with the file's stamp taken on the handle on each side of
@@ -55,8 +57,13 @@ pub(super) fn judged_read(
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Result<Looked, AxError> {
-    let at = chosen_path::land(city, addr, "read", bound)?;
-    miss::text_at(asked, at, &Floor::of_address(city.written(), addr))
+    let judged = chosen_path::land(city, addr, "read", bound)?;
+    let text = miss::text_at(
+        asked,
+        judged.location,
+        &Floor::of_address(city.written(), addr),
+    )?;
+    Ok((text.0, text.1, text.2, judged.addr))
 }
 
 /// Opens the file once and judges the handle where it lies (Windows).
@@ -77,8 +84,8 @@ fn handle_read(
     let Ok(real) = winx::file::get_file_path(&file) else {
         return Ok(None);
     };
-    city.judged_location(addr, &real, "read", bound)?;
-    Ok(whole_text(file))
+    let landed = city.judged_location(addr, &real, "read", bound)?;
+    Ok(whole_text(file).map(|(text, before, after)| (text, before, after, landed)))
 }
 
 /// Resolves, judges, opens the judged location, and checks the handle
@@ -98,13 +105,14 @@ fn handle_read(
     let Ok(real) = std::fs::canonicalize(city.join(addr)) else {
         return Ok(None);
     };
-    city.judged_location(addr, &real, "read", bound)?;
+    let landed = city.judged_location(addr, &real, "read", bound)?;
     let Ok(file) = std::fs::File::open(&real) else {
         return Ok(None);
     };
     let fd = std::path::Path::new("/proc/self/fd").join(file.as_raw_fd().to_string());
     match std::fs::read_link(fd) {
-        Ok(now) if now == real => Ok(whole_text(file)),
+        Ok(now) if now == real => Ok(whole_text(file)
+            .map(|(text, before, after)| (text, before, after, landed))),
         // Moved since the judgement, or a machine without procfs: the
         // judged path checks the handle its own way and says which.
         Ok(_) | Err(_) => Ok(None),
@@ -126,7 +134,7 @@ fn handle_read(
 /// directory, a failed read or query, or bytes that are not UTF-8, which
 /// the judged path answers.
 #[cfg(any(windows, target_os = "linux"))]
-fn whole_text(mut file: std::fs::File) -> Option<Looked> {
+fn whole_text(mut file: std::fs::File) -> Option<RawText> {
     use std::io::Read as _;
 
     let meta = file.metadata().ok()?;

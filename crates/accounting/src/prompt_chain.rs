@@ -12,6 +12,7 @@
 //! to a provider, and a run can make links in its room: reading these
 //! files past the read bound would be a second path out of it.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -156,6 +157,72 @@ pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound 
     })
 }
 
+/// Where a run looks for conventions below its own room.
+pub(crate) struct RuleScope<'a> {
+    pub(crate) city_root: &'a Path,
+    pub(crate) building: Address,
+    pub(crate) room: Address,
+}
+
+/// Discovers candidates without recording delivery. The ordered account
+/// decides which of them becomes evidence.
+pub(crate) fn nested_rules(
+    _scope: RuleScope<'_>,
+    _admitted: &Address,
+    _landed: &Address,
+) -> Vec<runtime::RuleCandidate> {
+    Vec::new()
+}
+
+/// Per-run rule delivery, confirmed only after exchange compaction.
+#[derive(Default)]
+pub(crate) struct RuleDelivery {
+    pub(crate) delivered: BTreeSet<Address>,
+    pending: BTreeMap<String, BTreeSet<Address>>,
+}
+
+impl RuleDelivery {
+    /// Answers one call with its selected candidates and remembers their
+    /// rooms on the open wave.
+    pub(crate) fn answer(
+        &mut self,
+        call: &str,
+        candidates: Vec<runtime::RuleCandidate>,
+    ) -> Vec<runtime::RuleCandidate> {
+        let rooms = candidates
+            .iter()
+            .map(|candidate| candidate.room.clone())
+            .collect();
+        self.pending.insert(call.to_owned(), rooms);
+        candidates
+    }
+
+    /// Stages a cached final answer for the same compaction decision as
+    /// any newly produced answer. Its bytes are not recomputed.
+    pub(crate) fn replay(&mut self, call: &str, result: &kernel::Payload) {
+        let candidates = result
+            .as_map()
+            .get("rules")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(runtime::RuleCandidate::from_json)
+            .collect();
+        self.answer(call, candidates);
+    }
+
+    /// Confirms only rules whose whole result survived exchange
+    /// compaction. Pending state from shortened or unadmitted calls is
+    /// discarded, so a later read may deliver those rules again.
+    pub(crate) fn complete_wave(&mut self, shortened: &BTreeSet<String>) {
+        for (call, rooms) in std::mem::take(&mut self.pending) {
+            if !shortened.contains(&call) {
+                self.delivered.extend(rooms);
+            }
+        }
+    }
+}
+
 /// The city's own spelling of a path inside it.
 ///
 /// The path comes from `city`, which is the authority for where a
@@ -206,3 +273,6 @@ fn unread(path: &Path, err: &std::io::Error) -> AxError {
              prompt without it",
     )
 }
+
+#[cfg(test)]
+mod tests;

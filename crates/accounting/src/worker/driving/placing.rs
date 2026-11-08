@@ -21,6 +21,7 @@ use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use runtime::{Admitted, Catalog, ConcurrentInvoke, ToolTool};
 
 use super::Sieving;
+use crate::prompt_chain::RuleDelivery;
 
 /// What a run's calls leave for the checkpoints around them. Shared between
 /// the tool face and the wave checkpoint, which the turn driver holds at once.
@@ -92,6 +93,7 @@ pub(super) struct Placing<'f> {
     /// What the run was told it can reach: the one authority on what a
     /// `tool` `run` stands for (`crates/runtime/Spec.lean` §8-61).
     catalog: Arc<Mutex<Catalog>>,
+    rules: RuleDelivery,
 }
 
 impl<'f> Placing<'f> {
@@ -109,6 +111,7 @@ impl<'f> Placing<'f> {
             ran: (0, 0),
             checkpointing,
             catalog: Arc::new(Mutex::new(Catalog::new())),
+            rules: RuleDelivery::default(),
         }
     }
 
@@ -118,6 +121,16 @@ impl<'f> Placing<'f> {
     #[must_use]
     pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
         self.catalog = catalog;
+        self
+    }
+
+    /// Starts delivery with the rule rooms a branched run inherited.
+    #[must_use]
+    pub(super) fn inheriting(
+        mut self,
+        delivered: std::collections::BTreeSet<kernel::Address>,
+    ) -> Self {
+        self.rules.delivered = delivered;
         self
     }
 
@@ -151,6 +164,44 @@ impl<'f> Placing<'f> {
         self.bench
             .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal)
+    }
+
+    /// Finalizes a read before its first result enters the idempotency
+    /// cache. Other tools continue directly to the bench.
+    fn prepare_read(
+        &mut self,
+        call: &ToolCall,
+        mut outcome: ToolOutcome,
+    ) -> Result<ToolOutcome, AxError> {
+        if call.name.as_str() != runtime::ReadTool::NAME {
+            return Ok(outcome);
+        }
+        let candidates = outcome
+            .result
+            .as_map()
+            .get("rules")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(runtime::RuleCandidate::from_json)
+            .collect();
+        let selected = self.rules.answer(&call.id, candidates);
+        let mut result = outcome.result.as_map().clone();
+        if selected.is_empty() {
+            result.remove("rules");
+        } else {
+            result.insert(
+                "rules".to_owned(),
+                serde_json::Value::Array(
+                    selected
+                        .into_iter()
+                        .map(runtime::RuleCandidate::into_json)
+                        .collect(),
+                ),
+            );
+        }
+        outcome.result = kernel::Payload::new(result)?;
+        Ok(outcome)
     }
 
     /// What the model reads back for what the bench decided.
@@ -194,6 +245,9 @@ impl<'f> Placing<'f> {
             // call failed when it succeeded (`crates/runtime/Spec.lean` §8-35). The
             // command counters are not touched: nothing ran this time.
             BenchOutcome::Duplicate { outcome } => {
+                if call.name.as_str() == runtime::ReadTool::NAME {
+                    self.rules.replay(&call.id, &outcome.result);
+                }
                 if call.name.as_str() == kernel::ToolName::EXEC {
                     self.sieving.package(call, outcome, self.temporal_of(call))
                 } else {
@@ -258,10 +312,18 @@ impl ConcurrentInvoke for Placing<'_> {
         ticket: Ticket,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<ToolOutcome, AxError> {
+        let answered = match answered {
+            Ok(outcome) => self.prepare_read(call, outcome),
+            Err(err) => Err(err),
+        };
         let decided = self
             .bench
             .account(ticket, answered)
             .inspect_err(|_| self.checkpointing.widen())?;
         self.answered(call, decided)
+    }
+
+    fn complete_wave(&mut self, shortened: &std::collections::BTreeSet<String>) {
+        self.rules.complete_wave(shortened);
     }
 }
