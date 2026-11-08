@@ -478,10 +478,9 @@ status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range mov
 # city's only writer - so a message with no end is not a slow tool call
 # but an interrupted history.
 #
-# The figure is derived rather than chosen: `IMAGE_MAX_BYTES` is 2 MiB,
-# base64 grows it to 2,796,203 B, and 8 MiB leaves a tool result room
-# for such a picture, its text and the JSON-RPC envelope, with 3x over
-# the largest payload the city already accepts.
+# The figure is derived rather than chosen: `IMAGE_MAX_BYTES` is 4 MiB,
+# padded base64 grows it to 5,592,408 B, and 8 MiB still leaves a tool
+# result room for such a picture, its text and the JSON-RPC envelope.
 #
 # Not gated by `xtask budget`: the number is a constant in the source
 # rather than a reading off a build, and `agent_protocols::mcp::reading`'s

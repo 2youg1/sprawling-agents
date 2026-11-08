@@ -181,7 +181,8 @@ pub struct Raising<'a> {
 ///
 /// # Errors
 /// Refuses what [`create`] refuses, a source that is not an absolute
-/// directory outside the city, and written rules the evaluator refuses.
+/// directory outside the city, a source that already holds building
+/// rules, and written rules the evaluator refuses.
 pub fn raise(city_root: &Path, asking: Raising<'_>) -> Result<(Building, Founding), AxError> {
     let Raising {
         addr,
@@ -230,6 +231,7 @@ fn import(
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(err) => return Err(import_io(&target, &err)),
     }
+    refuse_governed_source(&source)?;
     let staged = target.with_file_name(format!(".{}.importing", building.addr().as_str()));
     remove_staging(&staged)?;
     let placed = copy_directory(&source, &staged, 0)
@@ -266,6 +268,23 @@ fn import_source(city_root: &Path, source: &Path) -> Result<PathBuf, AxError> {
         ));
     }
     Ok(source)
+}
+
+/// A source that already holds building rules cannot be imported.
+/// Adoption refuses to overwrite that file, so the refusal happens
+/// before the copy and names the file in the source. A link at the same
+/// path is left to the copy, which refuses every link with one sentence.
+fn refuse_governed_source(source: &Path) -> Result<(), AxError> {
+    let rules = source.join(kernel::RESERVED_PREFIX).join(RULES_FILE);
+    match std::fs::symlink_metadata(&rules) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Ok(()),
+        Ok(_) => Err(invalid_import(
+            &rules,
+            "this folder already has building rules; import a directory that is not already a building, or remove that rules file and import again",
+        )),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(import_io(&rules, &err)),
+    }
 }
 
 /// One directory copy, bounded against cycles and refusing links rather

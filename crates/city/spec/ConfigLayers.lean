@@ -535,6 +535,6 @@ settings-control SupplierSection.accounts client/src/views/setup/providers/accou
 settings-control AccountSection.id client/src/views/setup/providers/accounts.svelte
 settings-control AccountSection.reference client/src/views/setup/providers/accounts.svelte
 settings-control AccountSection.header client/src/views/setup/providers/accounts.svelte
-settings-reason ConfigFile.skills 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
-settings-reason SkillsSection.shelves 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason ConfigFile.skills `[skills]` 不是单独一个控件写的整节：`shelves` 由技能页写入城层，`pins` 由目录页写入楼层。楼与房间写下 `shelves` 即拒。
+settings-control SkillsSection.shelves client/src/views/setup/shelves.svelte
 -/

@@ -6,8 +6,8 @@
 //! The bytes a model named, read after the one judgement `read` gives a
 //! path (`crates/runtime/spec/Tools/BoundReader.lean` §8-59).
 //!
-//! `read` hands back text. A tool that sends a picture or a recording to
-//! an endpoint needs the bytes, and they may sit in another building the
+//! `read` hands back text or a picture attachment. A tool that sends
+//! bytes to an endpoint needs the bytes themselves, and they may sit in another building the
 //! read bound opens or in a block a connector stored. Whether a model may
 //! read what it named is decided in `chosen_path`; a tool outside this
 //! crate that judged a path itself would be a second authority on it, so

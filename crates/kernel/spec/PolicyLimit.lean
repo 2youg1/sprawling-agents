@@ -16,7 +16,7 @@
 
 **为什么拒因归类型**：上限若是裸整数，四段拒因（动作／主体／码／recovery）就由每个调用点手拼，各自 `format!` 同一个数；数会改，句子会漏改，调用方也拼得出第二种拒因。类型给出拒因，调用点只递观测值。
 
-**形状**：三个形状 2 值类型，各带私有字段、一个 crate 内构造器和唯一方法 `admit`。`admit` 是判定与文案的同一入口：域内回 `Ok(())`，越界回 `E_INVALID_ARGS`，四段全部由类型给出。
+**形状**：三个形状 2 值类型，各带私有字段、一个 crate 内构造器和判定方法 `admit`。`admit` 是判定与文案的同一入口：域内回 `Ok(())`，越界回 `E_INVALID_ARGS`，四段全部由类型给出。`ImageMaxBytes` 另有 `read_from(source: impl Read) -> io::Result<Vec<u8>>`，最多读到上限+1 字节，供调用方把这份有界字节交给 `admit`；它不交出上限值，也不替 `admit` 判接受。
 
 | 类型 | 唯一实例（数的家仍是 `consts_policy`，§8-8） | `admit` | 越界时的四段 |
 |---|---|---|---|
@@ -27,11 +27,13 @@
 
 **合法域**：`0..=max`（含端点）——恰好落在上限上的观测被收下，越界一步即拒（不钳位）。句式与域随类型走，改上限只改 `consts_policy` 一处。观测值是 `usize`，上限是 `u64`，比较在 `u64` 里做：`usize` 至多 64 位，窄化在任何 Rust 目标上都不会失败，那条失败支仍答「越界」，这条判定因此不依赖目标的指针宽度。
 
-**拼不出第二种拒因**：字段私有、唯一构造器 `new` 是 `pub(crate)`（只给 `consts_policy` 铸实例）、无 serde、无 getter、无 `Display`。外部调用方既铸不出一个更松的上限（那就等于第二种拒因），也读不出裸数去 `format!` 自己的句子；四段文案的唯一生产点是 `admit`。编译失败反例 `tests/ui/forge_policy_limit.rs` 钉住「调用方铸不出政策值」。两处生产调用点（`gateway::endpoint::call::pictures_for`、`runtime::clock::stamp`）的测试以整值相等断言「调用方交出的就是本类型的拒因」，某一个调用点再拼一句自有文案即红。
+**拼不出第二种拒因**：字段私有、唯一构造器 `new` 是 `pub(crate)`（只给 `consts_policy` 铸实例）、无 serde、无 getter、无 `Display`。外部调用方既铸不出一个更松的上限（那就等于第二种拒因），也读不出裸数去 `format!` 自己的句子；四段文案的唯一生产点是 `admit`。编译失败反例 `tests/ui/forge_policy_limit.rs` 钉住「调用方铸不出政策值」。生产调用点的测试以整值相等断言「调用方交出的就是本类型的拒因」，某一个调用点再拼一句自有文案即红。
 
 **三个类型不合并且不并入 `Ceiling`／`Window`**（8-40 同一条理）：上限互换后仍然编译得过，一个类型就是一个可交换面。
 
 **队列（其余政策值逐个 newtype 化时从这里取）**：
+
+`ImageMaxBytes::read_from` 是读取侧的唯一 bounded-read 入口：普通图片文件读到上限+1 即停，超过上限的文件不必整份进内存；CAS 与 git locator 已由各自存储层交出整份字节，不经它。读取错误原样交给调用方按自己的动作映射，接受与否仍由 `admit` 决定。
 
 - `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `StorageError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
 - `OUTPUT_CEILING_DEFAULT`：合法域（非零）今天是两个家——`consts_policy` 的测试与 `gateway::provider::ceiling` 的 `Ceiling::new(..)?`；铸成 `Ceiling` 实例即一个家。

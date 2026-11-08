@@ -32,11 +32,6 @@ export function offered(written: string): Offered {
   return absolute ? { kind: "path", path: text } : { kind: "refused", why: "skill_mount_relative" };
 }
 
-// The folders mounted now, in the order the city answered them.
-export function mounted(shelves: readonly string[]): readonly string[] {
-  return [...shelves];
-}
-
 // Whether this exact spelling is already mounted, compared as the city
 // compares it: the text it was given, trimmed.
 export function alreadyMounted(shelves: readonly string[], path: string): boolean {
@@ -47,7 +42,7 @@ export function alreadyMounted(shelves: readonly string[], path: string): boolea
 // is not added twice: a shelf's index is one row per name, and a second
 // identical row would only be a second way to say the same thing.
 export function withLibrary(shelves: readonly string[], path: string): readonly string[] {
-  return alreadyMounted(shelves, path) ? mounted(shelves) : [...shelves, path.trim()];
+  return alreadyMounted(shelves, path) ? shelves : [...shelves, path.trim()];
 }
 
 // The whole table after taking one folder away, by its exact spelling.

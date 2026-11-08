@@ -13,6 +13,8 @@
 //! nor read the figure out to format a sentence of its own. The
 //! compile-failure counterexample is `tests/ui/forge_policy_limit.rs`.
 
+use std::io::Read as _;
+
 use crate::error::{AxCode, AxError};
 use crate::locator::Locator;
 
@@ -78,6 +80,20 @@ impl ImageMaxBytes {
     /// The only way a value of this type exists; see [`ImagesPerTurn::new`].
     pub(crate) const fn new(max: u64) -> ImageMaxBytes {
         ImageMaxBytes(max)
+    }
+
+    /// Reads one byte past this picture's limit, so the caller can
+    /// refuse an oversized file without first holding it whole.
+    ///
+    /// # Errors
+    /// Propagates a source read failure. Reaching the limit is not an
+    /// error here; [`Self::admit`] makes that decision from the bytes.
+    pub fn read_from(self, source: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        source
+            .take(self.0.saturating_add(1))
+            .read_to_end(&mut bytes)?;
+        Ok(bytes)
     }
 
     /// Whether this picture's bytes fit, refusing past the limit with
@@ -228,14 +244,21 @@ mod tests {
     #[test]
     fn a_picture_fits_at_the_ceiling_and_one_past_it_is_refused() {
         let at = a_picture();
-        assert!(IMAGE_MAX_BYTES.admit(&at, 2_097_152).is_ok());
+        assert!(IMAGE_MAX_BYTES.admit(&at, 4_194_304).is_ok());
         let expected = AxError::failure(
             AxCode::InvalidArgs,
             "put a picture on a provider request",
-            format!("{at} is 2097153 bytes"),
+            format!("{at} is 4194305 bytes"),
         )
-        .with_recovery("one picture is at most 2097152 bytes; shrink it before attaching it");
-        assert_eq!(IMAGE_MAX_BYTES.admit(&at, 2_097_153).unwrap_err(), expected);
+        .with_recovery("one picture is at most 4194304 bytes; shrink it before attaching it");
+        assert_eq!(IMAGE_MAX_BYTES.admit(&at, 4_194_305).unwrap_err(), expected);
+    }
+
+    #[test]
+    fn a_picture_read_stops_one_byte_past_the_limit() {
+        let source = vec![0u8; 5_000_000];
+        let bytes = IMAGE_MAX_BYTES.read_from(&mut &source[..]).unwrap();
+        assert_eq!(bytes.len(), 4_194_305);
     }
 
     #[test]

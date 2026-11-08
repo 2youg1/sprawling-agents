@@ -231,6 +231,50 @@ fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
     );
 }
 
+/// A folder that is already a building keeps its rules. Importing it
+/// would have to overwrite them, so the copy never starts and the empty
+/// target is not what the refusal names.
+#[test]
+fn importing_a_folder_that_already_has_rules_copies_nothing() {
+    let city = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    let rules = source.path().join(kernel::RESERVED_PREFIX).join(RULES_FILE);
+    std::fs::create_dir_all(rules.parent().unwrap()).unwrap();
+    std::fs::write(&rules, "confidential = false\n").unwrap();
+    std::fs::write(source.path().join("KEEP.md"), "keep\n").unwrap();
+
+    let err = raise(
+        city.path(),
+        Raising {
+            addr: &addr("lab"),
+            template: BuildingTemplate::Minimal,
+            rules: RulesText::Template,
+            source: Some(source.path()),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(
+        err.subject().contains(&source.path().display().to_string()),
+        "the refusal names the source rules file, not the empty target: {err}"
+    );
+    assert!(
+        !err.recovery().contains("nobody occupies"),
+        "an empty target is not the problem: {err}"
+    );
+    assert!(!city.path().join("lab").exists());
+    assert!(!city.path().join(".lab.importing").exists());
+    assert_eq!(
+        std::fs::read_to_string(source.path().join("KEEP.md")).unwrap(),
+        "keep\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&rules).unwrap(),
+        "confidential = false\n"
+    );
+}
+
 /// Adoption draws the same line over a directory that already had one
 /// of its own, and takes nothing away from it.
 #[test]

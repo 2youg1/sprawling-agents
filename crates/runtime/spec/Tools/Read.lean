@@ -183,6 +183,18 @@ impl ReadShown {
 - **racy 判定**：`Stamp` 不含内容。初次读完时若 `now - mtime < 2,000 ms`（mtime 在未来也算）或时钟不可用，claim 记录已读文本的 BLAKE3；之后同戳读到该记录必须走 `Compare`。无摘要的记录才可仅凭戳走 `Repeat`。时间由工作台注入的同一 clock 给出；runtime 不自行读系统钟，未注入或 clock 失败都不使合法 read 失败，而是保守地总是记录并比较摘要。常规本地文件系统上，普通写会改戳，racy 写由摘要兜底；网络卷与刻意伪造元数据不在保证范围内，绝不把该判定说成内容哈希的替代品。
 - **成本阈值与有界状态**：`recall` 在覆盖区间与戳都匹配后，用 V4 的同一 `unchanged` 函数和已确认总行数算出准确桩长；只有先前正文至少为桩的两倍才去重，小文件仍回全文。`SHOWN_MAX_PATHS = 64`，`SHOWN_MAX_PENDING = 256`，按单调 generation 淘汰最旧，路径与 id 都用 `BTreeMap`，决策不读哈希序。表只存戳、区间与可选摘要，不存正文。fork、successor、delegate 子 run 从空表开始；fork 中继承的旧桩仍由 V4 重画，但不会凭空成为新 run 的窗口证据。
 - **载荷与渲染**：`{path, unchanged: true, offset, lines, total_lines}`，不带 `text`、`bytes`，V4 画成一行未变桩（§8-63）。候选规则可在同一次桩上继续递送，规则是否完整进入窗口同样由压缩 id 决定。
+
+#### 8-29-9 图片按附件回答，不进 UTF-8 文本解码
+
+```rust
+impl ReadTool {
+    pub fn storing_pictures(self, origin: storage::BlockOrigin) -> ReadTool;
+}
+```
+
+- **普通路径先看名字，Locator 看字节。** catalog 优先与 `chosen_path` 的判定不变；普通路径的扩展名属于 `image::ImageFormat` 时才经 `BoundReader` 读字节，`cas:`／`file:` 则按内容猜格式。识别为 PNG、JPEG、WebP 或 GIF 时，从头读出宽高；其他内容与识别不到的普通文件仍走原文本路径。一个声称是图片但尺寸或上限不合格的输入以 `E_INVALID_ARGS` 拒绝，不降级成 UTF-8 错误。
+- **返回形状复用文本渲染与图片附件。** 字节经 `Cas::put_for` 以 `storing_pictures` 给出的 run／building origin 落 CAS；结果的 `text` 是与连接器相同的 `[picture attached: <media> <宽>x<高>, <locator>]`，`bytes` 仍是这行返回文本的长度，`attachments` 携真正的 `ImageRef`。base64 不进结果或账本；`offset`／`limit` 是文本行区间，对图片不适用。图片不写文本 `seen`／`shown` 戳，也不取嵌套规则候选。普通文件经 `ImageMaxBytes::read_from` 最多读到上限+1，超限无需整份入内存。
+- **上限只有一个家。** 识别、OCR、连接器与 provider 请求共用 `IMAGE_MAX_BYTES`；当前为 4 MiB，恰好上限接受，多一字节拒绝。普通文本快路径不因这项功能多读一次文件。
 -/
 
 /-! D127 未变桩以完整窗口证据为准，规则递送与 read 去重共用压缩确认
