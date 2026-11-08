@@ -36,8 +36,18 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 ```
 
 - **按五轴说明**（与 §8-13-2 的臂同一套，设置里的 `python` 臂照它说；`crates/wire/spec/Answer/Doctor.lean` D26）：文件——保，guest 只够得到 preopen 的目录，`Mount.writable` 为假的目录只读；网络——保，理由见下文「无出网的机械形」；进程树——保，wasip1 没有起进程的接口；用户——不保，引擎跑在 harness 的进程与身份里；资源——条件：CPU 由 `Fuel` 限；内存在 run 有上限时由同一个数限（D102），run 没有上限时 guest 的线性内存只受 wasm32 的地址空间所限，所以「CPU 与内存上限」这一轴整体答不保。它装不下 harness 居民，只跑 Python。
-- 能力面＝wasip1 preopen 集（Mount 逐条）；无网络能力（WASI p1 天然无 socket 宿主实现——Python 臂禁网的机械保证）；fuel 上限即 Fuel（耗尽＝FuelExhausted，不是 Err：宿主无故障）。
-- 未授能力被拒的观察形：guest 内 open 失败→非零退出（Failure）；宿主恒不代 guest 隐藏失败。A10 三断言在真 wasmtime 上以手写 WAT 模块定形（不依赖 CPython 工件）；CPython-WASI 集成测试以环境变量指向工件（住机器本地的忽略目录，恒不入库），缺工件即 skip——`just check` 自足。
+- 能力面＝wasip1 preopen 集（Mount 逐条）；python 臂在这次 run 的 mounts 之外另获一个只读目录：组件的 `lib/` 映到 guest 的 `/usr/local/lib`，与登记 guest 的 `sys.path` 相合。无网络能力（WASI p1 天然无 socket 宿主实现——Python 臂禁网的机械保证）；fuel 上限即 Fuel（耗尽＝FuelExhausted，不是 Err：宿主无故障）。
+- 未授能力被拒的观察形：guest 内 open 失败→非零退出（Failure）；宿主恒不代 guest 隐藏失败。A10 三断言在真 wasmtime 上以手写 WAT 模块定形（不依赖 CPython 工件）；`tools::exec::tests` 的真实 CPython-WASI 测试以环境变量指向工件（住机器本地的忽略目录，恒不入库），缺工件即 skip——`just check` 自足。
+
+- **登记 guest 的实际布局**：上游、版本、资产与内容摘要的权威是 `docs/third-party.md`；在登记的 guest 内执行 `import sys; print(sys.version, sys.prefix, sys.path, sys.flags)` 的原文输出是：
+
+  ```text
+  3.14.9 (tags/v3.14.9:ead82c0, Oct 21 2026, 06:02:15) [Clang 18.1.2-wasi-sdk (https://github.com/llvm/llvm-project 26a1d6601d727a96f43 /usr/local ['', '/usr/local/lib/python314.zip', '/usr/local/lib/python3.14', '/usr/local/lib/python3.14/lib-dynload', '/usr/local/lib/python3.14/site-packages'] sys.flags(debug=0, inspect=0, interactive=0, optimize=0, dont_write_bytecode=0, no_user_site=0, no_site=0, ignore_environment=0, verbose=0, bytes_warning=0, quiet=0, hash_randomization=1, isolated=0, dev_mode=False, utf8_mode=0, warn_default_encoding=0, safe_path=False, int_max_str_digits=4300)
+  ```
+
+  上游资产不带 `.pyc`；用这份 pinned guest 在可写副本上执行 `compileall`，以 `unchecked-hash` 生成 529 份字节码。生产只读挂载重建后的 `lib/`；`-v` 下 `collections`、`difflib`、`itertools`、`re` 及其依赖均从 `.pyc` 读入，没有源码编译。重建后 stdlib 树的摘要与规范化方法随资产登记在 `docs/third-party.md`。
+
+- **内容 pin 的威胁边界**：默认组件在每进程第一次选择时由 Doctor 以 `kernel::B3Hash` 核对，挡住损坏与版本错配。它不能也不声称挡住已经能写安装目录的人；`SPRAWLING_PYTHON_WASM` 是跳过 pin 的开发覆盖，Doctor 明说 `unpinned override`。
 **A10 三断言结论书**（证据＝`crates/runtime/tests/sandbox_a10.rs`，真 wasmtime（版本由 `Cargo.lock` 钉），手写 WAT 不依赖任何外部工件）：
 
 | 断言 | 观测形 | 结论 |

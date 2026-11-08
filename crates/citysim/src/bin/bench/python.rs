@@ -13,7 +13,9 @@ use std::sync::{Barrier, LazyLock, mpsc};
 use std::time::Duration;
 
 use kernel::{AxCode, AxError, B3Hash};
-use runtime::{Fuel, GuestMemory, Sandbox as _, SandboxExit, SandboxJob, WasmtimeSandbox};
+use runtime::{
+    Fuel, GuestMemory, Mount, PythonGuest, Sandbox as _, SandboxExit, SandboxJob, WasmtimeSandbox,
+};
 use sprawling::monitor::spread::micros;
 use sprawling::monitor::tree::{Tree, TreeReading};
 
@@ -124,6 +126,7 @@ struct Observation {
 struct Guest {
     path: PathBuf,
     digest: B3Hash,
+    stdlib: Mount,
     /// Owns the snapshot directory for every call in this measurement.
     _snapshot: tempfile::TempDir,
 }
@@ -159,8 +162,13 @@ pub(crate) fn measure_as(arm: Arm) -> Result<Report, String> {
 
 /// Runs exactly one real CPython call in this fresh process, then writes and
 /// flushes the completion line that ends the parent's timing.
-pub(crate) fn cold_child(expected_guest: &str, snapshot: &Path) -> Result<(), String> {
-    let prepared = prepare(snapshot)?;
+pub(crate) fn cold_child(
+    expected_guest: &str,
+    snapshot: &Path,
+    stdlib: &Path,
+) -> Result<(), String> {
+    let selected = PythonGuest::with_stdlib(snapshot.to_path_buf(), stdlib.to_path_buf());
+    let prepared = prepare(&selected)?;
     if prepared.guest.digest.to_string() != expected_guest {
         return Err(fixture(
             "the cold child received different guest bytes from its parent",
@@ -178,13 +186,13 @@ fn measure_from(wasm: Option<PathBuf>, arm: Arm) -> Result<Report, String> {
     measure_at_as(&wasm, arm)
 }
 
-#[cfg(test)]
-fn measure_at(wasm: &Path) -> Result<Report, String> {
-    measure_at_as(wasm, Arm::Baseline)
+fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
+    measure_guest_as(PythonGuest::at(wasm.to_path_buf()), arm)
 }
 
-fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
-    let mut prepared = prepare(wasm)?;
+fn measure_guest_as(selected: PythonGuest, arm: Arm) -> Result<Report, String> {
+    let stdlib_before = stdlib_digest(&selected.stdlib().host)?;
+    let mut prepared = prepare(&selected)?;
     let identity = Identity {
         build: current_build()?,
         guest: prepared.guest.digest,
@@ -249,13 +257,24 @@ fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
             "the guest bytes changed while the baseline was running",
         ));
     }
+    if stdlib_digest(&selected.stdlib().host)? != stdlib_before {
+        return Err(fixture(
+            "the stdlib tree changed while the baseline was running",
+        ));
+    }
     Ok(report)
+}
+
+#[cfg(test)]
+fn measure_at(wasm: &Path) -> Result<Report, String> {
+    measure_at_as(wasm, Arm::Baseline)
 }
 
 impl Guest {
     /// Reads the configured source once, then executes only a bench-owned
     /// snapshot whose digest is the identity of those same bytes.
-    fn at(source: &Path) -> Result<Guest, String> {
+    fn at(selected: &PythonGuest) -> Result<Guest, String> {
+        let source = selected.wasm();
         let bytes = std::fs::read(source).map_err(|why| {
             prerequisite(format!(
                 "read the CPython-WASI guest {}: {why}",
@@ -272,6 +291,7 @@ impl Guest {
         Ok(Guest {
             path,
             digest: B3Hash::digest(&bytes),
+            stdlib: selected.stdlib().clone(),
             _snapshot: snapshot,
         })
     }
@@ -281,6 +301,52 @@ impl Guest {
             .map(|bytes| B3Hash::digest(&bytes))
             .map_err(|why| prerequisite(format!("reread the CPython guest snapshot: {why}")))
     }
+}
+
+/// Canonical regular-file entries from docs/third-party.md, including raw path bytes.
+fn stdlib_digest(root: &Path) -> Result<B3Hash, String> {
+    fn visit(
+        root: &Path,
+        relative: Vec<u8>,
+        entries: &mut Vec<(Vec<u8>, PathBuf)>,
+    ) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(root)? {
+            let entry = entry?;
+            let mut name = relative.clone();
+            if !name.is_empty() {
+                name.push(b'/');
+            }
+            name.extend_from_slice(entry.file_name().as_encoded_bytes());
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                visit(&entry.path(), name, entries)?;
+            } else if kind.is_file() {
+                entries.push((name, entry.path()));
+            }
+        }
+        Ok(())
+    }
+    let read = || -> std::io::Result<B3Hash> {
+        let mut entries = Vec::new();
+        visit(root, Vec::new(), &mut entries)?;
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        let mut bytes = Vec::new();
+        for (name, path) in entries {
+            let contents = std::fs::read(path)?;
+            let length = u64::try_from(contents.len()).map_err(std::io::Error::other)?;
+            bytes.extend_from_slice(&name);
+            bytes.push(0);
+            bytes.extend_from_slice(&length.to_le_bytes());
+            bytes.extend_from_slice(&contents);
+        }
+        Ok(B3Hash::digest(&bytes))
+    };
+    read().map_err(|why| {
+        prerequisite(format!(
+            "digest the selected stdlib tree {}: {why}",
+            root.display()
+        ))
+    })
 }
 
 fn current_build() -> Result<B3Hash, String> {
@@ -299,10 +365,10 @@ impl Identity {
 
 /// Validates and compiles the snapshot with the first run of the real load.
 /// WAT can pass the engine checks, but cannot produce the exact CPython output.
-fn prepare(wasm: &Path) -> Result<Prepared, String> {
-    let guest = Guest::at(wasm)?;
+fn prepare(selected: &PythonGuest) -> Result<Prepared, String> {
+    let guest = Guest::at(selected)?;
     let mut sandbox = WasmtimeSandbox::new().map_err(|why| prerequisite(why.to_string()))?;
-    run_checked(&mut sandbox, &guest.path).map_err(|why| {
+    run_checked(&mut sandbox, &guest).map_err(|why| {
         prerequisite(format!(
             "the selected guest is not a usable CPython-WASI fixture: {why}"
         ))
@@ -310,21 +376,21 @@ fn prepare(wasm: &Path) -> Result<Prepared, String> {
     Ok(Prepared { guest, sandbox })
 }
 
-fn raw_job(wasm: &Path, script: &str) -> SandboxJob {
+fn raw_job(guest: &Guest, script: &str) -> SandboxJob {
     SandboxJob {
-        wasm: wasm.to_path_buf(),
+        wasm: guest.path.clone(),
         argv: vec!["python".to_owned(), "-c".to_owned(), script.to_owned()],
         env: Vec::new(),
         stdin: Vec::new(),
-        mounts: Vec::new(),
+        mounts: vec![guest.stdlib.clone()],
         fuel: Fuel(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
         memory: GuestMemory::Wasm32,
     }
 }
 
-fn run_checked(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<(), String> {
+fn run_checked(sandbox: &mut WasmtimeSandbox, guest: &Guest) -> Result<(), String> {
     let outcome = sandbox
-        .run(&raw_job(wasm, SCRIPT.as_str()))
+        .run(&raw_job(guest, SCRIPT.as_str()))
         .map_err(|why| why.to_string())?;
     output_detail(&outcome)
 }
@@ -335,10 +401,10 @@ struct TimedOutcome {
     outcome: runtime::SandboxOutcome,
 }
 
-fn timed_outcome(sandbox: &mut WasmtimeSandbox, wasm: &Path) -> Result<TimedOutcome, String> {
+fn timed_outcome(sandbox: &mut WasmtimeSandbox, guest: &Guest) -> Result<TimedOutcome, String> {
     let started = super::stamp();
     let outcome = sandbox
-        .run(&raw_job(wasm, SCRIPT.as_str()))
+        .run(&raw_job(guest, SCRIPT.as_str()))
         .map_err(|why| why.to_string())?;
     let returned = super::stamp();
     Ok(TimedOutcome {
@@ -370,7 +436,7 @@ fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
     check_state_isolation(prepared)?;
     (0..WARM_SAMPLES)
         .map(|index| {
-            let measured = timed_outcome(&mut prepared.sandbox, &prepared.guest.path)?;
+            let measured = timed_outcome(&mut prepared.sandbox, &prepared.guest)?;
             checked_output(&measured.outcome)?;
             Ok(Sample {
                 took: measured.took,
@@ -383,7 +449,7 @@ fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
 
 fn check_state_isolation(prepared: &mut Prepared) -> Result<(), String> {
     let write_script = format!("bench_state = 41\nprint('{STATE_WRITTEN}')\n");
-    let write = raw_job(&prepared.guest.path, &write_script);
+    let write = raw_job(&prepared.guest, &write_script);
     let written = prepared
         .sandbox
         .run(&write)
@@ -398,7 +464,7 @@ fn check_state_isolation(prepared: &mut Prepared) -> Result<(), String> {
     }
     let read_script =
         format!("print('{STATE_LEAKED}' if 'bench_state' in globals() else '{STATE_CLEAN}')\n");
-    let read = raw_job(&prepared.guest.path, &read_script);
+    let read = raw_job(&prepared.guest, &read_script);
     let read = prepared.sandbox.run(&read).map_err(|why| why.to_string())?;
     if read.exit != SandboxExit::Success
         || read.stdout != output_line(STATE_CLEAN)
@@ -540,7 +606,7 @@ fn concurrent_burst(prepared: &Prepared, round: usize) -> Result<(Vec<Call>, Dur
         for _ in 0..CONCURRENT_CALLERS {
             let barrier = &barrier;
             let mut sandbox = prepared.sandbox.clone();
-            let guest = &prepared.guest.path;
+            let guest = &prepared.guest;
             handles.push(scope.spawn(move || {
                 barrier.wait();
                 let start_delay = spawned_at.elapsed();
@@ -898,6 +964,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn stdlib_digest_uses_registered_encoding_and_detects_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("a")).unwrap();
+        std::fs::write(dir.path().join("z"), b"last").unwrap();
+        std::fs::write(dir.path().join("a/b"), b"first").unwrap();
+        let mut canonical = b"a/b\0".to_vec();
+        canonical.extend_from_slice(&5_u64.to_le_bytes());
+        canonical.extend_from_slice(b"firstz\0");
+        canonical.extend_from_slice(&4_u64.to_le_bytes());
+        canonical.extend_from_slice(b"last");
+        let before = stdlib_digest(dir.path()).unwrap();
+        assert_eq!(before, B3Hash::digest(&canonical));
+        std::fs::write(dir.path().join("a/b"), b"other").unwrap();
+        assert_ne!(before, stdlib_digest(dir.path()).unwrap());
+        std::fs::write(dir.path().join("a/b"), b"first").unwrap();
+        assert_eq!(before, stdlib_digest(dir.path()).unwrap());
+        std::fs::rename(dir.path().join("z"), dir.path().join("y")).unwrap();
+        assert_ne!(before, stdlib_digest(dir.path()).unwrap());
+    }
+
+    #[test]
     fn measured_output_failures_carry_a_code_action_and_recovery() {
         for (exit, stdout, stderr) in [
             (
@@ -966,6 +1053,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let wasm = dir.path().join("correctness.wasm");
         std::fs::write(&wasm, EMPTY_START).unwrap();
+        std::fs::create_dir(dir.path().join("lib")).unwrap();
         let refused = measure_at(&wasm).expect_err("a WAT fixture produced a CPython report");
         assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
         assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");

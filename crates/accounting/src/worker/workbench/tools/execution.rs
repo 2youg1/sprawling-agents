@@ -34,7 +34,7 @@ impl Laying {
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
                 mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
-                python_wasm: machine.python_wasm,
+                python_wasm: machine.python_wasm.map(runtime::PythonGuest::at),
                 shell: machine.shell,
                 fuel: runtime::Fuel(site.config.sandbox.fuel),
                 // What a child may inherit is the building's own

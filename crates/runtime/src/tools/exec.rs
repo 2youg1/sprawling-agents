@@ -26,7 +26,7 @@
 //! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
 //! that would work, so the caller redirects instead of guessing.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use kernel::{
@@ -69,6 +69,47 @@ const PYTHON: &str = "python";
 /// which a denylist does not.
 const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 
+/// One CPython interpreter and the standard-library capability it needs.
+///
+/// Keeping them together prevents a caller from selecting a guest without
+/// the stdlib layout its `sys.path` expects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PythonGuest {
+    wasm: PathBuf,
+    stdlib: Mount,
+}
+
+impl PythonGuest {
+    /// Uses the `lib/` directory beside `wasm` as the guest's stdlib.
+    pub fn at(wasm: PathBuf) -> PythonGuest {
+        let stdlib = wasm.parent().unwrap_or_else(|| Path::new("")).join("lib");
+        PythonGuest::with_stdlib(wasm, stdlib)
+    }
+
+    /// Pairs a wasm path with an explicit stdlib source, for a benchmark's
+    /// private wasm snapshot.
+    pub fn with_stdlib(wasm: PathBuf, stdlib: PathBuf) -> PythonGuest {
+        PythonGuest {
+            wasm,
+            stdlib: Mount {
+                host: stdlib,
+                guest: "/usr/local/lib".to_owned(),
+                writable: false,
+            },
+        }
+    }
+
+    /// The interpreter module to compile.
+    pub fn wasm(&self) -> &Path {
+        &self.wasm
+    }
+
+    /// The read-only standard-library capability to append to a run's mounts.
+    pub fn stdlib(&self) -> &Mount {
+        &self.stdlib
+    }
+}
+
 /// What one run's execution boundary is made of.
 ///
 /// Values that always travel together and are never chosen apart: read
@@ -78,7 +119,7 @@ const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
-    pub python_wasm: Option<PathBuf>,
+    pub python_wasm: Option<PythonGuest>,
     pub shell: Shell,
     pub fuel: Fuel,
     /// The names this building declared its children may inherit, on top
@@ -160,7 +201,7 @@ impl ExecTool {
     }
 
     fn run_python(&self, code: &str) -> Result<ToolOutcome, AxError> {
-        let Some(wasm) = self.setup.python_wasm.clone() else {
+        let Some(guest) = self.setup.python_wasm.as_ref() else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "run python",
@@ -171,12 +212,16 @@ impl ExecTool {
                  component",
             ));
         };
+        let mut mounts = self.setup.mounts.clone();
+        if guest.stdlib.host.is_dir() {
+            mounts.push(guest.stdlib.clone());
+        }
         let job = SandboxJob {
-            wasm,
+            wasm: guest.wasm.clone(),
             argv: vec!["python".to_owned(), "-c".to_owned(), code.to_owned()],
             env: Vec::new(),
             stdin: Vec::new(),
-            mounts: self.setup.mounts.clone(),
+            mounts,
             fuel: self.setup.fuel,
             memory: GuestMemory::of_shares(self.backlog.shares()),
         };

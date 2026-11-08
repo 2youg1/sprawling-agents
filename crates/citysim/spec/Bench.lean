@@ -102,7 +102,7 @@ Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一�
 /-!
 ### 8-6-1 CPython-WASI 执行基线（`bench::python`）
 
-这一族量居民经 `exec` 的 Python 臂实际抵达的 `runtime::sandbox` 适配器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，guest 与脚本的完整 BLAKE3 摘要都进读数行。`SandboxJob` 与 Python 臂同形：`argv = ["python", "-c", script]`、无环境继承、无 mount、`GuestMemory::Wasm32`，燃料取 `kernel::consts_policy::SANDBOX_FUEL_DEFAULT`。场景只走产品已有的 `WasmtimeSandbox`，不复制一份 Wasmtime 驱动。
+这一族量居民经 `exec` 的 Python 臂实际抵达的 `runtime::sandbox` 适配器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，guest 与脚本的完整 BLAKE3 摘要都进读数行。`SandboxJob` 与 Python 臂同形：`argv = ["python", "-c", script]`、无环境继承、一个只读 stdlib mount、`GuestMemory::Wasm32`，燃料取 `kernel::consts_policy::SANDBOX_FUEL_DEFAULT`。场景只走产品已有的 `WasmtimeSandbox` 与 `PythonGuest`，不复制一份 Wasmtime 驱动或 stdlib 布局。
 
 ```rust
 // bench 是二进制，以下都是 pub(crate)
@@ -110,17 +110,17 @@ pub struct Report { pub lines: Vec<String>, /* arm 与原始 Observation 行私�
 pub enum Arm { Baseline, Candidate }
 pub fn measure() -> Result<Report, String>;             // Baseline
 pub fn measure_as(arm: Arm) -> Result<Report, String>;
-pub fn cold_child(expected_guest: &str, snapshot: &Path) -> Result<(), String>;   // 仅 Main 的 python-cold 内部入口调用
+pub fn cold_child(expected_guest: &str, snapshot: &Path, stdlib: &Path) -> Result<(), String>; // 仅 Main 的 python-cold 内部入口调用
 impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 ```
 
-`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先与组件目录回退不由 bench 重写。`Guest::at` 只读该来源一次，把同样的字节写进本次测量私有的 tempfile 快照；父进程与冷子进程都只执行这份快照，摘要也从同一份字节算出。全部场景结束后重读快照，不同就拒掉整份 Report；冷子进程另核对父进程交给它的摘要。S2 之前这证明的是「经现有门配置且可运行的 CPython」，不是已钉住供应链来源的固定工件。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先建快照，再运行校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须逐字节等于登记值，不能把第一次的任意标记输出收养成基准；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
+`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先、组件目录回退与默认组件的内容 pin 都不由 bench 重写。`PythonGuest::at` 补上同一个只读 stdlib 来源；`Guest::at` 只读 wasm 来源一次，把同样的字节写进本次测量私有的 tempfile 快照，同时保留 stdlib 的 Mount。父进程与冷子进程都只执行这份快照并挂载同一个 stdlib 来源，摘要也从同一份字节算出；冷进程协议多带一个 stdlib 宿主路径，不复制这棵树。Main 以 args_os 接收参数，只对命令、arm 与 guest 摘要文本校验 UTF-8，路径不转字符串。测量前后按 docs/third-party.md 的规范化规则分别摘要所选 stdlib 树；摘要不同或读取失败即拒掉整份 Report，不检测结束前已恢复的变化。全部场景结束后重读快照，不同就拒掉整份 Report；冷子进程另核对父进程交给它的摘要。默认组件因此是经来源门与内容门选择的固定工件，开发覆盖则按 Doctor 的报告保持未钉。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先建快照，再运行校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须逐字节等于登记值，不能把第一次的任意标记输出收养成基准；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
 
 场景与读数行：
 
 | 行 | 驱动方式 | 回答的问题 |
 |---|---|---|
-| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要> <快照路径>` 子进程；子进程读取同一快照、校验并运行负载，完成时冲刷协议行，读取线程在 `read_line` 返回时记时。父进程等待退出时若消息尚未送达，会再有界等待，不把正常竞态误报成失败 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
+| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要> <快照路径> <stdlib 宿主路径>` 子进程；子进程读取同一快照、挂载同一 stdlib、校验并运行负载，完成时冲刷协议行，读取线程在 `read_line` 返回时记时。父进程等待退出时若消息尚未送达，会再有界等待，不把正常竞态误报成失败 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
 | `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载，返回时先停表再做输出校验；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
 | `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；以最后一次 sandbox 返回为每轮 wall 终点，之后核对输出 | 并发调用延迟、整批吞吐与尾延迟；每轮原始 wall 也进 CSV，可重算终端的 calls_per_s |
 | `python_start_delay` | 同上，每线程记录从本轮开始到屏障后实际起跑的时间，CSV 保留其 burst 轮次 | 起跑调度分布；当前没有 admission queue，故不把它改名成 queue delay |
@@ -136,7 +136,7 @@ impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 
 当前适配器没有 pre-warm 或阶段观察面，所以本切片不产 pre-warm awaited／racing、`instantiate` 或 `interpreter_initialization` 行；S1 的这些读数仍欠。冷／热之差不能冒充其中任何一项，WAT 正确性夹具也不能成为 CPython 计时。后续测量面须同时守住 roadmap 的「不新增 callback API」与计时采样点约束。
 
-D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：S2 的固定 guest 成为唯一工件后，路径解析可以删除，校验仍须确认实际运行的是该工件。
+D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：若以后取消开发覆盖、固定 guest 成为唯一工件，路径解析可以删除，校验仍须确认实际运行的是该工件。
 
 准备阶段的输出校验失败保留失败详情，只报告 `E_TOOL_UNAVAILABLE` 和配置真实 CPython-WASI guest 的恢复建议，不嵌入 `E_INVALID_ARGS`。
 

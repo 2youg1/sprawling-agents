@@ -26,16 +26,23 @@ mod reading;
 mod scenarios;
 
 fn main() -> std::process::ExitCode {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     match arguments.as_slice() {
-        [command, guest, snapshot] if command == python::COLD_COMMAND => {
-            return finish(python::cold_child(guest, Path::new(snapshot)));
+        [command, guest, snapshot, stdlib] if command == python::COLD_COMMAND => {
+            return finish(python::cold_child(
+                match guest.to_str() {
+                    Some(digest) => digest,
+                    None => return finish(Err(invalid_arguments())),
+                },
+                Path::new(snapshot),
+                Path::new(stdlib),
+            ));
         }
         [command] if command == "python" => {
             return finish(python::measure().and_then(present_python));
         }
         [command, arm] if command == "python" => {
-            return match python::Arm::parse(arm) {
+            return match arm.to_str().and_then(python::Arm::parse) {
                 Some(arm) => finish(python::measure_as(arm).and_then(present_python)),
                 None => finish(Err(invalid_arguments())),
             };
