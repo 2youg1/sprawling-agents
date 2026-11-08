@@ -43,6 +43,7 @@
   import Layers from "@lucide/svelte/icons/layers";
   import Lock from "@lucide/svelte/icons/lock";
   import MessageSquare from "@lucide/svelte/icons/message-square";
+  import Mic from "@lucide/svelte/icons/mic";
   import Pin from "@lucide/svelte/icons/pin";
   import Search from "@lucide/svelte/icons/search";
   import Settings from "@lucide/svelte/icons/settings";
@@ -94,6 +95,7 @@
     copy: Copy,
     door: DoorOpen,
     key: KeyRound,
+    mic: Mic,
   };
 
   export type GlyphSize = "sm" | "md" | "key" | "stop";

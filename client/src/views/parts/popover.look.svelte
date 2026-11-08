@@ -18,6 +18,16 @@
   import type { PopoverLook } from "./popover_wiring";
 
   const look: PopoverLook = $props();
+
+  // Cap the panel at the room on this side of the anchor
+  // (`PopoverView.room`). The gap it keeps from the anchor (and as much
+  // again from the clip edge) comes off — same arithmetic as the model
+  // picker — so a short viewport scrolls the panel instead of letting it
+  // rise past the window. Lists keep the palette height as their own
+  // inner scroll.
+  const panelCap = $derived(
+    look.room === null ? undefined : `calc(${String(look.room)}px - var(--spacing-snug) * 2)`,
+  );
 </script>
 
 <!-- The panel takes the theme's popover layer, so it paints and
@@ -26,9 +36,10 @@
      to a cut under reduced motion. -->
 <div
   class={[
-    "absolute left-0 z-(--layer-popover) w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
+    "absolute left-0 z-(--layer-popover) w-max min-w-full max-w-full overflow-y-auto rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
     look.side === "above" ? "bottom-full mb-snug rise" : "top-full mt-snug drop",
   ]}
+  style:max-height={panelCap}
   {...look.dialog}
 >
   {#if look.header !== undefined}{@render look.header()}{/if}
@@ -40,12 +51,15 @@
           {#each list.rows as item (item.key)}
             <li
               class={[
-                "relative flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body",
+                // Press scale is shared; the active fill is not — a chosen
+                // row already sits on wash-strong, so its press uses
+                // raised-hover instead of fighting another wash-strong.
+                "relative flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body transition-[background-color,color,scale] ease-leave active:scale-(--scale-press) active:ease-arrive still:active:scale-100",
                 item.chosen
-                  ? "applied wash-strong text-text"
+                  ? "applied wash-strong text-text active:bg-raised-hover"
                   : item.cursor
-                    ? "bg-raised-hover text-text-quiet"
-                    : "text-text-quiet",
+                    ? "bg-raised-hover text-text-quiet hover:text-text hover:ease-arrive active:wash-strong"
+                    : "text-text-quiet hover:bg-raised-hover hover:text-text hover:ease-arrive active:wash-strong",
                 item.cursor && "cursor",
               ]}
               {...item.wire}
@@ -53,11 +67,10 @@
               {#if look.row !== undefined}
                 {@render look.row(item.row)}
               {:else}
-                <!-- The name never shrinks; the secondary cell does.
-                     Both are capped rather than one holding its width
-                     against the other, so a one-word hint beside a long
-                     label survives whole. -->
-                <span class="min-w-0 max-w-[24ch] truncate">{item.row.label}</span>
+                <!-- The name wraps rather than crushing; the secondary
+                     cell still yields first. Caps keep one long line
+                     from stretching the popover past the column. -->
+                <span class="min-w-0 max-w-[28ch] wrap-anywhere text-pretty">{item.row.label}</span>
                 {#if item.row.secondary !== undefined}
                   <span class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-faint"
                     >{item.row.secondary}</span

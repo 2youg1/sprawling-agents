@@ -14,10 +14,16 @@
   // pointer already lands on 28 px. The ink brightens under the pointer
   // only while the key can be used, arriving on the arriving curve and
   // leaving on the leaving one (§4-43).
+  // Hover brightens the ink, a press yields by `--scale-press`, release
+  // returns on the leave curve (§4-43): three answers, one key.
   const KEY =
     "relative inline-flex size-control-sm shrink-0 items-center justify-center rounded-control " +
-    "text-text-faint transition-colors ease-leave aria-[disabled=false]:hover:text-text-quiet " +
-    "hover:ease-arrive still:transition-none";
+    "text-text-faint transition-[color,scale] ease-leave " +
+    "aria-[disabled=false]:hover:text-text-quiet hover:ease-arrive " +
+    "aria-[disabled=false]:active:scale-(--scale-press) aria-[disabled=false]:active:ease-arrive " +
+    // `still:` uses `:where`, so it must repeat the aria gate or the
+    // press scale's attribute selector wins and the key still yields.
+    "still:transition-none still:aria-[disabled=false]:active:scale-100";
 
   const TOUCH =
     "pointer-coarse:before:absolute pointer-coarse:before:top-1/2 pointer-coarse:before:left-1/2 " +

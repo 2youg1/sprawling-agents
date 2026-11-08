@@ -7,7 +7,9 @@
 // its name for that state, the refusal to say beside it, and its wiring
 // as one bag the look spreads on its button. One press records, a second
 // stops, and a press while the city is still transcribing does nothing
-// (client/Spec.lean §4-16).
+// (client/Spec.lean §4-16). The name is the accessible label and the Tip
+// the look draws, rather than a `title` a keyboard never reaches and a
+// touch screen never shows (docs/frontend-method.md §4-34).
 
 import type { HTMLButtonAttributes } from "svelte/elements";
 
@@ -25,7 +27,14 @@ export interface RecordLook {
   readonly wire: RecordWire;
 }
 
-export type RecordWire = Pick<HTMLButtonAttributes, "type" | "aria-disabled" | "onclick">;
+export interface RecordWire {
+  readonly type: "button";
+  readonly "aria-label": string;
+  // Always set, so the look can gate press scale on
+  // `aria-[disabled=false]` the way other icon keys do.
+  readonly "aria-disabled": boolean;
+  readonly onclick: HTMLButtonAttributes["onclick"];
+}
 
 export interface Heard {
   readonly taking: boolean;
@@ -42,13 +51,18 @@ export function hearingOf(heard: Heard): Hearing {
 
 export function lookOf(heard: Heard, lang: Lang, press: () => void): RecordLook {
   const hearing = hearingOf(heard);
+  const label = say(lang, LABEL[hearing]);
   return {
     hearing,
-    label: say(lang, LABEL[hearing]),
+    label,
     refused: heard.refused ? say(lang, "link_refused") : undefined,
     wire: {
       type: "button",
-      "aria-disabled": hearing === "hearing" ? "true" : undefined,
+      // The mark is decorative; the words name the action for a screen
+      // reader. The look's Tip carries the same words for pointer, focus
+      // and touch.
+      "aria-label": label,
+      "aria-disabled": hearing === "hearing",
       // The seat's `press` refuses while the city transcribes, for this
       // button and for the palette's "speak" alike.
       onclick: press,

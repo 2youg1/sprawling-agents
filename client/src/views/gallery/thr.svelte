@@ -290,6 +290,7 @@
   import Delivered from "../talk/delivered.svelte";
   import Head from "../talk/head.svelte";
   import Reasoning from "../talk/reasoning.look.svelte";
+  import { lengthOf as reasoningLength } from "../talk/reasoning";
   import SteerPin from "../talk/steer_pin.look.svelte";
   import Unread from "../talk/unread.look.svelte";
   import Case from "./case.svelte";
@@ -354,13 +355,13 @@ way down. -->
   <div class="flex flex-col gap-base">
     <Reasoning
       label={say($lang, "talk_reasoning")}
-      length={fill(say($lang, "talk_reasoning_length"), { n: "92" })}
+      length={reasoningLength($lang, THOUGHT)}
       text={THOUGHT}
       open={false}
     />
     <Reasoning
       label={say($lang, "talk_reasoning")}
-      length={fill(say($lang, "talk_reasoning_length"), { n: "92" })}
+      length={reasoningLength($lang, THOUGHT)}
       text={THOUGHT}
       open
     />

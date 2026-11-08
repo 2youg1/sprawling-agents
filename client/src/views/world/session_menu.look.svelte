@@ -15,8 +15,20 @@ comes in the bags. -->
 
   const look: SessionMenuLook = $props();
 
+  // Trigger: wash on hover, yield on press, return on release.
   const KEY =
-    "grid size-control-sm place-items-center rounded-control text-text-quiet hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text disabled:text-text-disabled";
+    "grid size-control-sm place-items-center rounded-control text-text-quiet " +
+    "transition-[background-color,color,scale] ease-leave " +
+    "hover:wash hover:text-text hover:ease-arrive " +
+    "active:scale-(--scale-press) active:ease-arrive " +
+    "aria-expanded:wash aria-expanded:text-text " +
+    "disabled:text-text-disabled still:transition-none still:active:scale-100";
+  // Long policy lines wrap instead of crushing into one control height;
+  // the list scrolls under a thin scrollbar once it outgrows the palette.
+  const ITEM =
+    "flex min-h-control-sm w-full items-center rounded-control px-snug py-tight text-left text-note text-pretty text-text " +
+    "transition-[background-color,color] ease-leave " +
+    "hover:wash hover:ease-arrive focus-visible:wash active:wash-strong active:ease-arrive";
 </script>
 
 <div class="relative">
@@ -30,7 +42,7 @@ comes in the bags. -->
   {#if look.open}
     <div
       {...look.popup}
-      class="absolute top-full right-0 z-(--layer-popover) flex min-w-[20ch] flex-col rounded-card bg-raised p-tight shadow-float"
+      class="absolute top-full right-0 z-(--layer-popover) flex w-max min-w-[24ch] max-w-[36ch] flex-col rounded-card bg-raised p-tight shadow-float"
     >
       {#if look.naming !== undefined}
         <form {...look.naming.form} class="flex flex-col gap-tight p-tight">
@@ -46,13 +58,10 @@ comes in the bags. -->
           </p>
         </form>
       {:else}
-        <ul {...look.list}>
+        <ul {...look.list} class="max-h-palette overflow-y-auto">
           {#each look.items as item (item.key)}
             <li {...item.holder}>
-              <button
-                {...item.wire}
-                class="flex h-control-sm w-full items-center rounded-control px-snug text-left text-note text-text hover:wash focus-visible:wash"
-              >
+              <button {...item.wire} class={ITEM}>
                 {item.word}
               </button>
             </li>
