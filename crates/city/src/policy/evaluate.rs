@@ -124,7 +124,8 @@ fn reading_room_document(
         )
         .with_recovery("make RULES.toml readable, then save the catalog again")
     })?;
-    let mut document: toml::Table = toml::from_str(&text).map_err(|err| refuse(err.to_string()))?;
+    let mut document: toml::Table =
+        toml::from_str(&text).map_err(|err| refuse(addr, err.to_string()))?;
     document.insert(
         "reading_room".to_owned(),
         toml::Value::Array(
@@ -134,7 +135,8 @@ fn reading_room_document(
                 .collect(),
         ),
     );
-    let rendered = toml::to_string_pretty(&document).map_err(|err| refuse(err.to_string()))?;
+    let rendered =
+        toml::to_string_pretty(&document).map_err(|err| refuse(addr, err.to_string()))?;
     let rules = evaluate(addr, &rendered)?;
     Ok((rendered, rules))
 }
@@ -233,12 +235,13 @@ impl Default for Granted {
 /// second list written here would be the one that goes stale the first
 /// time [`Written`] grows a field. What this adds is what the
 /// deserialiser cannot know: whose file this is and who may change it.
-fn refuse(subject: String) -> AxError {
+fn refuse(addr: &Address, subject: String) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, "read a building's rules", subject).with_recovery(
         format!(
-            "correct {RULES_FILE} in this building's reserved subtree, against the blank form \
-             a new building is laid out with; a resident cannot write it, and asks the \
-             User for the change instead"
+            "fix the TOML error reported above in `{}/.sprawling/{RULES_FILE}`; the User can \
+             edit this file directly, on the raise page, or on the building settings page; \
+             residents only read it",
+            addr.as_str()
         ),
     )
 }
@@ -252,7 +255,7 @@ fn refuse(subject: String) -> AxError {
 /// a confidential building contradicts by asking for.
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     crate::format::admit_format(crate::format::FormatFile::Rules, text)?;
-    let written: Written = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
+    let written: Written = toml::from_str(text).map_err(|err| refuse(addr, err.to_string()))?;
     let reach = DomainReach::parse(&written.write)?;
     let mut write_prefixes = Vec::with_capacity(written.prefixes.len());
     for prefix in &written.prefixes {

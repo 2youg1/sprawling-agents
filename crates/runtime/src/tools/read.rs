@@ -21,7 +21,11 @@
 //! reached by writing Python inside `exec` — which a city with no
 //! sandbox and no shell cannot do at all.
 //!
-//! **An answer is an interval, and it says what it is part of.** Whole-
+//! A text answer is an interval and says what it is part of; a PNG,
+//! JPEG, WebP or GIF answer carries the picture as an attachment instead
+//! of trying to decode its bytes as UTF-8.
+//!
+//! **A text answer is an interval, and it says what it is part of.** Whole-
 //! file reading made every long document an all-or-nothing call: the
 //! kernel's own SPEC is fourteen hundred lines, and a read of it either
 //! spent the window or was cut somewhere by the pipeline — usually
@@ -40,8 +44,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    Address, AxCode, AxError, B3Hash, CostTier, Effect, Payload, RenderIntent, Temporal, TimeMs,
-    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, B3Hash, CostTier, Effect, ImageRef, Payload, RenderIntent, Temporal,
+    TimeMs, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -158,6 +162,8 @@ enum Found {
     Chosen(kernel::Address),
     /// Text an admitted catalog entry or CAS object supplied.
     Text(String),
+    /// A picture whose bytes the same admission already released.
+    Picture { picture: ImageRef, bytes: Vec<u8> },
 }
 
 /// The interval of one answer: where it starts and how much of it there
@@ -323,6 +329,8 @@ pub struct ReadTool {
     /// bytes belong to - and where this city keeps content blocks, which
     /// a worktree does not hold. A Locator's bytes are read through it.
     reader: BoundReader,
+    /// Whose CAS origins pictures read by this run are stored for.
+    picture_origin: Option<storage::BlockOrigin>,
     /// The root `reader` reads under, its real location anchored once
     /// (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
     city: CityRoot,
@@ -397,6 +405,7 @@ impl ReadTool {
         Ok(ReadTool {
             catalog,
             reader: BoundReader::new(city_root, bound, block_store),
+            picture_origin: None,
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
             shown: ReadShown::default(),
@@ -406,8 +415,9 @@ impl ReadTool {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Reads a file by its path, or a skill by the name the catalog \
                              lists it under, with line numbers counted from 1. A truncated \
-                             answer states the total and the line to continue from. Reading a \
-                             directory or a missing file is refused."
+                             answer states the total and the line to continue from. PNG, JPEG, \
+                             WebP and GIF come back as picture attachments within the picture \
+                             size limit. Reading a directory or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -427,6 +437,9 @@ impl ReadTool {
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
         if let Some(read) = locator::open_locator(asked, &self.reader, "read") {
             let (_, bytes) = read?;
+            if let Some(picture) = crate::pipeline::connector::read_picture(&bytes)? {
+                return Ok(Found::Picture { picture, bytes });
+            }
             return String::from_utf8(bytes).map(Found::Text).map_err(|_| {
                 AxError::failure(AxCode::InvalidArgs, "read", format!("{asked} is not text"))
                     .with_recovery("read hands back text; these bytes are not UTF-8")
@@ -491,6 +504,16 @@ impl ReadTool {
         }
     }
 
+    /// Supplies the run and building whose CAS origins pictures are put
+    /// for. Text-only callers need no origin and keep the old behavior.
+    #[must_use]
+    pub fn storing_pictures(self, origin: storage::BlockOrigin) -> ReadTool {
+        ReadTool {
+            picture_origin: Some(origin),
+            ..self
+        }
+    }
+
     /// Enables nested-rule context on a successful ordinary read. The
     /// closure itself runs in accounting's ordered settlement, never in
     /// this concurrent invocation; no delivery is marked here.
@@ -500,6 +523,60 @@ impl ReadTool {
             rules: Some(candidates),
             ..self
         }
+    }
+
+    /// Reads a path whose extension names an image, returning `None`
+    /// when its bytes are not a picture the canonical conversation
+    /// carries so the ordinary text path can answer instead.
+    ///
+    /// # Errors
+    /// The read bound's refusal, `E_STORAGE_FATAL` for a file that will
+    /// not read, and the picture recognition or size refusal.
+    fn picture_at(&self, asked: &str) -> Result<Option<(ImageRef, Vec<u8>)>, AxError> {
+        let mut opened = self.reader.open(asked, Self::NAME)?;
+        let bytes = kernel::consts_policy::IMAGE_MAX_BYTES
+            .read_from(&mut opened)
+            .map_err(|err| {
+                AxError::failure(AxCode::StorageFatal, Self::NAME, format!("{asked}: {err}"))
+                    .with_recovery("the User has to make the file readable")
+            })?;
+        let picture = crate::pipeline::connector::read_picture(&bytes)?;
+        Ok(picture.map(|picture| (picture, bytes)))
+    }
+
+    /// Stores an admitted picture for this run and returns both its
+    /// locator-shaped result and the attachment the model actually sees.
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` when no run origin was supplied, a content
+    /// store failure, or a result payload that cannot be encoded.
+    fn present_picture(
+        &self,
+        asked: &str,
+        picture: ImageRef,
+        bytes: &[u8],
+    ) -> Result<ToolOutcome, AxError> {
+        let origin = self.picture_origin.as_ref().ok_or_else(|| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "read a picture",
+                format!("{asked}: this read tool has no picture origin"),
+            )
+            .with_recovery("construct the read tool with `storing_pictures` for this run")
+        })?;
+        storage::Cas::open(&self.reader.block_store)
+            .map_err(storage::StorageError::into_ax)?
+            .put_for(bytes, origin)
+            .map_err(storage::StorageError::into_ax)?;
+        let text = crate::pipeline::connector::picture_line(&picture);
+        let mut out = Map::new();
+        out.insert("path".to_owned(), Value::String(asked.to_owned()));
+        out.insert("bytes".to_owned(), Value::from(text.len()));
+        out.insert("text".to_owned(), Value::String(text));
+        Ok(ToolOutcome {
+            result: Payload::new(out)?,
+            attachments: vec![picture],
+        })
     }
 }
 
@@ -550,7 +627,21 @@ impl Tool for ReadTool {
         let mut repeated = None;
         let mut digest = None;
         let sampled = self.clock.as_ref().and_then(|clock| clock().ok());
-        let text = match self.resolve(asked)? {
+        let resolved = match self.resolve(asked)? {
+            Found::Chosen(addr) if image::ImageFormat::from_path(asked).is_ok() => {
+                match self.picture_at(asked)? {
+                    Some((picture, bytes)) => Found::Picture { picture, bytes },
+                    None => Found::Chosen(addr),
+                }
+            }
+            other @ Found::Chosen(_) | other @ Found::Text(_) | other @ Found::Picture { .. } => {
+                other
+            }
+        };
+        let text = match resolved {
+            Found::Picture { picture, bytes } => {
+                return self.present_picture(asked, picture, &bytes);
+            }
             Found::Text(text) => text,
             Found::Chosen(addr) => match engine::text_of(engine::Request {
                 city: &self.city,

@@ -162,6 +162,7 @@ pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<
 ```
 
 - **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。它是楼规唯一的写门（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）；`rules` 工具只读，没有写面（§8-2b，D23），所以「盘上的楼规永远读得懂」只有一条规则。
+- **User 的三条合法修改路径**：直接用编辑器改 `<building>/.sprawling/RULES.toml`；建楼页经 `CreateBuilding.rules` 提交自定义全文；楼设置页经 `PutRules` 带基线保存。三条路径都由 `evaluate` 这一读者判定；直接手改在下次读取时生效，后两条在写入前求值。TOML 或键值无效的拒词必须指出具体原文与这些入口，不得把 `E_CONFIG_INVALID` 误述成 resident 的写权限拒绝；只有 resident 的 `rules propose` 走 §8-2b 的治理拒绝。
 - **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
 - 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
 -/

@@ -55,14 +55,14 @@ pub const DEFAULT_AT: &str = "127.0.0.1:2501";                       // 服务�
 **两项图片政策**：
 
 ```rust
-pub const IMAGE_MAX_BYTES: ImageMaxBytes = ImageMaxBytes::new(2_097_152); // 2 MiB：一张图的字节上限
+pub const IMAGE_MAX_BYTES: ImageMaxBytes = ImageMaxBytes::new(4_194_304); // 4 MiB：一张图的字节上限
 pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // 一次请求最多几张不同的图
 pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // 有损编码的质量域：0..=100，域外即拒
 ```
 
 三项上限带 `kernel::policy_limit` 类型（§8-73）：合法域判定与四段拒因文案由类型一处给出，调用方只递观测值，拼不出第二种拒因；数的唯一家仍是本节。
 
-两个数都是「一句拒绝说得出、一个人改得动」的上限，与 `WORKTREE_MAX_BYTES` 同口径。2 MiB 取自两家 provider 都能收下的 base64 体量（base64 膨胀 4/3，2 MiB 上线约 2.7 MiB），4 张取自一回合窗口预算：再多就是把窗口花在像素上而不是任务上。
+两个数都是「一句拒绝说得出、一个人改得动」的上限，与 `WORKTREE_MAX_BYTES` 同口径。单图 4 MiB 是 User 选定的读取与请求上限，base64 膨胀 4/3 后约 5.33 MiB；4 张取自一回合窗口预算：再多就是把窗口花在像素上而不是任务上。
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`storage::worktree`）。
 

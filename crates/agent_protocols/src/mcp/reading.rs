@@ -51,10 +51,10 @@ use kernel::{AxCode, AxError};
 ///
 /// Derived from the largest payload the city already accepts rather
 /// than picked: one picture is at most `kernel::consts_policy`'s
-/// `IMAGE_MAX_BYTES` (2 MiB), which is 2,796,203 bytes once base64
-/// encoding has grown it by four thirds, so 8 MiB leaves a tool result
-/// room for such a picture, its text, and the JSON-RPC envelope around
-/// both. What it refuses is a server streaming without end.
+/// `IMAGE_MAX_BYTES` (4 MiB), which is 5,592,408 bytes once padded
+/// base64 encoding has grown it by four thirds, so 8 MiB leaves a tool
+/// result room for such a picture, its text, and the JSON-RPC envelope
+/// around both. What it refuses is a server streaming without end.
 pub const MESSAGE_CEILING: usize = 8_388_608;
 
 /// What one read of the transport found.
