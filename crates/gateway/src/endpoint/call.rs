@@ -530,7 +530,7 @@ mod tests {
             config("http://127.0.0.1:1/v1/messages"),
             Redemption::new(
                 resolver(),
-                std::sync::Arc::new(|_at: &kernel::Locator| Ok(vec![0u8; 3_000_000])),
+                std::sync::Arc::new(|_at: &kernel::Locator| Ok(vec![0u8; 5_000_000])),
             ),
         )
         .unwrap();
@@ -540,7 +540,7 @@ mod tests {
             .map(|picture| picture.locator.clone())
             .expect("the fixture puts one picture in the chat");
         let err = endpoint.wire_request(&request).unwrap_err();
-        assert_eq!(err, IMAGE_MAX_BYTES.admit(&at, 3_000_000).unwrap_err());
+        assert_eq!(err, IMAGE_MAX_BYTES.admit(&at, 5_000_000).unwrap_err());
     }
 
     #[test]

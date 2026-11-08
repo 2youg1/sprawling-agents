@@ -167,11 +167,10 @@ pub const CREDENTIAL_NAME_MARKERS: [&str; 11] = [
 /// than half-copied (11.4).
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;
 
-/// 2 MiB per picture. A ceiling a refusal can state and a person can
-/// raise, sized so a base64 body (4/3 of this) stays inside what both
-/// providers accept.
+/// 4 MiB per picture. A ceiling a refusal can state and a person can
+/// raise; the padded base64 body is four thirds of this on the wire.
 pub const IMAGE_MAX_BYTES: crate::policy_limit::ImageMaxBytes =
-    crate::policy_limit::ImageMaxBytes::new(2_097_152);
+    crate::policy_limit::ImageMaxBytes::new(4_194_304);
 
 /// Four distinct pictures in one request. Past that the window is being
 /// spent on pixels rather than on the work, and a limit stated once is
@@ -275,7 +274,7 @@ mod tests {
         assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
         assert_eq!(
             IMAGE_MAX_BYTES,
-            crate::policy_limit::ImageMaxBytes::new(2_097_152)
+            crate::policy_limit::ImageMaxBytes::new(4_194_304)
         );
         assert_eq!(IMAGES_PER_TURN, crate::policy_limit::ImagesPerTurn::new(4));
         assert_eq!(OUTPUT_CEILING_DEFAULT, 8_192);

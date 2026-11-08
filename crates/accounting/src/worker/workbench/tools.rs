@@ -150,8 +150,7 @@ impl Laying {
         // could name a skill and never hand it over. It holds the
         // catalog rather than a copy of what is in it, so a skill
         // admitted below this line is still reachable by name. It and
-        // `search` ask one read bound, so what one may open the other may
-        // find.
+        // `search` ask one read bound, so what one may open the other may find.
         let bound = self.read_bound(site);
         let candidates = nested_rule_candidates(site, addr, Arc::clone(&bound));
         let read_clock = Arc::clone(&self.clock);
@@ -161,6 +160,7 @@ impl Laying {
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
+        .storing_pictures(site.block_origin())
         .ruling(candidates.clone())
         .recalling(shown.clone())
         .clocking(Arc::new(move || read_clock.now()))
@@ -422,14 +422,7 @@ impl Laying {
         // because a provider caches the tool array by position.
         // `city::policy` refuses both settings on a confidential
         // building, so neither is ever reached there.
-        let mut outside = (self.browsers)(
-            &self.city_root,
-            &storage::BlockOrigin {
-                run: site.run_id,
-                building: site.building.addr().clone(),
-            },
-            &site.rules,
-        )?;
+        let mut outside = (self.browsers)(&self.city_root, &site.block_origin(), &site.rules)?;
         // External tools, for a building whose configuration names a
         // server or whose rules ask for this machine's desktop. They join
         // the table here, before the catalogue is rendered, because the

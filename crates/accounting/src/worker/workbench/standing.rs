@@ -69,6 +69,15 @@ fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterT
 }
 
 impl Site {
+    /// Whose reads and captures are pinned when this run puts bytes in
+    /// the city's content store.
+    pub(in crate::worker) fn block_origin(&self) -> storage::BlockOrigin {
+        storage::BlockOrigin {
+            run: self.run_id,
+            building: self.building.addr().clone(),
+        }
+    }
+
     /// What this run signs its commits with: its id, the room it works
     /// in, the model it was given and the effort it was asked for.
     ///

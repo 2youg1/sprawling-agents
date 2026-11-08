@@ -175,10 +175,7 @@ fn pictured(
         .cas
         .put_for(&bytes, &offload.origin)
         .map_err(storage::StorageError::into_ax)?;
-    let words = format!(
-        "[picture attached: image/png {}x{}, {}]",
-        picture.width, picture.height, picture.locator
-    );
+    let words = picture_line(&picture);
     Ok((text_block(words), Some(picture)))
 }
 
@@ -215,8 +212,7 @@ fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
 /// The refusal [`IMAGE_MAX_BYTES`] gives bytes past it, and
 /// `E_INVALID_ARGS` when the bytes are not a PNG whose header reads.
 pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError> {
-    let locator = Locator::cas(B3Hash::digest(bytes));
-    IMAGE_MAX_BYTES.admit(&locator, bytes.len())?;
+    let locator = picture_locator(bytes)?;
     let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     let (width, height) = decoder
         .read_header_info()
@@ -235,6 +231,80 @@ pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError> {
         width,
         height,
     })
+}
+
+/// The words that stand where a picture is attached, shared by a
+/// connector answer and `read` so both teach the same locator.
+pub(crate) fn picture_line(picture: &ImageRef) -> String {
+    format!(
+        "[picture attached: {} {}x{}, {}]",
+        picture.media_type.mime(),
+        picture.width,
+        picture.height,
+        picture.locator
+    )
+}
+
+/// A picture `read` can attach, or `None` when the bytes name no format
+/// the canonical conversation carries. Dimensions come from the header;
+/// pixels are never decoded.
+///
+/// # Errors
+/// `E_INVALID_ARGS` for a recognized image whose header does not read,
+/// and the shared `IMAGE_MAX_BYTES` refusal for bytes past the ceiling.
+pub(crate) fn read_picture(bytes: &[u8]) -> Result<Option<ImageRef>, AxError> {
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|err| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read a picture",
+                format!("its format cannot be read: {err}"),
+            )
+            .with_recovery("pass a complete PNG, JPEG, WebP or GIF")
+        })?;
+    let Some(media_type) = reader.format().and_then(picture_type) else {
+        return Ok(None);
+    };
+    let (width, height) = reader.into_dimensions().map_err(|err| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "read a picture",
+            format!("its {} header does not read: {err}", media_type.mime()),
+        )
+        .with_recovery("pass a complete PNG, JPEG, WebP or GIF within the picture size limit")
+    })?;
+    Ok(Some(ImageRef {
+        locator: picture_locator(bytes)?,
+        media_type,
+        width,
+        height,
+    }))
+}
+
+/// The canonical conversation's reading of an image format. Other image
+/// formats remain ordinary files for `read`, rather than gaining a media
+/// type no provider request can carry.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "image::ImageFormat is upstream and non-exhaustive; unsupported formats return None"
+)]
+fn picture_type(format: image::ImageFormat) -> Option<ImageType> {
+    match format {
+        image::ImageFormat::Png => Some(ImageType::Png),
+        image::ImageFormat::Jpeg => Some(ImageType::Jpeg),
+        image::ImageFormat::WebP => Some(ImageType::Webp),
+        image::ImageFormat::Gif => Some(ImageType::Gif),
+        _ => None,
+    }
+}
+
+/// The one byte ceiling and content address every picture recognition
+/// path uses.
+fn picture_locator(bytes: &[u8]) -> Result<Locator, AxError> {
+    let locator = Locator::cas(B3Hash::digest(bytes));
+    IMAGE_MAX_BYTES.admit(&locator, bytes.len())?;
+    Ok(locator)
 }
 
 /// One `audio` block as the line that names where it was stored, or the
