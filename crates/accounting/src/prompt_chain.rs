@@ -206,6 +206,11 @@ fn read_nested(
     if !pending.is_empty() {
         return None;
     }
+    // The whole stream is valid here. Only the retained prefix can end
+    // in an incomplete codepoint, so cut that prefix at the valid
+    // boundary rather than dropping the rule entirely.
+    let boundary = std::str::from_utf8(&text).map_or_else(|err| err.valid_up_to(), |_| text.len());
+    text.truncate(boundary);
     let dropped = total.saturating_sub(u64::try_from(text.len()).unwrap_or(u64::MAX));
     String::from_utf8(text).ok().map(|text| (text, dropped))
 }
