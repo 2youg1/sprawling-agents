@@ -39,7 +39,7 @@ impl Numbering {
     pub fn of(rendering: Rendering) -> Numbering {
         match rendering {
             Rendering::V1 | Rendering::V2 => Numbering::FromZero,
-            Rendering::V3 => Numbering::FromOne,
+            Rendering::V3 | Rendering::V4 => Numbering::FromOne,
         }
     }
 

@@ -48,10 +48,11 @@ pub fn shown(
     match (rendering, answer) {
         (Rendering::V1, ToolAnswer::Answered { result: payload })
         | (Rendering::V1, ToolAnswer::Failed { error: payload }) => json(payload),
-        (Rendering::V2 | Rendering::V3, ToolAnswer::Failed { error }) => error
+        (Rendering::V2 | Rendering::V3 | Rendering::V4, ToolAnswer::Failed { error }) => error
             .read::<AxError>()
             .map_or_else(|_| json(error), |refused| Ok(refusal::line(&refused))),
-        (Rendering::V2 | Rendering::V3, ToolAnswer::Answered { result }) => match name.as_str() {
+        (Rendering::V2 | Rendering::V3 | Rendering::V4, ToolAnswer::Answered { result }) => {
+            match name.as_str() {
             crate::tools::ReadTool::NAME => {
                 read::text(result, Numbering::of(rendering)).map_or_else(|| json(result), Ok)
             }
@@ -63,8 +64,9 @@ pub fn shown(
                 .get("text")
                 .and_then(serde_json::Value::as_str)
                 .map_or_else(|| json(result), |text| Ok(text.to_owned())),
-            _ => json(result),
-        },
+                _ => json(result),
+            }
+        }
     }
 }
 

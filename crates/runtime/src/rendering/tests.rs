@@ -197,6 +197,62 @@ fn version_three_numbers_a_read_from_one() {
     );
 }
 
+/// V4 has no output tax without either addition: every read shape is
+/// byte-identical to V3, and CURRENT names V4.
+#[test]
+fn version_four_without_rules_or_unchanged_matches_version_three() {
+    let bodies = [
+        json!({"path":"a.md","bytes":3,"text":"hi\n"}),
+        json!({"path":"a.md","total_lines":0,"bytes":0,"text":""}),
+        json!({"path":"a.md","offset":9,"total_lines":4,"bytes":0,"text":""}),
+        json!({"path":"a.md","bytes":2,"text":"hi"}),
+        json!({"path":"a.md","total_lines":40,"next_offset":1,"bytes":3,"text":"hi\n"}),
+    ];
+    for body in bodies {
+        let answer = answered(body);
+        assert_eq!(
+            shown(Rendering::V4, &read(), &answer).unwrap(),
+            shown(Rendering::V3, &read(), &answer).unwrap()
+        );
+    }
+    assert_eq!(super::CURRENT, Rendering::V4);
+}
+
+/// V4 draws rules after the numbered body, without numbering the rules,
+/// and leaves a blank line even when the file has no final newline.
+#[test]
+fn version_four_draws_rules_after_the_body_without_numbering_them() {
+    let answer = answered(json!({
+        "path":"lab/pkg/main.rs", "text":"fn main() {}",
+        "rules":[{"room":"lab/pkg","text":"Use LF.\n"}],
+    }));
+    assert_eq!(
+        shown(Rendering::V4, &read(), &answer).unwrap(),
+        "lab/pkg/main.rs lines 1-1 of 1\n1|fn main() {}\n\n## lab/pkg/AGENTS.md\n\nHow work is done in this part of the project, from the project itself. Where this and the building's rules above disagree, the rules decide: they are what the city enforces.\n\nUse LF.\n"
+    );
+    let no_rules = answered(json!({
+        "path":"lab/pkg/main.rs", "text":"fn main() {}", "rules":[],
+    }));
+    assert_eq!(
+        shown(Rendering::V4, &read(), &no_rules).unwrap(),
+        shown(Rendering::V3, &read(), &no_rules).unwrap()
+    );
+}
+
+/// An unchanged reply names the earlier interval instead of inventing
+/// an empty text body. Its indexes remain zero-based in the payload and
+/// are drawn from one.
+#[test]
+fn version_four_draws_an_unchanged_reply_as_a_reference() {
+    let answer = answered(json!({
+        "path":"lab/a.md", "unchanged":true, "offset":0, "lines":2, "total_lines":2,
+    }));
+    assert_eq!(
+        shown(Rendering::V4, &read(), &answer).unwrap(),
+        "lab/a.md lines 1-2 of 2: unchanged since your earlier read; not repeated\n"
+    );
+}
+
 /// A search hit block is numbered the way a V3 read from its first line
 /// is, so its line numbers are the offsets `read` takes.
 #[test]
