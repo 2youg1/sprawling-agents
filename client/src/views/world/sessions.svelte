@@ -40,7 +40,7 @@
   import { ui } from "../../ui";
   import type { Address, Seq, Tag } from "../../wire";
   import { ticker } from "../talk/timing";
-  import { filterOf, rowOf } from "./sessions";
+  import { dotOf, filterOf, rowOf } from "./sessions";
   import { branchFrom } from "../talk/branching";
   import type { SessionsLook } from "./sessions";
   import Look from "./sessions.look.svelte";
@@ -69,7 +69,9 @@
   // A running row says how long its run has gone, on the page's one
   // clock: it moves only while a row reads it and the page is seen, and
   // every reading is recomputed from the run's own start (client/Spec.lean §4-59).
-  const tick = ticker(u.now);
+  // Idle panes do not subscribe: a 100 ms rebuild of every row was
+  // stealing the main thread from session switches (client D112).
+  const clock = ticker(u.now);
 
   const city = $derived($belief.city);
   function named(stretch: Stretch): Named | null {
@@ -100,6 +102,11 @@
     );
   }
 
+  // Subscribe to the page clock only while a row is running. Idle
+  // rebuilds take a fresh wall clock here so a later list rebuild does
+  // not keep a frozen snapshot from a standalone `$derived` (D112).
+  const running = $derived(filtered.some((stretch) => dotOf(stretch) === "run"));
+
   const look: SessionsLook = $derived({
     filter: filterOf(
       offered,
@@ -117,7 +124,7 @@
       const going = newestWorking($belief, stretch.room);
       return rowOf(stretch, {
         lang: $lang,
-        now: $tick,
+        now: running ? $clock : u.now(),
         chosen: chosen(stretch),
         tags,
         pinning: pinningOf(stretch, tags),

@@ -66,7 +66,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Talk/Branching.lean` | 开新会话的七个入口（会话行、zen 切换器与既有五类入口）共用的「先开、再前往」：主区只在城开出新的一段之后移动，拒绝留在发起它的那一处 | （4-49、§7K、D44、D100） |
 | `client/spec/Views/SessionSwitch.lean` | zen 会话切换器：上下键只在可见行内移动，左右键只折叠或展开，Enter 才打开，组字中的键无效果 | （D107） |
 
-其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86、D88、D89、D90、D91、D92、D93、D94 与 D95 在 §10 之后，D96 至 D98 与 D101 至 D104 在 §10 之后；D60 与 D73 在 `client/spec/Views/Workspace.lean`，D99 在 `client/spec/Views/Parts/Combobox.lean`，D100 在 `client/spec/Views/Talk/Branching.lean`。
+其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86、D88、D89、D90、D91、D92、D93、D94 与 D95 在 §10 之后，D96 至 D98 与 D101 至 D104、D106 至 D112 在 §10 之后；D60 与 D73 在 `client/spec/Views/Workspace.lean`，D99 在 `client/spec/Views/Parts/Combobox.lean`，D100 在 `client/spec/Views/Talk/Branching.lean`。
 -/
 
 /-! ## 2 验收标准
@@ -307,7 +307,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### 主页侧栏返回控件
 
-`views/pages/home_side.svelte` 的两侧返回控件都是原生 `button`，以 `lang.json` 的 `page_home` 为可访问名称；Tab 与 Shift+Tab 按文档顺序进入和离开，Enter 与 Space 各按平台按钮行为触发一次 `onHome`。窄屏隐藏时不进入 Tab 顺序。两侧按钮调用外壳的 `homeTalk`，导航到 `DEFAULT_VIEW` 并保留当前图层；普通导航在新页面绘制后将焦点落在 `main h1`（`tabindex="-1"`，不加入 Tab 顺序），不返回已离开的侧栏按钮。设置面的主页键调用 `homeZen`：在导航前清除待落地的图层切换并设置 zen，后续 hashchange 不得用过期图层覆盖 zen。
+`views/pages/home_side.svelte` 的两侧返回控件都是原生 `button`，以 `lang.json` 的 `page_home` 为可访问名称；Tab 与 Shift+Tab 按文档顺序进入和离开，Enter 与 Space 各按平台按钮行为触发一次 `onHome`。窄屏隐藏时不进入 Tab 顺序。两侧按钮调用外壳的 `homeTalk`，导航到 `DEFAULT_VIEW` 并保留当前图层；普通导航在新页面绘制后将焦点落在 `main h1`（`tabindex="-1"`，不加入 Tab 顺序），不返回已离开的侧栏按钮。对话页之间换房间或换当前一段时，焦点落进对话框，不启动 document view transition（D112）：那一次导航仍在同一页上说话，把焦点交给看不见的标题会把下一击键盘吞掉。只读的过去一段没有对话框，仍落在 `main h1`。设置面的主页键调用 `homeZen`：在导航前清除待落地的图层切换并设置 zen，后续 hashchange 不得用过期图层覆盖 zen。
 
 收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`，远程组的门开关与确认码输入框在 `client/spec/Views/Door.lean`，隐私组每一项的确认与结果在 `client/spec/Views/Privacy.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
 -/
@@ -1241,6 +1241,14 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两个视图各建一棵树会让同一账本有两种结构；zen 没有世界层，仍需要纯键盘到达任一 session。分支恢复形状使人继续的是母段而不是被替换段。
 - **被击败的备选**：`/resume`——与两个已有入口重复；zen 改用会话平铺列表——委派与分支关系丢失；从 belief 的 run 建树——热窗口与重载改变树的形状。
 - **重开参数**：快捷键与浏览器默认冲突的证据出现，或 `SessionLine` 的关系不再足以唯一确定父会话。
+-/
+
+/-! D112 对话页换会话：焦点进框，且不做 document view transition
+
+- **决策**：`app.svelte` 的 `settle` 在 talk→talk 且目标是当前一段（地址栏不带 `:session`）时，于下一帧把焦点交给 `main textarea`；只读过去一段仍交给 `main h1`。`follow` 对 talk→talk 一律不做 `document.startViewTransition`，即时 `settle`。会话栏的 100 ms 时钟只在有 `dot = run` 的行时订阅；空闲时在造 `look` 的那次 `$derived` 里取 `u.now()`，不另立一份会冻住的 `now` 派生。
+- **理由**：换会话仍是在同一对话页上说话；把焦点落到不可见的 `h1` 后，下一击键盘像卡住，刷新后首次 settle 又不抢焦，体感「刷新才好」。整页交叉淡入要吃一整段 `panel` 时长，而会话切换唯一命名的 view-transition 元素就是那个标题。空闲时每 100 ms 整表 `rowOf` 与会话切换抢主线程；把 `u.now()` 提成单独 `$derived` 会在列表因 belief 重画时仍把冻结的快照喂给 `ago`。
+- **被击败的备选**：①每次导航都 `focusTitle`——与图层键落地进框（D48）不一致，且吃掉键入；②保留 talk→talk 的 document transition、只缩短时长——标题几乎不动，淡入仍挡交互；③页面本地预判 `E_BUSY` 不发——城才是权威（D100 已否决）；④空闲也订 100 ms 时钟——会话切换又与整表重建抢主线程。
+- **重开参数**：对话页换会话需要读屏器宣告整页标题时，或 view transition 能只粉会话栏而不挡输入框时。
 -/
 
 /-! ## 11 边界枚举
