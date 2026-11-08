@@ -130,10 +130,7 @@ pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
             line.strip_prefix("mod ")?.strip_suffix(';')
         })
         .filter(|name| {
-            !name.is_empty()
-                && name
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         })
         .count();
     refuse_if_empty(found, harness, "scenario file")
