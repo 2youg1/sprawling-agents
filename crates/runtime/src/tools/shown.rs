@@ -129,18 +129,12 @@ impl ReadShown {
     /// Answers from confirmed evidence only. A matching stamp and a
     /// covered interval are necessary but not sufficient: a racy claim
     /// must still be compared by content.
-    pub(crate) fn recall(
-        &self,
-        addr: &Address,
-        now: &Stamp,
-        want: Span,
-        stub_bytes: usize,
-    ) -> Recall {
+    pub(crate) fn recall(&self, addr: &Address, now: &Stamp, asked: &str, want: Span) -> Recall {
         let state = self.table();
         let Some(claim) = state.confirmed.get(addr) else {
             return Recall::Fresh;
         };
-        if claim.stamp != *now || claim.bytes < stub_bytes.saturating_mul(2) {
+        if claim.stamp != *now {
             return Recall::Fresh;
         }
         let lines = if want.offset >= claim.total_lines {
@@ -162,6 +156,18 @@ impl ReadShown {
             lines,
             total_lines: claim.total_lines,
         };
+        let Some(stub) = crate::rendering::unchanged(
+            asked,
+            want.offset,
+            answer.lines,
+            answer.total_lines,
+            crate::rendering::Numbering::FromOne,
+        ) else {
+            return Recall::Fresh;
+        };
+        if claim.bytes < stub.len().saturating_mul(2) {
+            return Recall::Fresh;
+        }
         match claim.digest {
             Some(digest) => Recall::Compare { digest, answer },
             None => Recall::Repeat(answer),
@@ -179,7 +185,7 @@ impl ReadShown {
     }
 
     /// Moves one staged claim to pending in call order.
-    pub(crate) fn admit(&self, call: &str) {
+    pub fn admit(&self, call: &str) {
         let mut state = self.table();
         if let Some(claim) = state.staged.remove(call) {
             state.pending.insert(call.to_owned(), claim);
@@ -188,7 +194,7 @@ impl ReadShown {
     }
 
     /// Confirms unshortened pending claims and discards speculation.
-    pub(crate) fn confirm(&self, shortened: &BTreeSet<String>) {
+    pub fn confirm(&self, shortened: &BTreeSet<String>) {
         let mut state = self.table();
         state.staged.clear();
         for (call, claim) in std::mem::take(&mut state.pending) {
@@ -198,7 +204,11 @@ impl ReadShown {
             let generation = state.next_generation();
             let claim = claim.with_generation(generation);
             if let Some(old) = state.confirmed.get_mut(&claim.addr) {
-                if old.stamp == claim.stamp {
+                let compatible_digest = match (old.digest, claim.digest) {
+                    (Some(before), Some(after)) => before == after,
+                    _ => true,
+                };
+                if old.stamp == claim.stamp && compatible_digest {
                     old.whole |= claim.whole;
                     if old.whole {
                         old.spans.clear();
@@ -238,4 +248,5 @@ fn trim<K: Ord + Clone>(claims: &mut BTreeMap<K, Claim>, cap: usize) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test fixtures")]
 mod tests;

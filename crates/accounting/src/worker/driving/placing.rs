@@ -126,19 +126,15 @@ impl<'f> Placing<'f> {
         self
     }
 
-    /// Shares the read tool's window evidence with ordered settlement.
+    /// Shares the read tool's window evidence and starts rule delivery
+    /// with the rooms a branched run inherited.
     #[must_use]
-    pub(super) fn recalling(mut self, shown: ReadShown) -> Self {
-        self.shown = shown;
-        self
-    }
-
-    /// Starts delivery with the rule rooms a branched run inherited.
-    #[must_use]
-    pub(super) fn inheriting(
+    pub(super) fn reading(
         mut self,
+        shown: ReadShown,
         delivered: std::collections::BTreeSet<kernel::Address>,
     ) -> Self {
+        self.shown = shown;
         self.rules.delivered = delivered;
         self
     }

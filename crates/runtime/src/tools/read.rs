@@ -37,11 +37,10 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, TimeMs, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, B3Hash, CostTier, Effect, Payload, RenderIntent, Temporal, TimeMs,
+    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -52,22 +51,13 @@ mod package;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
-use super::shown::{ReadShown, Span};
+use super::shown::{Claim, ReadShown, Span};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
 
 /// The clock used only to decide whether a stamp needs a content
 /// comparison. Tests inject a counted clock; production reads UTC.
-pub type ReadClock = Arc<dyn Fn() -> std::io::Result<TimeMs> + Send + Sync>;
-
-fn wall_clock() -> std::io::Result<TimeMs> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| std::io::Error::other("the system clock is before the Unix epoch"))?;
-    Ok(TimeMs::new(
-        u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
-    ))
-}
+pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 
 /// One nested convention a read may carry. `dropped` is the number of
 /// source bytes already known to be omitted from `text`; accounting
@@ -151,6 +141,10 @@ struct Taken {
     text: String,
     total_lines: Option<usize>,
     next_offset: Option<usize>,
+    /// Actual lines delivered, and the exact total even when the public
+    /// `total_lines` field is omitted because the answer reached EOF.
+    lines: usize,
+    total: usize,
 }
 
 impl Interval {
@@ -224,6 +218,8 @@ impl Interval {
                     text: String::new(),
                     total_lines: Some(skipped),
                     next_offset: None,
+                    lines: 0,
+                    total: skipped,
                 };
             };
             from = from.saturating_add(line.len());
@@ -235,6 +231,8 @@ impl Interval {
                 text: String::new(),
                 total_lines: Some(skipped),
                 next_offset: None,
+                lines: 0,
+                total: skipped,
             };
         }
         let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
@@ -263,11 +261,15 @@ impl Interval {
                 text,
                 total_lines: None,
                 next_offset: None,
+                lines: taken,
+                total: end,
             },
             left => Taken {
                 text,
                 total_lines: Some(end.saturating_add(left)),
                 next_offset: Some(end),
+                lines: taken,
+                total: end.saturating_add(left),
             },
         }
     }
@@ -291,7 +293,7 @@ pub struct ReadTool {
     /// §8-64).
     seen: ReadStamps,
     shown: ReadShown,
-    clock: ReadClock,
+    clock: Option<ReadClock>,
     rules: Option<RuleCandidates>,
     meta: ToolMeta,
 }
@@ -357,7 +359,7 @@ impl ReadTool {
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
             shown: ReadShown::default(),
-            clock: Arc::new(wall_clock),
+            clock: None,
             rules: None,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
@@ -442,7 +444,10 @@ impl ReadTool {
     /// Supplies the clock for the racy-stamp content comparison.
     #[must_use]
     pub fn clocking(self, clock: ReadClock) -> ReadTool {
-        ReadTool { clock, ..self }
+        ReadTool {
+            clock: Some(clock),
+            ..self
+        }
     }
 
     /// Supplies the nested conventions a successful ordinary read may
@@ -500,28 +505,54 @@ impl Tool for ReadTool {
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
         let mut looked = None;
         let mut opened = None;
+        let mut repeated = None;
+        let mut digest = None;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
-            Found::Chosen(addr) => {
-                let (text, before, after, landed) = engine::text_of(
-                    &self.city,
-                    &addr,
-                    asked,
-                    &*self.reader.bound,
-                    &self.shown,
-                    want,
-                )?;
-                looked = Some((addr.clone(), before, after));
-                opened = Some((addr, landed));
-                text
-            }
+            Found::Chosen(addr) => match engine::text_of(
+                &self.city,
+                &addr,
+                asked,
+                &*self.reader.bound,
+                &self.shown,
+                want,
+            )? {
+                engine::Looked::Text {
+                    text,
+                    before,
+                    after,
+                    addr: landed,
+                } => {
+                    let racy = match self.clock.as_ref() {
+                        Some(clock) => match clock() {
+                            Ok(now) => before.racy_at(now),
+                            Err(_) => true,
+                        },
+                        None => true,
+                    };
+                    digest = racy.then(|| B3Hash::digest(text.as_bytes()));
+                    looked = Some((addr.clone(), before, after));
+                    opened = Some((addr, landed));
+                    text
+                }
+                engine::Looked::Unchanged {
+                    stamp,
+                    addr: landed,
+                    answer,
+                } => {
+                    looked = Some((addr.clone(), stamp.clone(), stamp.clone()));
+                    opened = Some((addr, landed));
+                    repeated = Some(answer);
+                    String::new()
+                }
+            },
         };
         // Where the interval starts, as an index the drawn header and line
         // marks number from (`crate::rendering`); absent means index 0.
         if interval.offset != 0 {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
-        let taken = interval.cut(&text);
+        let taken = repeated.is_none().then(|| interval.cut(&text));
         let candidates = opened.map_or_else(Vec::new, |(admitted, landed)| {
             self.rules
                 .as_ref()
@@ -544,22 +575,64 @@ impl Tool for ReadTool {
         let windowed = ["offset", "limit"]
             .iter()
             .any(|key| call.args.as_map().contains_key(*key));
+        let complete = repeated.is_some()
+            || taken
+                .as_ref()
+                .is_some_and(|taken| taken.next_offset.is_none());
         if let Some((addr, before, after)) = looked
-            && (windowed || taken.next_offset.is_none())
+            && (windowed || complete)
         {
+            if let Some(taken) = &taken
+                && before == after
+            {
+                let total = u64::try_from(taken.total).unwrap_or(u64::MAX);
+                let lines = u64::try_from(taken.lines).unwrap_or(u64::MAX);
+                let claim = if windowed {
+                    Claim::window(
+                        addr.clone(),
+                        before.clone(),
+                        Span {
+                            offset: interval.offset,
+                            lines,
+                        },
+                        total,
+                        taken.text.len(),
+                        digest,
+                    )
+                } else {
+                    Claim::whole(
+                        addr.clone(),
+                        before.clone(),
+                        total,
+                        taken.text.len(),
+                        digest,
+                    )
+                };
+                self.shown.stage(&call.id, claim);
+            }
             self.seen.look(&addr, Some(before), Some(after));
         }
-        if let Some(total) = taken.total_lines {
-            out.insert("total_lines".to_owned(), Value::Number(total.into()));
+        if let Some(answer) = repeated {
+            out.insert("unchanged".to_owned(), Value::Bool(true));
+            out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
+            out.insert("lines".to_owned(), Value::Number(answer.lines.into()));
+            out.insert(
+                "total_lines".to_owned(),
+                Value::Number(answer.total_lines.into()),
+            );
+        } else if let Some(taken) = taken {
+            if let Some(total) = taken.total_lines {
+                out.insert("total_lines".to_owned(), Value::Number(total.into()));
+            }
+            if let Some(next) = taken.next_offset {
+                out.insert("next_offset".to_owned(), Value::Number(next.into()));
+            }
+            // The count the model needs to decide whether it has the whole
+            // thing: a result the pipeline shortened says so in its own
+            // envelope, and this is what it was shortened from.
+            out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
+            out.insert("text".to_owned(), Value::String(taken.text));
         }
-        if let Some(next) = taken.next_offset {
-            out.insert("next_offset".to_owned(), Value::Number(next.into()));
-        }
-        // The count the model needs to decide whether it has the whole
-        // thing: a result the pipeline shortened says so in its own
-        // envelope, and this is what it was shortened from.
-        out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
-        out.insert("text".to_owned(), Value::String(taken.text));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
             attachments: Vec::new(),

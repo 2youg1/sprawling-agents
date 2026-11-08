@@ -260,13 +260,15 @@ pub(crate) fn nested_rules(
     };
     let mut candidates = Vec::new();
     let mut remaining = kernel::consts_policy::INTERVAL_CAP_BYTES;
-    for (room, path) in paths.into_iter().filter(|(room, _)| {
-        room != &scope.room && room.is_within(&scope.room)
-    }) {
+    for (room, path) in paths
+        .into_iter()
+        .filter(|(room, _)| room != &scope.room && room.is_within(&scope.room))
+    {
         if remaining == 0 {
             break;
         }
-        let Some((text, dropped)) = read_nested(&scope.city_root, &scope.building, &path, remaining)
+        let Some((text, dropped)) =
+            read_nested(&scope.city_root, &scope.building, &path, remaining)
         else {
             continue;
         };
@@ -336,9 +338,9 @@ impl RuleDelivery {
                 .get(..boundary)
                 .unwrap_or_default()
                 .to_owned();
-            text.push_str(&runtime::elision::marker(
-                kernel::ByteLen::new(u64::try_from(dropped).unwrap_or(u64::MAX)),
-            ));
+            text.push_str(&runtime::elision::marker(kernel::ByteLen::new(
+                u64::try_from(dropped).unwrap_or(u64::MAX),
+            )));
             seen.insert(candidate.room.clone());
             selected.push(runtime::RuleCandidate {
                 room: candidate.room,

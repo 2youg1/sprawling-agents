@@ -45,7 +45,8 @@ pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offe
 pub use read::{ReadClock, ReadTool, RuleCandidate, RuleCandidates};
 pub use search::SearchTool;
 pub use shown::ReadShown;
-pub(crate) use shown::{Claim, Recall, Span};
+#[cfg(test)]
+pub(crate) use shown::Span;
 pub use status::ChildStatus;
 pub use status::ProviderMode;
 pub use status::StatusSnapshot;

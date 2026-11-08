@@ -19,21 +19,42 @@
 //! `nearby` lists are the ones a model has always been given. Only calls
 //! that end in an error or a directory take it.
 
-use kernel::{Address, AxError, ReadVerdict};
+use kernel::{Address, AxError, B3Hash, ReadVerdict};
 
 use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
-use crate::tools::shown::{ReadShown, Span};
+use crate::tools::shown::{Answer, ReadShown, Recall, Span};
 use crate::tools::stamp::Stamp;
 
-/// A file's text, its stamps before and after the bytes were read, and
-/// the judged city address whose file supplied them.
-pub(super) type Looked = (String, Stamp, Stamp, Address);
-type RawText = (String, Stamp, Stamp);
+/// A file's text, or a reference to an interval already in the window.
+/// Both arms carry the judged address and the handle's stamp.
+pub(super) enum Looked {
+    Text {
+        text: String,
+        before: Stamp,
+        after: Stamp,
+        addr: Address,
+    },
+    Unchanged {
+        stamp: Stamp,
+        addr: Address,
+        answer: Answer,
+    },
+}
+
+impl Looked {
+    fn text(text: String, before: Stamp, after: Stamp, addr: Address) -> Looked {
+        Looked::Text {
+            text,
+            before,
+            after,
+            addr,
+        }
+    }
+}
 
 /// The whole text at the admitted address `addr`, which the model wrote
-/// as `asked`, with the file's stamp taken on the handle on each side of
-/// the read (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+/// as `asked`, or an unchanged reply backed by confirmed evidence.
 ///
 /// # Errors
 /// `E_GATE_DENIED` when the file the handle reached lies outside the
@@ -44,16 +65,18 @@ pub(super) fn text_of(
     addr: &Address,
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-    _shown: &ReadShown,
-    _want: Span,
+    shown: &ReadShown,
+    want: Span,
 ) -> Result<Looked, AxError> {
-    match handle_read(city, addr, bound)? {
+    match handle_read(city, addr, asked, bound, shown, want)? {
         Some(looked) => Ok(looked),
         None => judged_read(city, addr, asked, bound),
     }
 }
 
-/// The judged path: resolve, judge, open, judge the handle again.
+/// The judged path: resolve, judge, open, judge the handle again. It
+/// always returns text; without the one-handle fast path it cannot make
+/// an unchanged claim.
 pub(super) fn judged_read(
     city: &CityRoot,
     addr: &Address,
@@ -66,7 +89,7 @@ pub(super) fn judged_read(
         judged.location,
         &Floor::of_address(city.written(), addr),
     )?;
-    Ok((text.0, text.1, text.2, judged.addr))
+    Ok(Looked::text(text.0, text.1, text.2, judged.addr))
 }
 
 /// Opens the file once and judges the handle where it lies (Windows).
@@ -79,7 +102,10 @@ pub(super) fn judged_read(
 fn handle_read(
     city: &CityRoot,
     addr: &Address,
+    asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
+    shown: &ReadShown,
+    want: Span,
 ) -> Result<Option<Looked>, AxError> {
     let Ok(file) = std::fs::File::open(city.join(addr)) else {
         return Ok(None);
@@ -88,7 +114,7 @@ fn handle_read(
         return Ok(None);
     };
     let landed = city.judged_location(addr, &real, "read", bound)?;
-    Ok(whole_text(file).map(|(text, before, after)| (text, before, after, landed)))
+    Ok(read_handle(file, landed, asked, shown, want))
 }
 
 /// Resolves, judges, opens the judged location, and checks the handle
@@ -101,7 +127,10 @@ fn handle_read(
 fn handle_read(
     city: &CityRoot,
     addr: &Address,
+    asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
+    shown: &ReadShown,
+    want: Span,
 ) -> Result<Option<Looked>, AxError> {
     use std::os::fd::AsRawFd as _;
 
@@ -114,9 +143,7 @@ fn handle_read(
     };
     let fd = std::path::Path::new("/proc/self/fd").join(file.as_raw_fd().to_string());
     match std::fs::read_link(fd) {
-        Ok(now) if now == real => {
-            Ok(whole_text(file).map(|(text, before, after)| (text, before, after, landed)))
-        }
+        Ok(now) if now == real => Ok(read_handle(file, landed, asked, shown, want)),
         // Moved since the judgement, or a machine without procfs: the
         // judged path checks the handle its own way and says which.
         Ok(_) | Err(_) => Ok(None),
@@ -128,27 +155,64 @@ fn handle_read(
 fn handle_read(
     _city: &CityRoot,
     _addr: &Address,
+    _asked: &str,
     _bound: &dyn Fn(&Address) -> ReadVerdict,
+    _shown: &ReadShown,
+    _want: Span,
 ) -> Result<Option<Looked>, AxError> {
     Ok(None)
 }
 
-/// The whole file as text in one read, sized by the length the handle
-/// reports, with its stamp on each side of the read; `None` for a
-/// directory, a failed read or query, or bytes that are not UTF-8, which
-/// the judged path answers.
+/// Decides from the handle's first facts whether any bytes are needed.
+/// `Repeat` reads none. `Compare` reads once and returns a stub only
+/// when the stamps stayed equal and the complete content hash matches.
 #[cfg(any(windows, target_os = "linux"))]
-fn whole_text(mut file: std::fs::File) -> Option<RawText> {
-    use std::io::Read as _;
-
-    let meta = file.metadata().ok()?;
-    if !meta.is_file() {
+fn read_handle(
+    file: std::fs::File,
+    addr: Address,
+    asked: &str,
+    shown: &ReadShown,
+    want: Span,
+) -> Option<Looked> {
+    let facts = Stamp::facts(&file).ok()?;
+    if !facts.is_file() {
         return None;
     }
+    let before = facts.stamp().clone();
+    match shown.recall(&addr, &before, asked, want) {
+        Recall::Fresh => read_text(file, facts.len(), before)
+            .map(|(text, before, after)| Looked::text(text, before, after, addr)),
+        Recall::Repeat(answer) => Some(Looked::Unchanged {
+            stamp: before,
+            addr,
+            answer,
+        }),
+        Recall::Compare { digest, answer } => {
+            read_text(file, facts.len(), before).map(|(text, before, after)| {
+                if before == after && B3Hash::digest(text.as_bytes()) == digest {
+                    Looked::Unchanged {
+                        stamp: after,
+                        addr,
+                        answer,
+                    }
+                } else {
+                    Looked::text(text, before, after, addr)
+                }
+            })
+        }
+    }
+}
+
+/// Reads the file once, sized by the length the handle reports, with a
+/// stamp on each side; `None` for a failed read or query or non-UTF-8
+/// bytes, which the judged path answers.
+#[cfg(any(windows, target_os = "linux"))]
+fn read_text(mut file: std::fs::File, len: u64, before: Stamp) -> Option<(String, Stamp, Stamp)> {
+    use std::io::Read as _;
+
     // One past the reported length, so a file that grew since the query
     // still ends in a single read rather than a reallocation.
-    let capacity = usize::try_from(meta.len()).ok()?.checked_add(1)?;
-    let before = Stamp::of_file(&file).ok()?;
+    let capacity = usize::try_from(len).ok()?.checked_add(1)?;
     let mut bytes = Vec::with_capacity(capacity);
     file.read_to_end(&mut bytes).ok()?;
     let after = Stamp::of_file(&file).ok()?;

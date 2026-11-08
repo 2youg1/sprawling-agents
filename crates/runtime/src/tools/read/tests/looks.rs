@@ -8,9 +8,13 @@ use crate::tools::{EditDesk, EditTool, PathLocks};
 
 /// A read and an edit sharing one run's table, the way the workbench
 /// lays them out.
-fn run(root: &Path) -> (ReadTool, EditTool) {
+fn run(root: &Path) -> (ReadTool, EditTool, ReadShown) {
     let seen = ReadStamps::default();
+    let shown = ReadShown::default();
     let (reader, _catalog) = tool(root);
+    let reader = reader
+        .recalling(shown.clone())
+        .clocking(Arc::new(|| Ok(TimeMs::new(u64::MAX))));
     let work = kernel::Address::parse("work").unwrap();
     let editor = EditTool::new(
         root,
@@ -23,7 +27,7 @@ fn run(root: &Path) -> (ReadTool, EditTool) {
         },
     )
     .unwrap();
-    (reader.noting(seen), editor)
+    (reader.noting(seen), editor, shown)
 }
 
 fn edit(path: &str, old: &str, new: &str) -> ToolCall {
@@ -50,7 +54,7 @@ fn a_whole_read_admits_the_runs_edit_and_answers_no_version() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("work")).unwrap();
     std::fs::write(dir.path().join("work").join("a.txt"), "one\n").unwrap();
-    let (reader, editor) = run(dir.path());
+    let (reader, editor, _) = run(dir.path());
 
     let refused = editor
         .invoke(&edit("work/a.txt", "one", "two"))
@@ -77,7 +81,7 @@ fn a_truncated_whole_read_is_not_a_look_and_an_asked_window_is() {
     std::fs::create_dir_all(dir.path().join("work")).unwrap();
     let long: String = (0..600).map(|n| format!("line {n}\n")).collect();
     std::fs::write(dir.path().join("work").join("long.txt"), &long).unwrap();
-    let (reader, editor) = run(dir.path());
+    let (reader, editor, _) = run(dir.path());
 
     reader.invoke(&call("work/long.txt")).unwrap();
     let after_truncated = editor.invoke(&edit("work/long.txt", "line 599\n", "last\n"));
@@ -92,5 +96,48 @@ fn a_truncated_whole_read_is_not_a_look_and_an_asked_window_is() {
             after_window.map(|_| ()).map_err(|err| *err.code()),
         ),
         (Err(AxCode::InvalidArgs), Ok(()))
+    );
+}
+
+/// S3 and the durability case together: an edit invalidates the old
+/// window evidence even though `seen` now holds the edit's new stamp;
+/// once the new full text is confirmed, a later repeat may use a stub.
+#[test]
+fn read_edit_read_returns_the_new_text_before_a_later_repeat_can_be_a_stub() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("work")).unwrap();
+    let original: String = (0..400)
+        .map(|line| format!("line {line}: a substantial passage\n"))
+        .collect();
+    std::fs::write(dir.path().join("work/long.txt"), &original).unwrap();
+    let (reader, editor, shown) = run(dir.path());
+
+    reader.invoke(&call("work/long.txt")).unwrap();
+    shown.admit("call-1");
+    shown.confirm(&std::collections::BTreeSet::new());
+    editor
+        .invoke(&edit(
+            "work/long.txt",
+            "line 10: a substantial passage\n",
+            "LINE 10: the edited passage\n",
+        ))
+        .unwrap();
+    let after_edit = reader.invoke(&call("work/long.txt")).unwrap();
+    let changed = after_edit
+        .result
+        .as_map()
+        .get("text")
+        .and_then(Value::as_str)
+        .unwrap();
+
+    assert!(changed.contains("LINE 10: the edited passage"));
+    assert!(!changed.contains("line 10: a substantial passage"));
+    assert_eq!(after_edit.result.as_map().get("unchanged"), None);
+    shown.admit("call-1");
+    shown.confirm(&std::collections::BTreeSet::new());
+    let repeated = reader.invoke(&call("work/long.txt")).unwrap();
+    assert_eq!(
+        repeated.result.as_map().get("unchanged"),
+        Some(&Value::Bool(true))
     );
 }

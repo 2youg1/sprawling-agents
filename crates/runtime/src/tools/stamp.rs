@@ -49,6 +49,7 @@ type Ticks = Option<u64>;
 /// same modification time rather than a second query.
 pub(crate) struct FileFacts {
     stamp: Stamp,
+    is_file: bool,
 }
 
 impl FileFacts {
@@ -56,14 +57,21 @@ impl FileFacts {
         &self.stamp
     }
 
-    /// Whether the modification time is too close to the read, in the
-    /// future, before the Unix epoch, or beyond the clock's range.
-    pub(crate) fn racy_at(&self, now: TimeMs) -> bool {
-        self.stamp.racy_at(now)
+    pub(crate) fn is_file(&self) -> bool {
+        self.is_file
+    }
+
+    pub(crate) fn len(&self) -> u64 {
+        self.stamp.len()
     }
 }
 
 impl Stamp {
+    /// The file length from the same metadata query as the stamp.
+    pub(crate) fn len(&self) -> u64 {
+        self.len
+    }
+
     /// Whether this stamp's modification time is within 2,000 ms of
     /// `now`. An unreadable or future modification time is racy too.
     pub(crate) fn racy_at(&self, now: TimeMs) -> bool {
@@ -126,6 +134,7 @@ impl Stamp {
                 volume: meta.dev(),
                 file: meta.ino(),
             },
+            is_file: meta.is_file(),
         })
     }
 
@@ -144,6 +153,7 @@ impl Stamp {
     /// Takes every fact used by a read from this one handle query.
     #[cfg(windows)]
     pub(crate) fn facts(file: &File) -> io::Result<FileFacts> {
+        const FILE_ATTRIBUTE_DIRECTORY: u64 = 0x10;
         let info = winapi_util::file::information(file)?;
         Ok(FileFacts {
             stamp: Stamp {
@@ -152,6 +162,7 @@ impl Stamp {
                 volume: info.volume_serial_number(),
                 file: info.file_index(),
             },
+            is_file: info.file_attributes() & FILE_ATTRIBUTE_DIRECTORY == 0,
         })
     }
 }

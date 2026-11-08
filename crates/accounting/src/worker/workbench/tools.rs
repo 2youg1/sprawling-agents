@@ -138,6 +138,7 @@ impl Laying {
                 crate::prompt_chain::nested_rules(scope.clone(), admitted, landed)
             })
         };
+        let read_clock = Arc::clone(&self.clock);
         let read = runtime::ReadTool::new(
             &site.write_root,
             Arc::clone(&catalog),
@@ -146,6 +147,7 @@ impl Laying {
         )?
         .ruling(candidates)
         .recalling(shown.clone())
+        .clocking(Arc::new(move || read_clock.now()))
         .noting(stamps);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way

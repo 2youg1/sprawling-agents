@@ -65,7 +65,11 @@ impl RunWorker {
             },
         )?;
         for warning in rebuilt.rule_warnings {
-            self.note(runtime::diagnostics::Level::Refuse, "runtime::fork", &warning);
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "runtime::fork",
+                &warning,
+            );
         }
         Ok(InheritedContext {
             messages: rebuilt.messages,

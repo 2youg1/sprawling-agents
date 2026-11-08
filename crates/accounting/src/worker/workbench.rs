@@ -125,6 +125,8 @@ pub(in crate::worker) struct Laying {
     /// The store the lanes share (`RunWorker::lane_store`).
     pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub(in crate::worker) notes: super::recording::Notes,
+    /// The worker's one clock, also used for read's racy-stamp judgement.
+    clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
     /// How long starting the building's servers took (`Hands.monotonic`).
     monotonic: fn() -> std::time::Instant,
     /// Where the ledger stood when the dispatch was staged: what the
@@ -209,6 +211,7 @@ impl super::RunWorker {
             edits: self.flight.edits.clone(),
             store: std::sync::Arc::clone(&self.lane_store),
             notes: self.log.clone(),
+            clock: std::sync::Arc::clone(&self.clock),
             monotonic: self.monotonic,
             staged_at: self.ledger.position(),
             trust: self.governance.autonomy.clone(),

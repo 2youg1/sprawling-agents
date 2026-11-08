@@ -25,6 +25,7 @@ mod read;
 mod refusal;
 mod search;
 
+pub(crate) use read::unchanged;
 pub use read::{Copied, Numbering};
 
 /// The renderer every answer this build writes is drawn with.
