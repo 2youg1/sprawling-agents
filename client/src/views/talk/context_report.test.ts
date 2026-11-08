@@ -73,6 +73,14 @@ describe("reportOf", () => {
           len: 1_000,
         },
         {
+          name: "sleeping",
+          namespace: "core",
+          exposure: "dormant",
+          from: "default",
+          hint: "",
+          len: 400,
+        },
+        {
           name: "offed",
           namespace: "core",
           exposure: "off",
@@ -106,6 +114,7 @@ describe("reportOf", () => {
     expect(look.buckets.find((bucket) => bucket.id === "tools")?.children.map((c) => c.name)).toEqual([
       "read",
       "search",
+      "sleeping",
     ]);
   });
 

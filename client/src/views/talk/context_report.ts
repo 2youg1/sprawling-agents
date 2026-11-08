@@ -45,8 +45,6 @@ export interface ReportChild {
   readonly name: string;
   readonly bytes: number;
   readonly bytesSaid: string;
-  /** Address to open, when the child is a prompt source. */
-  readonly addr: string | null;
 }
 
 export interface ReportBucket {
@@ -103,7 +101,7 @@ export function reportOf(
     const share = row?.share ?? 0;
     // A remainder of zero would only clutter the ring and the legend.
     if (bytes <= 0 || share <= 0) return [];
-    const children = childrenOf(id, prefix, shape);
+    const children = childrenOf(id, prefix);
     return [
       {
         id,
@@ -195,6 +193,8 @@ function weightsOf(
     prefix?.segments.find((each) => each.slot === slot)?.bytes ?? 0;
   // Prefer the shape's live tool-table bytes when present: that is what
   // the last request carried. Fall back to the frozen table length.
+  // Child rows for tools still come from Prefix (below): PromptShape has
+  // no per-tool breakdown, so the unfold is the frozen table.
   const tools = shape?.tools.bytes ?? prefix?.tools?.len ?? 0;
   const conversation = shape?.conversation.bytes ?? 0;
   return [
@@ -207,13 +207,11 @@ function weightsOf(
   ];
 }
 
-function childrenOf(
-  id: BucketId,
-  prefix: PrefixAnswer | null,
-  _shape: PromptShapeAnswer | null,
-): readonly ReportChild[] {
+function childrenOf(id: BucketId, prefix: PrefixAnswer | null): readonly ReportChild[] {
   switch (id) {
     case "tools":
+      // Frozen table only — see weightsOf. Off stays out; dormant stays in,
+      // because a dormant schema still sits in the live tools.bytes share.
       return toolChildren(prefix?.tools?.rows ?? []);
     case "city":
     case "building":
@@ -227,10 +225,10 @@ function childrenOf(
 
 function toolChildren(rows: readonly PromptTool[]): readonly ReportChild[] {
   return [...rows]
-    .filter((row) => row.exposure === "core" && row.len > 0)
+    .filter((row) => row.exposure !== "off" && row.len > 0)
     .sort((a, b) => b.len - a.len || a.name.localeCompare(b.name))
     .slice(0, CHILD_CAP)
-    .map((row) => ({ name: row.name, bytes: row.len, bytesSaid: kilo(row.len), addr: null }));
+    .map((row) => ({ name: row.name, bytes: row.len, bytesSaid: kilo(row.len) }));
 }
 
 function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[] {
@@ -242,7 +240,6 @@ function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[
       name: source.addr.slice(source.addr.lastIndexOf("/") + 1) || source.addr,
       bytes: source.kept,
       bytesSaid: kilo(source.kept),
-      addr: source.addr,
     }));
 }
 

@@ -19,7 +19,7 @@ import client.spec.Views.Parts
 | 控件 | 模式 | 键 | 结果 |
 |---|---|---|---|
 | 硬币键 | APG Button | Enter／Space | 做朝上那一面：发出框里的字，或对眼前的 run 发 `cancel`（D16）；变淡的发送面一按落进空操作 |
-| 上下文环 | APG Button（`aria-haspopup="dialog"`），提示同 `tip.svelte`；读数仍在 `aria-valuetext` | Tab | 到达环（硬币键外的环带），提示出现 |
+| 上下文环 | APG Button（同工具行：打开右侧检视，无 `aria-haspopup`），提示同 `tip.svelte`；读数仍在 `aria-valuetext` | Tab | 到达环（硬币键外的环带），提示出现 |
 | | | Enter／Space，或点按环带 | 在右侧打开该会话的上下文用量报告（`openContext`）；硬币键仍是发送／停止／转向 |
 | | | Escape | 撤下提示 |
 | 地址行 | APG Button（`aria-haspopup="dialog"`） | Enter／Space，或点按 | 打开命令面板（client/Spec.lean 4-10a）：键盘与鼠标打开时焦点进框，手指或笔按下时焦点落在面板本身（4-64b）；先列这个房间的会话，列表下读「谁在听」（D36）；Escape 关上，焦点回到地址行 |

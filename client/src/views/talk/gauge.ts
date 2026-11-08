@@ -134,7 +134,6 @@ export interface MeterWire {
   readonly "aria-valuemax": number;
   readonly "aria-valuenow": number;
   readonly "aria-valuetext": string;
-  readonly "aria-haspopup": "dialog";
 }
 
 // Everything the ring's look is given. The coin key it surrounds is the
@@ -174,7 +173,6 @@ export function ringOf(lang: Lang, context: Context | null): RingLook | null {
       "aria-valuemax": context.window,
       "aria-valuenow": Math.min(context.used, context.window),
       "aria-valuetext": reading,
-      "aria-haspopup": "dialog",
     },
     reading,
     arc: remainingArc(context),

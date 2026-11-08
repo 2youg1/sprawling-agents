@@ -33,7 +33,6 @@ describe("the context ring's look", () => {
         "aria-valuemax": 200_000,
         "aria-valuenow": 82_400,
         "aria-valuetext": reading,
-        "aria-haspopup": "dialog",
       },
       reading,
       arc: { dasharray: "59 100", dashoffset: "-41" },

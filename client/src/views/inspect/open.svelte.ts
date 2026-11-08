@@ -187,8 +187,11 @@ export function openContext(context: ContextItem): void {
 export function showItem(item: RightItem): void {
   clock += 1;
   const touched = clock;
+  // Re-show replaces the held record so fields that travel with the same
+  // identity (a context report's room, for example) cannot stick to the
+  // first open while the opener moved.
   const kept = held.some((each) => sameItem(each.item, item))
-    ? held.map((each) => (sameItem(each.item, item) ? { item: each.item, touched } : each))
+    ? held.map((each) => (sameItem(each.item, item) ? { item, touched } : each))
     : [...held, { item, touched }];
   const oldest = kept.length > KEPT ? kept.reduce((a, b) => (b.touched < a.touched ? b : a)) : null;
   held = oldest === null ? kept : kept.filter((each) => each !== oldest);
