@@ -18,9 +18,18 @@
 //! earlier one, and a page showing the line the person asked for would
 //! be showing a cut the model was never given.
 
-use kernel::{AxError, ChatMessage, RunId};
+use kernel::{Address, AxError, ChatMessage, RunId};
 
 use super::super::{Assignment, RunWorker};
+
+/// The conversation and the rule-delivery evidence a branch starts
+/// with. They come from the same committed waves, never from separate
+/// scans of the ledger.
+#[derive(Debug)]
+pub(in crate::worker) struct InheritedContext {
+    pub(in crate::worker) messages: Vec<ChatMessage>,
+    pub(in crate::worker) delivered: std::collections::BTreeSet<Address>,
+}
 
 impl RunWorker {
     /// The conversation this run opens with, and the line it was
@@ -35,9 +44,12 @@ impl RunWorker {
         &mut self,
         at: &Assignment,
         run: RunId,
-    ) -> Result<Vec<ChatMessage>, AxError> {
+    ) -> Result<InheritedContext, AxError> {
         let Some(origin) = at.origin else {
-            return Ok(Vec::new());
+            return Ok(InheritedContext {
+                messages: Vec::new(),
+                delivered: std::collections::BTreeSet::new(),
+            });
         };
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
@@ -52,6 +64,16 @@ impl RunWorker {
                 at_seq: rebuilt.at,
             },
         )?;
-        Ok(rebuilt.messages)
+        for warning in rebuilt.rule_warnings {
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "runtime::fork",
+                &warning,
+            );
+        }
+        Ok(InheritedContext {
+            messages: rebuilt.messages,
+            delivered: rebuilt.delivered,
+        })
     }
 }

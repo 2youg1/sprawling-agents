@@ -15,13 +15,14 @@
 ### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
 
 
-一回合加进 window 的东西是一对值：发出调用的助手回复与那波的答案——少了任何一半都不是对话，所以它们是一个值 `Exchange`（形状 2），由 `Turn<ToolWave>` 在波落地时收集、由 `runtime::fork` 从同一批记录重建。压缩只发生在 `Turn<Recording>::record` 的收尾边界（工具波全落地之后），这扇门一个回合只开一次（形状 1 判定住 `compact_texts`，调用的是 `compaction::plan`）。
+一回合加进 window 的东西是一对值：发出调用的助手回复与那波的答案——少了任何一半都不是对话，所以它们是一个值 `Exchange`（形状 2），由 `Turn<ToolWave>` 在波落地时收集、由 `runtime::fork` 从同一批记录重建。压缩只发生在 `Turn<Recording>::record` 的收尾边界（工具波全落地之后），这扇门一个回合只开一次（形状 1 判定住 `compact_texts`，调用的是 `compaction::plan`）。`compact() -> Result<BTreeSet<String>, AxError>` 交回文本实际变短的 `tool_use_id` 集合；没有裁切的 id 不在其中，助手文本没有工具 id，因而不进入集合。
 
 - **判定并入 `compaction::plan`，`turn.rs` 不另写阈值**：exchange 的总字节对着预算 `EXCHANGE_BUDGET_BYTES`（住 `kernel::consts_policy`）触发；触发后每段文本按**均分份额**过 `plan`：`Keep` 与 `MustOffload` 原样，`Cut(Strategy)` 走 `shorten`。除 `plan` 外这条路上没有第二次「装不装得下」的比较。
 - **波中永不换快照**：半落地的波会让压缩按半截分组，而 `fork` 是一回合一回合同一值重建的——两边分组不同就是同一历史两种字节，分支从此与母亲分叉。故收集期不压、只在收尾边界对全波一次压；红测用「全波分组与半波分组产出不同字节」钉住这一点。
 - **`MustOffload` 在这扇门上不动文本**：它要的是整块离窗留引用，而这扇门没有 store（tee 在落地管线那一侧），城里也没有工具解析得了引用——所以文本留原样。回路不是窗口：进这扇门的文本恒等于账上 `model_returned.data.content` 与 `tool_result` 里的那一份（`turn/wave.rs` 只打印一次、`fork` 由同一条记录重建），而 `exec` 结果在落地时已被管线裁过或 tee 过——原件在 CAS、账上有 `result_offloaded` 指过去。两条路都没有「只存在于窗口里」的字节。
 - **thinking 与 redacted thinking 永不碰**：thinking 块带覆盖其字节的签名，redacted 形态是封好的密文。
-- **`runtime::fork` 同边界重放**：`fold_run` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
+- **`runtime::fork` 同边界重放**：`fold_run` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。fork 也只把这个返回集合之外的 read 规则记为已递送；被裁掉的附注在分支里可以再次出现。
+- **递送确认在压缩之后**：`TurnReport::shortened()` 暴露同一个集合，run 在折入窗口之前调用 `ConcurrentInvoke::complete_wave(report.shortened())`。`Placing` 据此把未裁切的 read claim 与规则房间移入 confirmed，丢弃被裁切的和未获准入的 staged；默认实现为空，citysim 与闭包适配器不变。`seen` 的 edit 读戳、`IdemKey` 的重放表与这里的窗口证据是三件事，互不写入。
 - **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`fold_run`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
 - **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。
 -/

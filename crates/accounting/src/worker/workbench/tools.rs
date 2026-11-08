@@ -28,6 +28,31 @@ mod reading_room;
 mod search;
 mod transcribe;
 
+/// The stateless nested-rule source for one run's tree and room.
+fn nested_rule_candidates(
+    site: &Site,
+    room: &Address,
+    bound: runtime::ReadBound,
+) -> runtime::RuleCandidates {
+    let scope = crate::prompt_chain::RuleScope {
+        city_root: site.write_root.clone(),
+        building: site.building.addr().clone(),
+        room: room.clone(),
+        bound,
+    };
+    Arc::new(move |admitted, landed, skip, halted| {
+        crate::prompt_chain::nested_rules(
+            scope.clone(),
+            &runtime::RuleContext {
+                admitted: admitted.clone(),
+                landed: landed.clone(),
+            },
+            skip,
+            halted,
+        )
+    })
+}
+
 impl Laying {
     /// Lays out what the model may see and what routes what it calls.
     ///
@@ -75,6 +100,7 @@ impl Laying {
         // by it. A new table per run, so a fork, a successor or a child
         // starts having seen nothing (`crates/runtime/spec/Tools/Edit.lean` §8-64).
         let stamps = runtime::ReadStamps::default();
+        let shown = runtime::ReadShown::default();
         let edit = self.edit_tool(site, addr, policy.reader(), stamps.clone())?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (`crates/sprawling/Spec.lean` §8-87).
@@ -127,12 +153,17 @@ impl Laying {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
+        let candidates = nested_rule_candidates(site, addr, Arc::clone(&bound));
+        let read_clock = Arc::clone(&self.clock);
         let read = runtime::ReadTool::new(
             &site.write_root,
             Arc::clone(&catalog),
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
+        .ruling(candidates.clone())
+        .recalling(shown.clone())
+        .clocking(Arc::new(move || read_clock.now()))
         .noting(stamps);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way
@@ -232,6 +263,8 @@ impl Laying {
             policy: Some(policy),
             succession,
             context,
+            shown,
+            rule_candidates: candidates,
         })
     }
 

@@ -39,7 +39,7 @@ impl Numbering {
     pub fn of(rendering: Rendering) -> Numbering {
         match rendering {
             Rendering::V1 | Rendering::V2 => Numbering::FromZero,
-            Rendering::V3 => Numbering::FromOne,
+            Rendering::V3 | Rendering::V4 => Numbering::FromOne,
         }
     }
 
@@ -75,7 +75,39 @@ const MARK_END: char = '|';
 /// reached the end of its text, so the total is the last index shown
 /// plus one.
 pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
+    draw(result, numbering, Additions::Omitted)
+}
+
+/// V4: V3's body with the two additions recorded inside a read result.
+pub(super) fn text_v4(result: &Payload) -> Option<String> {
+    draw(result, Numbering::FromOne, Additions::Included)
+}
+
+/// Whether the version draws read-result additions.
+enum Additions {
+    Omitted,
+    Included,
+}
+
+fn draw(result: &Payload, numbering: Numbering, additions: Additions) -> Option<String> {
     let map = result.as_map();
+    if matches!(additions, Additions::Included)
+        && map.get("unchanged").and_then(Value::as_bool) == Some(true)
+    {
+        let path = map.get("path")?.as_str()?;
+        let offset = number(map.get("offset"))??;
+        let lines = number(map.get("lines"))??;
+        let total = number(map.get("total_lines"))??;
+        let mut out = unchanged(Stub {
+            path,
+            offset,
+            lines,
+            total_lines: total,
+            numbering,
+        })?;
+        append_rules(&mut out, rules(map)?);
+        return Some(out);
+    }
     let path = map.get("path")?.as_str()?;
     let body = map.get("text")?.as_str()?;
     let offset = number(map.get("offset"))?.unwrap_or(0);
@@ -119,7 +151,94 @@ pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     for (at, line) in (offset..).zip(lines) {
         push_line(&mut out, numbering, (offset, at), line)?;
     }
+    if matches!(additions, Additions::Included) {
+        append_rules(&mut out, rules(map)?);
+    }
     Some(out)
+}
+
+/// Every fact that determines an unchanged stub. Grouping them keeps
+/// the renderer and read's breakeven decision on the same request.
+pub(crate) struct Stub<'a> {
+    pub(crate) path: &'a str,
+    pub(crate) offset: u64,
+    pub(crate) lines: u64,
+    pub(crate) total_lines: u64,
+    pub(crate) numbering: Numbering,
+}
+
+/// Draws a stub. `lines == 0` is valid only for an empty file or an
+/// offset past the known end.
+pub(crate) fn unchanged(stub: Stub<'_>) -> Option<String> {
+    const SENTENCE: &str = "unchanged since your earlier read; not repeated";
+    if stub.lines == 0 {
+        return match (stub.offset, stub.total_lines) {
+            (0, 0) => Some(format!("{} is empty: {SENTENCE}\n", stub.path)),
+            (offset, total) if offset >= total => Some(format!(
+                "{} has {total} lines; offset {} is past the end: {SENTENCE}\n",
+                stub.path,
+                stub.numbering.shown(offset)?
+            )),
+            _ => None,
+        };
+    }
+    let last = stub.offset.checked_add(stub.lines.checked_sub(1)?)?;
+    if last >= stub.total_lines {
+        return None;
+    }
+    Some(format!(
+        "{} lines {}-{} of {}: {SENTENCE}\n",
+        stub.path,
+        stub.numbering.shown(stub.offset)?,
+        stub.numbering.shown(last)?,
+        stub.total_lines,
+    ))
+}
+
+/// The recorded rule files, or `None` when the field is not their
+/// declared shape. An absent field and an empty array add no bytes.
+fn rules(map: &serde_json::Map<String, Value>) -> Option<Vec<(&str, &str)>> {
+    let Some(value) = map.get("rules") else {
+        return Some(Vec::new());
+    };
+    value
+        .as_array()?
+        .iter()
+        .map(|rule| Some((rule.get("room")?.as_str()?, rule.get("text")?.as_str()?)))
+        .collect()
+}
+
+/// Reserves the rendered heading, priority and separator bytes for a rule.
+/// Includes a trailing newline even when the retained text lacks one.
+pub fn rule_overhead(room: &str) -> usize {
+    let mut rendered = String::from("body");
+    append_rules(&mut rendered, vec![(room, "")]);
+    rendered
+        .len()
+        .saturating_sub("body".len())
+        .saturating_add(1)
+}
+
+/// Appends the project conventions without passing them through the
+/// numbered-body grammar. Every pair of blocks has one blank line
+/// between it, including a body whose last line had no terminator.
+fn append_rules(out: &mut String, rules: Vec<(&str, &str)>) {
+    const PRIORITY: &str = "How work is done in this part of the project, from the project itself. Where this and the building's rules above disagree, the rules decide: they are what the city enforces.";
+    if rules.is_empty() {
+        return;
+    }
+    for (index, (room, text)) in rules.into_iter().enumerate() {
+        if index > 0 || !out.is_empty() {
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push('\n');
+        }
+        out.push_str(&format!("## {room}/AGENTS.md\n\n{PRIORITY}\n\n{text}"));
+    }
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
 }
 
 /// Writes the line at index `at` of a passage whose first line is at

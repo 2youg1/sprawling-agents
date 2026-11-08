@@ -189,6 +189,19 @@ fn a_result_line_carries_its_microseconds_and_an_older_line_reads_without_them()
     );
 }
 
+/// V4 round-trips by its lower-case name, and an unknown renderer is
+/// refused rather than silently downgraded to an older one.
+#[test]
+fn renderer_version_four_round_trips_and_an_unknown_version_is_refused() {
+    let encoded = serde_json::to_string(&Rendering::V4).unwrap();
+    assert_eq!(encoded, "\"v4\"");
+    assert_eq!(
+        serde_json::from_str::<Rendering>(&encoded).unwrap(),
+        Rendering::V4
+    );
+    assert!(serde_json::from_str::<Rendering>("\"v5\"").is_err());
+}
+
 /// The names Claude Code's tools take (`crates/runtime/spec/Tools.lean`
 /// §8-14-1) are what a call acted on, ahead of whatever string sorts
 /// first.

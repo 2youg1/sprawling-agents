@@ -112,6 +112,7 @@ pub(crate) fn drive_run<L: Ledger>(
         member,
         plan,
         handoff,
+        delivered,
         workbench,
     } = driving;
     let DriveContext {
@@ -185,7 +186,11 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             std::thread::sleep(std::time::Duration::from_millis(left.min(HALT_SLICE_MS)));
         };
+        let halted = || asking.borrow_mut().halted();
         let mut placing = Placing::new(bench, sieving, run_id, &checkpointing)
+            .stopping(&halted)
+            .reading(workbench.shown(), delivered)
+            .ruling(workbench.rule_candidates())
             .resolving(std::sync::Arc::clone(&workbench.catalog));
         let mut checkpoint = |t: TimeMs| {
             let scope = checkpointing.take_scope(&checkpoint_scope);

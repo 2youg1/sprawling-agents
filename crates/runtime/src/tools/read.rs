@@ -35,12 +35,13 @@
 //! line (`crates/runtime/spec/Tools.lean` §8-14-1, D119). The answer
 //! keeps 0-based indexes, which the renderer draws as line numbers.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    Address, AxCode, AxError, B3Hash, CostTier, Effect, Payload, RenderIntent, Temporal, TimeMs,
+    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -51,8 +52,100 @@ mod package;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
+use super::shown::{Claim, Observation, ReadShown, Span};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
+
+/// The clock used only to decide whether a stamp needs a content
+/// comparison. Tests inject a counted clock; production reads UTC.
+pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
+
+/// One nested convention a read may carry. `dropped` is the number of
+/// source bytes already known to be omitted from `text`; accounting
+/// removes it from the final payload after it applies the shared budget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuleCandidate {
+    pub room: Address,
+    pub text: String,
+    pub dropped: u64,
+}
+
+impl RuleCandidate {
+    /// The final delivery's JSON shape. `dropped` is internal budgeting
+    /// evidence; its user-visible consequence is already in `text`.
+    #[must_use]
+    pub fn into_json(self) -> Value {
+        let mut rule = Map::new();
+        rule.insert(
+            "room".to_owned(),
+            Value::String(self.room.as_str().to_owned()),
+        );
+        rule.insert("text".to_owned(), Value::String(self.text));
+        Value::Object(rule)
+    }
+
+    /// Reads a candidate produced by `into_json`; malformed input is not
+    /// a candidate and never becomes delivery evidence.
+    #[must_use]
+    pub fn from_json(value: &Value) -> Option<RuleCandidate> {
+        let room = value.get("room")?.as_str()?;
+        let room = match Address::parse(room) {
+            Ok(room) => room,
+            Err(_) => return None,
+        };
+        let text = value.get("text")?.as_str()?.to_owned();
+        let dropped = value.get("dropped").and_then(Value::as_u64).unwrap_or(0);
+        Some(RuleCandidate {
+            room,
+            text,
+            dropped,
+        })
+    }
+}
+
+/// The ordinary-path facts accounting needs to discover nested rules.
+/// This context is removed before the answer enters the ledger.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuleContext {
+    pub admitted: Address,
+    pub landed: Address,
+}
+
+impl RuleContext {
+    fn into_json(self) -> Value {
+        let mut context = Map::new();
+        context.insert(
+            "admitted".to_owned(),
+            Value::String(self.admitted.as_str().to_owned()),
+        );
+        context.insert(
+            "landed".to_owned(),
+            Value::String(self.landed.as_str().to_owned()),
+        );
+        Value::Object(context)
+    }
+
+    /// Reads the internal context; malformed input offers no candidates.
+    #[must_use]
+    pub fn from_json(value: &Value) -> Option<RuleContext> {
+        let admitted = value.get("admitted")?.as_str()?;
+        let landed = value.get("landed")?.as_str()?;
+        match (Address::parse(admitted), Address::parse(landed)) {
+            (Ok(admitted), Ok(landed)) => Some(RuleContext { admitted, landed }),
+            _ => None,
+        }
+    }
+}
+
+/// A stateless source of candidates. `skip` is the ordered settlement's
+/// confirmed and pending rooms; discovery skips their files before it
+/// spends any read or retained-text budget. The last argument polls cancellation;
+/// cancelled scans produce no candidates. The closure marks nothing.
+pub type RuleCandidates = Arc<
+    dyn Fn(&Address, &Address, &BTreeSet<Address>, &mut dyn FnMut() -> bool) -> Vec<RuleCandidate>
+        + Send
+        + Sync,
+>;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -86,6 +179,10 @@ struct Taken {
     text: String,
     total_lines: Option<usize>,
     next_offset: Option<usize>,
+    /// Actual lines delivered, and the exact total even when the public
+    /// `total_lines` field is omitted because the answer reached EOF.
+    lines: usize,
+    total: usize,
 }
 
 impl Interval {
@@ -159,6 +256,8 @@ impl Interval {
                     text: String::new(),
                     total_lines: Some(skipped),
                     next_offset: None,
+                    lines: 0,
+                    total: skipped,
                 };
             };
             from = from.saturating_add(line.len());
@@ -170,6 +269,8 @@ impl Interval {
                 text: String::new(),
                 total_lines: Some(skipped),
                 next_offset: None,
+                lines: 0,
+                total: skipped,
             };
         }
         let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
@@ -198,11 +299,15 @@ impl Interval {
                 text,
                 total_lines: None,
                 next_offset: None,
+                lines: taken,
+                total: end,
             },
             left => Taken {
                 text,
                 total_lines: Some(end.saturating_add(left)),
                 next_offset: Some(end),
+                lines: taken,
+                total: end.saturating_add(left),
             },
         }
     }
@@ -225,6 +330,9 @@ pub struct ReadTool {
     /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
     /// §8-64).
     seen: ReadStamps,
+    shown: ReadShown,
+    clock: Option<ReadClock>,
+    rules: Option<RuleCandidates>,
     meta: ToolMeta,
 }
 
@@ -236,6 +344,9 @@ impl ReadTool {
     /// The argument that names what to read, spelled once for the
     /// schema, the reading, the refusal and the ledger's readers.
     pub const FILE_PATH: &'static str = "file_path";
+
+    /// Internal ordinary-path context, removed by ordered accounting.
+    pub const RULE_CONTEXT: &'static str = "rule_context";
 
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
@@ -288,6 +399,9 @@ impl ReadTool {
             reader: BoundReader::new(city_root, bound, block_store),
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
+            shown: ReadShown::default(),
+            clock: None,
+            rules: None,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Reads a file by its path, or a skill by the name the catalog \
@@ -360,6 +474,33 @@ impl ReadTool {
     pub fn noting(self, seen: ReadStamps) -> ReadTool {
         ReadTool { seen, ..self }
     }
+
+    /// Shares this run's confirmed window evidence. A new run starts
+    /// empty; this is deliberately not inherited like rule delivery.
+    #[must_use]
+    pub fn recalling(self, shown: ReadShown) -> ReadTool {
+        ReadTool { shown, ..self }
+    }
+
+    /// Supplies the clock for the racy-stamp content comparison.
+    #[must_use]
+    pub fn clocking(self, clock: ReadClock) -> ReadTool {
+        ReadTool {
+            clock: Some(clock),
+            ..self
+        }
+    }
+
+    /// Enables nested-rule context on a successful ordinary read. The
+    /// closure itself runs in accounting's ordered settlement, never in
+    /// this concurrent invocation; no delivery is marked here.
+    #[must_use]
+    pub fn ruling(self, candidates: RuleCandidates) -> ReadTool {
+        ReadTool {
+            rules: Some(candidates),
+            ..self
+        }
+    }
 }
 
 impl Tool for ReadTool {
@@ -368,6 +509,7 @@ impl Tool for ReadTool {
     }
 
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        self.shown.discard(&call.id);
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -396,47 +538,123 @@ impl Tool for ReadTool {
                     Self::FILE_PATH
                 ))
             })?;
+        let interval = Interval::asked_for(call)?;
+        let want = Span {
+            offset: interval.offset,
+            lines: u64::from(interval.limit),
+        };
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
         let mut looked = None;
+        let mut opened = None;
+        let mut repeated = None;
+        let mut digest = None;
+        let sampled = self.clock.as_ref().and_then(|clock| clock().ok());
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
-            Found::Chosen(addr) => {
-                let (text, before, after) =
-                    engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?;
-                looked = Some((addr, before, after));
-                text
-            }
+            Found::Chosen(addr) => match engine::text_of(engine::Request {
+                city: &self.city,
+                addr: &addr,
+                asked,
+                bound: &*self.reader.bound,
+                shown: &self.shown,
+                want,
+            })? {
+                engine::Looked::Text {
+                    text,
+                    before,
+                    after,
+                    addr: landed,
+                } => {
+                    let racy = sampled.is_none_or(|now| before.racy_at(now));
+                    digest = racy.then(|| B3Hash::digest(text.as_bytes()));
+                    looked = Some((addr.clone(), before, after));
+                    opened = Some((addr, landed));
+                    text
+                }
+                engine::Looked::Unchanged {
+                    stamp,
+                    addr: landed,
+                    answer,
+                } => {
+                    looked = Some((addr.clone(), stamp.clone(), stamp.clone()));
+                    opened = Some((addr, landed));
+                    repeated = Some(answer);
+                    String::new()
+                }
+            },
         };
-        let interval = Interval::asked_for(call)?;
         // Where the interval starts, as an index the drawn header and line
         // marks number from (`crate::rendering`); absent means index 0.
         if interval.offset != 0 {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
-        let taken = interval.cut(&text);
+        let taken = repeated.is_none().then(|| interval.cut(&text));
+        if self.rules.is_some()
+            && let Some((admitted, landed)) = opened
+        {
+            out.insert(
+                Self::RULE_CONTEXT.to_owned(),
+                RuleContext { admitted, landed }.into_json(),
+            );
+        }
         // A whole answer is a look, and so is a window the caller asked
         // for by offset or limit; a whole read the cap truncated is not,
         // because the caller believes it saw the file (§8-64).
         let windowed = ["offset", "limit"]
             .iter()
             .any(|key| call.args.as_map().contains_key(*key));
+        let complete = repeated.is_some()
+            || taken
+                .as_ref()
+                .is_some_and(|taken| taken.next_offset.is_none());
         if let Some((addr, before, after)) = looked
-            && (windowed || taken.next_offset.is_none())
+            && (windowed || complete)
         {
+            if let Some(taken) = &taken
+                && before == after
+            {
+                let total = u64::try_from(taken.total).unwrap_or(u64::MAX);
+                let lines = u64::try_from(taken.lines).unwrap_or(u64::MAX);
+                let observed = Observation::new(total, taken.text.len(), digest);
+                let claim = if windowed {
+                    Claim::window(
+                        addr.clone(),
+                        before.clone(),
+                        Span {
+                            offset: interval.offset,
+                            lines,
+                        },
+                        observed,
+                    )
+                } else {
+                    Claim::whole(addr.clone(), before.clone(), observed)
+                };
+                self.shown.stage(&call.id, claim);
+            }
             self.seen.look(&addr, Some(before), Some(after));
         }
-        if let Some(total) = taken.total_lines {
-            out.insert("total_lines".to_owned(), Value::Number(total.into()));
+        if let Some(answer) = repeated {
+            out.insert("unchanged".to_owned(), Value::Bool(true));
+            out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
+            out.insert("lines".to_owned(), Value::Number(answer.lines.into()));
+            out.insert(
+                "total_lines".to_owned(),
+                Value::Number(answer.total_lines.into()),
+            );
+        } else if let Some(taken) = taken {
+            if let Some(total) = taken.total_lines {
+                out.insert("total_lines".to_owned(), Value::Number(total.into()));
+            }
+            if let Some(next) = taken.next_offset {
+                out.insert("next_offset".to_owned(), Value::Number(next.into()));
+            }
+            // The count the model needs to decide whether it has the whole
+            // thing: a result the pipeline shortened says so in its own
+            // envelope, and this is what it was shortened from.
+            out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
+            out.insert("text".to_owned(), Value::String(taken.text));
         }
-        if let Some(next) = taken.next_offset {
-            out.insert("next_offset".to_owned(), Value::Number(next.into()));
-        }
-        // The count the model needs to decide whether it has the whole
-        // thing: a result the pipeline shortened says so in its own
-        // envelope, and this is what it was shortened from.
-        out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
-        out.insert("text".to_owned(), Value::String(taken.text));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
             attachments: Vec::new(),

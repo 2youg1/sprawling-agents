@@ -39,11 +39,14 @@ impl Interrupting {
     /// provider. Anything else that arrives is held for the next safe
     /// point rather than answered here.
     pub(super) fn halted(&mut self) -> bool {
-        if self.held.is_some() {
-            return self.scope_stopping();
+        if let Some(held) = &self.held {
+            return matches!(held, Interrupt::Cancel) || self.scope_stopping();
         }
         match self.ask() {
-            Interrupt::Cancel => true,
+            Interrupt::Cancel => {
+                self.held = Some(Interrupt::Cancel);
+                true
+            }
             Interrupt::None => false,
             held @ (Interrupt::Steer { .. } | Interrupt::Policy { .. }) => {
                 self.held = Some(held);

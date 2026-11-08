@@ -169,6 +169,92 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
     );
 }
 
+struct Observed {
+    completed: Vec<std::collections::BTreeSet<String>>,
+}
+
+impl ConcurrentInvoke for Observed {
+    fn meta_of(&self, _call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        None
+    }
+
+    fn admit(&mut self, _call: &ToolCall, _t: TimeMs) -> Admitted {
+        Admitted::Answered(Ok(ToolOutcome {
+            result: Payload::of(&serde_json::json!({
+                "path": "lab/a.md", "bytes": 40_000, "text": prose(40_000),
+            }))
+            .unwrap(),
+            attachments: Vec::new(),
+        }))
+    }
+
+    fn tool(&self, _ticket: &crate::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
+        Err(
+            AxError::failure(AxCode::ToolUnavailable, "run a cleared call", "no tool")
+                .with_recovery("use admission answers"),
+        )
+    }
+
+    fn account(
+        &mut self,
+        _call: &ToolCall,
+        _ticket: crate::bench::Ticket,
+        _answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        Err(
+            AxError::failure(AxCode::ToolUnavailable, "account a cleared call", "no tool")
+                .with_recovery("use admission answers"),
+        )
+    }
+
+    fn complete_wave(&mut self, shortened: &std::collections::BTreeSet<String>) {
+        self.completed.push(shortened.clone());
+    }
+}
+
+#[test]
+fn the_run_hands_shortened_ids_to_delivery_bookkeeping_after_compaction() {
+    let mut ledger = TestLedger::new();
+    let mut model = OneShotModel {
+        calls: vec![ToolCall {
+            id: "call-1".to_owned(),
+            name: kernel::ToolName::parse("read").unwrap(),
+            args: Payload::empty(),
+        }],
+    };
+    let mut observed = Observed {
+        completed: Vec::new(),
+    };
+    let mut now = stopped(1);
+    let mut interrupt = |_: crate::SafePoint| Interrupt::None;
+    let mut hooks = crate::RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &ToolCall| kernel::Writes::Nothing,
+        invoke: &mut observed,
+        wait: &mut |_: TimeMs| crate::NextCall::Allowed,
+        deltas: None,
+    };
+    let handoff = crate::Handoff::new(
+        vec![job_locator()],
+        "overview".to_owned(),
+        "progress".to_owned(),
+        "context".to_owned(),
+        "next".to_owned(),
+    )
+    .unwrap();
+    crate::run::drive(run_plan(), &mut ledger, &mut model, &mut hooks, &handoff).unwrap();
+    assert_eq!(
+        observed.completed,
+        vec![
+            ["call-1".to_owned()].into_iter().collect(),
+            std::collections::BTreeSet::new(),
+        ]
+    );
+}
+
 #[test]
 fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
     let reply = prose(25_000);

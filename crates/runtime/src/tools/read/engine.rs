@@ -18,45 +18,112 @@
 //! not UTF-8 — is answered again by the judged path, whose refusals and
 //! `nearby` lists are the ones a model has always been given. Only calls
 //! that end in an error or a directory take it.
+//!
+//! The one-handle path exists on Windows, Linux and macOS, because each
+//! can ask an open handle where it really lies. Every other platform
+//! reads through the judged path and never answers with a stub.
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use kernel::B3Hash;
 use kernel::{Address, AxError, ReadVerdict};
 
 use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use crate::tools::shown::Recall;
+use crate::tools::shown::{Answer, ReadShown, Span};
 use crate::tools::stamp::Stamp;
 
-/// A file's text, and its stamp before and after the bytes were read.
-pub(super) type Looked = (String, Stamp, Stamp);
+/// One chosen-path read: its judgement inputs and the window evidence
+/// that may answer it. These values travel through every fast-path arm.
+#[derive(Clone, Copy)]
+pub(super) struct Request<'a> {
+    pub(super) city: &'a CityRoot,
+    pub(super) addr: &'a Address,
+    pub(super) asked: &'a str,
+    pub(super) bound: &'a dyn Fn(&Address) -> ReadVerdict,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    pub(super) shown: &'a ReadShown,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    pub(super) want: Span,
+}
+
+/// A file's text, or a reference to an interval already in the window.
+/// Both arms carry the judged address and the handle's stamp.
+pub(super) enum Looked {
+    Text {
+        text: String,
+        before: Stamp,
+        after: Stamp,
+        addr: Address,
+    },
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    Unchanged {
+        stamp: Stamp,
+        addr: Address,
+        answer: Answer,
+    },
+}
+
+impl Looked {
+    fn text(text: String, before: Stamp, after: Stamp, addr: Address) -> Looked {
+        Looked::Text {
+            text,
+            before,
+            after,
+            addr,
+        }
+    }
+}
 
 /// The whole text at the admitted address `addr`, which the model wrote
-/// as `asked`, with the file's stamp taken on the handle on each side of
-/// the read (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+/// as `asked`, or an unchanged reply backed by confirmed evidence.
 ///
 /// # Errors
 /// `E_GATE_DENIED` when the file the handle reached lies outside the
 /// city or in a place [`chosen_path::admit`] refuses; every other
 /// refusal is the judged path's, byte for byte.
-pub(super) fn text_of(
-    city: &CityRoot,
-    addr: &Address,
-    asked: &str,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Looked, AxError> {
-    match handle_read(city, addr, bound)? {
+pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError> {
+    match handle_read(request)? {
         Some(looked) => Ok(looked),
-        None => judged_read(city, addr, asked, bound),
+        None => judged_read(request.city, request.addr, request.asked, request.bound),
     }
 }
 
-/// The judged path: resolve, judge, open, judge the handle again.
+/// The judged path: resolve, judge, open, judge the handle again. It
+/// always returns text; without the one-handle fast path it cannot make
+/// an unchanged claim.
 pub(super) fn judged_read(
     city: &CityRoot,
     addr: &Address,
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Result<Looked, AxError> {
-    let at = chosen_path::land(city, addr, "read", bound)?;
-    miss::text_at(asked, at, &Floor::of_address(city.written(), addr))
+    let judged = chosen_path::land(city, addr, "read", bound)?;
+    let text = miss::text_at(
+        asked,
+        judged.location,
+        &Floor::of_address(city.written(), addr),
+    )?;
+    Ok(Looked::text(text.0, text.1, text.2, judged.addr))
 }
 
 /// Opens the file once and judges the handle where it lies (Windows).
@@ -66,19 +133,17 @@ pub(super) fn judged_read(
 /// `std::fs::canonicalize` does on this platform, so it opens nothing
 /// the judged path did not already open.
 #[cfg(windows)]
-fn handle_read(
-    city: &CityRoot,
-    addr: &Address,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<Looked>, AxError> {
-    let Ok(file) = std::fs::File::open(city.join(addr)) else {
+fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
+    let Ok(file) = std::fs::File::open(request.city.join(request.addr)) else {
         return Ok(None);
     };
     let Ok(real) = winx::file::get_file_path(&file) else {
         return Ok(None);
     };
-    city.judged_location(addr, &real, "read", bound)?;
-    Ok(whole_text(file))
+    let landed = request
+        .city
+        .judged_location(request.addr, &real, "read", request.bound)?;
+    Ok(read_handle(file, landed, request))
 }
 
 /// Resolves, judges, opens the judged location, and checks the handle
@@ -88,55 +153,115 @@ fn handle_read(
 /// Resolving first keeps the open after the judgement: a FIFO behind an
 /// unjudged link would block an open made before it.
 #[cfg(target_os = "linux")]
-fn handle_read(
-    city: &CityRoot,
-    addr: &Address,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<Looked>, AxError> {
+fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     use std::os::fd::AsRawFd as _;
 
-    let Ok(real) = std::fs::canonicalize(city.join(addr)) else {
+    let Ok(real) = std::fs::canonicalize(request.city.join(request.addr)) else {
         return Ok(None);
     };
-    city.judged_location(addr, &real, "read", bound)?;
+    let landed = request
+        .city
+        .judged_location(request.addr, &real, "read", request.bound)?;
     let Ok(file) = std::fs::File::open(&real) else {
         return Ok(None);
     };
     let fd = std::path::Path::new("/proc/self/fd").join(file.as_raw_fd().to_string());
     match std::fs::read_link(fd) {
-        Ok(now) if now == real => Ok(whole_text(file)),
+        Ok(now) if now == real => Ok(read_handle(file, landed, request)),
         // Moved since the judgement, or a machine without procfs: the
         // judged path checks the handle its own way and says which.
         Ok(_) | Err(_) => Ok(None),
     }
 }
 
+/// Resolves, judges, opens the judged location, and compares the
+/// opened handle with the file that location now names (macOS).
+///
+/// Identity is checked against the judged name, then F_GETPATH judges
+/// the held descriptor's actual location before any content is read.
+#[cfg(target_os = "macos")]
+fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
+    use std::os::unix::{ffi::OsStrExt as _, fs::MetadataExt as _};
+
+    let Ok(real) = std::fs::canonicalize(request.city.join(request.addr)) else {
+        return Ok(None);
+    };
+    request
+        .city
+        .judged_location(request.addr, &real, "read", request.bound)?;
+    let Ok(file) = std::fs::File::open(&real) else {
+        return Ok(None);
+    };
+    let (Ok(held), Ok(named)) = (file.metadata(), std::fs::metadata(&real)) else {
+        return Ok(None);
+    };
+    if (held.dev(), held.ino()) != (named.dev(), named.ino()) {
+        return Ok(None);
+    }
+    let actual = rustix::fs::getpath(&file).map_err(|err| {
+        kernel::AxError::failure(kernel::AxCode::GateDenied, "read", err.to_string())
+            .with_recovery("retry after the file location can be verified")
+    })?;
+    let actual = std::path::Path::new(std::ffi::OsStr::from_bytes(actual.as_bytes()));
+    let landed = request
+        .city
+        .judged_location(request.addr, actual, "read", request.bound)?;
+    Ok(read_handle(file, landed, request))
+}
+
 /// Every other platform reads through the judged path.
-#[cfg(not(any(windows, target_os = "linux")))]
-fn handle_read(
-    _city: &CityRoot,
-    _addr: &Address,
-    _bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<Looked>, AxError> {
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+fn handle_read(_request: Request<'_>) -> Result<Option<Looked>, AxError> {
     Ok(None)
 }
 
-/// The whole file as text in one read, sized by the length the handle
-/// reports, with its stamp on each side of the read; `None` for a
-/// directory, a failed read or query, or bytes that are not UTF-8, which
-/// the judged path answers.
-#[cfg(any(windows, target_os = "linux"))]
-fn whole_text(mut file: std::fs::File) -> Option<Looked> {
-    use std::io::Read as _;
-
-    let meta = file.metadata().ok()?;
-    if !meta.is_file() {
+/// Decides from the handle's first facts whether any bytes are needed.
+/// `Repeat` reads none. `Compare` reads once and returns a stub only
+/// when the stamps stayed equal and the complete content hash matches.
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Option<Looked> {
+    let facts = Stamp::facts(&file).ok()?;
+    if !facts.is_file() {
         return None;
     }
+    let before = facts.stamp().clone();
+    match request
+        .shown
+        .recall(request.addr, &before, request.asked, request.want)
+    {
+        Recall::Fresh => read_text(file, facts.len(), before)
+            .map(|(text, before, after)| Looked::text(text, before, after, addr)),
+        Recall::Repeat(answer) => Some(Looked::Unchanged {
+            stamp: before,
+            addr,
+            answer,
+        }),
+        Recall::Compare { digest, answer } => {
+            read_text(file, facts.len(), before).map(|(text, before, after)| {
+                if before == after && B3Hash::digest(text.as_bytes()) == digest {
+                    Looked::Unchanged {
+                        stamp: after,
+                        addr,
+                        answer,
+                    }
+                } else {
+                    Looked::text(text, before, after, addr)
+                }
+            })
+        }
+    }
+}
+
+/// Reads the file once, sized by the length the handle reports, with a
+/// stamp on each side; `None` for a failed read or query or non-UTF-8
+/// bytes, which the judged path answers.
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+fn read_text(mut file: std::fs::File, len: u64, before: Stamp) -> Option<(String, Stamp, Stamp)> {
+    use std::io::Read as _;
+
     // One past the reported length, so a file that grew since the query
     // still ends in a single read rather than a reallocation.
-    let capacity = usize::try_from(meta.len()).ok()?.checked_add(1)?;
-    let before = Stamp::of_file(&file).ok()?;
+    let capacity = usize::try_from(len).ok()?.checked_add(1)?;
     let mut bytes = Vec::with_capacity(capacity);
     file.read_to_end(&mut bytes).ok()?;
     let after = Stamp::of_file(&file).ok()?;

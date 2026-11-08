@@ -208,7 +208,7 @@ impl CityRoot {
         real: &Path,
         action: &'static str,
         bound: &dyn Fn(&Address) -> ReadVerdict,
-    ) -> Result<(), AxError> {
+    ) -> Result<Address, AxError> {
         let inside = spelled_under(&self.real, real).ok_or_else(|| {
             AxError::failure(
                 AxCode::GateDenied,
@@ -219,10 +219,10 @@ impl CityRoot {
         })?;
         // A path with no link on it names the address already admitted, and
         // asking the read bound twice would read a building's rules twice.
-        if inside != addr.as_str() {
-            admit(&inside, action, bound)?;
+        if inside == addr.as_str() {
+            return Ok(addr.clone());
         }
-        Ok(())
+        admit(&inside, action, bound)
     }
 }
 
@@ -241,15 +241,25 @@ impl CityRoot {
 /// `E_GATE_DENIED` when the real path is outside the city or [`admit`]
 /// refuses the address it names; `E_STORAGE_FATAL` when the path exists
 /// and its real location cannot be resolved.
+/// A real location and the city address that names it, produced by one
+/// judgement so a reader never derives the second from the first again.
+pub(crate) struct Judged {
+    pub location: Located,
+    pub addr: Address,
+}
+
 pub(crate) fn land(
     city: &CityRoot,
     addr: &Address,
     action: &'static str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Located, AxError> {
+) -> Result<Judged, AxError> {
     let located = real_location(&city.join(addr), action, addr.as_str())?;
-    city.judged_location(addr, located.path(), action, bound)?;
-    Ok(located)
+    let landed = city.judged_location(addr, located.path(), action, bound)?;
+    Ok(Judged {
+        location: located,
+        addr: landed,
+    })
 }
 
 /// Whether the file `opened` at the judged real location `judged` is
@@ -415,8 +425,10 @@ pub(crate) fn walked(
         return Ok(Walked::File(path));
     }
     match Address::parse(rel).and_then(|addr| land(city, &addr, "search", bound)) {
-        Ok(Located::Present(real)) if real.is_file() => Ok(Walked::File(real)),
-        Ok(Located::Present(_) | Located::Absent(_)) => Ok(Walked::Passed),
+        Ok(judged) => match judged.location {
+            Located::Present(real) if real.is_file() => Ok(Walked::File(real)),
+            Located::Present(_) | Located::Absent(_) => Ok(Walked::Passed),
+        },
         Err(refused) if refused.code() == &AxCode::GateDenied => Ok(Walked::Passed),
         Err(unresolved) => Err(unresolved),
     }

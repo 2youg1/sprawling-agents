@@ -555,15 +555,17 @@ impl RunWorker {
 工具面是 `accounting::worker::driving::placing::Placing`（形状：adapter），`crates/runtime/Spec.lean` §8-3 的 `ConcurrentInvoke` 在装配层的实现：
 
 ```rust
-pub(super) struct Placing<'f> { /* bench、sieving、run、next、ran —— 私有；checkpointing: &'f Checkpointing */ }
+pub(super) struct Placing<'f> { /* bench、sieving、run、next、ran、shown、rules —— 私有；checkpointing: &'f Checkpointing */ }
 impl<'f> Placing<'f> {
     pub(super) fn new(bench: ToolBench, sieving: Sieving, run: RunId, checkpointing: &'f Checkpointing) -> Placing<'f>;
+    pub(super) fn reading(self, shown: runtime::ReadShown, delivered: BTreeSet<Address>) -> Self;
+    pub(super) fn ruling(self, candidates: runtime::RuleCandidates) -> Self; // 同一候选源在有序 Placing 运行
     pub(super) fn ran(&self) -> (u32, u32);   // 本跑命令的 (通过, 失败)
 }
-impl ConcurrentInvoke for Placing<'_> { /* admit：定位次、派生键、bench.clear；tool：bench.tool_for；account：bench.account，再记 checkpoint 与命令计数、exec 结果过筛 */ }
+impl ConcurrentInvoke for Placing<'_> { /* admit：定位次、派生键、bench.clear；tool：bench.tool_for；account：read 先定稿再 bench.account，随后记 checkpoint 与命令计数、exec 结果过筛；complete_wave：压缩后确认 shown 与规则 */ }
 ```
 
-键的位次在 `admit` 里定、checkpoint 记录与命令计数在 `account` 里记，两段都按调用序跑，所以一波开头的只读调用并行跑完之后，键、checkpoint 列表与计数与串行波逐字相同。位次与计数是 `Placing` 的普通字段：先前它们是闭包捕获的 `Cell` 与 `Rc<RefCell<…>>`，因为闭包只能借不能拥有。`checkpointed` 仍是一个 `RefCell`，借给 `Placing` 与波前 checkpoint 钩子两处写，因为清扫读的是**最早**立起的那道 checkpoint（`settling::desks`），两份各自的列表合不出时间次序。失败码不新增：`admit` 与 `account` 的失败原样是 bench 与工具的失败，回给模型。
+键的位次在 `admit` 里定、checkpoint 记录与命令计数在 `account` 里记，两段都按调用序跑，所以一波开头的只读调用并行跑完之后，键、checkpoint 列表与计数与串行波逐字相同。read 的规则在 `bench.account` 前定稿，`IdemKey` 因而缓存第一次的最终答案；`complete_wave` 在 exchange 压缩后只确认未裁切的 read claim 与规则房间（§8-44）。位次与计数是 `Placing` 的普通字段：先前它们是闭包捕获的 `Cell` 与 `Rc<RefCell<…>>`，因为闭包只能借不能拥有。`checkpointed` 仍是一个 `RefCell`，借给 `Placing` 与波前 checkpoint 钩子两处写，因为清扫读的是**最早**立起的那道 checkpoint（`settling::desks`），两份各自的列表合不出时间次序。失败码不新增：`admit` 与 `account` 的失败原样是 bench 与工具的失败，回给模型。
 
 `outcome` 刻意仍是 `Result` 而不在方法里 `?`：一跑失败了它的桌子照样要结，而结桌子正是把它最后几行放上历史的动作。把它提到方法边界上会静静跳过它们。
 

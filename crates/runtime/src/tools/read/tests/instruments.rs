@@ -51,14 +51,31 @@ fn open_everywhere() -> ReadBound {
 /// resolved, opened and judged again, every line collected for the cut.
 fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
     let city = CityRoot::anchor(root, "read").unwrap();
-    let (text, _, _) = super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap();
+    let super::engine::Looked::Text { text, .. } =
+        super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap()
+    else {
+        panic!("the judged path always returns text")
+    };
     let (cut, _, _) = reference_cut(0, LINE_CAP, &text);
     cut.len()
 }
 
 /// The handle read with the one-pass cut.
 fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usize {
-    let (text, _, _) = super::engine::text_of(city, addr, addr.as_str(), &**bound).unwrap();
+    let super::engine::Looked::Text { text, .. } = super::engine::text_of(super::engine::Request {
+        city,
+        addr,
+        asked: addr.as_str(),
+        bound: &**bound,
+        shown: &crate::tools::ReadShown::default(),
+        want: crate::tools::Span {
+            offset: 0,
+            lines: u64::from(LINE_CAP),
+        },
+    })
+    .unwrap() else {
+        panic!("an empty evidence table cannot return a stub")
+    };
     let cut = Interval {
         offset: 0,
         limit: LINE_CAP,
@@ -195,12 +212,12 @@ fn instrument_read_after_write_ab() {
 /// The ceiling CI holds (`crates/xtask/budgets.toml` `[read_handle_ratio]`):
 /// the handle read of a 20 KiB file, where the fixed cost of resolving
 /// and opening dominates, stays within this many resolved reads of it.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 const RATIO_CEILING: f64 = 1.5;
 
 /// Only where the engine reads through the handle: elsewhere the judged
 /// path is the read, and it is meant to cost more than a bare read.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #[test]
 fn a_read_costs_within_a_bound_of_a_resolved_read() {
     let bound = open_everywhere();

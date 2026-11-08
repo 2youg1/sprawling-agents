@@ -14,8 +14,12 @@ fn text(of: &str) -> ContentBlock {
 }
 
 fn result(of: &str) -> ContentBlock {
+    result_id("call-1", of)
+}
+
+fn result_id(id: &str, of: &str) -> ContentBlock {
     ContentBlock::ToolResult {
-        tool_use_id: "call-1".to_owned(),
+        tool_use_id: id.to_owned(),
         content: of.to_owned(),
         is_error: false,
         attachments: Vec::new(),
@@ -67,6 +71,16 @@ fn an_over_budget_reply_is_shortened_and_a_structured_result_stays_whole() {
         ContentBlock::ToolResult { content, .. } => assert_eq!(content, &answer),
         other => panic!("expected a tool_result block, got {other:?}"),
     }
+}
+
+#[test]
+fn compaction_reports_only_the_tool_results_whose_text_it_shortened() {
+    let mut exchange = Exchange::new();
+    exchange.push_assistant(vec![text("a short reply")]);
+    exchange.push_result(result_id("prose", &prose(40_000)));
+    exchange.push_result(result_id("structured", &printed(40_000)));
+    let shortened = exchange.compact().unwrap();
+    assert_eq!(shortened, ["prose".to_owned()].into_iter().collect());
 }
 
 #[test]

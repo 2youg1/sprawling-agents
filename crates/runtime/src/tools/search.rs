@@ -162,7 +162,7 @@ impl SearchTool {
                 }
                 let addr = chosen_path::admit(&spelled, "search", &*self.bound)?;
                 let located = chosen_path::land(&self.city, &addr, "search", &*self.bound)?;
-                let chosen_path::Located::Present(path) = located else {
+                let chosen_path::Located::Present(path) = located.location else {
                     return Err(AxError::failure(
                         AxCode::InvalidArgs,
                         "search",

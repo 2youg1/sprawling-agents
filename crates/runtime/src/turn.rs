@@ -328,9 +328,10 @@ impl Turn<'_, Recording> {
             usage,
             stop,
         } = self.state;
-        exchange.compact()?;
+        let shortened = exchange.compact()?;
         Ok(PhaseOutcome::Advanced(TurnReport {
             redacted: self.journal.redacted(),
+            shortened,
             model_returned,
             calls_made,
             assistant: exchange.assistant().to_vec(),

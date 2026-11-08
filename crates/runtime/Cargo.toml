@@ -55,6 +55,10 @@ wasmtime-wasi = { version = "50.0.1", optional = true, default-features = false,
 
 # One Job Object per run, so a run's whole process tree can be read
 # (`crates/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.
+[target.'cfg(target_os = "macos")'.dependencies]
+# F_GETPATH queries the opened descriptor, independent of replaceable names.
+rustix = { version = "1.1.5", features = ["fs"] }
+
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 # A file's identity for an edit's read stamp (volume serial number and

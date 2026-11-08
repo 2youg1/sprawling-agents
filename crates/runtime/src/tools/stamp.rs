@@ -13,10 +13,11 @@
 //! proptest in `stamp::tests` drives it on random traces.
 //!
 //! A stamp is the file's length, its modification time and its identity
-//! on the volume, read in one query of an open handle. No content is hashed: a
-//! read pays for the bytes it shows and nothing else, and an edit's own
-//! write lands through a staging file renamed over the name, so its
-//! identity changes on every write the tool makes.
+//! on the volume, read in one query of an open handle. The stamp itself
+//! carries no content hash; a read hashes only a racy claim
+//! (`crates/runtime/spec/Tools/Read.lean` D127). An edit's own write
+//! lands through a staging file renamed over the name, so its identity
+//! changes on every write the tool makes.
 
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -24,7 +25,7 @@ use std::io;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use kernel::Address;
+use kernel::{Address, TimeMs};
 
 /// What a file is at one moment, as far as an edit needs to know: its
 /// length, its last write time and which file on which volume it is,
@@ -45,7 +46,88 @@ type Ticks = (i64, i64);
 #[cfg(windows)]
 type Ticks = Option<u64>;
 
+/// One metadata query's stamp, with the race judgement made from the
+/// same modification time rather than a second query.
+pub(crate) struct FileFacts {
+    stamp: Stamp,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    is_file: bool,
+}
+
+#[cfg_attr(
+    not(any(windows, target_os = "linux", target_os = "macos", test)),
+    expect(
+        dead_code,
+        reason = "unchanged evidence is queried only by handle fast paths"
+    )
+)]
+impl FileFacts {
+    pub(crate) fn stamp(&self) -> &Stamp {
+        &self.stamp
+    }
+
+    pub(crate) fn is_file(&self) -> bool {
+        self.is_file
+    }
+
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    pub(crate) fn len(&self) -> u64 {
+        self.stamp.len()
+    }
+}
+
 impl Stamp {
+    /// The file length from the same metadata query as the stamp.
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
+    pub(crate) fn len(&self) -> u64 {
+        self.len
+    }
+
+    /// Whether this stamp's modification time is within 2,000 ms of
+    /// `now`. An unreadable or future modification time is racy too.
+    pub(crate) fn racy_at(&self, now: TimeMs) -> bool {
+        let Some(modified) = self.modified_ms() else {
+            return true;
+        };
+        now.value().saturating_sub(modified) < 2_000
+    }
+
+    #[cfg(unix)]
+    fn modified_ms(&self) -> Option<u64> {
+        let (seconds, nanoseconds) = self.written;
+        let millis = i128::from(seconds)
+            .checked_mul(1_000)?
+            .checked_add(i128::from(nanoseconds) / 1_000_000)?;
+        u64::try_from(millis).ok()
+    }
+
+    #[cfg(windows)]
+    fn modified_ms(&self) -> Option<u64> {
+        // FILETIME starts at 1601-01-01, 11,644,473,600 seconds before
+        // the Unix epoch, and counts 100-nanosecond intervals.
+        const UNIX_EPOCH: u64 = 116_444_736_000_000_000;
+        let since_epoch = self.written?.checked_sub(UNIX_EPOCH)?;
+        Some(since_epoch / 10_000)
+    }
+
     /// The stamp of whatever stands at `path` now, or `None` when nothing
     /// does.
     ///
@@ -66,13 +148,22 @@ impl Stamp {
     /// Whatever the platform answers when the handle is asked about.
     #[cfg(unix)]
     pub(crate) fn of_file(file: &File) -> io::Result<Stamp> {
+        Ok(Stamp::facts(file)?.stamp)
+    }
+
+    /// Takes every fact used by a read from this one metadata query.
+    #[cfg(unix)]
+    pub(crate) fn facts(file: &File) -> io::Result<FileFacts> {
         use std::os::unix::fs::MetadataExt;
         let meta = file.metadata()?;
-        Ok(Stamp {
-            len: meta.len(),
-            written: (meta.mtime(), meta.mtime_nsec()),
-            volume: meta.dev(),
-            file: meta.ino(),
+        Ok(FileFacts {
+            stamp: Stamp {
+                len: meta.len(),
+                written: (meta.mtime(), meta.mtime_nsec()),
+                volume: meta.dev(),
+                file: meta.ino(),
+            },
+            is_file: meta.is_file(),
         })
     }
 
@@ -85,12 +176,22 @@ impl Stamp {
     /// Whatever the platform answers when the handle is asked about.
     #[cfg(windows)]
     pub(crate) fn of_file(file: &File) -> io::Result<Stamp> {
+        Ok(Stamp::facts(file)?.stamp)
+    }
+
+    /// Takes every fact used by a read from this one handle query.
+    #[cfg(windows)]
+    pub(crate) fn facts(file: &File) -> io::Result<FileFacts> {
+        const FILE_ATTRIBUTE_DIRECTORY: u64 = 0x10;
         let info = winapi_util::file::information(file)?;
-        Ok(Stamp {
-            len: info.file_size(),
-            written: info.last_write_time(),
-            volume: info.volume_serial_number(),
-            file: info.file_index(),
+        Ok(FileFacts {
+            stamp: Stamp {
+                len: info.file_size(),
+                written: info.last_write_time(),
+                volume: info.volume_serial_number(),
+                file: info.file_index(),
+            },
+            is_file: info.file_attributes() & FILE_ATTRIBUTE_DIRECTORY == 0,
         })
     }
 }

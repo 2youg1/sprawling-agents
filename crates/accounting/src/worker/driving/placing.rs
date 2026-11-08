@@ -18,9 +18,12 @@ use kernel::{
     AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
 };
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
-use runtime::{Admitted, Catalog, ConcurrentInvoke, ToolTool};
+use runtime::{
+    Admitted, Catalog, ConcurrentInvoke, ReadShown, RuleCandidates, RuleContext, ToolTool,
+};
 
 use super::Sieving;
+use crate::prompt_chain::RuleDelivery;
 
 /// What a run's calls leave for the checkpoints around them. Shared between
 /// the tool face and the wave checkpoint, which the turn driver holds at once.
@@ -92,6 +95,10 @@ pub(super) struct Placing<'f> {
     /// What the run was told it can reach: the one authority on what a
     /// `tool` `run` stands for (`crates/runtime/Spec.lean` §8-61).
     catalog: Arc<Mutex<Catalog>>,
+    shown: ReadShown,
+    rules: RuleDelivery,
+    rule_candidates: Option<RuleCandidates>,
+    halted: Option<&'f dyn Fn() -> bool>,
 }
 
 impl<'f> Placing<'f> {
@@ -109,7 +116,17 @@ impl<'f> Placing<'f> {
             ran: (0, 0),
             checkpointing,
             catalog: Arc::new(Mutex::new(Catalog::new())),
+            shown: ReadShown::default(),
+            rules: RuleDelivery::default(),
+            rule_candidates: None,
+            halted: None,
         }
+    }
+
+    /// Polls the drive's existing interrupt source during rule scanning.
+    pub(super) fn stopping(mut self, halted: &'f dyn Fn() -> bool) -> Self {
+        self.halted = Some(halted);
+        self
     }
 
     /// Resolves each `tool` `run` against the run's own catalog. A face
@@ -118,6 +135,27 @@ impl<'f> Placing<'f> {
     #[must_use]
     pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
         self.catalog = catalog;
+        self
+    }
+
+    /// Supplies the same stateless candidate source the read tool was
+    /// built with; it runs here, in call order, rather than in `invoke`.
+    #[must_use]
+    pub(super) fn ruling(mut self, candidates: RuleCandidates) -> Self {
+        self.rule_candidates = Some(candidates);
+        self
+    }
+
+    /// Shares the read tool's window evidence and starts rule delivery
+    /// with the rooms a branched run inherited.
+    #[must_use]
+    pub(super) fn reading(
+        mut self,
+        shown: ReadShown,
+        delivered: std::collections::BTreeSet<kernel::Address>,
+    ) -> Self {
+        self.shown = shown;
+        self.rules.delivered = delivered;
         self
     }
 
@@ -151,6 +189,47 @@ impl<'f> Placing<'f> {
         self.bench
             .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal)
+    }
+
+    /// Finalizes a read before its first result enters the idempotency
+    /// cache. Other tools continue directly to the bench.
+    fn prepare_read(
+        &mut self,
+        call: &ToolCall,
+        mut outcome: ToolOutcome,
+    ) -> Result<ToolOutcome, AxError> {
+        if call.name.as_str() != runtime::ReadTool::NAME {
+            return Ok(outcome);
+        }
+        let mut result = outcome.result.as_map().clone();
+        let context = result
+            .remove(runtime::ReadTool::RULE_CONTEXT)
+            .and_then(|value| RuleContext::from_json(&value));
+        let candidates = match (context, self.rule_candidates.as_ref()) {
+            (Some(context), Some(candidates)) => candidates(
+                &context.admitted,
+                &context.landed,
+                &self.rules.seen(),
+                &mut || self.halted.is_some_and(|halted| halted()),
+            ),
+            _ => Vec::new(),
+        };
+        let selected = self.rules.answer(&call.id, candidates);
+        if selected.is_empty() {
+            result.remove("rules");
+        } else {
+            result.insert(
+                "rules".to_owned(),
+                serde_json::Value::Array(
+                    selected
+                        .into_iter()
+                        .map(runtime::RuleCandidate::into_json)
+                        .collect(),
+                ),
+            );
+        }
+        outcome.result = kernel::Payload::new(result)?;
+        Ok(outcome)
     }
 
     /// What the model reads back for what the bench decided.
@@ -194,6 +273,9 @@ impl<'f> Placing<'f> {
             // call failed when it succeeded (`crates/runtime/Spec.lean` §8-35). The
             // command counters are not touched: nothing ran this time.
             BenchOutcome::Duplicate { outcome } => {
+                if call.name.as_str() == runtime::ReadTool::NAME {
+                    self.rules.replay(&call.id, &outcome.result);
+                }
                 if call.name.as_str() == kernel::ToolName::EXEC {
                     self.sieving.package(call, outcome, self.temporal_of(call))
                 } else {
@@ -232,13 +314,21 @@ impl ConcurrentInvoke for Placing<'_> {
         // deduplication is for.
         let key = match call.action() {
             Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action),
-            Err(unreadable) => return Admitted::Answered(Err(unreadable)),
+            Err(unreadable) => {
+                self.shown.discard(&call.id);
+                return Admitted::Answered(Err(unreadable));
+            }
         };
         match self.bench.clear(call, &key, t) {
             Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
-            Ok(Clearance::Answered(decided)) => Admitted::Answered(self.answered(call, decided)),
+            Ok(Clearance::Answered(decided)) => {
+                let answered = self.answered(call, decided);
+                self.shown.discard(&call.id);
+                Admitted::Answered(answered)
+            }
             Err(refused) => {
                 self.checkpointing.widen();
+                self.shown.discard(&call.id);
                 Admitted::Answered(Err(refused))
             }
         }
@@ -258,10 +348,28 @@ impl ConcurrentInvoke for Placing<'_> {
         ticket: Ticket,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<ToolOutcome, AxError> {
-        let decided = self
-            .bench
-            .account(ticket, answered)
-            .inspect_err(|_| self.checkpointing.widen())?;
-        self.answered(call, decided)
+        let answered = match answered {
+            Ok(outcome) => self.prepare_read(call, outcome),
+            Err(err) => Err(err),
+        };
+        if answered.is_err() {
+            self.shown.discard(&call.id);
+        }
+        let decided = self.bench.account(ticket, answered).inspect_err(|_| {
+            self.checkpointing.widen();
+            self.shown.discard(&call.id);
+        })?;
+        let answered = self.answered(call, decided);
+        if answered.is_ok() {
+            self.shown.admit(&call.id);
+        } else {
+            self.shown.discard(&call.id);
+        }
+        answered
+    }
+
+    fn complete_wave(&mut self, shortened: &std::collections::BTreeSet<String>) {
+        self.rules.complete_wave(shortened);
+        self.shown.confirm(shortened);
     }
 }

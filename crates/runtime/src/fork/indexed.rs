@@ -95,7 +95,14 @@ pub fn inherited_indexed(
     // run_forked line is refused.
     let mut conversation = Conversation::new();
     if let Some(origin) = forked_from(owner, &records)? {
-        conversation.push_inherited(&inherited_indexed(index, dir, origin)?.messages);
+        let ancestry = inherited_indexed(index, dir, origin)?;
+        conversation.push_inherited(&ancestry.messages);
+        let mut folded = fold_run(conversation, records.iter().skip(start))?;
+        folded.delivered.extend(ancestry.delivered);
+        let mut warnings = ancestry.rule_warnings;
+        warnings.extend(folded.rule_warnings);
+        folded.rule_warnings = warnings;
+        return Ok(folded);
     }
     fold_run(conversation, records.iter().skip(start))
 }

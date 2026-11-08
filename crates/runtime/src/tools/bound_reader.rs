@@ -79,7 +79,7 @@ impl BoundReader {
         // root inside `land` used to cost on every call
         // (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
         let city = chosen_path::CityRoot::anchor(&self.city_root, action)?;
-        let real = match chosen_path::land(&city, &addr, action, &*self.bound)? {
+        let real = match chosen_path::land(&city, &addr, action, &*self.bound)?.location {
             Located::Present(real) if real.is_file() => real,
             Located::Present(_) => {
                 return Err(AxError::failure(
@@ -158,6 +158,18 @@ impl Opened {
     #[must_use]
     pub fn named(&self) -> &Named {
         &self.named
+    }
+
+    /// The object's total byte length, without moving its read cursor.
+    /// This is sizing information, not permission to skip validation.
+    ///
+    /// # Errors
+    /// Whatever the open file's metadata query returns.
+    pub fn byte_len(&self) -> std::io::Result<u64> {
+        match &self.source {
+            Source::Disk(handle) => handle.as_file().metadata().map(|meta| meta.len()),
+            Source::Held(bytes) => Ok(u64::try_from(bytes.get_ref().len()).unwrap_or(u64::MAX)),
+        }
     }
 }
 

@@ -111,11 +111,22 @@ fn both(root: &Path, bound: ReadBound, asked: &str) -> (String, String) {
     let city = CityRoot::anchor(root, "read").unwrap();
     let addr = kernel::Address::parse(asked).unwrap();
     let print = |answer: Result<super::engine::Looked, AxError>| match answer {
-        Ok((text, _, _)) => format!("ok {text:?}"),
+        Ok(super::engine::Looked::Text { text, .. }) => format!("ok {text:?}"),
+        Ok(super::engine::Looked::Unchanged { answer, .. }) => format!("unchanged {answer:?}"),
         Err(err) => format!("err {}", serde_json::to_string(&err).unwrap()),
     };
     (
-        print(super::engine::text_of(&city, &addr, asked, &*bound)),
+        print(super::engine::text_of(super::engine::Request {
+            city: &city,
+            addr: &addr,
+            asked,
+            bound: &*bound,
+            shown: &crate::tools::ReadShown::default(),
+            want: crate::tools::Span {
+                offset: 0,
+                lines: u64::from(super::LINE_CAP),
+            },
+        })),
         print(super::engine::judged_read(&city, &addr, asked, &*bound)),
     )
 }
