@@ -188,6 +188,7 @@ pub(crate) fn drive_run<L: Ledger>(
         };
         let mut placing = Placing::new(bench, sieving, run_id, &checkpointing)
             .reading(workbench.shown(), delivered)
+            .ruling(workbench.rule_candidates())
             .resolving(std::sync::Arc::clone(&workbench.catalog));
         let mut checkpoint = |t: TimeMs| {
             let scope = checkpointing.take_scope(&checkpoint_scope);

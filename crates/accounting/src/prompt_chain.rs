@@ -247,6 +247,7 @@ pub(crate) fn nested_rules(
     scope: RuleScope,
     admitted: &Address,
     landed: &Address,
+    skip: &BTreeSet<Address>,
 ) -> Vec<runtime::RuleCandidate> {
     if !admitted.is_within(&scope.building) || !landed.is_within(&scope.building) {
         return Vec::new();
@@ -265,10 +266,9 @@ pub(crate) fn nested_rules(
     };
     let mut candidates = Vec::new();
     let mut remaining = kernel::consts_policy::INTERVAL_CAP_BYTES;
-    for (room, path) in paths
-        .into_iter()
-        .filter(|(room, _)| room != &scope.room && room.is_within(&scope.room))
-    {
+    for (room, path) in paths.into_iter().filter(|(room, _)| {
+        room != &scope.room && room.is_within(&scope.room) && !skip.contains(room)
+    }) {
         if remaining == 0 {
             break;
         }
@@ -298,6 +298,15 @@ pub(crate) struct RuleDelivery {
 }
 
 impl RuleDelivery {
+    /// The rooms discovery must not spend another read or byte on.
+    pub(crate) fn seen(&self) -> BTreeSet<Address> {
+        self.delivered
+            .iter()
+            .chain(self.pending.values().flatten())
+            .cloned()
+            .collect()
+    }
+
     /// Answers one call with its selected candidates and remembers their
     /// rooms on the open wave.
     pub(crate) fn answer(
@@ -305,12 +314,7 @@ impl RuleDelivery {
         call: &str,
         candidates: Vec<runtime::RuleCandidate>,
     ) -> Vec<runtime::RuleCandidate> {
-        let seen: BTreeSet<Address> = self
-            .delivered
-            .iter()
-            .chain(self.pending.values().flatten())
-            .cloned()
-            .collect();
+        let seen = self.seen();
         let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
         let mut used = 0usize;
         let mut selected = Vec::new();

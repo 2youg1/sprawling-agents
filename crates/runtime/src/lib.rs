@@ -44,7 +44,7 @@ pub use tools::{BoundReader, Opened};
 pub use tools::{EditDesk, EditTool, PathLocks, ReadStamps};
 pub use tools::{ExecSetup, ExecTool, PythonGuest};
 pub use tools::{FailureClass, Shell, ShellCount, ShellTally};
-pub use tools::{ReadShown, ReadTool, RuleCandidate, RuleCandidates};
+pub use tools::{ReadShown, ReadTool, RuleCandidate, RuleCandidates, RuleContext};
 pub use tools::{SucceedTool, Succession, SuccessionDesk};
 
 pub mod bench;

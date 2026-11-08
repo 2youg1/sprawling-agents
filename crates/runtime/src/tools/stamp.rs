@@ -13,10 +13,11 @@
 //! proptest in `stamp::tests` drives it on random traces.
 //!
 //! A stamp is the file's length, its modification time and its identity
-//! on the volume, read in one query of an open handle. No content is hashed: a
-//! read pays for the bytes it shows and nothing else, and an edit's own
-//! write lands through a staging file renamed over the name, so its
-//! identity changes on every write the tool makes.
+//! on the volume, read in one query of an open handle. The stamp itself
+//! carries no content hash; a read hashes only a racy claim
+//! (`crates/runtime/spec/Tools/Read.lean` D127). An edit's own write
+//! lands through a staging file renamed over the name, so its identity
+//! changes on every write the tool makes.
 
 use std::collections::BTreeMap;
 use std::fs::File;

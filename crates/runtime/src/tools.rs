@@ -42,7 +42,7 @@ pub(crate) use stamp::Stamp;
 // readers outside the tool: the machine's own dependency report, and a
 // caller deciding whether a task can be done here at all.
 pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings};
-pub use read::{ReadClock, ReadTool, RuleCandidate, RuleCandidates};
+pub use read::{ReadClock, ReadTool, RuleCandidate, RuleCandidates, RuleContext};
 pub use search::SearchTool;
 pub use shown::ReadShown;
 #[cfg(test)]

@@ -71,6 +71,7 @@ fn a_deeper_directory_offers_its_rules_from_the_run_room_downwards() {
         scope(dir.path()),
         &at("lab/pkg/probe/a.rs"),
         &at("lab/pkg/probe/a.rs"),
+        &BTreeSet::new(),
     );
     assert_eq!(
         candidates
@@ -93,7 +94,13 @@ fn only_a_strict_descendant_of_the_run_room_and_home_building_is_eligible() {
         ("lab/pkg/probe/a.rs", "other/pkg/a.rs"),
     ] {
         assert!(
-            nested_rules(scope(dir.path()), &at(admitted), &at(landed)).is_empty(),
+            nested_rules(
+                scope(dir.path()),
+                &at(admitted),
+                &at(landed),
+                &BTreeSet::new(),
+            )
+            .is_empty(),
             "{admitted} -> {landed} was eligible"
         );
     }
@@ -121,6 +128,7 @@ fn the_first_oversized_rule_is_cut_with_its_marker_and_later_rules_wait() {
     assert!(selected[0].text.len() <= cap);
     assert!(selected[0].text.contains("[truncated: "));
     assert!(selected[0].dropped > 0);
+    assert_eq!(selected[0].clone().into_json().get("dropped"), None);
 }
 
 #[test]
@@ -136,6 +144,7 @@ fn an_oversized_rule_file_is_bounded_and_carries_its_omission() {
         scope(dir.path()),
         &at("lab/pkg/probe/a.rs"),
         &at("lab/pkg/probe/a.rs"),
+        &BTreeSet::new(),
     );
     assert_eq!(candidates.len(), 2);
     assert!(candidates[1].text.len() <= cap);
@@ -156,6 +165,7 @@ fn a_rule_cut_inside_a_multibyte_character_keeps_its_valid_prefix() {
         scope(dir.path()),
         &at("lab/pkg/probe/a.rs"),
         &at("lab/pkg/probe/a.rs"),
+        &BTreeSet::new(),
     );
     let probe = candidates
         .iter()
@@ -164,6 +174,38 @@ fn a_rule_cut_inside_a_multibyte_character_keeps_its_valid_prefix() {
     assert!(probe.text.len() < remaining);
     assert!(probe.text.ends_with('x'));
     assert!(probe.dropped > 0);
+}
+
+#[test]
+fn a_rule_behind_an_oversized_one_arrives_on_the_next_read() {
+    let dir = project();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    write(
+        dir.path(),
+        "lab/pkg/AGENTS.md",
+        "x".repeat(cap.saturating_add(1)).as_bytes(),
+    );
+    let mut delivery = RuleDelivery::default();
+    let first = nested_rules(
+        scope(dir.path()),
+        &at("lab/pkg/probe/a.rs"),
+        &at("lab/pkg/probe/a.rs"),
+        &delivery.seen(),
+    );
+    assert_eq!(delivery.answer("first", first).len(), 1);
+    delivery.complete_wave(&BTreeSet::new());
+
+    let second = nested_rules(
+        scope(dir.path()),
+        &at("lab/pkg/probe/a.rs"),
+        &at("lab/pkg/probe/a.rs"),
+        &delivery.seen(),
+    );
+    let selected = delivery.answer("second", second);
+    assert_eq!(selected.len(), 1);
+    assert_eq!(selected[0].room, at("lab/pkg/probe"));
+    assert_eq!(selected[0].text, "probe rules\n");
+    assert_eq!(selected[0].dropped, 0);
 }
 
 #[test]
@@ -178,6 +220,7 @@ fn non_utf8_after_the_kept_prefix_skips_the_rule_instead_of_leaking_it() {
             scope(dir.path()),
             &at("lab/pkg/probe/a.rs"),
             &at("lab/pkg/probe/a.rs"),
+            &BTreeSet::new(),
         )
         .into_iter()
         .all(|candidate| candidate.room != at("lab/pkg/probe"))

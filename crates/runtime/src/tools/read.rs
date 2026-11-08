@@ -35,6 +35,7 @@
 //! line (`crates/runtime/spec/Tools.lean` §8-14-1, D119). The answer
 //! keeps 0-based indexes, which the renderer draws as line numbers.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -70,8 +71,8 @@ pub struct RuleCandidate {
 }
 
 impl RuleCandidate {
-    /// The candidate's JSON shape. A zero `dropped` is omitted, so the
-    /// final delivery carries only `room` and `text`.
+    /// The final delivery's JSON shape. `dropped` is internal budgeting
+    /// evidence; its user-visible consequence is already in `text`.
     #[must_use]
     pub fn into_json(self) -> Value {
         let mut rule = Map::new();
@@ -80,9 +81,6 @@ impl RuleCandidate {
             Value::String(self.room.as_str().to_owned()),
         );
         rule.insert("text".to_owned(), Value::String(self.text));
-        if self.dropped != 0 {
-            rule.insert("dropped".to_owned(), self.dropped.into());
-        }
         Value::Object(rule)
     }
 
@@ -105,9 +103,45 @@ impl RuleCandidate {
     }
 }
 
-/// A stateless, read-only source of candidates. Delivery state belongs
-/// to accounting's ordered settlement, never to this closure.
-pub type RuleCandidates = Arc<dyn Fn(&Address, &Address) -> Vec<RuleCandidate> + Send + Sync>;
+/// The ordinary-path facts accounting needs to discover nested rules.
+/// This context is removed before the answer enters the ledger.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuleContext {
+    pub admitted: Address,
+    pub landed: Address,
+}
+
+impl RuleContext {
+    fn into_json(self) -> Value {
+        let mut context = Map::new();
+        context.insert(
+            "admitted".to_owned(),
+            Value::String(self.admitted.as_str().to_owned()),
+        );
+        context.insert(
+            "landed".to_owned(),
+            Value::String(self.landed.as_str().to_owned()),
+        );
+        Value::Object(context)
+    }
+
+    /// Reads the internal context; malformed input offers no candidates.
+    #[must_use]
+    pub fn from_json(value: &Value) -> Option<RuleContext> {
+        let admitted = value.get("admitted")?.as_str()?;
+        let landed = value.get("landed")?.as_str()?;
+        match (Address::parse(admitted), Address::parse(landed)) {
+            (Ok(admitted), Ok(landed)) => Some(RuleContext { admitted, landed }),
+            _ => None,
+        }
+    }
+}
+
+/// A stateless source of candidates. `skip` is the ordered settlement's
+/// confirmed and pending rooms; discovery skips their files before it
+/// spends any read or retained-text budget. The closure marks nothing.
+pub type RuleCandidates =
+    Arc<dyn Fn(&Address, &Address, &BTreeSet<Address>) -> Vec<RuleCandidate> + Send + Sync>;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -307,6 +341,9 @@ impl ReadTool {
     /// schema, the reading, the refusal and the ledger's readers.
     pub const FILE_PATH: &'static str = "file_path";
 
+    /// Internal ordinary-path context, removed by ordered accounting.
+    pub const RULE_CONTEXT: &'static str = "rule_context";
+
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
@@ -450,9 +487,9 @@ impl ReadTool {
         }
     }
 
-    /// Supplies the nested conventions a successful ordinary read may
-    /// carry. No delivery is marked here: calls can be speculative and
-    /// concurrent, while only accounting sees their ordered admission.
+    /// Enables nested-rule context on a successful ordinary read. The
+    /// closure itself runs in accounting's ordered settlement, never in
+    /// this concurrent invocation; no delivery is marked here.
     #[must_use]
     pub fn ruling(self, candidates: RuleCandidates) -> ReadTool {
         ReadTool {
@@ -553,20 +590,12 @@ impl Tool for ReadTool {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
         let taken = repeated.is_none().then(|| interval.cut(&text));
-        let candidates = opened.map_or_else(Vec::new, |(admitted, landed)| {
-            self.rules
-                .as_ref()
-                .map_or_else(Vec::new, |candidates| candidates(&admitted, &landed))
-        });
-        if !candidates.is_empty() {
+        if self.rules.is_some()
+            && let Some((admitted, landed)) = opened
+        {
             out.insert(
-                "rules".to_owned(),
-                Value::Array(
-                    candidates
-                        .into_iter()
-                        .map(RuleCandidate::into_json)
-                        .collect(),
-                ),
+                Self::RULE_CONTEXT.to_owned(),
+                RuleContext { admitted, landed }.into_json(),
             );
         }
         // A whole answer is a look, and so is a window the caller asked

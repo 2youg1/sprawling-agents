@@ -18,7 +18,9 @@ use kernel::{
     AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
 };
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
-use runtime::{Admitted, Catalog, ConcurrentInvoke, ReadShown, ToolTool};
+use runtime::{
+    Admitted, Catalog, ConcurrentInvoke, ReadShown, RuleCandidates, RuleContext, ToolTool,
+};
 
 use super::Sieving;
 use crate::prompt_chain::RuleDelivery;
@@ -95,6 +97,7 @@ pub(super) struct Placing<'f> {
     catalog: Arc<Mutex<Catalog>>,
     shown: ReadShown,
     rules: RuleDelivery,
+    rule_candidates: Option<RuleCandidates>,
 }
 
 impl<'f> Placing<'f> {
@@ -114,6 +117,7 @@ impl<'f> Placing<'f> {
             catalog: Arc::new(Mutex::new(Catalog::new())),
             shown: ReadShown::default(),
             rules: RuleDelivery::default(),
+            rule_candidates: None,
         }
     }
 
@@ -123,6 +127,14 @@ impl<'f> Placing<'f> {
     #[must_use]
     pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
         self.catalog = catalog;
+        self
+    }
+
+    /// Supplies the same stateless candidate source the read tool was
+    /// built with; it runs here, in call order, rather than in `invoke`.
+    #[must_use]
+    pub(super) fn ruling(mut self, candidates: RuleCandidates) -> Self {
+        self.rule_candidates = Some(candidates);
         self
     }
 
@@ -181,17 +193,17 @@ impl<'f> Placing<'f> {
         if call.name.as_str() != runtime::ReadTool::NAME {
             return Ok(outcome);
         }
-        let candidates = outcome
-            .result
-            .as_map()
-            .get("rules")
-            .and_then(serde_json::Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(runtime::RuleCandidate::from_json)
-            .collect();
-        let selected = self.rules.answer(&call.id, candidates);
         let mut result = outcome.result.as_map().clone();
+        let context = result
+            .remove(runtime::ReadTool::RULE_CONTEXT)
+            .and_then(|value| RuleContext::from_json(&value));
+        let candidates = match (context, self.rule_candidates.as_ref()) {
+            (Some(context), Some(candidates)) => {
+                candidates(&context.admitted, &context.landed, &self.rules.seen())
+            }
+            _ => Vec::new(),
+        };
+        let selected = self.rules.answer(&call.id, candidates);
         if selected.is_empty() {
             result.remove("rules");
         } else {

@@ -134,8 +134,8 @@ impl Laying {
                 building: site.building.addr().clone(),
                 room: addr.clone(),
             };
-            Arc::new(move |admitted, landed| {
-                crate::prompt_chain::nested_rules(scope.clone(), admitted, landed)
+            Arc::new(move |admitted, landed, skip| {
+                crate::prompt_chain::nested_rules(scope.clone(), admitted, landed, skip)
             })
         };
         let read_clock = Arc::clone(&self.clock);
@@ -145,7 +145,7 @@ impl Laying {
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
-        .ruling(candidates)
+        .ruling(candidates.clone())
         .recalling(shown.clone())
         .clocking(Arc::new(move || read_clock.now()))
         .noting(stamps);
@@ -248,6 +248,7 @@ impl Laying {
             succession,
             context,
             shown,
+            rule_candidates: candidates,
         })
     }
 

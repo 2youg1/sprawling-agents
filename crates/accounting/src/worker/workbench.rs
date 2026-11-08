@@ -313,6 +313,8 @@ pub(super) struct Workbench {
     pub(super) context: runtime::ContextReading,
     /// Complete read intervals this run has confirmed into its window.
     shown: runtime::ReadShown,
+    /// The stateless nested-rule source shared by `read` and `Placing`.
+    rule_candidates: runtime::RuleCandidates,
 }
 
 /// Who this run can reach: the residents beside it, and the sub-agents
@@ -354,6 +356,10 @@ impl Workbench {
     /// The table shared by `read` and the ordered wave settlement.
     pub(super) fn shown(&self) -> runtime::ReadShown {
         self.shown.clone()
+    }
+
+    pub(super) fn rule_candidates(&self) -> runtime::RuleCandidates {
+        self.rule_candidates.clone()
     }
 
     /// Hands the bench to the drive, once.

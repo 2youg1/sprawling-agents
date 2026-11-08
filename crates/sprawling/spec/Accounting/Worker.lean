@@ -559,6 +559,7 @@ pub(super) struct Placing<'f> { /* bench、sieving、run、next、ran、shown、
 impl<'f> Placing<'f> {
     pub(super) fn new(bench: ToolBench, sieving: Sieving, run: RunId, checkpointing: &'f Checkpointing) -> Placing<'f>;
     pub(super) fn reading(self, shown: runtime::ReadShown, delivered: BTreeSet<Address>) -> Self;
+    pub(super) fn ruling(self, candidates: runtime::RuleCandidates) -> Self; // 同一候选源在有序 Placing 运行
     pub(super) fn ran(&self) -> (u32, u32);   // 本跑命令的 (通过, 失败)
 }
 impl ConcurrentInvoke for Placing<'_> { /* admit：定位次、派生键、bench.clear；tool：bench.tool_for；account：read 先定稿再 bench.account，随后记 checkpoint 与命令计数、exec 结果过筛；complete_wave：压缩后确认 shown 与规则 */ }

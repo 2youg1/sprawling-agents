@@ -90,4 +90,28 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
         );
     }
     assert!(bodies[2].to_string().contains("pub fn b()"));
+
+    let reads: Vec<serde_json::Value> =
+        storage::read_raw_lines_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap()
+            .iter()
+            .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+            .filter(|line| line["kind"] == "tool_result" && line["data"]["name"] == "read")
+            .collect();
+    assert_eq!(reads.len(), 2, "{reads:?}");
+    for read in &reads {
+        assert_eq!(read["data"]["result"].get("rule_context"), None);
+    }
+    let rules = reads[0]["data"]["result"]["rules"].as_array().unwrap();
+    assert_eq!(rules.len(), 2);
+    for rule in rules {
+        let keys: Vec<&str> = rule
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(keys, ["room", "text"]);
+    }
+    assert_eq!(reads[1]["data"]["result"].get("rules"), None);
 }

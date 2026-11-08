@@ -156,6 +156,24 @@ fn a_real_agent_reuses_a_read_but_receives_the_full_text_after_its_edit() {
             1,
         )
     );
+    let reads: Vec<serde_json::Value> =
+        storage::read_raw_lines_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap()
+            .iter()
+            .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+            .filter(|line| line["kind"] == "tool_result" && line["data"]["name"] == "read")
+            .collect();
+    assert_eq!(reads.len(), 3, "{reads:?}");
+    let stub = &reads[1]["data"];
+    assert_eq!(stub["rendered"], "v4");
+    assert_eq!(stub["result"]["unchanged"], true);
+    assert_eq!(stub["result"]["offset"], 0);
+    assert_eq!(stub["result"]["lines"], 300);
+    assert_eq!(stub["result"]["total_lines"], 300);
+    for absent in ["text", "bytes", "next_offset", "rule_context"] {
+        assert_eq!(stub["result"].get(absent), None, "{absent}: {stub}");
+    }
+    assert_eq!(reads[2]["data"]["result"].get("unchanged"), None);
 }
 
 #[test]

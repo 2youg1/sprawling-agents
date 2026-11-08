@@ -142,7 +142,8 @@ pub fn admit_external(package: &Path,
 
 ```rust
 pub struct RuleCandidate { pub room: Address, pub text: String, pub dropped: u64 }
-pub type RuleCandidates = Arc<dyn Fn(&Address, &Address) -> Vec<RuleCandidate> + Send + Sync>;
+pub struct RuleContext { pub admitted: Address, pub landed: Address }
+pub type RuleCandidates = Arc<dyn Fn(&Address, &Address, &BTreeSet<Address>) -> Vec<RuleCandidate> + Send + Sync>;
 pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 impl ReadTool {
     pub fn ruling(self, candidates: RuleCandidates) -> ReadTool;
@@ -152,8 +153,8 @@ impl ReadTool {
 ```
 
 - **只有普通城市路径成功读取才取候选。** locator、catalog、skill、目录与失败读取不取。候选闭包只读，不标记递送；参数是受准地址与落点地址，两者都在 home building 内、受准文件目录是 run 房间严格后代时才非空。规则链按受准地址，覆盖 run 房间之下到文件目录的各级 `AGENTS.md`，顺序由 `city::room_agents_paths` 给出。邻楼和跨楼链接不生成附注。
-- **候选不是窗口证据。** runtime 只把 `{room, text, dropped}` 带上结果；accounting 的 `Placing` 在串行 `account` 中过滤已递送与同波 pending，定稿后先写进 `ToolBench.seen`，再交给回合渲染。最终 `rules` 只含 `{room, text}`；没有选择结果时整个字段缺席。`Duplicate` 因此仍逐字回答第一次定稿的结果，符合 §8-35。
-- **预算与读取边界**：全部附注文本不超过 `INTERVAL_CAP_BYTES`。首个超限文件在 UTF-8 边界切下并带 `[truncated: N bytes]`，标记预留最坏宽度；切下的文件算递送，后续文件推迟到下一次 read。每个候选文件经与冻结相同的读界读取，但 Absent、Withheld、其他错误与任何位置的非 UTF-8 都只跳过该文件，不让合法 read 失败。嵌套读取有界：最多保留 64 KiB 正文，继续读到 EOF 只验证 UTF-8 并累计省略量；候选正文总量同界，不把项目里的大规则文件整份读进内存。
+- **候选不是窗口证据。** runtime 在装有候选闭包时只把内部 `rule_context: {admitted, landed}` 带上结果，不在并发 `invoke` 里读取规则正文；accounting 的 `Placing` 在串行 `account` 中取出并删除该字段，把 confirmed 与同波 pending 的集合交给候选闭包，让它在读取前就跳过已递送房间。定稿后先写进 `ToolBench.seen`，再交给回合渲染。最终 `rules` 只含 `{room, text}`；没有选择结果时整个字段缺席。`Duplicate` 因此仍逐字回答第一次定稿的结果，符合 §8-35。
+- **预算与读取边界**：全部附注文本不超过 `INTERVAL_CAP_BYTES`。首个超限文件在 UTF-8 边界切下并带 `[truncated: N bytes]`，标记预留最坏宽度；切下的文件算递送，后续文件推迟到下一次 read；下一次发现会先跳过该房间，所以后续规则必定能被读到，不会反复停在同一个超限文件。每个候选文件经与冻结相同的读界读取，但 Absent、Withheld、其他错误与任何位置的非 UTF-8 都只跳过该文件，不让合法 read 失败。嵌套读取有界：最多保留 64 KiB 正文，继续读到 EOF 只验证 UTF-8 并累计省略量；候选正文总量同界，不把项目里的大规则文件整份读进内存。
 - **递送状态**：confirmed 与同波 pending 共同去重；`complete_wave` 只把未被 exchange 裁切的 pending 并入 confirmed，被裁切的规则可在后续 read 重新递送。fork 从与继承消息相同的已提交波次继承 confirmed 集合（§8-2）， successor、delegate 子 run 从空集合开始。
 
 #### 8-29-8 未变文件只追加 unchanged 桩（`tools::shown`，形状 1 判定）
@@ -183,11 +184,11 @@ impl ReadShown {
 
 /-! D127 未变桩以完整窗口证据为准，规则递送与 read 去重共用压缩确认
 
-**决定**：`ReadTool` 只产生文件事实与私有 claim，`Placing` 在有序结算点定稿规则和 admit claim，`Exchange::compact` 报告裁切 id，run 在折入窗口前确认。规则最终载荷在 `IdemKey` 缓存之前定稿；unchanged claim 不进载荷。racy 文件按已读文本的 BLAKE3 比较，其他平台不发桩。
+**决定**：`ReadTool` 只产生文件事实、私有 claim 与普通路径的 `RuleContext`；`Placing` 在有序结算点先以 confirmed＋pending 过滤规则房间、再读取候选并定稿，随后 admit claim。`Exchange::compact` 报告裁切 id，run 在折入窗口前确认。规则最终载荷在 `IdemKey` 缓存之前定稿；unchanged claim 不进载荷。racy 文件按已读文本的 BLAKE3 比较，其他平台不发桩。
 
 **理由**：`invoke` 能并发和推测执行，账本存的是结构化答案，模型真正看到的是渲染后再经 exchange 压缩的文本。提前标记会把没放行的读或被裁掉的附注当成已交付；复用 `seen` 又会在 edit 后把新戳误当窗口里的旧内容。共用压缩 id 让规则继承与 unchanged 都遵守同一个「模型确实收到」定义。
 
-**被否**：①只比较戳直接回桩——同长度、同 mtime 的原地改写会静默陈旧；②每次 read 都算哈希——为可能永不重复的文件付固定成本；③把窗口里旧结果改写成桩——破坏已发送前缀与缓存；④复用 `seen` 或 `IdemKey`——它们分别服务 edit 准入与同一次调用重放，不证明完整内容进入窗口；⑤在工具描述里劝模型别重读——既不强制也不省 token。
+**被否**：①只比较戳直接回桩——同长度、同 mtime 的原地改写会静默陈旧；②每次 read 都算哈希——为可能永不重复的文件付固定成本；③把窗口里旧结果改写成桩——破坏已发送前缀与缓存；④复用 `seen` 或 `IdemKey`——它们分别服务 edit 准入与同一次调用重放，不证明完整内容进入窗口；⑤在工具描述里劝模型别重读——既不强制也不省 token；⑥在 `invoke` 里预读全部候选——它既做推测 IO，又让首个超限房间在每轮候选发现中反复耗尽预算，后续规则永远到不了。
 
 **重开参数**：网络卷必须提供同等保证时，改为每次内容比较或引入可验证的内容版本；快路径测量不能覆盖状态时，先保留全文路径。
 -/
