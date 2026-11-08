@@ -68,7 +68,7 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
     ExecSetup {
         workdir: workdir.to_path_buf(),
         mounts: Vec::new(),
-        python_wasm: python,
+        python_wasm: python.map(PythonGuest::at),
         shell: shell.map_or(Shell::Absent, |program| Shell::Found {
             program,
             interpreter: kernel::Interpreter::System,

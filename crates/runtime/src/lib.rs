@@ -43,7 +43,7 @@ pub use tools::StatusTool;
 pub use tools::ToolTool;
 pub use tools::parse_arm;
 pub use tools::{EditDesk, EditTool, PathLocks, ReadStamps};
-pub use tools::{ExecSetup, ExecTool};
+pub use tools::{ExecSetup, ExecTool, PythonGuest};
 pub use tools::{FailureClass, Shell, ShellCount, ShellTally};
 pub use tools::{SucceedTool, Succession, SuccessionDesk};
 

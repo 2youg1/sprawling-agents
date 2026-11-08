@@ -28,8 +28,12 @@ mod scenarios;
 fn main() -> std::process::ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     match arguments.as_slice() {
-        [command, guest, snapshot] if command == python::COLD_COMMAND => {
-            return finish(python::cold_child(guest, Path::new(snapshot)));
+        [command, guest, snapshot, stdlib] if command == python::COLD_COMMAND => {
+            return finish(python::cold_child(
+                guest,
+                Path::new(snapshot),
+                Path::new(stdlib),
+            ));
         }
         [command] if command == "python" => {
             return finish(python::measure().and_then(present_python));
