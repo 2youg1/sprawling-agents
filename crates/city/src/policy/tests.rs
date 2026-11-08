@@ -267,6 +267,33 @@ fn the_form_a_building_is_laid_out_with_is_one_this_reader_accepts() {
     }
 }
 
+/// A User's direct edit is read by the same door as a page's edit; only
+/// a resident's tool write is outside the write domain.
+#[test]
+fn a_user_can_hand_edit_the_rules_in_the_buildings_reserved_subtree() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = addr("lab");
+    crate::building::create(dir.path(), &lab, crate::BuildingTemplate::Minimal).unwrap();
+    let path = rules_path(dir.path(), &lab);
+    let edited = std::fs::read_to_string(&path)
+        .unwrap()
+        .replace("review = false", "review = true");
+    std::fs::write(&path, edited).unwrap();
+
+    assert!(load(dir.path(), &lab).unwrap().review());
+}
+
+/// A malformed User edit is a configuration error with a usable repair,
+/// not the resident permission refusal whose recovery this used to share.
+#[test]
+fn a_malformed_user_edit_is_not_reported_as_a_resident_permission_refusal() {
+    let err = evaluate(&addr("lab"), "confidential = false\nwrite = [").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.recovery().contains("lab/.sprawling/RULES.toml"));
+    assert!(err.recovery().contains("User can edit"));
+    assert!(!err.recovery().contains("resident cannot write"));
+}
+
 #[test]
 fn a_confidential_building_locks_the_model_pool_and_its_own_subtree() {
     let rules = evaluate(
