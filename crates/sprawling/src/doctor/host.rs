@@ -31,6 +31,7 @@ use super::{Absence, Fault, Machine, PATIENCE, Platform, Presence, ThisMachine, 
 /// selects on it.
 pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
 
+
 /// The machine-level directory this city keeps components in, or
 /// nothing when this environment states no home directory.
 ///
@@ -148,6 +149,24 @@ pub(crate) fn chromedriver() -> Presence {
 /// component directory.
 pub(crate) fn python_wasm() -> Presence {
     look(PYTHON_WASI)
+}
+
+/// Whether the component came through the pinned install or the developer override.
+#[derive(Clone, Copy)]
+pub(super) enum PythonGuestSource {
+    Pinned,
+    Override,
+}
+
+/// Applies the selected guest's provenance rule to a presence answer.
+pub(super) fn judge_python_guest(
+    found: Presence,
+    _source: PythonGuestSource,
+    _expected: &str,
+    _checked: &std::sync::OnceLock<Result<(), Fault>>,
+) -> Presence {
+    drop(found);
+    Presence::Absent(Absence::NotOnSearchPath)
 }
 
 /// The interpreter this platform calls a shell.

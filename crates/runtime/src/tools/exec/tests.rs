@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
+#[cfg(feature = "wasm")]
+use crate::WasmtimeSandbox;
 use crate::sandbox::{EchoSandbox, FaultSandbox};
 use kernel::Address;
 
@@ -280,6 +282,30 @@ fn a_call_names_a_command_or_a_script_and_nothing_else() {
             )),
         ]
     );
+}
+
+#[cfg(feature = "wasm")]
+#[test]
+fn the_python_guest_imports_the_advertised_stdlib() {
+    let Some(wasm) = std::env::var_os("SPRAWLING_PYTHON_WASM").map(PathBuf::from) else {
+        eprintln!("skip: SPRAWLING_PYTHON_WASM does not name a real CPython-WASI guest");
+        return;
+    };
+    let chamber = tempfile::tempdir().unwrap();
+    let setup = ExecSetup {
+        fuel: Fuel(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
+        ..setup(chamber.path(), Some(wasm), None)
+    };
+    let sandbox = WasmtimeSandbox::new().unwrap();
+    let tool = ExecTool::new(setup, Box::new(sandbox), patient()).unwrap();
+    let outcome = tool
+        .invoke(&call(python(
+            "import collections, difflib, itertools, re; print('stdlib-ok')",
+        )))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert_eq!(result["exit_code"], 0, "{result}");
+    assert_eq!(result["stdout"], "stdlib-ok\n", "{result}");
 }
 
 #[test]

@@ -58,6 +58,11 @@ pub(crate) enum Fault {
     /// version call it started. The sentence it carries is the whole
     /// explanation, and `describe` prints it unchanged.
     Unreadable(String),
+    /// The installed guest is not the content this build registered.
+    DigestMismatch {
+        expected: kernel::B3Hash,
+        found: kernel::B3Hash,
+    },
 }
 
 /// Which kind of not being here.
@@ -165,6 +170,9 @@ impl Fault {
             Fault::WillNotStart(err) => format!("will not start: {err}"),
             Fault::HalfWritten => "half-written; delete it and install again".to_owned(),
             Fault::Unreadable(err) => err.clone(),
+            Fault::DigestMismatch { expected, found } => {
+                format!("pinned guest digest mismatch: expected {expected}, found {found}")
+            }
         }
     }
 }

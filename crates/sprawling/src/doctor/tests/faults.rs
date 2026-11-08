@@ -16,10 +16,94 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::doctor::host::{PythonGuestSource, judge_python_guest};
 use crate::doctor::probe::{ask_version, component_at, on_search_path};
 use crate::doctor::{Absence, Fault, Presence, Version};
 
 const VARIABLE: &str = "SPRAWLING_TEST_COMPONENT";
+
+#[test]
+fn a_guest_with_the_wrong_digest_is_broken_not_absent() {
+    let dir = tempfile::tempdir().unwrap();
+    let at = dir.path().join("python.wasm");
+    std::fs::write(&at, b"wrong guest").unwrap();
+    let expected = kernel::B3Hash::digest(b"registered guest");
+    let found = Presence::Present {
+        at,
+        version: Version::Silent,
+    };
+    let answered = judge_python_guest(
+        found,
+        PythonGuestSource::Pinned,
+        &expected.to_string(),
+        &std::sync::OnceLock::new(),
+    );
+    let expected_fault = Fault::DigestMismatch {
+        expected,
+        found: kernel::B3Hash::digest(b"wrong guest"),
+    };
+    assert!(
+        matches!(
+            &answered,
+            Presence::Broken { fault, .. } if fault == &expected_fault
+        ),
+        "{answered:?}"
+    );
+    let rendered = answered.describe();
+    assert!(rendered.contains(&expected.to_string()), "{rendered}");
+    assert!(
+        rendered.contains(&kernel::B3Hash::digest(b"wrong guest").to_string()),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn a_pinned_guest_is_present() {
+    let dir = tempfile::tempdir().unwrap();
+    let at = dir.path().join("python.wasm");
+    std::fs::write(&at, b"registered guest").unwrap();
+    let expected = kernel::B3Hash::digest(b"registered guest").to_string();
+    let found = Presence::Present {
+        at: at.clone(),
+        version: Version::Silent,
+    };
+    let answered = judge_python_guest(
+        found,
+        PythonGuestSource::Pinned,
+        &expected,
+        &std::sync::OnceLock::new(),
+    );
+    assert_eq!(
+        answered,
+        Presence::Present {
+            at,
+            version: Version::Silent,
+        }
+    );
+}
+
+#[test]
+fn an_override_is_reported_unpinned() {
+    let dir = tempfile::tempdir().unwrap();
+    let at = dir.path().join("other.wasm");
+    let found = Presence::Present {
+        at: at.clone(),
+        version: Version::Silent,
+    };
+    let answered = judge_python_guest(
+        found,
+        PythonGuestSource::Override,
+        "not a digest, because an override never reads it",
+        &std::sync::OnceLock::new(),
+    );
+    assert_eq!(
+        answered,
+        Presence::Present {
+            at,
+            version: Version::Said("unpinned override".to_owned()),
+        }
+    );
+}
 
 /// A file on the search path that is not a program is found there and
 /// reported as broken with the operating system's own words, which is

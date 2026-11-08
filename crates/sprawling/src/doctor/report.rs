@@ -300,6 +300,10 @@ fn state(presence: &Presence) -> wire::DoctorState {
                 Fault::WillNotStart(said) => wire::DoctorFault::WillNotStart { said: said.clone() },
                 Fault::HalfWritten => wire::DoctorFault::HalfWritten,
                 Fault::Unreadable(said) => wire::DoctorFault::Unreadable { said: said.clone() },
+                // The wire keeps its existing closed fault set; the text carries both digests.
+                Fault::DigestMismatch { .. } => wire::DoctorFault::Unreadable {
+                    said: fault.describe(),
+                },
             },
         },
         Presence::Absent(absence) => wire::DoctorState::Absent {
