@@ -255,8 +255,12 @@ fn importing_a_folder_that_already_has_rules_copies_nothing() {
     .unwrap_err();
 
     assert_eq!(err.code(), &AxCode::InvalidArgs);
-    assert!(
-        err.subject().contains(&source.path().display().to_string()),
+    // `canonicalize` on Windows spells the same directory with a `\\?\`
+    // prefix and may expand a short temp name, so the text tempfile
+    // handed back is not a substring of the path the refusal names.
+    assert_eq!(
+        std::fs::canonicalize(std::path::Path::new(err.subject())).unwrap(),
+        std::fs::canonicalize(&rules).unwrap(),
         "the refusal names the source rules file, not the empty target: {err}"
     );
     assert!(
