@@ -53,14 +53,14 @@ describe("the raise page", () => {
 
   test("the import box carries an absolute path, keeps an empty box out of the frame, and refuses a relative one", () => {
     expect(
-      ["", "  ", "C:\\work\\lab", "/home/ada/lab", "\\\\host\\share\\lab", "lab", "~/lab"].map(
+      ["", "  ", "C:\\work\\lab", "/work/lab", "\\\\host\\share\\lab", "lab", "~/lab"].map(
         (written) => [sourceOf(written), sourceRefusal(written)],
       ),
     ).toEqual([
       [null, null],
       [null, null],
       ["C:\\work\\lab", null],
-      ["/home/ada/lab", null],
+      ["/work/lab", null],
       ["\\\\host\\share\\lab", null],
       ["lab", "raise_source_relative"],
       ["~/lab", "raise_source_relative"],

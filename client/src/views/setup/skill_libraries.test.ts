@@ -14,14 +14,14 @@ import { alreadyMounted, offered, withLibrary, withoutLibrary } from "./skill_li
 describe("a skill library a person points at", () => {
   test("an absolute path on either platform is offered, and a home-relative one is the city's to expand", () => {
     expect(
-      ["", "  ", "C:\\work\\skills", "/home/ada/skills", "~/skills", "\\\\host\\share\\skills"].map(
+      ["", "  ", "C:\\work\\skills", "/work/skills", "~/skills", "\\\\host\\share\\skills"].map(
         offered,
       ),
     ).toEqual([
       { kind: "blank" },
       { kind: "blank" },
       { kind: "path", path: "C:\\work\\skills" },
-      { kind: "path", path: "/home/ada/skills" },
+      { kind: "path", path: "/work/skills" },
       { kind: "path", path: "~/skills" },
       { kind: "path", path: "\\\\host\\share\\skills" },
     ]);

@@ -128,7 +128,7 @@ reading_room = ["tutor", "blast-radius"]
 shelves = ["~/.claude/skills"]
 ```
 
-**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**本机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库在 [`../crates/city/skills/`](../crates/city/skills/) 下附带九件 skill；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
+**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库在 [`../crates/city/skills/`](../crates/city/skills/) 下附带九件 skill；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
 
 **MCP**（Model Context Protocol）是一栋楼通往外部应用——邮件、GitHub、Figma、文档转换器——的路，经由一个工具服务。一个 server 是楼的 `CONFIG.toml` 里的一条：电脑上的程序写 `command`，托管服务写 `url`；**MCP** 页替你写同样的条目。保密楼一个也不起。
 
@@ -385,7 +385,7 @@ Ctrl+C 和 Ctrl+V 归终端：Ctrl+C 复制选中的文字，城市收到 Ctrl+C
 
 Mayor 会先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`，也读 hall 自己的。它用 `plan` 工具把城市的计划写进 `<city>/hall/Roadmap.md`，一行一条工作线，再用同一个工具把各自那一份交给各栋楼。没有现成的楼该接这件事时，它请你盖一栋，或者收编你指给它的文件夹——城市长成什么样由你决定；一个项目它从不要两栋楼。你把这栋楼的那一份设为它的常设目标之后，城市就让那栋楼一直做到这一份做完。Mayor 回报之前，先把它决定了什么记进 `<city>/hall/Memo.md`。
 
-**也可以绕过 Mayor。** `/raise lab` 按 `minimal` 模板盖一栋叫 `lab` 的楼（`/raise vault confidential` 盖一栋保密楼）；从命令面板或用 `/room <地址>` 打开它的某个房间，你的话就直接送到那里。不带文字的 `/raise` 打开建楼页：在那里选模板、查看并修改它准备写入的 `RULES.toml`，既能盖新楼，也能把城里已有的目录接管为楼而不覆盖里面的文件，还能填一个本机绝对路径，把那个文件夹复制进来。
+**也可以绕过 Mayor。** `/raise lab` 按 `minimal` 模板盖一栋叫 `lab` 的楼（`/raise vault confidential` 盖一栋保密楼）；从命令面板或用 `/room <地址>` 打开它的某个房间，你的话就直接送到那里。不带文字的 `/raise` 打开建楼页：在那里选模板、查看并修改它准备写入的 `RULES.toml`，既能盖新楼，也能把城里已有的目录接管为楼而不覆盖里面的文件，还能填一个主机绝对路径，把那个文件夹复制进来。
 
 同一个命令面板里的 **带着这段对话去…** 会把当前对话分叉到另一个能接收它的房间，不能接收的房间旁边写明原因——不必靠复制粘贴搬走上下文。
 

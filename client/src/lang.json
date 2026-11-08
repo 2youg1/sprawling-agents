@@ -7869,7 +7869,7 @@
   },
   "skill_mount_title": {
     "en": "folders from this computer",
-    "zh": "本机的 skill 文件夹"
+    "zh": "主机的 skill 文件夹"
   },
   "skill_mount_help": {
     "en": "the whole folder is mounted read-only: every folder inside it holding a SKILL.md becomes a skill, and nothing is copied",
@@ -7889,7 +7889,7 @@
   },
   "skill_mount_none": {
     "en": "no folder from this computer is mounted yet; the skills above all live in the city",
-    "zh": "还没有挂载本机的文件夹；上面的 skill 都住在城里"
+    "zh": "还没有挂载主机的文件夹；上面的 skill 都住在城里"
   },
   "skill_mount_taken": {
     "en": "this folder is already mounted",
@@ -7897,7 +7897,7 @@
   },
   "skill_mount_needs_path": {
     "en": "type a folder on this machine first",
-    "zh": "先写下本机的一个文件夹"
+    "zh": "先写下主机的一个文件夹"
   },
   "skill_mount_remove": {
     "en": "unmount",
@@ -8033,15 +8033,15 @@
   },
   "raise_source": {
     "en": "import from this computer",
-    "zh": "从本机导入"
+    "zh": "从主机导入"
   },
   "raise_source_label": {
     "en": "absolute path on the machine running the city",
     "zh": "运行城市那台机器上的绝对路径"
   },
   "raise_source_placeholder": {
-    "en": "C:\\work\\my-project or /home/you/my-project",
-    "zh": "C:\\work\\my-project 或 /home/you/my-project"
+    "en": "C:\\work\\my-project or /work/my-project",
+    "zh": "C:\\work\\my-project 或 /work/my-project"
   },
   "raise_source_help": {
     "en": "leave it empty to create a building or adopt a folder already in the city; a folder named here is copied in, and the original stays where it is",
