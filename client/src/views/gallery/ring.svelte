@@ -155,7 +155,7 @@
 </Case>
 
 <Case label="context report · ring picks a bucket; detail unfolds under it" width={360}>
-  <div class="h-[34rem] overflow-hidden rounded-panel border border-edge-panel bg-page">
+  <div class="h-[42rem] overflow-hidden rounded-panel border border-edge-panel bg-page">
     <Report look={report} />
   </div>
 </Case>

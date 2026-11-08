@@ -80,7 +80,7 @@
   }
 </script>
 
-<article class="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-wide overflow-auto px-wide py-wide">
+<article class="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] content-start gap-wide overflow-auto px-wide py-wide">
   <header class="grid gap-snug">
     <p class="text-caption text-text-faint">{look.title}</p>
     <p class="text-figure font-figure figure text-text">
@@ -99,6 +99,8 @@
       <div class="relative size-[12rem]">
         <!-- Pointer-only hit target: not a control, so a press cannot
         park focus here; keyboard stays on the legend chips. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="absolute inset-0 z-1 cursor-pointer rounded-pill" onclick={hit}></div>
         <svg class="pointer-events-none size-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
           <circle
@@ -174,7 +176,7 @@
     </div>
 
     {#if picked !== null}
-      <section class="grid min-h-0 content-start gap-snug border-t border-edge-quiet pt-wide">
+      <section class="grid content-start gap-snug border-t border-edge-quiet pt-wide">
         <header class="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-snug">
           <h2 class="truncate text-note text-text">{picked.said}</h2>
           <p class="figure text-note text-text-quiet tabular-nums">
