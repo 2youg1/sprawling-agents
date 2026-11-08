@@ -7,7 +7,7 @@
 name: nightly release
 on:
   schedule:
-    - cron: "41 5 * * *"
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       publish:
