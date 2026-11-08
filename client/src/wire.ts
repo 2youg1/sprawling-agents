@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 77 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "52e31a20c358090e18deed1e04fc3e32f408d400501cab5ceb49ef9361e2c628" as const;
+export const WIRE_HASH = "93f13fb04e54f24f4954be894c0e66111a22ba8eb685f68a5cee478db63a4956" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -4114,6 +4114,37 @@ export const PrivacyAnswer = Schema.Struct({
 export type PrivacyAnswer = typeof PrivacyAnswer.Type;
 
 /**
+ * One part of a request's cache shape, as a record states it: how many
+ * bytes the part carries, and their hash.
+ * 
+ * Both figures because two questions read this row. A prompt cache
+ * compares the hash; a person asking why a request is expensive needs
+ * the bytes, which no hash can answer for.
+ */
+export const ShapePart = Schema.Struct({
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  hash: Schema.String,
+}).annotate({ identifier: "ShapePart" });
+export type ShapePart = typeof ShapePart.Type;
+
+/**
+ * The two growing halves of one request's cache shape, as the run's
+ * latest `prompt_shape_compared` recorded them.
+ * 
+ * The four frozen segments stay on [`PrefixAnswer`]: this answer names
+ * only what that record adds — the tool table and the conversation —
+ * so a context report can weigh the whole payload without a second
+ * home for the segments.
+ */
+export const PromptShapeAnswer = Schema.Struct({
+  conversation: ShapePart,
+  run: RunId,
+  tools: ShapePart,
+  upper_bound: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}).annotate({ identifier: "PromptShapeAnswer" });
+export type PromptShapeAnswer = typeof PromptShapeAnswer.Type;
+
+/**
  * The role one sentence plays on a card.
  */
 export const SliceKind = Schema.Union([
@@ -5261,6 +5292,9 @@ export const Answer = Schema.Union([
     prefix: PrefixAnswer,
   }),
   Schema.Struct({
+    prompt_shape: PromptShapeAnswer,
+  }),
+  Schema.Struct({
     content: ContentAnswer,
   }),
   Schema.Struct({
@@ -5559,6 +5593,11 @@ export const Query = Schema.Union([
   Schema.Literal("doctor"),
   Schema.Struct({
     prefix: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    prompt_shape: Schema.Struct({
       run: RunId,
     }),
   }),

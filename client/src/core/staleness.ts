@@ -140,6 +140,10 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "bytes":
     case "export":
       return "none";
+    // The growing halves of a request move every turn that compares a
+    // shape; the frozen prefix itself does not.
+    case "prompt_shape":
+      return kind === "prompt_shape_compared" ? "same_run" : "none";
     // A shelf moves when somebody mounts one on the city's layer, edits
     // the building's rules, or a run starts under them and pins a version.
     case "skills":

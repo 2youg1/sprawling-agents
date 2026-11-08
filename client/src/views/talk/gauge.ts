@@ -121,13 +121,15 @@ export function checkpointsOf(reminders: Reminders): readonly Checkpoint[] {
 }
 
 // What the ring's focusable element carries, spread onto it as it is.
-// It is a meter rather than a button: it reports a reading and does
-// nothing when pressed. It takes focus so a keyboard reaches the reading
-// the tip spells out, as a pointer does by hovering; the tip says the
-// same words as `aria-valuetext`, so the meter is not also described by
-// it, which would have a screen reader read the line twice.
+// It is a disclosure control that still reports a meter reading: press
+// (or Enter / Space) opens the context report on the right; the tip on
+// hover and focus spells the same words as `aria-valuetext`, and the
+// look wires that tip through `aria-describedby` (client/spec/Views/
+// Workspace.lean §7-11). The coin key paints above it and keeps send /
+// stop / steer.
 export interface MeterWire {
-  readonly role: "meter";
+  readonly role: "button";
+  readonly type: "button";
   readonly tabindex: 0;
   readonly "aria-label": string;
   readonly "aria-valuemin": 0;
@@ -165,9 +167,10 @@ export function ringOf(lang: Lang, context: Context | null): RingLook | null {
   ].join(" · ");
   return {
     meter: {
-      role: "meter",
+      role: "button",
+      type: "button",
       tabindex: 0,
-      "aria-label": say(lang, "ring_name"),
+      "aria-label": say(lang, "context_report_open"),
       "aria-valuemin": 0,
       "aria-valuemax": context.window,
       "aria-valuenow": Math.min(context.used, context.window),

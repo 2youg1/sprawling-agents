@@ -213,6 +213,9 @@ impl Views {
             // What an agent was told, and the store read that recovers it. A run with no prompt
             // yet and an object this city no longer holds are both "I could not look".
             wire::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
+            wire::Query::PromptShape { run } => {
+                return Prepared::PromptShape(self.prompt_shape_ask(*run));
+            }
             // Read at every asking rather than held: each file is one a person also edits or
             // another page also writes, and a copy kept in this fold would answer with what it
             // said the last time somebody used a page.
@@ -295,15 +298,7 @@ impl Views {
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             // The host's privacy page is read by the serving binary's own listener
             // (`crates/sprawling/spec/Privacy/Service.lean`); the views hold nothing of the host.
-            wire::Query::Privacy => unavailable_because(
-                "Privacy".to_owned(),
-                &kernel::AxError::failure(
-                    kernel::AxCode::ToolUnavailable,
-                    "answer the privacy page",
-                    "the city's views do not read host privacy controls",
-                )
-                .with_recovery("ask the city's own listener, which serves the privacy page"),
-            ),
+            wire::Query::Privacy => privacy_unavailable(),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {
                 return Prepared::Building {
@@ -420,6 +415,19 @@ impl Views {
             .map(|(run, _)| run.to_string())
             .collect()
     }
+}
+
+/// The privacy page lives on the city's own listener, not in these views.
+fn privacy_unavailable() -> wire::Answer {
+    unavailable_because(
+        "Privacy".to_owned(),
+        &kernel::AxError::failure(
+            kernel::AxCode::ToolUnavailable,
+            "answer the privacy page",
+            "the city's views do not read host privacy controls",
+        )
+        .with_recovery("ask the city's own listener, which serves the privacy page"),
+    )
 }
 
 /// The rules `template` would lay a building out with at `addr`, read

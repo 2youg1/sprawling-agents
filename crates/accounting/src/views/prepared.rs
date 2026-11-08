@@ -36,7 +36,7 @@ use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
 use super::lines::buildings_of;
 use super::listing::listing_answer;
-use super::prefix::{PrefixAsk, content_answer};
+use super::prefix::{PrefixAsk, PromptShapeAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
 use crate::plan_view::{PlanView, plans_of};
 
@@ -195,6 +195,8 @@ pub enum Prepared {
     },
     /// The prompt one run was frozen with: a ledger line and the store.
     Prefix(PrefixAsk),
+    /// The growing halves of one run's latest request shape.
+    PromptShape(PromptShapeAsk),
     /// A bounded slice of the history ending before a cursor.
     History {
         ledger: LedgerAsk,
@@ -264,6 +266,7 @@ impl Prepared {
             Self::GitStatus(ask) => ask.read(),
             Self::Commits(ask) => ask.read(),
             Self::Prefix(ask) => ask.read(),
+            Self::PromptShape(ask) => ask.read(),
             Self::City(ask) => ask.read(),
             Self::History {
                 ledger,

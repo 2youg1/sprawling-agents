@@ -15,12 +15,14 @@
   // endpoints with their models' windows, and this room's settled
   // config, which states both reminders. What it draws from them is
   // `gauge.ts`'s, and how it is drawn is `gauge.look.svelte`'s: this seat
-  // only asks and hands the answer on.
+  // only asks and hands the answer on. Pressing the band (not the coin)
+  // opens the context report on the right.
   import type { Snippet } from "svelte";
 
   import { QUERIES } from "../../core/asking";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer } from "../../wire";
+  import { openContext } from "../inspect/open.svelte";
   import Look from "./gauge.look.svelte";
   import { contextOf, remindersOf, ringOf, sessionRunOf } from "./gauge";
   import type { Reminders } from "./gauge";
@@ -71,6 +73,12 @@
       ),
     ),
   );
+
+  function open(): void {
+    const at = run;
+    if (at === undefined) return;
+    openContext({ run: at, room });
+  }
 </script>
 
-<Look {ring} {children} />
+<Look {ring} onOpen={run === undefined ? null : open}>{@render children()}</Look>

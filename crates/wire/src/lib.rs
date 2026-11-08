@@ -37,6 +37,7 @@ pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
 pub use answer::HistoryAnswer;
 pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
+pub use answer::PromptShapeAnswer;
 pub use answer::PursuitLine;
 pub use answer::TemplateAnswer;
 pub use answer::TuningDefaults;

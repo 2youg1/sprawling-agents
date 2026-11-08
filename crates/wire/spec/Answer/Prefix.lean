@@ -12,23 +12,31 @@
 -/
 
 /-!
-### 8-35 四条读：一个 agent 被告知了什么、一栋楼会做什么、它那里还有什么没提交
+### 8-35 五条读：一个 agent 被告知了什么、请求里什么在涨、一栋楼会做什么、它那里还有什么没提交
 
-这四条读回答三个问题：「这个 agent 收到的 system prompt 是什么」（`prompt_assembled` 只记四段的哈希与来源注记，拿着哈希读不回原文）；「这栋楼会做什么」（`Query::RegistryView` 的书里没有 skill）；「此刻工作树在哪」（`Query::Changes` 比的是两个检查点，答不出分支名、与上游的距离、以及哪些文件还没进检查点）。
+这五条读回答四个问题：「这个 agent 收到的 system prompt 是什么」（`prompt_assembled` 只记四段的哈希与来源注记，拿着哈希读不回原文；`Query::Prefix` 把四段与冻下的工具表读回）；「那次请求里两个会涨的半区有多重」（`Query::PromptShape` 只答工具表与对话的字节，从不重装前缀）；「这栋楼会做什么」（`Query::RegistryView` 的书里没有 skill）；「此刻工作树在哪」（`Query::Changes` 比的是两个检查点，答不出分支名、与上游的距离、以及哪些文件还没进检查点）。
 
 ```rust
-// Query 第 25–28 条（声明序，QUERY_NAMES 同序追加）
-Prefix    { run: RunId },           // → Answer::Prefix(Box<PrefixAnswer>)
-Content   { locator: Locator },     // → Answer::Content(Box<ContentAnswer>)
-Skills    { building: Address },    // → Answer::Skills(Box<SkillsAnswer>)
-GitStatus { building: Address },    // → Answer::GitStatus(Box<GitStatusAnswer>)
+// Query（声明序，QUERY_NAMES 同序追加）
+Prefix      { run: RunId },           // → Answer::Prefix(Box<PrefixAnswer>)
+PromptShape { run: RunId },           // → Answer::PromptShape(Box<PromptShapeAnswer>)
+Content     { locator: Locator },     // → Answer::Content(Box<ContentAnswer>)
+Skills      { building: Address },    // → Answer::Skills(Box<SkillsAnswer>)
+GitStatus   { building: Address },    // → Answer::GitStatus(Box<GitStatusAnswer>)
 
 pub enum PrefixSlot { City, Building, Resident, Run }
 pub struct PrefixSource  { pub addr: Address, pub kept: u64, pub dropped: u64 }
 pub struct PrefixSegment { pub slot: PrefixSlot, pub hash: B3Hash, pub bytes: u64,
                            pub text: String, pub stored: bool,
                            pub sources: Vec<PrefixSource> }
-pub struct PrefixAnswer  { pub run: RunId, pub segments: Vec<PrefixSegment> }
+pub struct PrefixAnswer  { pub run: RunId, pub segments: Vec<PrefixSegment>,
+                           pub tools: Option<PromptTools> }
+pub struct PromptShapeAnswer {
+    pub run: RunId,
+    pub tools: ShapePart,            // 最新一次请求的工具表字节
+    pub conversation: ShapePart,     // 同次请求的对话区（账本字段名 run）
+    pub upper_bound: u64,
+}
 pub struct ContentAnswer { pub locator: Locator, pub text: String, pub bytes: u64,
                            pub truncated: bool, pub binary: bool }
 

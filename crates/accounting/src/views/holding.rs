@@ -122,6 +122,9 @@ pub struct Views {
     /// prompt a page asks for is one ledger line rather than a walk
     /// back through the whole run.
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
+    /// Where each run's newest `prompt_shape_compared` sits, so a
+    /// context report reads one ledger line for the growing halves.
+    pub(super) latest_shapes: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Where each building's newest run's first `prompt_assembled` sits,
     /// so the capabilities a page asks for are one ledger line
     /// (`crates/wire/spec/Answer/Catalog.lean` §8-99).
@@ -261,6 +264,7 @@ impl Views {
             next_unfolded: kernel::Seq::FIRST,
             index,
             first_prompts: std::collections::BTreeMap::new(),
+            latest_shapes: std::collections::BTreeMap::new(),
             building_prompts: std::collections::BTreeMap::new(),
             unprompted: std::collections::BTreeMap::new(),
             sessions: super::sessions::RoomSessions::default(),
@@ -438,6 +442,9 @@ impl Views {
                         })
                         .or_insert(folded);
                 }
+            }
+            Holding::PromptShape => {
+                self.latest_shapes.insert(record.run(), record.seq());
             }
             Holding::Nothing => {}
         }
