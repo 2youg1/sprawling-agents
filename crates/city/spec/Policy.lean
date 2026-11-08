@@ -36,7 +36,7 @@ impl ModelRecommendation {
     pub fn model(&self) -> &ModelRef;
     pub fn effort(&self) -> Effort;
 }
-pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、review、browser、usersbrowser、desktop、reading_room、harness_minutes、workspace_models —— 私有 */ }
+pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、review、browser、usersbrowser、desktop、reading_room、harness_minutes、workspace_models、checkpoint_entropy_allow —— 私有 */ }
 impl BuildingRules {
     pub fn workspace_models(&self) -> Option<&WorkspaceModelPolicy>; // 没写这一节即 None，旧路径不变
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
@@ -50,6 +50,7 @@ impl BuildingRules {
     pub fn usersbrowser(&self) -> Option<&UserBrowser>;
     pub fn write_domain(&self) -> Result<WriteDomain, AxError>;
     pub fn harness_minutes(&self) -> u32;             // harness run 的墙钟上限；缺这一行读作 60
+    pub fn checkpoint_entropy_allow(&self) -> &EntropyAllowlist; // 精确的仓库相对路径；缺省空
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
@@ -75,6 +76,7 @@ impl RulesCache {
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——在读它的地方丢掉，一栋楼就写得比人授予的少，而这件事没有任何一处说出来。
 - **`review = true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
 - **`egress` 是可选的域名表**：不写这一键，楼不限主机；写了表，城的浏览器与人的浏览器只导航到表中域名及其子域；空表是不到任何公网主机（D27）。表随 run 冻结，经 `limit_egress` 交给 `runtime::bench::ToolBench`，由它在每次调用前以 `kernel::gate::egress::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
+- **`checkpoint_entropy_allow` 是 User 给低置信度扫描留的出路**：值是仓库相对文件路径的数组，每项先过 `Address::parse`，匹配整项而不是前缀或 glob。它只豁免这些文件里的熵命中，已知厂商形状照样拒绝；不含命中正文，也不写摘要。文件住在楼自己的保留子树，agent 只能读不能改（D1）；装配层把同一份 `EntropyAllowlist` 交给 model lane、bench 的预测网、harness、adoption 与 landing 的 checkpoint。缺省为空，旧城行为不需要迁移。处置与验收的权威是 `crates/storage/spec/Checkpoint.lean` D95，这里只规定配置从哪里来、谁能改。
 - **执行点与缺口要分清**：provider 路径由 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网是否被拦，取决于 exec 所在的那一臂 `runtime::tools::exec::Confinement` 是否承诺关网（`Guarantee::Network`，每一臂在工具描述里说出自己不承诺什么），浏览器工具一次调用点名的页面由 bench 按表判，页面里的子资源、重定向与 `exec` 发起的连接不经这张表。判定在这里，拦截只到调用点名的那个主机——不承诺关网的地方不要说「出网已管住」。
 - **`usersbrowser` 一键同时是开关与地址**：值 `"ws://127.0.0.1:<port>/session"` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一键即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
 - **`browser` 与 `usersbrowser` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser` 不是 `usersbrowser` 的前缀截断——TOML 的键是文法给出的整体，两个设置因此互不误读。
@@ -195,6 +197,17 @@ effort = "high"
 - **本版不加结构化表单**：另立一帧与一棵 TOML 写者，会让同一个键有两种写法，而现有规则页已经带着基线、求值与端点簿校验三道守卫；占位符解决“不知道写什么”，结构化编辑器留给真有批量改法需求的那天（D90 的重开参数）。
 
 验收：city 的解析与结构拒绝测试、Lean 的 `route_existing_session`／`route_without_policy`／`route_recommendation_allowed`／`route_recommendation_within_max`；accounting 经真实 `delegate` 覆盖三档、无难度缺省、已有 Session 不换模型、无策略旧行为与开始前拒绝。
+-/
+
+/-! D116 checkpoint 的熵允许清单写在楼规里，且只收短路径
+
+**决定**：`checkpoint_entropy_allow` 是 `RULES.toml` 的可选键，元素是仓库相对路径；不把命中正文或摘要写进清单。它只豁免熵命中，形状拒绝没有对应的放宽键。
+
+**理由**：这份文件由 User 写、agent 改不到，并且已有整份求值与基线写门；把豁免放在普通工作文档里会让被扫描的 run 自己放宽判定。路径足以指出误报所在的文件，又避免把长触发串复制进进历史的治理文件。易触发的长例句留在本就不进历史的 `Memo.md`、`Roadmap.md` 或 `JOB.md`；`SPEC.md` 与 `RULES.toml` 只用短名引用它们。
+
+**被否**：允许任意字符串（把真实未知密钥永久豁免且把正文写进历史）；路径前缀或 glob（一个短目录名会豁免过宽）；另建一份可写配置（同一规则出现两个所有者）。
+
+**重开参数**：出现必须按单个命中而非单文件豁免的真实场景，并且能用一个不含正文也不永久保存秘密指纹的身份表达它时。
 -/
 
 /-! D90 工作区策略追加进 RULES.toml，而不是另建模型默认值

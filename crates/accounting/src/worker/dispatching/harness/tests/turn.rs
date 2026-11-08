@@ -26,7 +26,10 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     let heard = Arc::new(Mutex::new(Heard::default()));
     let mut script = opening();
     script.extend([
-        Step::Write("lab/room1/notes.md", "# Notes\n\nThey read well now.\n"),
+        Step::Write(
+            "lab/room1/notes.md",
+            "# Notes\n\nThey read well now.\n".to_owned(),
+        ),
         said("the notes read well"),
         Step::Answer(json!({ "stopReason": "end_turn" })),
         Step::Drain,
@@ -48,6 +51,8 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     assert_eq!(
         run.iter().map(|record| record.kind()).collect::<Vec<_>>(),
         vec![
+            // 城的第一个提交借给这个 run 的树，它的记录随同一次扫描落到账本
+            EventKind::CheckpointCommitted,
             EventKind::WorktreeOpened,
             EventKind::RunStarted,
             EventKind::HarnessReported,
@@ -55,6 +60,8 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
             EventKind::HarnessAnswered,
             EventKind::HandoffWritten,
             EventKind::RunFrozen,
+            // 落地自己的提交，它的扫描 finding 只在这条记录里
+            EventKind::CheckpointCommitted,
             EventKind::PrOpened,
         ]
     );
@@ -139,7 +146,7 @@ fn a_harness_run_frozen_done_offers_its_tree_for_review() {
     let (dir, _, ledger) = city_with("pi");
     let mut script = opening();
     script.extend([
-        Step::Write("lab/room1/notes.md", "# Notes\n"),
+        Step::Write("lab/room1/notes.md", "# Notes\n".to_owned()),
         said("written"),
         Step::Answer(json!({ "stopReason": "end_turn" })),
         Step::Drain,
@@ -213,6 +220,7 @@ fn a_harness_that_says_nothing_is_cut_at_the_ceiling_and_frozen_limit() {
     assert_eq!(
         run.iter().map(EventRecord::kind).collect::<Vec<_>>(),
         vec![
+            EventKind::CheckpointCommitted,
             EventKind::WorktreeOpened,
             EventKind::RunStarted,
             EventKind::CancelReceived,
@@ -226,4 +234,115 @@ fn a_harness_that_says_nothing_is_cut_at_the_ceiling_and_frozen_limit() {
         run.last().unwrap().data(),
         &Payload::of(&RunFrozen::of(&Completion::Limit)).unwrap()
     );
+}
+
+/// A known provider key shape in the harness's own tree refuses its
+/// closing commit. The run still freezes, and the report reaches the
+/// Ledger before that freeze, so `sprawling secrets` can name the line
+/// afterwards without carrying its bytes.
+#[test]
+fn a_harness_that_writes_a_known_key_shape_is_refused_and_reported_before_the_freeze() {
+    let (dir, _, ledger) = city_with("pi");
+    // Assembled at runtime: this file is scanned by the city's own
+    // `xtask secret`, and a literal key here would be a finding itself.
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    let mut script = opening();
+    script.extend([
+        Step::Write("lab/room1/key.env", format!("KEY={token}\n")),
+        said("wrote the key"),
+        Step::Answer(json!({ "stopReason": "end_turn" })),
+        Step::Drain,
+    ]);
+    let mut worker = worker(
+        dir.path(),
+        played(script, Arc::new(Mutex::new(Heard::default()))),
+    );
+
+    let refused = worker.handle(dispatch("lab/room1", None)).unwrap_err();
+    assert_eq!(refused.code(), &kernel::AxCode::SecretEgress);
+
+    let all = records(&ledger);
+    let blocked = all
+        .iter()
+        .find(|record| record.kind() == EventKind::SecretEgressBlocked)
+        .expect("the refused closing commit is booked");
+    let report: kernel::event::record::SecretEgressBlocked = blocked.data().read().unwrap();
+    assert_eq!(report.withheld[0].path, "lab/room1/key.env");
+    assert_eq!(report.withheld[0].line, 1);
+    assert_eq!(report.withheld[0].reason, "anthropic");
+    let frozen = all
+        .iter()
+        .find(|record| record.kind() == EventKind::RunFrozen)
+        .expect("the refused run still freezes");
+    assert_eq!(
+        frozen.data(),
+        &Payload::of(&RunFrozen::of(&Completion::Cancelled)).unwrap()
+    );
+    assert!(
+        blocked.seq() < frozen.seq(),
+        "the report precedes the freeze"
+    );
+    assert!(!all.iter().any(|record| {
+        record
+            .canonical_line()
+            .unwrap()
+            .windows(token.len())
+            .any(|window| window == token.as_bytes())
+    }));
+}
+
+/// The city's first commit is raised while lending the room its tree, not
+/// by a wave. Its scan findings are recorded on that commit, so a folder
+/// that already held an entropy-shaped string is reported even though the
+/// unchanged blob is never read again.
+#[test]
+fn a_base_checkpoints_entropy_finding_is_recorded_on_the_commit_it_made() {
+    let (dir, _, ledger) = city_with("pi");
+    let room = dir.path().join("lab").join("room1");
+    std::fs::create_dir_all(&room).unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    std::fs::write(room.join("notes.md"), format!("Example: {token}\n")).unwrap();
+    let mut script = opening();
+    script.extend([
+        said("read it"),
+        Step::Answer(json!({ "stopReason": "end_turn" })),
+        Step::Drain,
+    ]);
+    let mut worker = worker(
+        dir.path(),
+        played(script, Arc::new(Mutex::new(Heard::default()))),
+    );
+
+    worker.handle(dispatch("lab/room1", None)).unwrap();
+
+    let all = records(&ledger);
+    let base = all
+        .iter()
+        .filter(|record| record.kind() == EventKind::CheckpointCommitted)
+        .map(|record| {
+            record
+                .data()
+                .read::<kernel::event::record::CheckpointCommitted>()
+                .unwrap()
+        })
+        .find_map(|record| match record {
+            kernel::event::record::CheckpointCommitted::Committed(commit)
+                if !commit.withheld.is_empty() =>
+            {
+                Some(commit)
+            }
+            kernel::event::record::CheckpointCommitted::JobPinned { .. }
+            | kernel::event::record::CheckpointCommitted::Committed(_) => None,
+        })
+        .expect("the base commit records the entropy finding it committed");
+    assert_eq!(base.withheld[0].path, "lab/room1/notes.md");
+    assert_eq!(base.withheld[0].line, 1);
+    assert_eq!(base.withheld[0].reason, "high entropy");
+    assert!(!all.iter().any(|record| {
+        record
+            .canonical_line()
+            .unwrap()
+            .windows(token.len())
+            .any(|window| window == token.as_bytes())
+    }));
 }

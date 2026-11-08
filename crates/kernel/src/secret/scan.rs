@@ -12,7 +12,36 @@ use crate::consts_policy::SECRET_ENTROPY_MIN;
 
 use super::hex_run::is_labelled_hex_secret;
 use super::span::SecretSpan;
+use crate::Address;
+use std::collections::BTreeSet;
 use std::sync::LazyLock;
+
+/// Exact repository-relative paths whose entropy hits a checkpoint may
+/// commit without recording a finding. Known provider shapes never consult
+/// this list. Elements enter as validated [`Address`] values; matching is
+/// exact, never a prefix or a glob.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EntropyAllowlist {
+    paths: BTreeSet<String>,
+}
+
+impl EntropyAllowlist {
+    /// Whether `path` is exactly one of the entered repository paths.
+    pub fn allows(&self, path: &str) -> bool {
+        self.paths.contains(path)
+    }
+}
+
+impl FromIterator<Address> for EntropyAllowlist {
+    fn from_iter<T: IntoIterator<Item = Address>>(paths: T) -> Self {
+        EntropyAllowlist {
+            paths: paths
+                .into_iter()
+                .map(|path| path.as_str().to_owned())
+                .collect(),
+        }
+    }
+}
 
 fn charset_admits(charset: SecretCharset, byte: u8) -> bool {
     match charset {

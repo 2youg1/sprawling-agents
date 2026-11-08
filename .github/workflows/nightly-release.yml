@@ -237,7 +237,9 @@ jobs:
           {
             echo "## Nightly — unstable"
             echo
-            echo "This is an automatically built experimental snapshot, not a curated release."
+            echo "This is an automatically published experimental snapshot, not a curated release."
+            echo "No stability or usability is guaranteed. If you hit a problem, open an issue promptly."
+            echo "If you need stability, wait for a stable release."
             echo "Behaviour, protocols and stored-data formats may change without notice."
             echo "Back up the city before updating; rolling back the binary does not promise"
             echo "that an older binary can read data a newer one migrated."

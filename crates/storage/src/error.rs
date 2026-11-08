@@ -59,10 +59,11 @@ pub enum StorageError {
     SeqMissing { seq: u64 },
     #[error("checkpoint {op} failed: {detail}")]
     Checkpoint { op: &'static str, detail: String },
-    /// Locations only. The matched bytes are never carried — proving a
-    /// secret leaked by reprinting it would be the leak.
-    #[error("staged content matches secret shapes at {locations}")]
-    SecretEgress { locations: String },
+    /// The refusal's code, scope, locations and reasons. The matched bytes
+    /// are never carried — proving a secret leaked by reprinting it would be
+    /// the leak. The same report is written as `secret_egress_blocked`.
+    #[error("staged content matches known secret shapes at {}", .0.locations())]
+    SecretEgress(kernel::event::record::SecretEgressBlocked),
     /// An export or restore that is well-formed I/O but not a city:
     /// an occupied destination, a bundle whose manifest disagrees with
     /// what arrived, a chain with a gap.
@@ -232,10 +233,15 @@ impl StorageError {
                 AxError::failure(AxCode::WorktreeBusy, op, detail)
                     .with_recovery("resolve the repository state, then retry the wave")
             }
-            StorageError::SecretEgress { locations } => {
-                AxError::failure(AxCode::SecretEgress, "commit checkpoint", locations)
-                    .with_recovery("remove the secret from the staged files, then retry")
-            }
+            StorageError::SecretEgress(report) => AxError::failure(
+                AxCode::SecretEgress,
+                "commit checkpoint",
+                report.locations(),
+            )
+            .with_recovery(
+                "remove the known key shape from the staged files, then retry; run `sprawling \
+                 secrets <city>` to list the recorded positions and reasons without the bytes",
+            ),
             StorageError::LedgerHeld { dir } => AxError::failure(
                 AxCode::LedgerHeld,
                 "open the ledger for writing",

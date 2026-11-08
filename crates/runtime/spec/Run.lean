@@ -55,11 +55,18 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
 ```rust
 pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
+pub struct CheckpointFailure { /* cause: AxError、refusal: Option<SecretEgressBlocked> —— 私有 */ }
+impl From<AxError> for CheckpointFailure;                 // 无扫描结构的普通失败
+impl From<storage::StorageError> for CheckpointFailure;   // 同一转换：SecretEgress 的完整报告随错误一起过来
+impl CheckpointFailure {
+    pub fn refusal(&self) -> Option<&SecretEgressBlocked>;  // 要写进账本的扫描报告
+    pub fn into_cause(self) -> AxError;                      // 报告入账之后交给调用方的错误
+}
 
 pub struct RunHooks<'a> {            // 闭包，不是 trait：本模块只有一个消费者形式；invoke 除外
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时钟由调用方注入；驱动只在自己的线程、串行阶段按「时间纪律」的时点调用它
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
-    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
+    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, CheckpointFailure>>,  // 波前 checkpoint；拒绝可携 secret_egress_blocked 的结构
     pub writes: &'a dyn Fn(&ToolCall) -> Writes,                    // 这条调用会不会写（§8-45）
     pub invoke: &'a mut dyn ConcurrentInvoke,   // 一波的工具，三段（§8-3）；回合时间戳随 admit 行
     pub wait: &'a mut dyn FnMut(TimeMs) -> NextCall,               // 等到 Watchdog 给的 until；途中来了 Halt 就立刻答 Halted
@@ -82,6 +89,8 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 - **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 `crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」为准。
 - **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前、工具面的 `account` 之前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
+- **checkpoint 的拒绝先留下可查询事实**：`CheckpointFailure` 包含交给调用方的 `AxError`，以及可选的 `SecretEgressBlocked`。转换只有一条（`From<storage::StorageError>`）：只有它认得出 `SecretEgress` 并留下报告，调用方自己 `map_err` 就会把报告丢掉。`advance` 在传播错误之前把后者作为本 run 的 `secret_egress_blocked` 行放入 held lines；载荷的 `code`、`scope` 与每处 `withheld` 由 storage 的同一报告给出，runtime 不解析错误文本，也不接触命中字节。随后仍走原有的 carrier 与冻结路径；`gate_denied` 记这次动作被拒，`secret_egress_blocked` 记扫描证据，两者不是同一份载荷的两个拼写。
+- **波形之外的提交走同一行事件**：`HarnessRun::refusal` 把同一种报告写成同一 `secret_egress_blocked`，因为 harness 自己的收尾提交发生在驱动之外，它的拒绝同样要在冻结之前入账。收尾提交成功、随后清理写者 index 失败时，这次 run 仍按既有错误路径结束，它的 `checkpoint_committed` 因此不写；残留的 index 由下一次开城清掉，而「提交已落地却按失败结束」是本条之外的更大不一致，不在这里顺手改。
 - **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
 - **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`checkpoint`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。

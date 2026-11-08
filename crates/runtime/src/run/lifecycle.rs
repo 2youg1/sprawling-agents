@@ -264,10 +264,23 @@ impl Run<Active> {
         let touches = Wave::of(turn.calls(), hooks.writes);
         let decided = self.state.checkpoint.for_wave(touches);
         if let (WaveCheckpoint::Stage, Some(checkpoint)) = (decided, hooks.checkpoint.as_mut()) {
+            let committed = match checkpoint(t) {
+                Ok(committed) => committed,
+                Err(failure) => {
+                    if let Some(refusal) = failure.refusal {
+                        turn.hold_run_line(
+                            RunLine::SecretEgressBlocked,
+                            self.plan.addr.clone(),
+                            Payload::of(&refusal)?,
+                        );
+                    }
+                    return Err(failure.cause);
+                }
+            };
             turn.hold_run_line(
                 RunLine::CheckpointCommitted,
                 self.plan.addr.clone(),
-                checkpoint(t)?,
+                committed,
             );
         }
 

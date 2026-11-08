@@ -194,7 +194,11 @@ impl Laying {
         let of = site.provenance(self.city, addr);
         let mut bench = ToolBench::new(domain)
             .with_checkpoint(runtime::bench::CheckpointNet {
-                checkpoint: self.open_checkpoint(&site.write_root, of.run())?,
+                checkpoint: self.open_checkpoint(
+                    &site.write_root,
+                    of.run(),
+                    site.rules.checkpoint_entropy_allow().clone(),
+                )?,
                 scope,
                 of,
             })

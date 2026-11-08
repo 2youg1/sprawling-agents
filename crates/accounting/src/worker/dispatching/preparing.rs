@@ -350,6 +350,7 @@ impl LaneHalf {
             policy: desks.policy.clone(),
             write_root: site.write_root.clone(),
             checkpoint_scope,
+            checkpoint_entropy_allow: site.rules.checkpoint_entropy_allow().clone(),
             run_id: site.run_id,
             of: site.provenance(laying.city, &at.addr),
             sieving,

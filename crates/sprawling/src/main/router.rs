@@ -125,6 +125,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Whose => super::whose::verb(read),
         Verb::Check => super::check::verb(nth(1)),
         Verb::View => super::view::verb(read),
+        Verb::Secrets => super::view::secrets(read),
         Verb::PlaybackExport => super::playback::export(read),
         Verb::PlaybackCheck => super::playback::check(read),
         Verb::Init => init(read),

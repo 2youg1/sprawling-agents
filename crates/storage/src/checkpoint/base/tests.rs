@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use kernel::{Address, B3Hash, RunId, TimeMs};
+use kernel::{Address, B3Hash, Payload, RunId, TimeMs};
 
 use super::*;
 use crate::checkpoint::ModelChoice;
@@ -58,11 +58,14 @@ fn a_base_checkpoint_beside_history_is_filed_and_leaves_later_checkpoints_on_dis
     let repo = git2::Repository::open(tmp.path()).unwrap();
     let oid_of =
         |payload: &Payload| git2::Oid::from_str(payload.as_map()["oid"].as_str().unwrap()).unwrap();
+    let base_oid = |commit: &kernel::event::record::Commit| {
+        git2::Oid::from_str(&commit.oid.to_string()).unwrap()
+    };
     let filed = repo
         .find_reference(&format!(
             "refs/sprawling/runs/{}/{}",
             RunId::CITY,
-            oid_of(&payload)
+            base_oid(&payload)
         ))
         .is_ok();
     assert_eq!(
@@ -103,7 +106,7 @@ fn a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote() {
 
     assert_eq!(
         (
-            matches!(refused, Err(StorageError::SecretEgress { .. })),
+            matches!(refused, Err(StorageError::SecretEgress(_))),
             wave.map(|_| ()).map_err(|err| err.to_string()),
         ),
         (true, Ok(()))

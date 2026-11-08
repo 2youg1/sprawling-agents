@@ -527,6 +527,67 @@ fn a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp() {
     assert_eq!(kinds[7], "tool_called");
 }
 
+/// A known-shape checkpoint refusal leaves a structured, byte-free record
+/// before the run freezes cancelled through the driver's ordinary carrier path.
+#[test]
+fn a_refused_checkpoint_records_its_scope_and_findings_before_the_run_freezes() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let report = kernel::event::record::SecretEgressBlocked::checkpoint(
+        vec!["lab".to_owned()],
+        vec![kernel::event::record::CheckpointFinding {
+            path: "lab/SPEC.md".to_owned(),
+            offset: 9,
+            len: 37,
+            line: 1,
+            reason: "anthropic".to_owned(),
+        }],
+    );
+    let mut checkpoint = |_: TimeMs| {
+        Err(runtime::CheckpointFailure::from(
+            storage::StorageError::SecretEgress(report.clone()),
+        ))
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: Some(&mut checkpoint),
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    let outcome = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff());
+    let frozen = outcome.unwrap();
+    assert!(matches!(frozen.completion(), Completion::Cancelled));
+    let blocked = ledger
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .find(|line| line["kind"] == "secret_egress_blocked")
+        .expect("the refusal has its own queryable event");
+    assert_eq!(blocked["data"]["code"], "E_SECRET_EGRESS");
+    assert_eq!(blocked["data"]["scope"], serde_json::json!(["lab"]));
+    assert_eq!(blocked["data"]["withheld"][0]["line"], 1);
+    assert_eq!(blocked["data"]["withheld"][0]["reason"], "anthropic");
+    assert_eq!(
+        ledger.kinds().last().map(String::as_str),
+        Some("run_frozen")
+    );
+}
+
 #[test]
 fn a_run_that_calls_nothing_puts_up_no_checkpoint() {
     let mut ledger = RecordingLedger::new();

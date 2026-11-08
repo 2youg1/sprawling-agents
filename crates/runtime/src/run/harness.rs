@@ -15,7 +15,9 @@
 //! hold the order, because `conclude` and `abandon` take the run by value
 //! and a frozen run has nothing left to write with.
 
-use kernel::event::record::{CancelReceived, HarnessAnswered, HarnessReported, HarnessStop};
+use kernel::event::record::{
+    CancelReceived, HarnessAnswered, HarnessReported, HarnessStop, SecretEgressBlocked,
+};
 use kernel::{AxError, Completion, EventKind, EventRef, Evidence, Ledger, Payload, TimeMs};
 
 use crate::handoff::Handoff;
@@ -100,6 +102,26 @@ impl<'a> HarnessRun<'a> {
             t,
         ))?;
         self.cut = Some(cut);
+        Ok(())
+    }
+
+    /// Books a checkpoint's known-shape refusal for this run's tree, so
+    /// `sprawling secrets` lists it after the run freezes. A wave
+    /// checkpoint's refusal reaches the same event through the driver.
+    ///
+    /// # Errors
+    /// Propagates a payload that will not encode and the ledger.
+    pub fn refusal(
+        &self,
+        ledger: &mut dyn Ledger,
+        report: &SecretEgressBlocked,
+        t: TimeMs,
+    ) -> Result<(), AxError> {
+        ledger.append(self.charter.line(
+            EventKind::SecretEgressBlocked,
+            Payload::of(report)?,
+            t,
+        ))?;
         Ok(())
     }
 

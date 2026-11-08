@@ -20,7 +20,7 @@ pub enum StorageError {                      // thiserror；crate 根
     Draft { source: AxError },              // 组 log_truncated 草稿失败（不以死变体粉饰）
     CasMissing / CasCorrupt / RangeOutOfBounds,               // cas
     SeqMissing,                                              // index
-    Checkpoint / SecretEgress / Bundle,                      // 各自的模块
+    Checkpoint / SecretEgress(SecretEgressBlocked) / Bundle, // 各自的模块；SecretEgress 原样携 code、scope、withheld
     Worktree / WorktreeBusy / MergeStale / MergeWouldDiscard, // worktree
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
     NameTaken { path: PathBuf },            // 新建时名字上已站着东西（8-32）→ E_VERSION_CONFLICT

@@ -67,7 +67,9 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use catalog::{CatalogDrift, CatalogSubject};
-pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
+pub use checkpoint::{
+    CheckpointCommitted, CheckpointFinding, Commit, CommitAttribution, SecretEgressBlocked,
+};
 pub use collaboration::{
     ConflictLevel, GoalConflict, Landing, Lane, PursuitChanged, PursuitMove, SignalConsumed,
     SignalEnqueued, SignalId, SignalKind, SignalLanded, SignalWaitEnded, SignalWaitStarted,

@@ -156,6 +156,56 @@ pub enum Advance {
     Concluded(Completion),
 }
 
+/// A checkpoint failure, optionally carrying the structured scan refusal
+/// that must reach the Ledger before the run freezes.
+#[derive(Debug)]
+pub struct CheckpointFailure {
+    cause: AxError,
+    refusal: Option<kernel::event::record::SecretEgressBlocked>,
+}
+
+impl CheckpointFailure {
+    /// The scan report a refused checkpoint carries, when the failure was
+    /// one. A caller that holds a Ledger writes it as
+    /// `secret_egress_blocked` before the run freezes.
+    pub fn refusal(&self) -> Option<&kernel::event::record::SecretEgressBlocked> {
+        self.refusal.as_ref()
+    }
+
+    /// The error the run reports once any refusal report is booked.
+    pub fn into_cause(self) -> AxError {
+        self.cause
+    }
+}
+
+impl From<storage::StorageError> for CheckpointFailure {
+    /// A refused checkpoint keeps its structured report, which is the only
+    /// reason this wrapper exists; every other storage failure travels as
+    /// the error it already is. One conversion, so a caller cannot lose the
+    /// report by mapping the error itself.
+    fn from(err: storage::StorageError) -> Self {
+        let refusal = if let storage::StorageError::SecretEgress(report) = &err {
+            Some(report.clone())
+        } else {
+            None
+        };
+        CheckpointFailure {
+            cause: err.into_ax(),
+            refusal,
+        }
+    }
+}
+
+impl From<AxError> for CheckpointFailure {
+    /// An ordinary checkpoint failure has no scan report to add.
+    fn from(cause: AxError) -> Self {
+        CheckpointFailure {
+            cause,
+            refusal: None,
+        }
+    }
+}
+
 /// The things the driver cannot decide for itself. Closures rather
 /// than traits: no second implementation exists yet, and this
 /// library introduces a trait at a seam that already has one.
@@ -177,7 +227,7 @@ pub struct RunHooks<'a> {
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,
     /// The pre-wave checkpoint. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
-    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
+    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, CheckpointFailure>>,
     /// What a call may write, by its declared effect, asked before the
     /// wave runs: a wave whose every call answers `Nothing` changes no
     /// file, so it needs no checkpoint of its own (§8-45).

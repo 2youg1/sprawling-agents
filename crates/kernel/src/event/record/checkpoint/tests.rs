@@ -65,6 +65,7 @@ fn commit(effort: Option<Effort>, predecessor: Option<RunId>, scope: &[&str]) ->
         },
         scope: scope.iter().map(|at| (*at).to_owned()).collect(),
         files: vec!["lab/notes.md".to_owned()],
+        withheld: Vec::new(),
     }
 }
 

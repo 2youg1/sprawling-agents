@@ -7,11 +7,14 @@
 
 use std::io::Write;
 
-use kernel::{Payload, TimeMs};
+use kernel::TimeMs;
+use kernel::event::record::Commit;
 
 use crate::error::StorageError;
 
-use super::commit::{Checkpoint, checkpoint_ref, committed, git_err, subject_of};
+use super::commit::{
+    Checkpoint, CommitDetails, checkpoint_ref, commit_record, git_err, subject_of,
+};
 use super::opening::{HeadMove, IndexOwner, commit_refused};
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
@@ -65,7 +68,7 @@ impl Checkpoint {
         t: TimeMs,
         of: &Provenance,
         progress: &mut dyn FnMut(BaseProgress),
-    ) -> Result<Payload, StorageError> {
+    ) -> Result<Commit, StorageError> {
         if Self::head_commit(&self.repo)?.is_some() {
             return self.write_held(&BaseOf { scopes, t, of }, BaseTarget::Filed, progress);
         }
@@ -98,6 +101,7 @@ impl Checkpoint {
             repo,
             last: None,
             index,
+            entropy_allow: self.entropy_allow.clone(),
         })
     }
 
@@ -108,7 +112,7 @@ impl Checkpoint {
         base: &BaseOf<'_>,
         target: BaseTarget,
         progress: &mut dyn FnMut(BaseProgress),
-    ) -> Result<Payload, StorageError> {
+    ) -> Result<Commit, StorageError> {
         let objects = self.repo.path().join("objects");
         let objects = objects.to_str().ok_or_else(|| StorageError::Checkpoint {
             op: "open the object store",
@@ -129,7 +133,7 @@ impl Checkpoint {
         let BaseOf { scopes, t, of } = *base;
         let files = self.stage_scopes_held(scopes)?;
         progress(BaseProgress::Staged { files: files.len() });
-        self.scan_staged()?;
+        let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
@@ -195,7 +199,15 @@ impl Checkpoint {
         }
         held.reset()
             .map_err(git_err("release the base checkpoint"))?;
-        committed(oid, of, scopes, files)
+        commit_record(
+            oid,
+            CommitDetails {
+                of,
+                scopes,
+                files,
+                withheld,
+            },
+        )
     }
 }
 

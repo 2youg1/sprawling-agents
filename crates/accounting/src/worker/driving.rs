@@ -57,6 +57,8 @@ pub(crate) struct Driving {
     /// What a checkpoint covers, from [`Site::checkpoint_scope`]:
     /// every prefix of the run's write domain, not just its room.
     pub checkpoint_scope: Vec<String>,
+    /// The building's exact-path exemptions for entropy-only findings.
+    pub checkpoint_entropy_allow: kernel::EntropyAllowlist,
     pub run_id: RunId,
     /// What every checkpoint this drive raises is signed with.
     pub of: storage::Provenance,

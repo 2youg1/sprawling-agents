@@ -136,6 +136,8 @@ pub(in crate::worker) struct HarnessHalf {
     pub(in crate::worker) start: StartHarness,
     pub(in crate::worker) chartered: Chartered,
     pub(in crate::worker) building: city::Building,
+    /// The building's exact-path exemptions for entropy-only findings.
+    pub(in crate::worker) entropy_allow: kernel::EntropyAllowlist,
     /// The one prompt this run sends: the room's brief.
     pub(in crate::worker) prompt: String,
     pub(in crate::worker) handoff: runtime::handoff::Handoff,
@@ -163,6 +165,7 @@ pub(crate) struct HarnessDriven {
     pub(in crate::worker) who: String,
     pub(in crate::worker) building: city::Building,
     pub(in crate::worker) city: kernel::B3Hash,
+    pub(in crate::worker) entropy_allow: kernel::EntropyAllowlist,
     pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// The room's tree, given back by the landing whatever the outcome.
     pub(in crate::worker) lease: Option<storage::WorktreeLease>,
@@ -186,6 +189,7 @@ pub(crate) fn drive_harness<L: Ledger>(
         who: half.chartered.who,
         building: half.building,
         city: half.city,
+        entropy_allow: half.entropy_allow,
         member: half.member,
         lease,
         outcome,
@@ -243,6 +247,7 @@ fn drive_turn<L: Ledger>(
             run_id: half.chartered.run,
             who: &half.chartered.who,
             of: &of,
+            entropy_allow: &half.entropy_allow,
         },
         &Placing {
             city_root: &half.city_root,
@@ -288,7 +293,15 @@ fn drive_turn<L: Ledger>(
     let failure = match (prompted, failed) {
         (Ok(answer), None) => {
             let scope = tree_scope(&half.building);
-            match commit(&root, &scope, &of, context) {
+            match commit(
+                &HarnessCheckpoint {
+                    root: &root,
+                    scope: &scope,
+                    of: &of,
+                    entropy_allow: &half.entropy_allow,
+                },
+                context,
+            ) {
                 Ok(committed) => {
                     return run.conclude(
                         &mut *ledger,
@@ -300,7 +313,15 @@ fn drive_turn<L: Ledger>(
                         clock.now()?,
                     );
                 }
-                Err(uncommitted) => uncommitted,
+                Err(uncommitted) => {
+                    // A known-shape refusal is the run's own fact, and the
+                    // ledger is where a person reads it back: book it before
+                    // the freeze that ends the run.
+                    if let Some(report) = uncommitted.refusal() {
+                        run.refusal(&mut *ledger, report, clock.now()?)?;
+                    }
+                    uncommitted.into_cause()
+                }
             }
         }
         // A line the turn could not book outranks what the session said:
@@ -314,17 +335,32 @@ fn drive_turn<L: Ledger>(
 
 /// Commits the tree as the harness left it, on this run's own index
 /// (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+struct HarnessCheckpoint<'a> {
+    root: &'a Path,
+    scope: &'a [String],
+    of: &'a storage::Provenance,
+    entropy_allow: &'a kernel::EntropyAllowlist,
+}
+
 fn commit(
-    root: &Path,
-    scope: &[String],
-    of: &storage::Provenance,
+    plan: &HarnessCheckpoint<'_>,
     context: &DriveContext,
-) -> Result<Payload, AxError> {
-    let mut own =
-        storage::Checkpoint::open_writer(root, of.run()).map_err(storage::StorageError::into_ax)?;
+) -> Result<Payload, runtime::CheckpointFailure> {
+    let mut own = storage::Checkpoint::open_writer(plan.root, plan.of.run())
+        .map_err(runtime::CheckpointFailure::from)?
+        .with_entropy_allowlist(plan.entropy_allow.clone());
     let committed = own
-        .wave_pre(scope, context.clock.now()?, of)
-        .map_err(storage::StorageError::into_ax)?;
-    own.close_writer().map_err(storage::StorageError::into_ax)?;
-    Ok(committed)
+        .wave_pre(plan.scope, context.clock.now()?, plan.of)
+        .map_err(runtime::CheckpointFailure::from);
+    // The writer's index goes back whatever the checkpoint said; the
+    // checkpoint's own refusal outranks a cleanup failure, because it is the
+    // fact the ledger has to carry.
+    let closed = own.close_writer().map_err(runtime::CheckpointFailure::from);
+    match committed {
+        Ok(payload) => {
+            closed?;
+            Ok(payload)
+        }
+        Err(refused) => Err(refused),
+    }
 }

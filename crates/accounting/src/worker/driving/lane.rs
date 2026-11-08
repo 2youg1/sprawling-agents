@@ -106,6 +106,7 @@ pub(crate) fn drive_run<L: Ledger>(
         policy,
         write_root,
         checkpoint_scope,
+        checkpoint_entropy_allow,
         run_id,
         of,
         sieving,
@@ -137,7 +138,8 @@ pub(crate) fn drive_run<L: Ledger>(
     // design, and on one shared index libgit2's `.git/index.lock` refused
     // the second checkpoint (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
     let mut checkpoint_handle = storage::Checkpoint::open_writer(&write_root, run_id)
-        .map_err(storage::StorageError::into_ax)?;
+        .map_err(storage::StorageError::into_ax)?
+        .with_entropy_allowlist(checkpoint_entropy_allow);
     // What the wave checkpoint and the bench checkpointed, in the order they went
     // up, so the sweep afterwards knows which commit a deleted file can
     // be restored from; and what the calls since the last checkpoint said they
@@ -196,7 +198,7 @@ pub(crate) fn drive_run<L: Ledger>(
             let scope = checkpointing.take_scope(&checkpoint_scope);
             let payload = checkpoint_handle
                 .wave_pre(&scope, t, &of)
-                .map_err(storage::StorageError::into_ax)?;
+                .map_err(runtime::CheckpointFailure::from)?;
             if let Some(oid) = payload
                 .as_map()
                 .get("oid")

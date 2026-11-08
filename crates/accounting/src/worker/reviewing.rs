@@ -5,7 +5,8 @@
 
 //! What a run offers a building it may not write in, and what merging it costs.
 
-use kernel::{AxError, EventKind};
+use kernel::event::record::CheckpointCommitted;
+use kernel::{AxError, EventKind, Payload};
 
 use crate::effect;
 
@@ -55,6 +56,7 @@ impl RunWorker {
                             who,
                             addr,
                             run_id,
+                            entropy_allow: site.rules.checkpoint_entropy_allow(),
                         },
                         branch,
                     )?,
@@ -162,6 +164,7 @@ pub(super) struct Offering<'a> {
     pub(super) who: &'a str,
     pub(super) addr: &'a kernel::Address,
     pub(super) run_id: kernel::RunId,
+    pub(super) entropy_allow: &'a kernel::EntropyAllowlist,
 }
 
 impl RunWorker {
@@ -177,15 +180,52 @@ impl RunWorker {
     /// Propagates a tree that will not commit, a branch that is not a
     /// node id, and the ledger's refusal of the line.
     pub(super) fn offer(&mut self, offering: &Offering<'_>, branch: String) -> Result<(), AxError> {
-        let commit = storage::Checkpoint::open(offering.tree)
-            .map_err(storage::StorageError::into_ax)?
-            .land(
-                offering.scopes,
-                self.clock.now()?,
-                offering.of,
-                &format!("offer: {}", offering.scopes.join(" ")),
-            )
-            .map_err(storage::StorageError::into_ax)?;
+        let landed = match storage::Checkpoint::open(offering.tree)
+            .map_err(storage::StorageError::into_ax)
+            .and_then(|checkpoint| {
+                let at = self.clock.now()?;
+                checkpoint
+                    .with_entropy_allowlist(offering.entropy_allow.clone())
+                    .land(
+                        offering.scopes,
+                        at,
+                        offering.of,
+                        &format!("offer: {}", offering.scopes.join(" ")),
+                    )
+                    .map_err(storage::StorageError::into_ax)
+            }) {
+            Ok(landed) => landed,
+            Err(err) => {
+                // The refusal names `sprawling secrets`; book its report
+                // before the error travels, or that command cannot show it.
+                let failure = runtime::CheckpointFailure::from(err);
+                if let Some(report) = failure.refusal() {
+                    self.record_for(
+                        offering.run_id,
+                        effect::Line {
+                            who: offering.who.to_owned(),
+                            addr: offering.addr.clone(),
+                            kind: EventKind::SecretEgressBlocked,
+                            data: Payload::of(report)?,
+                        },
+                    )?;
+                }
+                return Err(failure.into_cause());
+            }
+        };
+        // The landing's own scan is the only account of what it committed:
+        // a run that wrote after its last wave checkpoint has those findings
+        // here and nowhere else.
+        let commit = landed.oid.to_string();
+        self.record_for(
+            offering.run_id,
+            effect::Line {
+                who: offering.who.to_owned(),
+                addr: offering.addr.clone(),
+                kind: EventKind::CheckpointCommitted,
+                data: Payload::of(&CheckpointCommitted::Committed(landed))?,
+            },
+        )?;
         let request = collab::OpenRequest {
             node: collab::NodeId::parse(&branch)?,
             implementer: offering.who.to_owned(),

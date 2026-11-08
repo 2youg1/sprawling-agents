@@ -120,6 +120,18 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 -/
 
 /-!
+## 8-105a `sprawling secrets <city>`：直接列出 checkpoint 的扫描命中（`bin::main::view`）
+
+只读子命令，不需要城在服务。它按 seq 读 Ledger，把成功 `checkpoint_committed.withheld` 与拒绝 `secret_egress_blocked.withheld` 展开成每处一行 JSON：`run`、`seq`、`outcome`（`committed` 或 `refused`）、`code`（拒绝时为 `E_SECRET_EGRESS`，成功时省略）、`scope`、`path`、`offset`、`len`、`line`、`reason`。这些字段全部来自 kernel 的事件结构；本命令不重新扫描工作区，不读 blob，也不输出命中正文。没有命中时 stdout 为空、退出 0；账本或载荷读不出时按只读动词的普通拒绝退出 1。
+
+```rust
+pub(super) fn write_secret_findings(dir: &Path, out: &mut impl Write) -> Result<(), ViewError>;
+```
+
+验收：`main::view` 的测试同时放入一条成功与一条拒绝记录，逐字节比对 JSONL，并断言原命中正文不出现在输出。命令仍由 `main::verbs` 的唯一命令表登记为 `ReadsOnly`，测试经 `main::router` 走到这里。
+-/
+
+/-!
 ## 8-126 `sprawling playback export` 与 `sprawling playback check`（`bin::main::playback`；`crates/accounting/Spec.lean` §8-12）
 
 **形状。** `main/playback.rs` 是 adapter：读命令行，把人的入口交给 `accounting::playback` 的共享投影，把字节写到 stdout 或一个新文件，把复核结果写成一行 JSON。投影、选择、读界、规范字节与复核都在 `crates/accounting/Spec.lean` §8-12，本节不重述。

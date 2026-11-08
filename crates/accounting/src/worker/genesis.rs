@@ -8,7 +8,9 @@
 use std::path::{Path, PathBuf};
 
 use city::{History, has_history};
-use kernel::event::record::{AutonomyChanged, ShelvedFrom, SkillShelved};
+use kernel::event::record::{
+    AutonomyChanged, CheckpointCommitted, Commit, ShelvedFrom, SkillShelved,
+};
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
 use storage::JsonlLedger;
@@ -349,11 +351,24 @@ impl RunWorker {
             "city::building",
             &format!("{} adopted as a building", building.addr().as_str()),
         );
-        if let Err(refused) = self.adoption_base(building) {
-            return Err(self.withdrawn(building, refused));
-        }
+        let base = match self.adoption_base(building) {
+            Ok(base) => base,
+            Err(refused) => return Err(self.withdrawn(building, refused)),
+        };
         let payload = city::building_adopted_payload(building, template)?;
-        self.record(EventKind::BuildingCreated, payload)
+        self.record(EventKind::BuildingCreated, payload)?;
+        // The base commit is the one checkpoint no run's wave made, so its
+        // scan findings have no `checkpoint_committed` line unless this one
+        // writes it. After the building exists, because the record is filed
+        // under the address it adopted.
+        if let Some(base) = base {
+            self.record_at(
+                EventKind::CheckpointCommitted,
+                building.addr().clone(),
+                Payload::of(&CheckpointCommitted::Committed(base))?,
+            )?;
+        }
+        Ok(())
     }
 
     /// `refused`, once the rules the unfinished adoption of `building`
@@ -380,7 +395,7 @@ impl RunWorker {
     /// # Errors
     /// The city's hash, the clock, and a checkpoint the store refuses,
     /// a staged credential among them.
-    fn adoption_base(&mut self, building: &city::Building) -> Result<(), AxError> {
+    fn adoption_base(&mut self, building: &city::Building) -> Result<Option<Commit>, AxError> {
         let addr = building.addr();
         // The base checkpoint is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
@@ -396,18 +411,36 @@ impl RunWorker {
             },
         );
         let t = crate::Clock::now(&*self.clock)?;
-        storage::Checkpoint::open(&self.city_root)
-            .and_then(|checkpoint| {
-                checkpoint.base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+        let entropy_allow = city::load(&self.city_root, addr)?
+            .checkpoint_entropy_allow()
+            .clone();
+        let made = storage::Checkpoint::open(&self.city_root).and_then(|checkpoint| {
+            checkpoint
+                .with_entropy_allowlist(entropy_allow)
+                .base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
                     self.note(
                         runtime::diagnostics::Level::Effect,
                         "storage::checkpoint",
                         &format!("{}: base checkpoint {step:?}", addr.as_str()),
                     );
                 })
-            })
-            .map(drop)
-            .map_err(storage::StorageError::into_ax)
+        });
+        match made {
+            Ok(record) => Ok(Some(record)),
+            Err(err) => {
+                // A refusal tells the person to run `sprawling secrets`; the
+                // report it names has to be in the ledger before that.
+                let failure = runtime::CheckpointFailure::from(err);
+                if let Some(report) = failure.refusal() {
+                    self.record_at(
+                        EventKind::SecretEgressBlocked,
+                        addr.clone(),
+                        Payload::of(report)?,
+                    )?;
+                }
+                Err(failure.into_cause())
+            }
+        }
     }
 
     /// The startup scan: closes the account of every

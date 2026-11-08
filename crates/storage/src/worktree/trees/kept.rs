@@ -366,6 +366,8 @@ mod tests {
                 .unwrap()
                 .land(&[], TimeMs::new(t), &owner(), "checkpoint: city")
                 .unwrap()
+                .oid
+                .to_string()
         };
         std::fs::create_dir_all(city_docs.parent().unwrap()).unwrap();
         std::fs::write(

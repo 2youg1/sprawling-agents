@@ -7,6 +7,7 @@
 //! `crates/agent_protocols/spec/Harness/Session.lean` states them.
 
 use kernel::event::Who;
+use kernel::event::record::CheckpointFinding;
 use kernel::ledger::chain_hash;
 use kernel::{Address, B3Hash, EventDraft, GENESIS_PREV, Locator, RunId, Seq};
 
@@ -262,4 +263,51 @@ fn a_lost_session_freezes_cancelled_with_no_answer() {
             EventKind::RunFrozen,
         ]
     );
+}
+
+/// A harness's own tree can be refused by a known key shape after the
+/// driver has finished. The report reaches the same event a wave
+/// checkpoint writes, before the freeze that ends the run, so
+/// `sprawling secrets` reads it back afterwards.
+#[test]
+fn a_refused_tree_is_booked_before_the_run_freezes() {
+    let owned = owned();
+    let mut ledger = Kept::new();
+    let mut clock = 0u64;
+    let mut now = || {
+        clock = clock.saturating_add(1);
+        Ok(TimeMs::new(clock))
+    };
+    let run = HarnessRun::open(charter(&owned), &mut ledger, &mut now).unwrap();
+    let report = SecretEgressBlocked::checkpoint(
+        vec!["lab".to_owned()],
+        vec![CheckpointFinding {
+            path: "lab/SPEC.md".to_owned(),
+            offset: 4,
+            len: 30,
+            line: 1,
+            reason: "anthropic".to_owned(),
+        }],
+    );
+    run.refusal(&mut ledger, &report, TimeMs::new(5)).unwrap();
+    run.abandon(&mut ledger, &handoff(&owned), TimeMs::new(6))
+        .unwrap();
+
+    assert_eq!(
+        ledger.kinds(),
+        vec![
+            EventKind::CheckpointCommitted,
+            EventKind::RunStarted,
+            EventKind::SecretEgressBlocked,
+            EventKind::HandoffWritten,
+            EventKind::RunFrozen,
+        ]
+    );
+    let booked = ledger
+        .lines
+        .iter()
+        .find(|line| line.kind == EventKind::SecretEgressBlocked)
+        .unwrap();
+    assert_eq!(booked.data.as_map()["code"], "E_SECRET_EGRESS");
+    assert_eq!(booked.data.as_map()["withheld"][0]["reason"], "anthropic");
 }

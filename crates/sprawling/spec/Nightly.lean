@@ -197,6 +197,7 @@ tag 只接受上述形状，日期为六位数字、月日范围有效，tag 末
 `identical` 为 Current，`behind` 为 Behind，`ahead` 为 Ahead，`diverged` 为 Unconfirmed；
 网络或解码失败为 Refused，不能猜版本顺序。base 与 head 的顺序由 verdict 的含义决定
 （`Behind` 说的是已安装的这份），所以换序会把更新方向整条读反。
+发布说明在比较范围之前明确写出：这是自动发布的实验快照，不保证稳定性或可用性；遇到问题尽快开 issue，需要稳定则等正式版。自动构建与 CI 通过不构成这类保证。
 nightly 只经 Archive 更新，命令显式携带 `SPRAWLING_RELEASE_CHANNEL=nightly`。
 `status` 显示 Cargo 基准版本与 nightly tag，不把它说成正式 release。
 

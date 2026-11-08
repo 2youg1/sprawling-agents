@@ -33,7 +33,9 @@
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
-use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
+use kernel::{
+    Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, EntropyAllowlist, WriteDomain,
+};
 
 mod cache;
 mod desktop;
@@ -103,6 +105,8 @@ pub struct BuildingRules {
     harness_minutes: Option<std::num::NonZeroU32>,
     /// How delegated work in this building chooses a native model.
     workspace_models: Option<WorkspaceModelPolicy>,
+    /// Exact repository paths whose entropy-only checkpoint hits are exempt.
+    checkpoint_entropy_allow: EntropyAllowlist,
 }
 
 impl BuildingRules {
@@ -220,6 +224,13 @@ impl BuildingRules {
     #[must_use]
     pub fn workspace_models(&self) -> Option<&WorkspaceModelPolicy> {
         self.workspace_models.as_ref()
+    }
+
+    /// Exact paths whose entropy-only checkpoint findings are exempt.
+    /// Known provider shapes never consult this list.
+    #[must_use]
+    pub fn checkpoint_entropy_allow(&self) -> &EntropyAllowlist {
+        &self.checkpoint_entropy_allow
     }
 
     /// What this building's residents may write inside their prefixes.
@@ -413,6 +424,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
                     reading_room: Vec::new(),
                     harness_minutes: None,
                     workspace_models: None,
+                    checkpoint_entropy_allow: EntropyAllowlist::default(),
                 }),
             }
         }

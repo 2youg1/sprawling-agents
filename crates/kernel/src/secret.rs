@@ -16,6 +16,6 @@ mod scan;
 mod sealed;
 mod span;
 
-pub use scan::{names_a_credential, scan};
+pub use scan::{EntropyAllowlist, names_a_credential, scan};
 pub use sealed::Sealed;
 pub use span::{SecretRef, SecretSpan};

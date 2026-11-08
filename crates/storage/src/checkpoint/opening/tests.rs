@@ -67,6 +67,10 @@ fn oid_of(payload: &kernel::Payload) -> String {
     payload.as_map()["oid"].as_str().unwrap().to_owned()
 }
 
+fn base_oid(commit: &kernel::event::record::Commit) -> String {
+    commit.oid.to_string()
+}
+
 /// `others_never_touch_an_index`, `a_pin_holds_what_its_writer_staged`: two
 /// writers checkpoint their own rooms of one city on two threads, wave for
 /// wave in lockstep, and each commit's tree is exactly what its own writer
@@ -176,7 +180,7 @@ fn writers_racing_for_the_base_make_exactly_one() {
                 handle
                     .ensure_base(&["work/one".to_owned()], TimeMs::new(1_000), &of)
                     .unwrap()
-                    .map(|payload| oid_of(&payload))
+                    .map(|base| base_oid(&base))
             })
         })
         .collect();

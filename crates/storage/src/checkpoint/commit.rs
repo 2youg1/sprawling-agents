@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use kernel::event::record::{CheckpointCommitted, Commit, FileRestored};
+use kernel::event::record::{CheckpointCommitted, CheckpointFinding, Commit, FileRestored};
 use kernel::{Address, GitOid, Payload, TimeMs};
 
 use crate::alias::WriteTarget;
@@ -46,24 +46,43 @@ pub(super) fn checkpoint_ref(of: &Provenance, oid: git2::Oid) -> String {
 /// It carries what the commit's own trailers carry that the record
 /// cannot say for itself: the model and the effort. The run and the
 /// actor are the record's identity and are not repeated here.
+pub(super) struct CommitDetails<'a> {
+    pub(super) of: &'a Provenance,
+    pub(super) scopes: &'a [String],
+    pub(super) files: Vec<String>,
+    pub(super) withheld: Vec<CheckpointFinding>,
+}
+
 pub(super) fn committed(
     oid: git2::Oid,
-    of: &Provenance,
-    scopes: &[String],
-    files: Vec<String>,
+    details: CommitDetails<'_>,
 ) -> Result<Payload, StorageError> {
+    let record = commit_record(oid, details)?;
+    Payload::of(&CheckpointCommitted::Committed(record))
+        .map_err(|source| StorageError::Draft { source })
+}
+
+/// The record of one commit, in the shape the Ledger and the callers of
+/// [`Checkpoint::land`] both read.
+///
+/// One builder for a commit's record, so the payload a checkpoint writes and
+/// the value a landing hands back cannot describe the same commit differently.
+pub(super) fn commit_record(
+    oid: git2::Oid,
+    details: CommitDetails<'_>,
+) -> Result<Commit, StorageError> {
     let spelled = oid.to_string();
     let oid = GitOid::parse(&spelled).ok_or_else(|| StorageError::Checkpoint {
         op: "record a checkpoint commit",
         detail: format!("git named this commit {spelled}, which is not 40 hex digits"),
     })?;
-    let record = CheckpointCommitted::Committed(Commit {
+    Ok(Commit {
         oid,
-        by: of.attribution(),
-        scope: scopes.to_vec(),
-        files,
-    });
-    Payload::of(&record).map_err(|source| StorageError::Draft { source })
+        by: details.of.attribution(),
+        scope: details.scopes.to_vec(),
+        files: details.files,
+        withheld: details.withheld,
+    })
 }
 
 pub struct Checkpoint {
@@ -73,6 +92,8 @@ pub struct Checkpoint {
     pub(crate) last: Option<git2::Oid>,
     /// Which index this handle stages into (`checkpoint::opening`).
     pub(crate) index: super::opening::IndexOwner,
+    /// Exact paths whose entropy-only findings may commit without a record.
+    pub(crate) entropy_allow: kernel::EntropyAllowlist,
 }
 
 pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
@@ -102,7 +123,7 @@ impl Checkpoint {
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
-    ) -> Result<Option<Payload>, StorageError> {
+    ) -> Result<Option<Commit>, StorageError> {
         if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
@@ -121,7 +142,7 @@ impl Checkpoint {
             .and_then(|mut index| index.read(true))
             .map_err(git_err("read the index the base wrote"))?;
         match made {
-            Ok(payload) => Ok(Some(payload)),
+            Ok(record) => Ok(Some(record)),
             // Another writer made the base between the read and the swap:
             // the same city as if it had gone first (storage §8-39).
             Err(_) if Self::head_commit(&self.repo)?.is_some() => Ok(None),
@@ -156,7 +177,7 @@ impl Checkpoint {
         of: &Provenance,
     ) -> Result<Payload, StorageError> {
         let files = self.stage_scopes(scopes)?;
-        self.scan_staged()?;
+        let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
@@ -171,7 +192,15 @@ impl Checkpoint {
                 "sprawling: a wave checkpoint",
             )
             .map_err(git_err("file a wave checkpoint"))?;
-        committed(oid, of, scopes, files)
+        committed(
+            oid,
+            CommitDetails {
+                of,
+                scopes,
+                files,
+                withheld,
+            },
+        )
     }
 
     /// The way back a `file_discarded` names: the blob at `address` in

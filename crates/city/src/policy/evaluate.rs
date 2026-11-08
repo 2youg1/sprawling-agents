@@ -25,7 +25,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist};
+use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, EntropyAllowlist};
 
 use super::reach::DomainReach;
 use super::{
@@ -202,6 +202,9 @@ pub(crate) struct Written {
     /// Optional native-model routing for delegated work in this workspace.
     #[serde(default)]
     workspace_models: Option<WorkspaceModelPolicy>,
+    /// Exact repository paths whose entropy-only checkpoint hits are exempt.
+    #[serde(default)]
+    checkpoint_entropy_allow: Vec<String>,
 }
 
 /// What `usersbrowser` may say: off, on with no address declared yet,
@@ -258,6 +261,11 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         // than the person granted it and saying so nowhere.
         write_prefixes.push(Address::parse(prefix)?);
     }
+    let checkpoint_entropy_allow = written
+        .checkpoint_entropy_allow
+        .iter()
+        .map(|path| Address::parse(path))
+        .collect::<Result<EntropyAllowlist, AxError>>()?;
     let usersbrowser = match written.usersbrowser {
         Granted::Switch(false) => None,
         Granted::Switch(true) => Some(UserBrowser::Waiting),
@@ -315,6 +323,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         reading_room: written.reading_room,
         harness_minutes: written.harness_minutes,
         workspace_models: written.workspace_models,
+        checkpoint_entropy_allow,
     })
 }
 
