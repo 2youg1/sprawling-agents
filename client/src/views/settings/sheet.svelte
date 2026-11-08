@@ -5,12 +5,13 @@
 
 <script lang="ts">
   // What the settings panel holds (client/Spec.lean §7L): the tree in a column
-  // of its own on the left, under the panel's name and its close key,
-  // and the group the tree points at beside it. The two scroll apart, so
-  // a long group never scrolls the tree out of reach; a panel narrower
-  // than `lg` stacks them and scrolls as one. Drawn inside the
-  // panel's `<dialog>` and, on its own, by the gallery, which cannot
-  // open a modal without covering every other specimen.
+  // of its own on the left, under a home key that leaves for the
+  // conversation in zen, the panel's name and its close key, and the
+  // group the tree points at beside it. The two scroll apart, so a long
+  // group never scrolls the tree out of reach; a panel narrower than
+  // `lg` stacks them and scrolls as one. Drawn inside the panel's
+  // `<dialog>` and, on its own, by the gallery, which cannot open a
+  // modal without covering every other specimen.
 
   import { say } from "../../core/lang";
   import type { SetupGroup, View } from "../../core/route";
@@ -24,11 +25,13 @@
     readonly beneath: View;
     readonly onPick: (group: SetupGroup) => void;
     readonly onClose: () => void;
+    // Leaves for the conversation in the zen tier.
+    readonly onHome: () => void;
     // The id the group's heading carries, which names the panel.
     readonly titleId: string;
   }
 
-  const { group, beneath, onPick, onClose, titleId }: Props = $props();
+  const { group, beneath, onPick, onClose, onHome, titleId }: Props = $props();
   const { lang } = ui();
 
   let body = $state<HTMLElement | undefined>(undefined);
@@ -51,17 +54,26 @@
     <div
       class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
     >
-      <div class="flex items-center justify-between px-snug">
-        <span class="text-label font-label text-text">{say($lang, "nav_settings")}</span>
+      <div class="flex items-center justify-between gap-snug px-snug">
         <button
           type="button"
-          class="-mr-tight flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"
+          class="-ml-tight flex h-control-sm min-w-0 items-center gap-tight rounded-control pr-snug text-note text-text-faint transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive"
+          aria-label={say($lang, "settings_home_zen")}
+          onclick={onHome}
+        >
+          <Glyph name="chevron" size="sm" class="shrink-0 rotate-180" />
+          <span class="truncate">{say($lang, "settings_home_zen")}</span>
+        </button>
+        <button
+          type="button"
+          class="-mr-tight flex size-control-sm shrink-0 items-center justify-center rounded-control text-text-faint transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive"
           aria-label={say($lang, "settings_close")}
           onclick={onClose}
         >
           <Glyph name="cross" size="sm" />
         </button>
       </div>
+      <p class="px-snug text-label font-label text-text">{say($lang, "nav_settings")}</p>
       <Tree {group} {beneath} {onPick} />
     </div>
     <!-- The group is the panel's second level: it arrives half a panel

@@ -38,6 +38,8 @@
   import { closeRight, rightItem } from "./views/inspect/open.svelte";
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
+  import HomeSide from "./views/pages/home_side.svelte";
+  import { homeSidesOf } from "./views/pages/home_side";
   import Palette from "./views/palette.svelte";
   import {
     closePalette,
@@ -186,6 +188,18 @@
     sheetOpen = false;
     opener?.focus();
     opener = null;
+  }
+
+  // Leaves any full page for the Mayor's room in the zen tier: the
+  // settings panel's home key, and a click on either blank side of a
+  // page that offers them.
+  function homeZen(): void {
+    u.prefs.setTier("zen");
+    u.go(DEFAULT_VIEW);
+  }
+
+  function homeTalk(): void {
+    u.go(DEFAULT_VIEW);
   }
 
   // The tier is this tab's (`core/prefs.ts`, client/Spec.lean D47), cycled in `TIERS` order;
@@ -412,11 +426,20 @@
     {:else}
       <Pages view={beneath} />
     {/if}
-    <SettingsPanel group={panelGroup(view)} {beneath} onPick={pickGroup} onClose={closePanel} />
+    <SettingsPanel
+      group={panelGroup(view)}
+      {beneath}
+      onPick={pickGroup}
+      onClose={closePanel}
+      onHome={homeZen}
+    />
   {:else if view.kind === "talk"}
     <Workspace address={view.address} item={view.item} session={view.session} {tier} />
   {:else}
     <Pages {view} />
+    {#if homeSidesOf(view)}
+      <HomeSide onHome={homeTalk} />
+    {/if}
   {/if}
   {#if view.kind !== "welcome"}
     <Edge {tier} onTier={cycleTier} onPeek={(on: boolean) => (peeking = on)} {mailboxAsked} />

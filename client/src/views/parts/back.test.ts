@@ -9,12 +9,13 @@ import { Address } from "../../wire";
 import { backOf } from "./back";
 
 describe("a page's back key", () => {
-  test("a page entered from the settings tree leads back to the settings panel", () => {
+  test("a page entered from the settings tree draws no back key", () => {
     expect([
       backOf({ kind: "city" }),
       backOf({ kind: "mcp" }),
       backOf({ kind: "monitor" }),
-    ]).toEqual([{ kind: "setup" }, { kind: "setup" }, { kind: "setup" }]);
+      backOf({ kind: "welcome" }),
+    ]).toEqual([null, null, null, null]);
   });
 
   test("a building leads back to the city's overview", () => {

@@ -5,11 +5,11 @@
 
 <script lang="ts" module>
   // The ways into a page that are not the page: the palette (Accel-/),
-  // the file finder in its box (Accel-P), the back key every page but
-  // the conversation stands under, and the stack of refusals over the
-  // composer. The palette and the finder are drawn as specimens - the
-  // same box open in this fold's flow, because a modal would cover the
-  // whole route - and the refusals in the stack's own specimen stand.
+  // the file finder in its box (Accel-P), the back key a building keeps
+  // to the city, and the stack of refusals over the composer. The
+  // palette and the finder are drawn as specimens - the same box open
+  // in this fold's flow, because a modal would cover the whole route -
+  // and the refusals in the stack's own specimen stand.
   //
   // The palette shows the places with the cursor on its first row, then
   // the verbs with one this page cannot run, kept and greyed with its
@@ -152,7 +152,7 @@
     },
   ];
   const VERBS = $derived([...ACTIONS, ...SESSIONS]);
-  const BACK = $derived(backLookOf({ kind: "mcp" }, $lang));
+  const BACK = $derived(backLookOf({ kind: "building", address: Address.make("hall") }, $lang));
 
   // The rooms a conversation in `lab/parser` can be carried to, as the
   // palette lists them once its first row was pressed: the room itself,
@@ -279,7 +279,7 @@
   </Stand>
 </Case>
 
-<Case label="back key · to the settings, over a page">
+<Case label="back key · to the city, over a building page">
   {#if BACK !== undefined}
     <Back {...BACK} />
   {/if}
