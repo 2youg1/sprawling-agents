@@ -1418,7 +1418,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 ### 验收
 
 1. **红转绿（`driving/tests/sieving`）**：一次真实派活，`exec` 打印一份超过 2 KiB 的输出；模型收到的工具结果含 `[sieve:` 页脚且短于原文；账本 `tool_result` 载荷的 `sieve[0].original` 是 `cas:b3-` 且能从 CAS 读回原文，`rest_path` 在磁盘上。
-2. `crates/citysim/tests/sieve.rs` 的 `the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
+2. `crates/citysim/tests/scenarios/sieve.rs` 的 `the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
 3. 同种子 citysim 逐字节重放不变（`the_same_seed_and_table_replay_a_byte_identical_window`）。
 
 **留给 gitignore 的一句**：`.rest/` 住房间里，楼的 `.gitignore`（`crates/city/Spec.lean` §8-21）应忽略它，否则检查点提交会把一份 rest 文件收进历史。那份文件不在本节范围内。
@@ -1736,7 +1736,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 1. **红转绿**：`crates/accounting/src/worker/plans/tests/graph.rs` 的 `three_ready_nodes_drive_three_runs_at_once`——
    三个 ready 节点、一个 pursuit，假 provider 记下同时在飞的请求峰值。串行时峰值为 1，红就红在这里。
-2. **红转绿**：`crates/citysim/tests/scenario.rs` 的 `two_runs_interleaved_on_one_ledger_replay_byte_identically`。
+2. **红转绿**：`crates/citysim/tests/scenarios/scenario.rs` 的 `two_runs_interleaved_on_one_ledger_replay_byte_identically`。
 3. **红转绿**：`accounting::worker::driving::tests::flight::two_dispatches_from_the_desk_drive_at_once`——
    两次派活各自进一条车道，主循环接它们回家；账本 `seq` 单调、`prev` 成链，
    每一轮活的 `run_started` 排在它自己的 `model_called` 之前，且第一轮冻结之前两轮都已开始。

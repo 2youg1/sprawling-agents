@@ -53,8 +53,11 @@
 #
 # Which jobs a pull request must pass is a repository setting rather than a
 # line in this file. `changes` is deliberately not required: it exists to
-# let `proof` and `nix-eval` skip, and a skipped required check counts as met while a
-# required check that never starts blocks the branch for ever.
+# let `proof`, `nix-eval`, and the heavy suite jobs skip when their paths
+# did not move (docs-only changes keep `gates` and `supply`), and a
+# skipped required check counts as met while a required check that never
+# starts blocks the branch for ever. Warming the release dependency cache
+# after a green main push lives in `release-warm.yml`, not here.
 #
 # Windows for everything a person can reproduce at their desk, because it is
 # the platform the project is developed on, so a red job is a red local run.
@@ -137,6 +140,8 @@ jobs:
     outputs:
       proof: ${{ steps.filter.outputs.proof }}
       nix: ${{ steps.filter.outputs.nix }}
+      code: ${{ steps.filter.outputs.code }}
+      lean: ${{ steps.filter.outputs.lean }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
@@ -163,6 +168,32 @@ jobs:
               - 'crates/desktop/ffi/zig-version'
               - 'crates/xtask/src/package/**'
               - 'crates/xtask/src/bundle.rs'
+            # Product code, client, gates machinery, and the files that
+            # change what `just check` compiles or judges. A docs-only
+            # pull request leaves this false so the heavy Windows jobs
+            # stay off (`crates/xtask/Spec.lean` D27).
+            code:
+              - 'crates/**'
+              - 'client/**'
+              - 'tools/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - 'clippy.toml'
+              - '.cargo/**'
+              - 'justfile'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'bunfig.toml'
+              - 'architecture.toml'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'deny.toml'
+            lean:
+              - '**/*.lean'
+              - 'lean-toolchain'
+              - 'lakefile.toml'
+              - 'lake-manifest.json'
 
   # Evaluation catches a malformed flake input without paying for the full
   # build. The complete Nix build and its installation acceptance stay in
@@ -272,6 +303,10 @@ jobs:
   # busy, so the two renders cannot share one four-processor runner
   # without slowing each other.
   swap:
+    needs: changes
+    # `always()` so a release-validation call still runs when `changes` is
+    # skipped; docs-only pull requests leave `code` false and stay off.
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -297,6 +332,8 @@ jobs:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
   models:
+    needs: changes
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.lean == 'true'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -309,6 +346,8 @@ jobs:
         run: just models
 
   clippy:
+    needs: changes
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -347,12 +386,14 @@ jobs:
   # lets a path cargo baked in at compile time resolve there.
   #
   # The suite links with rust-lld (lld-link) rather than Microsoft's
-  # link.exe: the archive holds 78 linked binaries, and on a warm cache
-  # the compile from the first workspace crate to the archive took 171 s
-  # and 194 s in two runs against 201 s with link.exe. This archive is a
-  # test build that nobody downloads;
-  # `release.yml` builds what ships with link.exe, so the linker of a
-  # released binary is not this one (`crates/xtask/Spec.lean` D27).
+  # link.exe: the archive's linked binaries are whatever
+  # `cargo nextest archive` lists for the tree (citysim's scenarios are
+  # one binary; sprawling/wire top-level `tests/*.rs` files are still one
+  # each — `crates/xtask/Spec.lean` D27). On a warm cache the compile from
+  # the first workspace crate to the archive took 171 s and 194 s in two
+  # runs against 201 s with link.exe. This archive is a test build that
+  # nobody downloads; `release.yml` builds what ships with link.exe, so
+  # the linker of a released binary is not this one.
   #
   # The target directory starts warm: `./.github/actions/warm-target`
   # restores the one the newest push to main left and ages every input
@@ -362,6 +403,8 @@ jobs:
   # the bundle comes from its own cache entry when `client/` is unchanged.
   test-build:
     name: test build
+    needs: changes
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
     outputs:
       slices: ${{ steps.plan.outputs.slices }}
     runs-on: windows-latest
@@ -475,10 +518,14 @@ jobs:
 
   # The one verdict of the suite, under the name branch protection
   # requires. It reads the build and all slices, so a slice that
-  # failed, or never started because the build failed, fails it.
+  # failed, or never started because the build failed, fails it. A
+  # docs-only change skips the build; both sides of the need are then
+  # skipped together and this job agrees.
   test:
     needs: [test-build, test-slice]
-    if: ${{ always() }}
+    # Stay skipped with the build on a docs-only change; still run when
+    # the build failed so the missing slices fail this check by name.
+    if: ${{ always() && needs.test-build.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -579,6 +626,8 @@ jobs:
   # does not judge: its own linter forbids `any`, `as`, `throw`, `try` and a
   # non-exhaustive switch.
   client:
+    needs: changes
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -666,10 +715,14 @@ jobs:
       - name: the proofs
         run: cargo xtask proof
 
-  # D27 in crates/xtask/Spec.lean: skipped required work is not a green tree.
-  # This is the shared verdict, so release has no second list of checks.
+  # D27 in crates/xtask/Spec.lean: a path-filtered skip is allowed for the
+  # optional heavy jobs; gates and supply must still succeed, and a
+  # failure or cancel anywhere fails the tree. `changes` is on this list
+  # so a red or broken filter job cannot skip the suite and still leave
+  # validation green. This is the shared verdict, so release has no
+  # second list of checks.
   validation:
-    needs: [models, clippy, test, gates, swap, supply, client]
+    needs: [changes, models, clippy, test, gates, swap, supply, client]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -677,4 +730,10 @@ jobs:
       - name: every required job passed
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: jq -e 'all(.[]; .result == "success")' <<<"$RESULTS"
+        run: |
+          jq -e '
+            all(.[]; .result == "success" or .result == "skipped")
+            and (.gates.result == "success")
+            and (.supply.result == "success")
+            and (all(.[]; .result != "failure" and .result != "cancelled"))
+          ' <<<"$RESULTS"

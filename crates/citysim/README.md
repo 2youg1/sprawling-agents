@@ -69,7 +69,7 @@ lake build crates.citysim.Spec    # the SPEC's proofs; `just models` builds ever
 cargo xtask gates modmap specalign  # this crate's module rows and their SPEC anchors
 ```
 
-Two golden Ledgers under `crates/fixtures/` are rebuilt byte for byte by these tests: `golden-s1` by `tests/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/interventions.rs` from a whole run with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand.
+Two golden Ledgers under `crates/fixtures/` are rebuilt byte for byte by these tests: `golden-s1` by `tests/scenarios/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/scenarios/interventions.rs` from a whole run with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand. The scenario files share one integration binary (`tests/scenarios/`) so the CI test archive links that graph once.
 
 `just provider <script> <record>` starts the stand-in: it binds a loopback port, prints `SPRAWLING_PROVIDER=<url>` before it answers anything, and appends every exchange to the record.
 

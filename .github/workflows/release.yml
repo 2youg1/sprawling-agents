@@ -81,6 +81,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # A `workflow_run` caller (release-warm) has github.sha on tip of
+          # main, not the green commit; prefer an explicit source-sha.
+          ref: ${{ inputs.source-sha || github.sha }}
       - name: install pinned toolchain
         run: rustup show
       - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
@@ -152,6 +156,10 @@ jobs:
       LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nightly and release-warm pass `source-sha`; a `workflow_run`
+          # caller's github.sha is tip of main, not that green commit.
+          ref: ${{ inputs.source-sha || github.sha }}
       # The same pinned, isolated toolchain and Windows work-drive Cargo home
       # as CI, so the cache key and small-file writes follow D27's measurements.
       - uses: ./.github/actions/toolchain
@@ -185,30 +193,35 @@ jobs:
       # (crates/xtask/Spec.lean §8-11). An empty triple is the host build,
       # whose two archive names are what they always were.
       # Only main saves, and a tag push never runs on main, so the tag run
-      # is warm only when a build-only dispatch of this workflow on main ran
-      # first on the commit about to be tagged: a tag ref restores caches its
-      # default branch saved. The key is the shared key, the runner OS and
-      # architecture, a hash of the installed toolchains and of the job's
-      # CARGO*/CC*/CFLAGS*/CXX*/CMAKE*/RUST* variables (the step above makes
-      # the first a function of the tree), and a hash of the manifests,
-      # Cargo.lock, `.cargo/config.toml` and `rust-toolchain.toml` - not the
-      # event, the ref or the matrix target, so the dispatch and the tag
-      # compute the same key. A manifest change between them still restores
-      # through the prefix without the lock hash, and `cache_hit` below then
-      # reads false, because it reports an exact key only. Only what cargo
-      # would build identically is reused: workspace crates are cleaned
-      # before the save, and the fat-LTO link of the binary always runs here.
+      # is warm when a prior main build wrote the three-platform `release`
+      # entries: `release-warm.yml` after a green main CI whose commit
+      # touched the cache key inputs, a qualifying main nightly archive, or
+      # a build-only dispatch of this workflow on the commit about to be
+      # tagged. A tag ref restores caches its default branch saved. The key
+      # is the shared key, the runner OS and architecture, a hash of the
+      # installed toolchains and of the job's CARGO*/CC*/CFLAGS*/CXX*/
+      # CMAKE*/RUST* variables (the step above makes the first a function of
+      # the tree), and a hash of the manifests, Cargo.lock,
+      # `.cargo/config.toml` and `rust-toolchain.toml` - not the event, the
+      # ref or the matrix target, so the warm and the tag compute the same
+      # key. A manifest change between them still restores through the
+      # prefix without the lock hash, and `cache_hit` below then reads
+      # false, because it reports an exact key only. Only what cargo would
+      # build identically is reused: workspace crates are cleaned before the
+      # save, and the fat-LTO link of the binary always runs here.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: archive-cache
         with:
           shared-key: release
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: the checkout is the commit a nightly names
-        if: env.RELEASE_CHANNEL == 'nightly'
+      - name: the checkout is the commit a caller named
+        if: env.SOURCE_SHA != ''
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$NIGHTLY_TAG"
+          if [ "$RELEASE_CHANNEL" = nightly ]; then
+            test -n "$NIGHTLY_TAG"
+          fi
           checked_out=$(git rev-parse HEAD)
           test "$checked_out" = "$SOURCE_SHA" || {
             echo "::error::this run names $SOURCE_SHA but checked out $checked_out"

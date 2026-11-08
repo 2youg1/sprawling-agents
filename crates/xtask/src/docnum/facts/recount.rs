@@ -116,6 +116,26 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
     refuse_if_empty(walk::files_with_ext(&base, &["rs"])?.len(), dir, what)
 }
 
+/// How many citysim scenario modules the suite harness loads.
+///
+/// The harness's `mod` list is the authority: a helper file under
+/// `scenarios/` is not a scenario, and `main.rs` itself is not one either.
+pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
+    let harness = "crates/citysim/tests/scenarios/main.rs";
+    let text = walk::read_text(&root.join(harness))?;
+    let found = text
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            line.strip_prefix("mod ")?.strip_suffix(';')
+        })
+        .filter(|name| {
+            !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        })
+        .count();
+    refuse_if_empty(found, harness, "scenario file")
+}
+
 /// The version this workspace pins for one crate.
 ///
 /// Every manifest is read, and two manifests pinning one crate at two

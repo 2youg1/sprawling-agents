@@ -18,7 +18,7 @@
 
 | 模块 | 它回答的问题 | 构型 |
 |---|---|---|
-| `suite`（含 held-out 判定） | 一批真实任务怎么组织、怎么跑两次而结果可比 | 库面，`tests/evaluation.rs` 驱动 |
+| `suite`（含 held-out 判定） | 一批真实任务怎么组织、怎么跑两次而结果可比 | 库面，`tests/scenarios/evaluation.rs` 驱动 |
 | `score`、`metabolism` | 哪些沉淀资产在升值、哪些该退场 | 仅测试构型 |
 | `nesting` | 模型编辑哪种嵌套格式错得最少，错时怎么错 | 仅测试构型 |
 | `ablation` | 拿掉 City.md 的某一段，居民做不了什么 | 仅测试构型 |

@@ -111,7 +111,9 @@ every week.
 (properties before examples), `insta` (golden output), `trybuild` (proof
 that something cannot be expressed), `kani` (bounded proof, Linux CI),
 `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile
-bytes).
+bytes). Miri is not among them: the only `unsafe` left is FFI into Zig or
+Win32, which Miri cannot see; the reason and the alternative live in
+[verification.md](verification.md#why-miri-is-not-a-gate).
 
 **A second compiled language is admitted by rule, not by taste.** This is
 a ruling of the person. Safe Rust comes first; Zig comes next, and only for

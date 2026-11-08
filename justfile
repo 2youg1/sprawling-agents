@@ -293,14 +293,18 @@ test-archive file:
 # takes. A slice's runner pays ~60 s of setup before its first test while
 # most parts run in 10-80 s, so the parts are bundled into four slices
 # balanced on their measured nextest time rather than given a runner
-# each. trybuild is split by package and citysim stands alone as parts;
+# each. trybuild is split by package and citysim stands alone as a part;
 # the other unit tests are grouped by crate, the integration tests by
 # package, and the remaining kinds fall into one part. The unit
 # scenarios of accounting are split into execution, collaboration and
-# the rest, and the first two share a slice that carries no other heavy
+# the rest; the first two share a slice that carries no other heavy
 # part, because their file writes and worker scenarios are the heaviest
-# load one runner takes. The domain module names live only in these
-# predicates, and the rest is generated from them.
+# load one runner takes. citysim rides with the lighter accounting
+# complement (runtime, gateway, and the accounting rest): on two green
+# Windows CI runs the worker slice ended near 424 s while accounting
+# ended near 178 s, and moving citysim off worker is what reopens the
+# "no other heavy part" rule for that slice. The domain module names
+# live only in these predicates, and the rest is generated from them.
 #
 # `environment` names what a slice installs beyond the toolchain and
 # the archive: `compile` builds projects of its own (trybuild), so it
@@ -346,8 +350,9 @@ test-slice-plan file out:
         ('trybuild', 'compile', ['trybuild-kernel', 'trybuild-storage', 'trybuild-collab', 'trybuild-runtime',
                                  'trybuild-wire', 'unit-kernel-storage', 'other-kinds']),
         ('sprawling', 'client', ['unit-xtask', 'unit-sprawling', 'integration-sprawling', 'integration-other']),
-        ('accounting', 'plain', ['unit-accounting-other', 'unit-runtime', 'unit-other', 'unit-gateway-protocols']),
-        ('worker', 'plain', ['unit-accounting-execution', 'unit-accounting-collaboration', 'citysim']),
+        ('accounting', 'plain', ['unit-accounting-other', 'unit-runtime', 'unit-other',
+                                 'unit-gateway-protocols', 'citysim']),
+        ('worker', 'plain', ['unit-accounting-execution', 'unit-accounting-collaboration']),
     ]
     bundled = [part for _, _, members in bundles for part in members]
     if sorted(bundled) != sorted(parts) or len(bundled) != len(set(bundled)):

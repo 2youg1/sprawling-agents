@@ -84,10 +84,11 @@ mod tests {
         "xtask",
     ];
 
-    /// The subcommands a document names as a way for the person to install
-    /// sprawling itself, which no recipe, workflow or check runs, so no
-    /// contributor needs them.
-    const WAYS_IN: &[&str] = &["binstall"];
+    /// Subcommands documents name that no recipe, workflow or check runs,
+    /// so no contributor needs them on every machine: install ways into
+    /// sprawling itself, and tools this repository deliberately keeps off
+    /// the gates (see docs/verification.md § Why Miri is not a gate).
+    const WAYS_IN: &[&str] = &["binstall", "miri"];
 
     fn repository() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")

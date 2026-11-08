@@ -1,0 +1,80 @@
+# Warm the three-platform `release` Rust cache after a green CI run on
+# main whose commit touched the cache key inputs. Tag builds restore
+# those entries; the fat-LTO profile is unchanged
+# (`crates/xtask/Spec.lean` D27). Kept out of `ci.yml` so a cold C
+# dependency or a flaky archive does not paint the required CI check red.
+name: release warm
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+# `workflow_run` is a low-trust trigger: without an explicit write-capable
+# cache-mode the three-platform `release` save is skipped and the warm
+# does nothing. `decide` still admits only a successful `push` CI on main
+# (`crates/xtask/Spec.lean` D27).
+cache-mode: write
+
+concurrency:
+  # Keep an in-flight warm that will write the release cache; a later main
+  # push whose `decide` sets `warm` false would otherwise abort it under
+  # `cancel-in-progress: true` and leave tag builds without the three
+  # platform entries. `queue: max` keeps pending warms that a later
+  # docs-only run would otherwise replace under the default single slot.
+  group: release-warm-main
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  decide:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      warm: ${{ steps.filter.outputs.release_cache }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: the commit CI judged
+        id: meta
+        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+      - name: the parent on main
+        id: parent
+        run: echo "base=$(git rev-parse HEAD^)" >> "$GITHUB_OUTPUT"
+      - name: whether the release cache key inputs moved
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          base: ${{ steps.parent.outputs.base }}
+          filters: |
+            release_cache:
+              - 'Cargo.lock'
+              - 'Cargo.toml'
+              - '**/Cargo.toml'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+
+  warm:
+    needs: decide
+    if: ${{ needs.decide.outputs.warm == 'true' }}
+    uses: ./.github/workflows/release.yml
+    # Same static ceiling as nightly-release: GitHub expands the called
+    # graph before job `if`, and archive still declares contents:read so
+    # this warm receives no publish or OIDC grant (`crates/xtask/Spec.lean` D27).
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      channel: source
+      source-sha: ${{ needs.decide.outputs.sha }}
+      sign: false
