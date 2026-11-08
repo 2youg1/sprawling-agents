@@ -8,9 +8,8 @@
 //! tool that says nothing. Each one is a typed answer with its cause,
 //! never the word "absent" on its own.
 //!
-//! Every probe here is handed a temporary directory as its search path
-//! or its component directory, so nothing touches this process's own
-//! environment.
+//! Probes use temporary directories; real scans run in a child with its
+//! own environment so other tests retain their machine state.
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -24,85 +23,128 @@ const VARIABLE: &str = "SPRAWLING_TEST_COMPONENT";
 
 #[test]
 fn a_guest_with_the_wrong_digest_is_broken_not_absent() {
+    scan_python_in_child(false);
+}
+
+#[test]
+fn an_override_scan_is_reported_unpinned() {
+    scan_python_in_child(true);
+}
+
+fn scan_python_in_child(overridden: bool) {
     let dir = tempfile::tempdir().unwrap();
-    let at = dir.path().join("python.wasm");
+    let at = accounting::home::Home::at(dir.path())
+        .components()
+        .join("python-wasi/python.wasm");
+    std::fs::create_dir_all(at.parent().unwrap()).unwrap();
     std::fs::write(&at, b"wrong guest").unwrap();
-    let expected = kernel::B3Hash::digest(b"registered guest");
-    let found = Presence::Present {
-        at,
-        version: Version::Silent,
-    };
-    let answered = judge_python_guest(
-        found,
-        PythonGuestSource::Pinned,
-        &expected.to_string(),
-        &std::sync::OnceLock::new(),
-    );
-    let expected_fault = Fault::DigestMismatch {
-        expected,
-        found: kernel::B3Hash::digest(b"wrong guest"),
-    };
+    let mut child = child::command(std::env::current_exe().unwrap());
+    child
+        .args([
+            "--exact",
+            "doctor::tests::faults::isolated_python_scan",
+            "--nocapture",
+        ])
+        .env("HOME", dir.path())
+        .env("USERPROFILE", dir.path())
+        .env(
+            "SPRAWLING_TEST_PYTHON_SCAN",
+            if overridden { "override" } else { "pinned" },
+        )
+        .env_remove(crate::doctor::table::PYTHON_WASM_VARIABLE);
+    if overridden {
+        child.env(crate::doctor::table::PYTHON_WASM_VARIABLE, &at);
+    }
+    let output = child.output().unwrap();
+    assert!(String::from_utf8_lossy(&output.stdout).contains("running 1 test"));
     assert!(
-        matches!(
-            &answered,
-            Presence::Broken { fault, .. } if fault == &expected_fault
-        ),
-        "{answered:?}"
-    );
-    let rendered = answered.describe();
-    assert!(rendered.contains(&expected.to_string()), "{rendered}");
-    assert!(
-        rendered.contains(&kernel::B3Hash::digest(b"wrong guest").to_string()),
-        "{rendered}"
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 
 #[test]
-fn a_pinned_guest_is_present() {
+fn isolated_python_scan() {
+    let Ok(mode) = std::env::var("SPRAWLING_TEST_PYTHON_SCAN") else {
+        return;
+    };
+    let machine = crate::doctor::ThisMachine::new(
+        crate::doctor::Platform::current(),
+        crate::doctor::PATIENCE,
+    );
+    let findings = crate::doctor::examine(&machine);
+    let found = &findings
+        .iter()
+        .find(|finding| finding.requirement.name == "python-wasi")
+        .unwrap()
+        .presence;
+    let rendered = found.describe();
+    if mode == "override" {
+        assert!(found.usable(), "{rendered}");
+        assert!(crate::doctor::usable_python_wasm().is_some());
+        assert!(rendered.contains("unpinned override"), "{rendered}");
+    } else {
+        assert!(matches!(found, Presence::Broken { .. }), "{rendered}");
+        assert!(crate::doctor::usable_python_wasm().is_none());
+        assert!(
+            rendered.contains(crate::doctor::table::PYTHON_GUEST_B3),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(&kernel::B3Hash::digest(b"wrong guest").to_string()),
+            "{rendered}"
+        );
+    }
+}
+
+#[test]
+fn a_pinned_guest_requires_its_stdlib_even_after_a_cached_digest_match() {
     let dir = tempfile::tempdir().unwrap();
     let at = dir.path().join("python.wasm");
     std::fs::write(&at, b"registered guest").unwrap();
     let expected = kernel::B3Hash::digest(b"registered guest").to_string();
+    let checked = std::sync::OnceLock::new();
     let found = Presence::Present {
         at: at.clone(),
         version: Version::Silent,
     };
-    let answered = judge_python_guest(
-        found,
-        PythonGuestSource::Pinned,
-        &expected,
-        &std::sync::OnceLock::new(),
-    );
+    assert!(matches!(
+        judge_python_guest(
+            found.clone(),
+            PythonGuestSource::Pinned,
+            &expected,
+            &checked
+        ),
+        Presence::Broken { .. }
+    ));
+    let lib = dir.path().join("lib/python3.14");
+    for name in [
+        "encodings/__init__.py",
+        "collections/__init__.py",
+        "difflib.py",
+        "re/__init__.py",
+        "os.py",
+    ] {
+        let path = lib.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"installed").unwrap();
+    }
     assert_eq!(
-        answered,
-        Presence::Present {
-            at,
-            version: Version::Silent,
-        }
+        judge_python_guest(
+            found.clone(),
+            PythonGuestSource::Pinned,
+            &expected,
+            &checked
+        ),
+        found
     );
-}
-
-#[test]
-fn an_override_is_reported_unpinned() {
-    let dir = tempfile::tempdir().unwrap();
-    let at = dir.path().join("other.wasm");
-    let found = Presence::Present {
-        at: at.clone(),
-        version: Version::Silent,
-    };
-    let answered = judge_python_guest(
-        found,
-        PythonGuestSource::Override,
-        "not a digest, because an override never reads it",
-        &std::sync::OnceLock::new(),
-    );
-    assert_eq!(
-        answered,
-        Presence::Present {
-            at,
-            version: Version::Said("unpinned override".to_owned()),
-        }
-    );
+    std::fs::remove_file(lib.join("encodings/__init__.py")).unwrap();
+    assert!(matches!(
+        judge_python_guest(found, PythonGuestSource::Pinned, &expected, &checked),
+        Presence::Broken { .. }
+    ));
 }
 
 /// A file on the search path that is not a program is found there and

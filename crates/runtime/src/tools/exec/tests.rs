@@ -284,6 +284,41 @@ fn a_call_names_a_command_or_a_script_and_nothing_else() {
     );
 }
 
+#[test]
+fn python_mounts_follow_the_selected_guests_stdlib_layout() {
+    struct Capture(std::sync::Arc<Mutex<Vec<Mount>>>);
+    impl Sandbox for Capture {
+        fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError> {
+            *self.0.lock().unwrap() = job.mounts.clone();
+            EchoSandbox::new().run(job)
+        }
+    }
+    let chamber = tempfile::tempdir().unwrap();
+    let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+    let wasm = chamber.path().join("python.wasm");
+    let authorized = Mount {
+        host: chamber.path().to_path_buf(),
+        guest: "/work".to_owned(),
+        writable: false,
+    };
+    for external in [false, true] {
+        if external {
+            std::fs::create_dir(chamber.path().join("lib")).unwrap();
+        }
+        let mut config = setup(chamber.path(), Some(wasm.clone()), None);
+        config.mounts.push(authorized.clone());
+        let guest = config.python_wasm.clone().unwrap();
+        let tool = ExecTool::new(config, Box::new(Capture(seen.clone())), patient()).unwrap();
+        tool.invoke(&call(python("print(1)"))).unwrap();
+        let expected = if external {
+            vec![authorized.clone(), guest.stdlib().clone()]
+        } else {
+            vec![authorized.clone()]
+        };
+        assert_eq!(*seen.lock().unwrap(), expected);
+    }
+}
+
 #[cfg(feature = "wasm")]
 #[test]
 fn the_python_guest_imports_the_advertised_stdlib() {

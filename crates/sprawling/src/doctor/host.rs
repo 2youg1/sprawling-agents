@@ -153,15 +153,21 @@ pub(crate) fn chromedriver() -> Presence {
 /// Where the CPython-WASI component is, by the variable or the
 /// component directory.
 pub(crate) fn python_wasm() -> Presence {
-    let source = std::env::var_os(PYTHON_WASM_VARIABLE)
+    look(PYTHON_WASI)
+}
+
+/// The component probe and execution entry share this non-recursive provenance door.
+pub(super) fn python_component(
+    variable: Option<OsString>,
+    dir: Option<PathBuf>,
+    file: &str,
+) -> Presence {
+    let source = variable
+        .as_ref()
         .filter(|value| !value.is_empty())
         .map_or(PythonGuestSource::Pinned, |_| PythonGuestSource::Override);
-    judge_python_guest(
-        look(PYTHON_WASI),
-        source,
-        PYTHON_GUEST_B3,
-        &PYTHON_GUEST_CHECK,
-    )
+    let found = super::probe::component_at(PYTHON_WASM_VARIABLE, variable, dir, file);
+    judge_python_guest(found, source, PYTHON_GUEST_B3, &PYTHON_GUEST_CHECK)
 }
 
 /// Whether the component came through the pinned install or the developer override.
@@ -191,7 +197,29 @@ pub(super) fn judge_python_guest(
         .get_or_init(|| verify_python_guest(&at, expected))
         .clone()
     {
-        Ok(()) => Presence::Present { at, version },
+        Ok(()) => {
+            let lib = runtime::PythonGuest::at(at.clone())
+                .stdlib()
+                .host
+                .join("python3.14");
+            let installed = [
+                "encodings/__init__.py",
+                "collections/__init__.py",
+                "difflib.py",
+                "re/__init__.py",
+                "os.py",
+            ]
+            .iter()
+            .all(|name| lib.join(name).is_file());
+            if installed {
+                Presence::Present { at, version }
+            } else {
+                Presence::Broken {
+                    at,
+                    fault: Fault::HalfWritten,
+                }
+            }
+        }
         Err(fault) => Presence::Broken { at, fault },
     }
 }

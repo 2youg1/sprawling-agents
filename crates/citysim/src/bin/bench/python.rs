@@ -191,6 +191,7 @@ fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
 }
 
 fn measure_guest_as(selected: PythonGuest, arm: Arm) -> Result<Report, String> {
+    let stdlib_before = stdlib_digest(&selected.stdlib().host)?;
     let mut prepared = prepare(&selected)?;
     let identity = Identity {
         build: current_build()?,
@@ -256,6 +257,11 @@ fn measure_guest_as(selected: PythonGuest, arm: Arm) -> Result<Report, String> {
             "the guest bytes changed while the baseline was running",
         ));
     }
+    if stdlib_digest(&selected.stdlib().host)? != stdlib_before {
+        return Err(fixture(
+            "the stdlib tree changed while the baseline was running",
+        ));
+    }
     Ok(report)
 }
 
@@ -295,6 +301,52 @@ impl Guest {
             .map(|bytes| B3Hash::digest(&bytes))
             .map_err(|why| prerequisite(format!("reread the CPython guest snapshot: {why}")))
     }
+}
+
+/// Canonical regular-file entries from docs/third-party.md, including raw path bytes.
+fn stdlib_digest(root: &Path) -> Result<B3Hash, String> {
+    fn visit(
+        root: &Path,
+        relative: Vec<u8>,
+        entries: &mut Vec<(Vec<u8>, PathBuf)>,
+    ) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(root)? {
+            let entry = entry?;
+            let mut name = relative.clone();
+            if !name.is_empty() {
+                name.push(b'/');
+            }
+            name.extend_from_slice(entry.file_name().as_encoded_bytes());
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                visit(&entry.path(), name, entries)?;
+            } else if kind.is_file() {
+                entries.push((name, entry.path()));
+            }
+        }
+        Ok(())
+    }
+    let read = || -> std::io::Result<B3Hash> {
+        let mut entries = Vec::new();
+        visit(root, Vec::new(), &mut entries)?;
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        let mut bytes = Vec::new();
+        for (name, path) in entries {
+            let contents = std::fs::read(path)?;
+            let length = u64::try_from(contents.len()).map_err(std::io::Error::other)?;
+            bytes.extend_from_slice(&name);
+            bytes.push(0);
+            bytes.extend_from_slice(&length.to_le_bytes());
+            bytes.extend_from_slice(&contents);
+        }
+        Ok(B3Hash::digest(&bytes))
+    };
+    read().map_err(|why| {
+        prerequisite(format!(
+            "digest the selected stdlib tree {}: {why}",
+            root.display()
+        ))
+    })
 }
 
 fn current_build() -> Result<B3Hash, String> {
@@ -910,6 +962,27 @@ fn fixture(detail: impl Into<String>) -> String {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stdlib_digest_uses_registered_encoding_and_detects_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("a")).unwrap();
+        std::fs::write(dir.path().join("z"), b"last").unwrap();
+        std::fs::write(dir.path().join("a/b"), b"first").unwrap();
+        let mut canonical = b"a/b\0".to_vec();
+        canonical.extend_from_slice(&5_u64.to_le_bytes());
+        canonical.extend_from_slice(b"firstz\0");
+        canonical.extend_from_slice(&4_u64.to_le_bytes());
+        canonical.extend_from_slice(b"last");
+        let before = stdlib_digest(dir.path()).unwrap();
+        assert_eq!(before, B3Hash::digest(&canonical));
+        std::fs::write(dir.path().join("a/b"), b"other").unwrap();
+        assert_ne!(before, stdlib_digest(dir.path()).unwrap());
+        std::fs::write(dir.path().join("a/b"), b"first").unwrap();
+        assert_eq!(before, stdlib_digest(dir.path()).unwrap());
+        std::fs::rename(dir.path().join("z"), dir.path().join("y")).unwrap();
+        assert_ne!(before, stdlib_digest(dir.path()).unwrap());
+    }
 
     #[test]
     fn measured_output_failures_carry_a_code_action_and_recovery() {

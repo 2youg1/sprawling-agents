@@ -213,7 +213,9 @@ impl ExecTool {
             ));
         };
         let mut mounts = self.setup.mounts.clone();
-        mounts.push(guest.stdlib.clone());
+        if guest.stdlib.host.is_dir() {
+            mounts.push(guest.stdlib.clone());
+        }
         let job = SandboxJob {
             wasm: guest.wasm.clone(),
             argv: vec!["python".to_owned(), "-c".to_owned(), code.to_owned()],

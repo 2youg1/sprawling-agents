@@ -152,7 +152,7 @@ pub(super) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError>
 
 - **`command` 是一行命令，怎么跑由楼定**（D118）。楼给了 shell（`Shell::Found`）时它交给那个解释器，即 shell 臂；楼没要 shell（`Shell::Absent`，这是缺省，`crates/kernel/spec/Config.lean` §8-22）时它被读成一个程序与它的参数，经 program 臂跑；楼要了 shell 而所在的主机上没有（`Shell::Missing`）照旧拒（D30）。`parse_arm` 只读参数，所以 bench 的删除预判（`kernel::discard::forecast`）与 sieve 的命令键（§8-27）看到的总是 `Shell { text }`，与楼无关；换成 program 臂发生在 `ExecTool::invoke` 里，在放置之后、起进程之前。
 - **程序行的文法**（`program_line`）：引号外的空白分词；一对单引号或双引号里的字符，包括空白，原样并进当前的词，引号本身不进词，引号里不做任何展开；反斜杠是普通字符，因为它是 Windows 路径的分隔符。引号外出现 `|`、`&`、`;`、`<`、`>`、`(`、`)`、`$`、反引号、`*`、`?`、`[`、`]`、`{`、`}`、`~`、`#` 或换行时拒绝：这些字符在 shell 里有意义，原样当参数传下去，跑的就是另一条命令，而模型不会知道。引号没有闭合、整行没有一个词，也拒。拒绝是 `E_INVALID_ARGS`，主语点出那个字符，恢复语说这栋楼没有 shell，只能跑一个程序和它的参数：管道与重定向写成 `python`，或请 User 在楼的 `CONFIG.toml` 里设 `[sandbox] shell = true`。
-- **`python`** 是一段脚本，交给 python 臂（wasip1 guest，§8-13）；它没有 host 形，`where: host` 时拒。它除 run 的 mounts 外还得到 `PythonGuest` 携带的一个只读 stdlib 目录。
+- **`python`** 是一段脚本，交给 python 臂（wasip1 guest，§8-13）；它没有 host 形，`where: host` 时拒。需要外置 stdlib 时，它除 run 的 mounts 外还得到 `PythonGuest` 携带的一个只读 stdlib 目录。
 - **旧形状**：`arm` 是较早的版本拼这次调用的方式（D115），收到它时以 `E_INVALID_ARGS` 拒绝，恢复语说出 `command` 与 `python`。两者都给、或都不给，同码拒绝。
 -/
 
@@ -208,7 +208,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 三个参数，在函数参数上限之内。
 
-`PythonGuest::at` 把 wasm 旁的 `lib/` 作为 stdlib；`with_stdlib` 只供 bench 的冷子进程把私有 wasm 快照与来源树重新配成同一个值。两种构造都把宿主目录以只读 `Mount` 映到 `/usr/local/lib`，不在代码里写死 Python 的 minor 版本。`run_python` 把这条 mount 追加在这次 run 自己的 mounts 之后；因此 Python 臂除了工作区授权外还得到恰好一个只读目录，组件缺失仍是 `E_TOOL_UNAVAILABLE`。真实 guest 测试 `the_python_guest_imports_the_advertised_stdlib` 经 `SPRAWLING_PYTHON_WASM` 选择工件，无工件时跳过，导入 `collections`、`difflib`、`itertools`、`re`，不再另给 stdlib mount。
+`PythonGuest::at` 把 wasm 旁的 `lib/` 作为 stdlib；`with_stdlib` 只供 bench 的冷子进程把私有 wasm 快照与来源树重新配成同一个值。两种构造都把宿主目录以只读 `Mount` 映到 `/usr/local/lib`，不在代码里写死 Python 的 minor 版本。`run_python` 在旁置 lib/ 存在时把这条 mount 追加在这次 run 自己的 mounts 之后；没有旁置目录的内嵌 stdlib 覆盖不追加它。默认 guest 经 Doctor 确认 stdlib 安装完整，仍追加该挂载；因此 Python 臂除了工作区授权外还得到恰好一个只读目录，组件缺失仍是 `E_TOOL_UNAVAILABLE`。真实 guest 测试 `the_python_guest_imports_the_advertised_stdlib` 经 `SPRAWLING_PYTHON_WASM` 选择工件，无工件时跳过，导入 `collections`、`difflib`、`itertools`、`re`，不再另给 stdlib mount。
 
 **账本上留什么**：配置写入时不记事件——`CONFIG.toml` 是「一跑受什么治理」的权威，再记一条同事实的事件就是第二个权威。账本记的是**一跑拿它做了什么**：`exec` 的结果载荷增 `env` 字段，列出这次真正递给子进程的名字，按名排序。名字不是值——值恒不入账本。
 
