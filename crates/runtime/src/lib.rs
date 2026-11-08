@@ -32,7 +32,7 @@ pub mod transcript;
 pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
 pub use backlog::{Ceiling, Unapplied, Unseen, platform_shares};
 pub use backlog::{Chunk, Exit, PlatformShares, PollBudget, RunProcesses, Shares, Sink, Stream};
-pub use tools::BoundReader;
+pub use tools::{BoundReader, Opened};
 pub use tools::ChildStatus;
 pub use tools::ProviderMode;
 pub use tools::ReadBound;

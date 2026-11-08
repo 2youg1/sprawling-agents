@@ -393,6 +393,7 @@ impl Freezing<'_> {
 /// Where a session's origin becomes a conversation, declared here because a
 /// module lives where the crate root says it does.
 mod inherited;
+pub(in crate::worker) use inherited::InheritedContext;
 mod model_note;
 mod naming;
 mod run_slot;

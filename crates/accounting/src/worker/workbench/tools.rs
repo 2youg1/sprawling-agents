@@ -127,12 +127,23 @@ impl Laying {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
+        let candidates: runtime::RuleCandidates = {
+            let scope = crate::prompt_chain::RuleScope {
+                city_root: site.write_root.clone(),
+                building: site.building.addr().clone(),
+                room: addr.clone(),
+            };
+            Arc::new(move |admitted, landed| {
+                crate::prompt_chain::nested_rules(scope.clone(), admitted, landed)
+            })
+        };
         let read = runtime::ReadTool::new(
             &site.write_root,
             Arc::clone(&catalog),
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
+        .ruling(candidates)
         .noting(stamps);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way

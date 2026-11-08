@@ -44,15 +44,15 @@ fn project() -> tempfile::TempDir {
     );
     write(dir.path(), "lab/pkg/probe/a.rs", b"pub fn a() {}\n");
     write(dir.path(), "lab/pkg/probe/b.rs", b"pub fn b() {}\n");
-    write(dir.path(), "lab/run/a.rs", b"pub fn shallow() {}\n");
+    write(dir.path(), "lab/a.rs", b"pub fn shallow() {}\n");
     dir
 }
 
-fn scope(root: &std::path::Path) -> RuleScope<'_> {
+fn scope(root: &std::path::Path) -> RuleScope {
     RuleScope {
-        city_root: root,
+        city_root: root.to_path_buf(),
         building: at("lab"),
-        room: at("lab/run"),
+        room: at("lab"),
     }
 }
 
@@ -88,7 +88,7 @@ fn a_deeper_directory_offers_its_rules_from_the_run_room_downwards() {
 fn only_a_strict_descendant_of_the_run_room_and_home_building_is_eligible() {
     let dir = project();
     for (admitted, landed) in [
-        ("lab/run/a.rs", "lab/run/a.rs"),
+        ("lab/a.rs", "lab/a.rs"),
         ("other/pkg/a.rs", "other/pkg/a.rs"),
         ("lab/pkg/probe/a.rs", "other/pkg/a.rs"),
     ] {
@@ -112,7 +112,7 @@ fn a_second_file_in_the_same_room_does_not_deliver_the_same_rule_twice() {
 fn the_first_oversized_rule_is_cut_with_its_marker_and_later_rules_wait() {
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     let candidates = vec![
-        candidate("lab/pkg", "x".repeat(cap.saturating_sub(20))),
+        candidate("lab/pkg", "x".repeat(cap.saturating_add(1))),
         candidate("lab/pkg/probe", "later\n".to_owned()),
     ];
     let mut delivery = RuleDelivery::default();

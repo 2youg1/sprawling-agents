@@ -50,9 +50,10 @@ pub(in crate::worker) struct LaneHalf {
     pub(in crate::worker) job_locator: Locator,
     pub(in crate::worker) desks: BenchDesks,
     pub(in crate::worker) laying: Laying,
-    /// The conversation this run opens with, rebuilt on the accounting
-    /// thread where the ledger's index is held.
-    pub(in crate::worker) inherited: Vec<kernel::ChatMessage>,
+    /// The conversation and rule-delivery evidence this run opens
+    /// with, rebuilt on the accounting thread where the ledger's index
+    /// is held.
+    pub(in crate::worker) inherited: super::super::freezing::InheritedContext,
     pub(in crate::worker) carried_from: Option<RunId>,
     pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// The key of the command this dispatch answers, stamped on every
@@ -313,7 +314,7 @@ impl LaneHalf {
             super::super::freezing::Freezing {
                 city_root: &laying.city_root,
                 cas: &mut store,
-                inherited,
+                inherited: inherited.messages,
                 carried_from,
             }
             .freeze_plan(site, &mut workbench, at, given)?
@@ -355,6 +356,7 @@ impl LaneHalf {
             member,
             plan,
             handoff,
+            delivered: inherited.delivered,
             workbench,
         })
     }

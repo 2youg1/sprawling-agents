@@ -100,9 +100,36 @@ pub(crate) fn read_convention(
     building: &Address,
     path: &Path,
 ) -> Result<Reading, AxError> {
+    match open_convention(city_root, building, path)? {
+        ConventionOpen::Opened(mut opened) => {
+            let mut bytes = Vec::new();
+            opened
+                .read_to_end(&mut bytes)
+                .map_err(|err| unread(path, &err))?;
+            Ok(Reading::Sent(bytes))
+        }
+        ConventionOpen::Absent => Ok(Reading::Absent),
+        ConventionOpen::Withheld(reason) => Ok(Reading::Withheld(reason)),
+    }
+}
+
+enum ConventionOpen {
+    Opened(runtime::Opened),
+    Absent,
+    Withheld(String),
+}
+
+/// Opens one convention through the read bound shared by the freeze,
+/// the layers answer and nested reads. Only the caller's error policy
+/// differs after this point.
+fn open_convention(
+    city_root: &Path,
+    building: &Address,
+    path: &Path,
+) -> Result<ConventionOpen, AxError> {
     match std::fs::symlink_metadata(path) {
         Ok(entry) if entry.is_dir() => {
-            return Ok(Reading::Withheld(format!(
+            return Ok(ConventionOpen::Withheld(format!(
                 "{} is a directory, not a file",
                 city::AGENTS_FILE
             )));
@@ -114,7 +141,7 @@ pub(crate) fn read_convention(
                 std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
             ) =>
         {
-            return Ok(Reading::Absent);
+            return Ok(ConventionOpen::Absent);
         }
         Err(err) => return Err(unread(path, &err)),
     }
@@ -125,18 +152,62 @@ pub(crate) fn read_convention(
         &kernel::layout::CityLayout::new(city_root).cas(),
     );
     match reader.open(asked.as_str(), ACTION) {
-        Ok(mut opened) => {
-            let mut bytes = Vec::new();
-            opened
-                .read_to_end(&mut bytes)
-                .map_err(|err| unread(path, &err))?;
-            Ok(Reading::Sent(bytes))
-        }
+        Ok(opened) => Ok(ConventionOpen::Opened(opened)),
         Err(refused) if matches!(refused.code(), AxCode::GateDenied | AxCode::InvalidArgs) => {
-            Ok(Reading::Withheld(refused.subject().to_owned()))
+            Ok(ConventionOpen::Withheld(refused.subject().to_owned()))
         }
         Err(other) => Err(other),
     }
+}
+
+/// Reads a nested convention with a bounded retained prefix. The rest
+/// is still walked to EOF: an invalid sequence anywhere withholds the
+/// rule, and `dropped` is the exact number of source bytes not retained.
+fn read_nested(
+    city_root: &Path,
+    building: &Address,
+    path: &Path,
+    keep: usize,
+) -> Option<(String, u64)> {
+    let mut opened = match open_convention(city_root, building, path) {
+        Ok(ConventionOpen::Opened(opened)) => opened,
+        Ok(ConventionOpen::Absent | ConventionOpen::Withheld(_)) | Err(_) => return None,
+    };
+    let capacity = opened
+        .byte_len()
+        .ok()
+        .and_then(|len| usize::try_from(len).ok())
+        .map_or(keep, |len| len.min(keep));
+    let mut text = Vec::with_capacity(capacity);
+    let mut pending = Vec::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; 8_192];
+    loop {
+        let read = match opened.read(&mut buffer) {
+            Ok(read) => read,
+            Err(_) => return None,
+        };
+        if read == 0 {
+            break;
+        }
+        total = total.saturating_add(u64::try_from(read).unwrap_or(u64::MAX));
+        let retained = keep.saturating_sub(text.len()).min(read);
+        text.extend_from_slice(buffer.get(..retained)?);
+        pending.extend_from_slice(buffer.get(..read)?);
+        match std::str::from_utf8(&pending) {
+            Ok(_) => pending.clear(),
+            Err(err) if err.error_len().is_some() => return None,
+            Err(err) => {
+                let valid = err.valid_up_to();
+                pending.drain(..valid);
+            }
+        }
+    }
+    if !pending.is_empty() {
+        return None;
+    }
+    let dropped = total.saturating_sub(u64::try_from(text.len()).unwrap_or(u64::MAX));
+    String::from_utf8(text).ok().map(|text| (text, dropped))
 }
 
 /// What a run of `home` may read by a path: the read bound, closed over
@@ -158,8 +229,9 @@ pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound 
 }
 
 /// Where a run looks for conventions below its own room.
-pub(crate) struct RuleScope<'a> {
-    pub(crate) city_root: &'a Path,
+#[derive(Clone)]
+pub(crate) struct RuleScope {
+    pub(crate) city_root: PathBuf,
     pub(crate) building: Address,
     pub(crate) room: Address,
 }
@@ -167,11 +239,48 @@ pub(crate) struct RuleScope<'a> {
 /// Discovers candidates without recording delivery. The ordered account
 /// decides which of them becomes evidence.
 pub(crate) fn nested_rules(
-    _scope: RuleScope<'_>,
-    _admitted: &Address,
-    _landed: &Address,
+    scope: RuleScope,
+    admitted: &Address,
+    landed: &Address,
 ) -> Vec<runtime::RuleCandidate> {
-    Vec::new()
+    if !admitted.is_within(&scope.building) || !landed.is_within(&scope.building) {
+        return Vec::new();
+    }
+    let Some((directory, _)) = admitted.as_str().rsplit_once('/') else {
+        return Vec::new();
+    };
+    let Ok(directory) = Address::parse(directory) else {
+        return Vec::new();
+    };
+    if directory == scope.room || !directory.is_within(&scope.room) {
+        return Vec::new();
+    }
+    let Ok(paths) = city::room_agents_paths(&scope.city_root, &scope.building, &directory) else {
+        return Vec::new();
+    };
+    let mut candidates = Vec::new();
+    let mut remaining = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    for (room, path) in paths.into_iter().filter(|(room, _)| {
+        room != &scope.room && room.is_within(&scope.room)
+    }) {
+        if remaining == 0 {
+            break;
+        }
+        let Some((text, dropped)) = read_nested(&scope.city_root, &scope.building, &path, remaining)
+        else {
+            continue;
+        };
+        remaining = remaining.saturating_sub(text.len());
+        candidates.push(runtime::RuleCandidate {
+            room,
+            text,
+            dropped,
+        });
+        if dropped > 0 {
+            break;
+        }
+    }
+    candidates
 }
 
 /// Per-run rule delivery, confirmed only after exchange compaction.
@@ -189,26 +298,76 @@ impl RuleDelivery {
         call: &str,
         candidates: Vec<runtime::RuleCandidate>,
     ) -> Vec<runtime::RuleCandidate> {
-        let rooms = candidates
+        let seen: BTreeSet<Address> = self
+            .delivered
+            .iter()
+            .chain(self.pending.values().flatten())
+            .cloned()
+            .collect();
+        let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+        let mut used = 0usize;
+        let mut selected = Vec::new();
+        let mut seen = seen;
+        for candidate in candidates {
+            if seen.contains(&candidate.room) {
+                continue;
+            }
+            let remaining = cap.saturating_sub(used);
+            let original = candidate
+                .text
+                .len()
+                .saturating_add(usize::try_from(candidate.dropped).unwrap_or(usize::MAX));
+            let whole = candidate.dropped == 0 && candidate.text.len() <= remaining;
+            if whole {
+                used = used.saturating_add(candidate.text.len());
+                seen.insert(candidate.room.clone());
+                selected.push(candidate);
+                continue;
+            }
+            let room = runtime::elision::marker_room(original);
+            if remaining < room {
+                break;
+            }
+            let front = remaining.saturating_sub(room);
+            let boundary = runtime::elision::boundary_before(&candidate.text, front);
+            let dropped = original.saturating_sub(boundary);
+            let mut text = candidate
+                .text
+                .get(..boundary)
+                .unwrap_or_default()
+                .to_owned();
+            text.push_str(&runtime::elision::marker(
+                kernel::ByteLen::new(u64::try_from(dropped).unwrap_or(u64::MAX)),
+            ));
+            seen.insert(candidate.room.clone());
+            selected.push(runtime::RuleCandidate {
+                room: candidate.room,
+                text,
+                dropped: u64::try_from(dropped).unwrap_or(u64::MAX),
+            });
+            break;
+        }
+        let rooms = selected
             .iter()
             .map(|candidate| candidate.room.clone())
             .collect();
         self.pending.insert(call.to_owned(), rooms);
-        candidates
+        selected
     }
 
     /// Stages a cached final answer for the same compaction decision as
     /// any newly produced answer. Its bytes are not recomputed.
     pub(crate) fn replay(&mut self, call: &str, result: &kernel::Payload) {
-        let candidates = result
+        let rooms = result
             .as_map()
             .get("rules")
             .and_then(serde_json::Value::as_array)
             .into_iter()
             .flatten()
             .filter_map(runtime::RuleCandidate::from_json)
+            .map(|candidate| candidate.room)
             .collect();
-        self.answer(call, candidates);
+        self.pending.insert(call.to_owned(), rooms);
     }
 
     /// Confirms only rules whose whole result survived exchange

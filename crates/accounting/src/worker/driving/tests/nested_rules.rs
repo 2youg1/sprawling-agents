@@ -20,10 +20,10 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
     crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     for (path, text) in [
-        ("lab/pkg/AGENTS.md", "package rules\n"),
-        ("lab/pkg/probe/AGENTS.md", "probe rules\n"),
-        ("lab/pkg/probe/a.rs", "pub fn a() {}\n"),
-        ("lab/pkg/probe/b.rs", "pub fn b() {}\n"),
+        ("lab/nested/pkg/AGENTS.md", "package rules\n"),
+        ("lab/nested/pkg/probe/AGENTS.md", "probe rules\n"),
+        ("lab/nested/pkg/probe/a.rs", "pub fn a() {}\n"),
+        ("lab/nested/pkg/probe/b.rs", "pub fn b() {}\n"),
     ] {
         let path = dir.path().join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -36,13 +36,13 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
                 "read a",
                 "read",
                 "tu_a",
-                serde_json::json!({"file_path":"lab/pkg/probe/a.rs"}),
+                serde_json::json!({"file_path":"lab/nested/pkg/probe/a.rs"}),
             ),
             completion_with(
                 "read b",
                 "read",
                 "tu_b",
-                serde_json::json!({"file_path":"lab/pkg/probe/b.rs"}),
+                serde_json::json!({"file_path":"lab/nested/pkg/probe/b.rs"}),
             ),
             completion("done", None),
         ],
@@ -50,7 +50,7 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
         .handle(wire::Command::Dispatch {
-            addr: Address::parse("lab").unwrap(),
+            addr: Address::parse("lab/nested").unwrap(),
             task: "read two files".to_owned(),
             goal: "see each rule once".to_owned(),
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
@@ -72,8 +72,16 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
         assert_eq!(body["system"], bodies[0]["system"]);
         assert_eq!(body["tools"], bodies[0]["tools"]);
     }
-    for heading in ["## lab/pkg/AGENTS.md", "## lab/pkg/probe/AGENTS.md"] {
-        assert_eq!(bodies[1].to_string().matches(heading).count(), 1);
+    for heading in [
+        "## lab/nested/pkg/AGENTS.md",
+        "## lab/nested/pkg/probe/AGENTS.md",
+    ] {
+        assert_eq!(
+            bodies[1].to_string().matches(heading).count(),
+            1,
+            "{}",
+            bodies[1]
+        );
         assert_eq!(
             bodies[2].to_string().matches(heading).count(),
             1,

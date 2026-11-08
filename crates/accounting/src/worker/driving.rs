@@ -66,6 +66,9 @@ pub(crate) struct Driving {
     /// This run's place in the backlog, when it is a run somebody handed
     /// down: the member a halt on its scope marks (`crates/runtime/Spec.lean` §8-28-2).
     pub member: Option<runtime::BacklogId>,
+    /// Rule rooms already delivered in the conversation this run
+    /// inherits. Empty for an ordinary run, a successor or a delegate.
+    pub delivered: std::collections::BTreeSet<Address>,
     /// What is to be run, and what says how to pick it up again. Fields
     /// rather than parameters beside this value: a lane is entered with
     /// one thing.
