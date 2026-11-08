@@ -112,15 +112,25 @@ describe("reportOf", () => {
       fill(say("en", "context_report_insight"), { bucket: say("en", "context_bucket_conversation"), share: String(look.buckets[0]?.share) }),
     );
     expect(look.buckets.find((bucket) => bucket.id === "tools")?.children.map((c) => c.name)).toEqual([
-      "read",
-      "search",
-      "sleeping",
+      "core/read",
+      "core/search",
+      "core/sleeping",
     ]);
   });
 
   test("warns past the handoff mark", () => {
     const look = reportOf("en", RUN, prefix, shape, {
       used: 200_000,
+      window: 256_000,
+      first: 30,
+      second: 65,
+    });
+    expect(look.warning).toContain("65");
+  });
+
+  test("warns when used tokens land exactly on the handoff percent", () => {
+    const look = reportOf("en", RUN, prefix, shape, {
+      used: 166_400,
       window: 256_000,
       first: 30,
       second: 65,

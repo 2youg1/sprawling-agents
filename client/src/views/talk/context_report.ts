@@ -178,16 +178,20 @@ function bucketKey(id: BucketId): "context_bucket_tools" | "context_bucket_city"
 
 function warningOf(lang: Lang, fullness: Context | null): string | null {
   if (fullness === null) return null;
-  // Compare the raw share so a 64.6% window does not trip a 65% handoff
-  // just because the displayed percent rounds up.
-  const used = (fullness.used / fullness.window) * 100;
-  if (fullness.second !== null && used >= fullness.second) {
+  // Integer compare so a 64.6% window does not trip a 65% handoff from
+  // Math.round on the header, and an exact threshold is not lost to float
+  // remainder (`used * 100` vs `threshold * window`).
+  if (fullness.second !== null && atLeastPercent(fullness, fullness.second)) {
     return fill(say(lang, "context_report_handoff"), { n: String(fullness.second) });
   }
-  if (fullness.first !== null && used >= fullness.first) {
+  if (fullness.first !== null && atLeastPercent(fullness, fullness.first)) {
     return fill(say(lang, "context_report_filling"), { n: String(fullness.first) });
   }
   return null;
+}
+
+function atLeastPercent(fullness: Context, percent: number): boolean {
+  return fullness.used * 100 >= percent * fullness.window;
 }
 
 function weightsOf(
@@ -231,9 +235,13 @@ function childrenOf(id: BucketId, prefix: PrefixAnswer | null): readonly ReportC
 function toolChildren(rows: readonly PromptTool[]): readonly ReportChild[] {
   return [...rows]
     .filter((row) => row.exposure !== "off" && row.len > 0)
-    .sort((a, b) => b.len - a.len || a.name.localeCompare(b.name))
+    .sort((a, b) => b.len - a.len || a.name.localeCompare(b.name) || a.namespace.localeCompare(b.namespace))
     .slice(0, CHILD_CAP)
-    .map((row) => ({ key: row.name, name: row.name, bytes: row.len, bytesSaid: kilo(row.len) }));
+    .map((row) => {
+      // Namespace + name: two catalogs can ship the same tool spelling.
+      const label = `${row.namespace}/${row.name}`;
+      return { key: label, name: label, bytes: row.len, bytesSaid: kilo(row.len) };
+    });
 }
 
 function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[] {
