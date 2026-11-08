@@ -105,9 +105,9 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "citysim_scenarios",
-        home: "crates/citysim/tests",
+        home: "crates/citysim/tests/scenarios",
         takes: None,
-        recount: |root, _arg| recount::in_directory(root, "crates/citysim/tests", "scenario file"),
+        recount: |root, _arg| recount::citysim_scenarios(root),
     },
     Fact {
         key: "crate_graph",

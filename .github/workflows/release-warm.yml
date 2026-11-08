@@ -15,8 +15,13 @@ permissions:
   actions: read
 
 concurrency:
+  # Keep an in-flight warm that will write the release cache; a later main
+  # push whose `decide` sets `warm` false would otherwise abort it under
+  # `cancel-in-progress: true` and leave tag builds without the three
+  # platform entries. Concurrent decide jobs are cheap; concurrent warms
+  # share the same cache key inputs when both run.
   group: release-warm-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   decide:

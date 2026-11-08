@@ -116,6 +116,27 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
     refuse_if_empty(walk::files_with_ext(&base, &["rs"])?.len(), dir, what)
 }
 
+/// How many citysim scenario modules the suite harness loads.
+///
+/// `main.rs` is the one integration binary that owns the suite; it is not
+/// a scenario. Counting it would raise the document's number when the
+/// scenarios themselves did not move.
+pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
+    let dir = "crates/citysim/tests/scenarios";
+    let base = root.join(dir);
+    if !base.is_dir() {
+        return Err(XtaskError::Doc {
+            file: dir.to_owned(),
+            msg: "no such directory, so no scenario file can be counted".to_owned(),
+        });
+    }
+    let found = walk::files_with_ext(&base, &["rs"])?
+        .into_iter()
+        .filter(|path| path.file_name().and_then(|name| name.to_str()) != Some("main.rs"))
+        .count();
+    refuse_if_empty(found, dir, "scenario file")
+}
+
 /// The version this workspace pins for one crate.
 ///
 /// Every manifest is read, and two manifests pinning one crate at two

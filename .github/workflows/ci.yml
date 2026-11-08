@@ -179,6 +179,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
+              - 'clippy.toml'
               - '.cargo/**'
               - 'justfile'
               - 'flake.nix'
@@ -190,6 +191,9 @@ jobs:
               - 'deny.toml'
             lean:
               - '**/*.lean'
+              - 'lean-toolchain'
+              - 'lakefile.toml'
+              - 'lake-manifest.json'
 
   # Evaluation catches a malformed flake input without paying for the full
   # build. The complete Nix build and its installation acceptance stay in
@@ -713,10 +717,12 @@ jobs:
 
   # D27 in crates/xtask/Spec.lean: a path-filtered skip is allowed for the
   # optional heavy jobs; gates and supply must still succeed, and a
-  # failure or cancel anywhere fails the tree. This is the shared
-  # verdict, so release has no second list of checks.
+  # failure or cancel anywhere fails the tree. `changes` is on this list
+  # so a red or broken filter job cannot skip the suite and still leave
+  # validation green. This is the shared verdict, so release has no
+  # second list of checks.
   validation:
-    needs: [models, clippy, test, gates, swap, supply, client]
+    needs: [changes, models, clippy, test, gates, swap, supply, client]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
