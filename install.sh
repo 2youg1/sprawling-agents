@@ -136,6 +136,21 @@ release_index() {
         ' | sort -r
 }
 
+# The first tag in the channel its argument names, from a list ordered
+# newest publication first. A function rather than a `case` inside `$( )`:
+# `crates/sprawling/spec/Install.lean` section 8-118 records why that
+# clause has to sit at the top level.
+channel_head() {
+    while IFS="$(printf '\t')" read -r published candidate; do
+        case "$1:$candidate" in
+            release:v* | nightly:nightly-*)
+                printf '%s\n' "$candidate"
+                return
+                ;;
+        esac
+    done
+}
+
 # The newest release in the selected channel, or the one SPRAWLING_VERSION
 # names. A pinned tag is asked for directly; a channel selection fetches
 # its exact release after finding it in the bounded list.
@@ -146,15 +161,7 @@ release_json() {
     else
         listed=$(curl -fsSL "${API}?per_page=100") ||
             die "cannot reach ${API}; check the network, or download from ${RELEASES}"
-        selected=$(release_index "$listed" |
-            while IFS="$(printf '\t')" read -r published candidate; do
-                case "$channel:$candidate" in
-                    release:v* | nightly:nightly-*)
-                        printf '%s\n' "$candidate"
-                        break
-                        ;;
-                esac
-            done)
+        selected=$(release_index "$listed" | channel_head "$channel")
         [ -n "$selected" ] || die "no published release is available in the $channel channel; see ${RELEASES}"
         curl -fsSL "${API}/tags/${selected}" ||
             die "cannot read release $selected; check the network, or download from ${RELEASES}"
