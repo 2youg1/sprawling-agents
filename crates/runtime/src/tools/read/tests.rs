@@ -12,6 +12,7 @@ mod instruments;
 mod locators;
 mod looks;
 mod same_bytes;
+mod unchanged;
 
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));

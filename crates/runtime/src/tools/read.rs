@@ -37,10 +37,11 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, TimeMs, Tool,
+    ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -51,8 +52,22 @@ mod package;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
+use super::shown::{ReadShown, Span};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
+
+/// The clock used only to decide whether a stamp needs a content
+/// comparison. Tests inject a counted clock; production reads UTC.
+pub type ReadClock = Arc<dyn Fn() -> std::io::Result<TimeMs> + Send + Sync>;
+
+fn wall_clock() -> std::io::Result<TimeMs> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| std::io::Error::other("the system clock is before the Unix epoch"))?;
+    Ok(TimeMs::new(
+        u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
+    ))
+}
 
 /// One nested convention a read may carry. `dropped` is the number of
 /// source bytes already known to be omitted from `text`; accounting
@@ -275,6 +290,8 @@ pub struct ReadTool {
     /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
     /// §8-64).
     seen: ReadStamps,
+    shown: ReadShown,
+    clock: ReadClock,
     rules: Option<RuleCandidates>,
     meta: ToolMeta,
 }
@@ -339,6 +356,8 @@ impl ReadTool {
             reader: BoundReader::new(city_root, bound, block_store),
             city: CityRoot::anchor(city_root, Self::NAME)?,
             seen: ReadStamps::default(),
+            shown: ReadShown::default(),
+            clock: Arc::new(wall_clock),
             rules: None,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
@@ -413,6 +432,19 @@ impl ReadTool {
         ReadTool { seen, ..self }
     }
 
+    /// Shares this run's confirmed window evidence. A new run starts
+    /// empty; this is deliberately not inherited like rule delivery.
+    #[must_use]
+    pub fn recalling(self, shown: ReadShown) -> ReadTool {
+        ReadTool { shown, ..self }
+    }
+
+    /// Supplies the clock for the racy-stamp content comparison.
+    #[must_use]
+    pub fn clocking(self, clock: ReadClock) -> ReadTool {
+        ReadTool { clock, ..self }
+    }
+
     /// Supplies the nested conventions a successful ordinary read may
     /// carry. No delivery is marked here: calls can be speculative and
     /// concurrent, while only accounting sees their ordered admission.
@@ -459,6 +491,11 @@ impl Tool for ReadTool {
                     Self::FILE_PATH
                 ))
             })?;
+        let interval = Interval::asked_for(call)?;
+        let want = Span {
+            offset: interval.offset,
+            lines: u64::from(interval.limit),
+        };
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
         let mut looked = None;
@@ -466,14 +503,19 @@ impl Tool for ReadTool {
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
             Found::Chosen(addr) => {
-                let (text, before, after, landed) =
-                    engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?;
+                let (text, before, after, landed) = engine::text_of(
+                    &self.city,
+                    &addr,
+                    asked,
+                    &*self.reader.bound,
+                    &self.shown,
+                    want,
+                )?;
                 looked = Some((addr.clone(), before, after));
                 opened = Some((addr, landed));
                 text
             }
         };
-        let interval = Interval::asked_for(call)?;
         // Where the interval starts, as an index the drawn header and line
         // marks number from (`crate::rendering`); absent means index 0.
         if interval.offset != 0 {

@@ -51,14 +51,25 @@ fn open_everywhere() -> ReadBound {
 /// resolved, opened and judged again, every line collected for the cut.
 fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
     let city = CityRoot::anchor(root, "read").unwrap();
-    let (text, _, _) = super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap();
+    let (text, _, _, _) = super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap();
     let (cut, _, _) = reference_cut(0, LINE_CAP, &text);
     cut.len()
 }
 
 /// The handle read with the one-pass cut.
 fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usize {
-    let (text, _, _) = super::engine::text_of(city, addr, addr.as_str(), &**bound).unwrap();
+    let (text, _, _, _) = super::engine::text_of(
+        city,
+        addr,
+        addr.as_str(),
+        &**bound,
+        &crate::tools::ReadShown::default(),
+        crate::tools::Span {
+            offset: 0,
+            lines: u64::from(LINE_CAP),
+        },
+    )
+    .unwrap();
     let cut = Interval {
         offset: 0,
         limit: LINE_CAP,

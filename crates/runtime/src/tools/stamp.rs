@@ -24,7 +24,7 @@ use std::io;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use kernel::Address;
+use kernel::{Address, TimeMs};
 
 /// What a file is at one moment, as far as an edit needs to know: its
 /// length, its last write time and which file on which volume it is,
@@ -45,7 +45,52 @@ type Ticks = (i64, i64);
 #[cfg(windows)]
 type Ticks = Option<u64>;
 
+/// One metadata query's stamp, with the race judgement made from the
+/// same modification time rather than a second query.
+pub(crate) struct FileFacts {
+    stamp: Stamp,
+}
+
+impl FileFacts {
+    pub(crate) fn stamp(&self) -> &Stamp {
+        &self.stamp
+    }
+
+    /// Whether the modification time is too close to the read, in the
+    /// future, before the Unix epoch, or beyond the clock's range.
+    pub(crate) fn racy_at(&self, now: TimeMs) -> bool {
+        self.stamp.racy_at(now)
+    }
+}
+
 impl Stamp {
+    /// Whether this stamp's modification time is within 2,000 ms of
+    /// `now`. An unreadable or future modification time is racy too.
+    pub(crate) fn racy_at(&self, now: TimeMs) -> bool {
+        let Some(modified) = self.modified_ms() else {
+            return true;
+        };
+        now.value().saturating_sub(modified) < 2_000
+    }
+
+    #[cfg(unix)]
+    fn modified_ms(&self) -> Option<u64> {
+        let (seconds, nanoseconds) = self.written;
+        let millis = i128::from(seconds)
+            .checked_mul(1_000)?
+            .checked_add(i128::from(nanoseconds) / 1_000_000)?;
+        u64::try_from(millis).ok()
+    }
+
+    #[cfg(windows)]
+    fn modified_ms(&self) -> Option<u64> {
+        // FILETIME starts at 1601-01-01, 11,644,473,600 seconds before
+        // the Unix epoch, and counts 100-nanosecond intervals.
+        const UNIX_EPOCH: u64 = 116_444_736_000_000_000;
+        let since_epoch = self.written?.checked_sub(UNIX_EPOCH)?;
+        Some(since_epoch / 10_000)
+    }
+
     /// The stamp of whatever stands at `path` now, or `None` when nothing
     /// does.
     ///
@@ -66,13 +111,21 @@ impl Stamp {
     /// Whatever the platform answers when the handle is asked about.
     #[cfg(unix)]
     pub(crate) fn of_file(file: &File) -> io::Result<Stamp> {
+        Ok(Stamp::facts(file)?.stamp)
+    }
+
+    /// Takes every fact used by a read from this one metadata query.
+    #[cfg(unix)]
+    pub(crate) fn facts(file: &File) -> io::Result<FileFacts> {
         use std::os::unix::fs::MetadataExt;
         let meta = file.metadata()?;
-        Ok(Stamp {
-            len: meta.len(),
-            written: (meta.mtime(), meta.mtime_nsec()),
-            volume: meta.dev(),
-            file: meta.ino(),
+        Ok(FileFacts {
+            stamp: Stamp {
+                len: meta.len(),
+                written: (meta.mtime(), meta.mtime_nsec()),
+                volume: meta.dev(),
+                file: meta.ino(),
+            },
         })
     }
 
@@ -85,12 +138,20 @@ impl Stamp {
     /// Whatever the platform answers when the handle is asked about.
     #[cfg(windows)]
     pub(crate) fn of_file(file: &File) -> io::Result<Stamp> {
+        Ok(Stamp::facts(file)?.stamp)
+    }
+
+    /// Takes every fact used by a read from this one handle query.
+    #[cfg(windows)]
+    pub(crate) fn facts(file: &File) -> io::Result<FileFacts> {
         let info = winapi_util::file::information(file)?;
-        Ok(Stamp {
-            len: info.file_size(),
-            written: info.last_write_time(),
-            volume: info.volume_serial_number(),
-            file: info.file_index(),
+        Ok(FileFacts {
+            stamp: Stamp {
+                len: info.file_size(),
+                written: info.last_write_time(),
+                volume: info.volume_serial_number(),
+                file: info.file_index(),
+            },
         })
     }
 }

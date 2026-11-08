@@ -23,6 +23,7 @@ use kernel::{Address, AxError, ReadVerdict};
 
 use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
+use crate::tools::shown::{ReadShown, Span};
 use crate::tools::stamp::Stamp;
 
 /// A file's text, its stamps before and after the bytes were read, and
@@ -43,6 +44,8 @@ pub(super) fn text_of(
     addr: &Address,
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
+    _shown: &ReadShown,
+    _want: Span,
 ) -> Result<Looked, AxError> {
     match handle_read(city, addr, bound)? {
         Some(looked) => Ok(looked),
@@ -111,8 +114,9 @@ fn handle_read(
     };
     let fd = std::path::Path::new("/proc/self/fd").join(file.as_raw_fd().to_string());
     match std::fs::read_link(fd) {
-        Ok(now) if now == real => Ok(whole_text(file)
-            .map(|(text, before, after)| (text, before, after, landed))),
+        Ok(now) if now == real => {
+            Ok(whole_text(file).map(|(text, before, after)| (text, before, after, landed)))
+        }
         // Moved since the judgement, or a machine without procfs: the
         // judged path checks the handle its own way and says which.
         Ok(_) | Err(_) => Ok(None),

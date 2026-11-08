@@ -308,6 +308,8 @@ pub(super) struct Workbench {
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
     /// Where the run records the provider's count, which `status` reads.
     pub(super) context: runtime::ContextReading,
+    /// Complete read intervals this run has confirmed into its window.
+    shown: runtime::ReadShown,
 }
 
 /// Who this run can reach: the residents beside it, and the sub-agents
@@ -346,6 +348,11 @@ pub(super) fn held<'a, T>(
 }
 
 impl Workbench {
+    /// The table shared by `read` and the ordered wave settlement.
+    pub(super) fn shown(&self) -> runtime::ReadShown {
+        self.shown.clone()
+    }
+
     /// Hands the bench to the drive, once.
     ///
     /// # Errors

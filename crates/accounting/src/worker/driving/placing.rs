@@ -18,7 +18,7 @@ use kernel::{
     AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
 };
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
-use runtime::{Admitted, Catalog, ConcurrentInvoke, ToolTool};
+use runtime::{Admitted, Catalog, ConcurrentInvoke, ReadShown, ToolTool};
 
 use super::Sieving;
 use crate::prompt_chain::RuleDelivery;
@@ -93,6 +93,7 @@ pub(super) struct Placing<'f> {
     /// What the run was told it can reach: the one authority on what a
     /// `tool` `run` stands for (`crates/runtime/Spec.lean` §8-61).
     catalog: Arc<Mutex<Catalog>>,
+    shown: ReadShown,
     rules: RuleDelivery,
 }
 
@@ -111,6 +112,7 @@ impl<'f> Placing<'f> {
             ran: (0, 0),
             checkpointing,
             catalog: Arc::new(Mutex::new(Catalog::new())),
+            shown: ReadShown::default(),
             rules: RuleDelivery::default(),
         }
     }
@@ -121,6 +123,13 @@ impl<'f> Placing<'f> {
     #[must_use]
     pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
         self.catalog = catalog;
+        self
+    }
+
+    /// Shares the read tool's window evidence with ordered settlement.
+    #[must_use]
+    pub(super) fn recalling(mut self, shown: ReadShown) -> Self {
+        self.shown = shown;
         self
     }
 
@@ -286,13 +295,21 @@ impl ConcurrentInvoke for Placing<'_> {
         // deduplication is for.
         let key = match call.action() {
             Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action),
-            Err(unreadable) => return Admitted::Answered(Err(unreadable)),
+            Err(unreadable) => {
+                self.shown.admit(&call.id);
+                return Admitted::Answered(Err(unreadable));
+            }
         };
         match self.bench.clear(call, &key, t) {
             Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
-            Ok(Clearance::Answered(decided)) => Admitted::Answered(self.answered(call, decided)),
+            Ok(Clearance::Answered(decided)) => {
+                let answered = self.answered(call, decided);
+                self.shown.admit(&call.id);
+                Admitted::Answered(answered)
+            }
             Err(refused) => {
                 self.checkpointing.widen();
+                self.shown.admit(&call.id);
                 Admitted::Answered(Err(refused))
             }
         }
@@ -316,6 +333,7 @@ impl ConcurrentInvoke for Placing<'_> {
             Ok(outcome) => self.prepare_read(call, outcome),
             Err(err) => Err(err),
         };
+        self.shown.admit(&call.id);
         let decided = self
             .bench
             .account(ticket, answered)
@@ -325,5 +343,6 @@ impl ConcurrentInvoke for Placing<'_> {
 
     fn complete_wave(&mut self, shortened: &std::collections::BTreeSet<String>) {
         self.rules.complete_wave(shortened);
+        self.shown.confirm(shortened);
     }
 }

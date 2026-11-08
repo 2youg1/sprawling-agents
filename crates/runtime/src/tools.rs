@@ -14,6 +14,7 @@ mod path_lock;
 pub(crate) use exec::native_windows;
 mod read;
 mod search;
+mod shown;
 mod stamp;
 mod status;
 mod succeed;
@@ -41,8 +42,10 @@ pub(crate) use stamp::Stamp;
 // readers outside the tool: the machine's own dependency report, and a
 // caller deciding whether a task can be done here at all.
 pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings};
-pub use read::{ReadTool, RuleCandidate, RuleCandidates};
+pub use read::{ReadClock, ReadTool, RuleCandidate, RuleCandidates};
 pub use search::SearchTool;
+pub use shown::ReadShown;
+pub(crate) use shown::{Claim, Recall, Span};
 pub use status::ChildStatus;
 pub use status::ProviderMode;
 pub use status::StatusSnapshot;

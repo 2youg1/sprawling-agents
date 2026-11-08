@@ -75,6 +75,7 @@ impl Laying {
         // by it. A new table per run, so a fork, a successor or a child
         // starts having seen nothing (`crates/runtime/spec/Tools/Edit.lean` §8-64).
         let stamps = runtime::ReadStamps::default();
+        let shown = runtime::ReadShown::default();
         let edit = self.edit_tool(site, addr, policy.reader(), stamps.clone())?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (`crates/sprawling/Spec.lean` §8-87).
@@ -144,6 +145,7 @@ impl Laying {
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?
         .ruling(candidates)
+        .recalling(shown.clone())
         .noting(stamps);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way
@@ -243,6 +245,7 @@ impl Laying {
             policy: Some(policy),
             succession,
             context,
+            shown,
         })
     }
 
