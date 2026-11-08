@@ -31,14 +31,14 @@ pub struct TurnReport {
 }
 
 impl TurnReport {
-    /// What the provider counted for this call, when it said. The
-    /// context gauge reads `input_tokens` from here and nowhere else.
     /// The tool results whose window text became shorter at the closing
     /// boundary. Delivery of their claims is not evidence of delivery.
     pub fn shortened(&self) -> &std::collections::BTreeSet<String> {
         &self.shortened
     }
 
+    /// What the provider counted for this call, when it said. The
+    /// context gauge reads `input_tokens` from here and nowhere else.
     pub fn usage(&self) -> Option<&ModelUsage> {
         self.usage.as_ref()
     }

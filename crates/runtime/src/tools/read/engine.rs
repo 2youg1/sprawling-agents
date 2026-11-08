@@ -23,11 +23,15 @@
 //! can ask an open handle where it really lies. Every other platform
 //! reads through the judged path and never answers with a stub.
 
-use kernel::{Address, AxError, B3Hash, ReadVerdict};
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use kernel::B3Hash;
+use kernel::{Address, AxError, ReadVerdict};
 
 use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
-use crate::tools::shown::{Answer, ReadShown, Recall, Span};
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use crate::tools::shown::Recall;
+use crate::tools::shown::{Answer, ReadShown, Span};
 use crate::tools::stamp::Stamp;
 
 /// One chosen-path read: its judgement inputs and the window evidence
@@ -38,7 +42,21 @@ pub(super) struct Request<'a> {
     pub(super) addr: &'a Address,
     pub(super) asked: &'a str,
     pub(super) bound: &'a dyn Fn(&Address) -> ReadVerdict,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     pub(super) shown: &'a ReadShown,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     pub(super) want: Span,
 }
 
@@ -51,6 +69,13 @@ pub(super) enum Looked {
         after: Stamp,
         addr: Address,
     },
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     Unchanged {
         stamp: Stamp,
         addr: Address,
@@ -152,18 +177,16 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
 /// Resolves, judges, opens the judged location, and compares the
 /// opened handle with the file that location now names (macOS).
 ///
-/// macOS has no procfs entry naming an open descriptor, so identity is
-/// asked the way `same_file` asks it: the volume and file number on
-/// each side. A file renamed under the path after the open therefore
-/// answers through the judged path, which names what is there.
+/// Identity is checked against the judged name, then F_GETPATH judges
+/// the held descriptor's actual location before any content is read.
 #[cfg(target_os = "macos")]
 fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
-    use std::os::unix::fs::MetadataExt as _;
+    use std::os::unix::{ffi::OsStrExt as _, fs::MetadataExt as _};
 
     let Ok(real) = std::fs::canonicalize(request.city.join(request.addr)) else {
         return Ok(None);
     };
-    let landed = request
+    request
         .city
         .judged_location(request.addr, &real, "read", request.bound)?;
     let Ok(file) = std::fs::File::open(&real) else {
@@ -175,6 +198,14 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     if (held.dev(), held.ino()) != (named.dev(), named.ino()) {
         return Ok(None);
     }
+    let actual = rustix::fs::getpath(&file).map_err(|err| {
+        kernel::AxError::failure(kernel::AxCode::GateDenied, "read", err.to_string())
+            .with_recovery("retry after the file location can be verified")
+    })?;
+    let actual = std::path::Path::new(std::ffi::OsStr::from_bytes(actual.as_bytes()));
+    let landed = request
+        .city
+        .judged_location(request.addr, actual, "read", request.bound)?;
     Ok(read_handle(file, landed, request))
 }
 
@@ -196,7 +227,7 @@ fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Opti
     let before = facts.stamp().clone();
     match request
         .shown
-        .recall(&addr, &before, request.asked, request.want)
+        .recall(request.addr, &before, request.asked, request.want)
     {
         Recall::Fresh => read_text(file, facts.len(), before)
             .map(|(text, before, after)| Looked::text(text, before, after, addr)),

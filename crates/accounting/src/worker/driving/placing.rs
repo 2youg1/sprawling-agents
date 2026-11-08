@@ -98,6 +98,7 @@ pub(super) struct Placing<'f> {
     shown: ReadShown,
     rules: RuleDelivery,
     rule_candidates: Option<RuleCandidates>,
+    halted: Option<&'f dyn Fn() -> bool>,
 }
 
 impl<'f> Placing<'f> {
@@ -118,7 +119,14 @@ impl<'f> Placing<'f> {
             shown: ReadShown::default(),
             rules: RuleDelivery::default(),
             rule_candidates: None,
+            halted: None,
         }
+    }
+
+    /// Polls the drive's existing interrupt source during rule scanning.
+    pub(super) fn stopping(mut self, halted: &'f dyn Fn() -> bool) -> Self {
+        self.halted = Some(halted);
+        self
     }
 
     /// Resolves each `tool` `run` against the run's own catalog. A face
@@ -198,9 +206,12 @@ impl<'f> Placing<'f> {
             .remove(runtime::ReadTool::RULE_CONTEXT)
             .and_then(|value| RuleContext::from_json(&value));
         let candidates = match (context, self.rule_candidates.as_ref()) {
-            (Some(context), Some(candidates)) => {
-                candidates(&context.admitted, &context.landed, &self.rules.seen())
-            }
+            (Some(context), Some(candidates)) => candidates(
+                &context.admitted,
+                &context.landed,
+                &self.rules.seen(),
+                &mut || self.halted.is_some_and(|halted| halted()),
+            ),
             _ => Vec::new(),
         };
         let selected = self.rules.answer(&call.id, candidates);
@@ -304,7 +315,7 @@ impl ConcurrentInvoke for Placing<'_> {
         let key = match call.action() {
             Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action),
             Err(unreadable) => {
-                self.shown.admit(&call.id);
+                self.shown.discard(&call.id);
                 return Admitted::Answered(Err(unreadable));
             }
         };
@@ -312,12 +323,12 @@ impl ConcurrentInvoke for Placing<'_> {
             Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
             Ok(Clearance::Answered(decided)) => {
                 let answered = self.answered(call, decided);
-                self.shown.admit(&call.id);
+                self.shown.discard(&call.id);
                 Admitted::Answered(answered)
             }
             Err(refused) => {
                 self.checkpointing.widen();
-                self.shown.admit(&call.id);
+                self.shown.discard(&call.id);
                 Admitted::Answered(Err(refused))
             }
         }
@@ -341,12 +352,20 @@ impl ConcurrentInvoke for Placing<'_> {
             Ok(outcome) => self.prepare_read(call, outcome),
             Err(err) => Err(err),
         };
-        self.shown.admit(&call.id);
-        let decided = self
-            .bench
-            .account(ticket, answered)
-            .inspect_err(|_| self.checkpointing.widen())?;
-        self.answered(call, decided)
+        if answered.is_err() {
+            self.shown.discard(&call.id);
+        }
+        let decided = self.bench.account(ticket, answered).inspect_err(|_| {
+            self.checkpointing.widen();
+            self.shown.discard(&call.id);
+        })?;
+        let answered = self.answered(call, decided);
+        if answered.is_ok() {
+            self.shown.admit(&call.id);
+        } else {
+            self.shown.discard(&call.id);
+        }
+        answered
     }
 
     fn complete_wave(&mut self, shortened: &std::collections::BTreeSet<String>) {

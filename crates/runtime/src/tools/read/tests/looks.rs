@@ -136,8 +136,14 @@ fn read_edit_read_returns_the_new_text_before_a_later_repeat_can_be_a_stub() {
     shown.admit("call-1");
     shown.confirm(&std::collections::BTreeSet::new());
     let repeated = reader.invoke(&call("work/long.txt")).unwrap();
+    if !cfg!(any(windows, target_os = "linux", target_os = "macos")) {
+        assert_eq!(
+            repeated.result.as_map().get("text").and_then(Value::as_str),
+            Some(changed)
+        );
+    }
     assert_eq!(
         repeated.result.as_map().get("unchanged"),
-        Some(&Value::Bool(true))
+        cfg!(any(windows, target_os = "linux", target_os = "macos")).then_some(&Value::Bool(true))
     );
 }

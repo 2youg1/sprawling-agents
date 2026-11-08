@@ -187,3 +187,72 @@ fn a_conflicting_digest_replaces_rather_than_merges_old_evidence() {
         }
     );
 }
+
+#[test]
+fn confirmation_follows_admission_order_instead_of_call_names() {
+    let (shown, addr, stamp) = evidence(Some(B3Hash::digest(b"old")));
+    shown.admit("call-1");
+    shown.confirm(&BTreeSet::new());
+    for (call, text) in [("z", b"middle".as_slice()), ("a", b"new".as_slice())] {
+        shown.stage(
+            call,
+            whole(
+                addr.clone(),
+                stamp.clone(),
+                observed(40, 4_000, Some(B3Hash::digest(text))),
+            ),
+        );
+        shown.admit(call);
+    }
+    shown.confirm(&BTreeSet::new());
+    assert!(
+        matches!(recall(&shown, &addr, &stamp, Span { offset: 0, lines: 40 }),
+        Recall::Compare { digest, .. } if digest == B3Hash::digest(b"new"))
+    );
+}
+
+#[test]
+fn repeating_a_tiny_claim_never_makes_elision_profitable() {
+    let (shown, addr, stamp) = evidence(None);
+    shown.discard("call-1");
+    for _ in 0..100 {
+        shown.stage(
+            "small",
+            whole(addr.clone(), stamp.clone(), observed(40, 1, None)),
+        );
+        shown.admit("small");
+        shown.confirm(&BTreeSet::new());
+    }
+    assert_eq!(
+        recall(
+            &shown,
+            &addr,
+            &stamp,
+            Span {
+                offset: 0,
+                lines: 40
+            }
+        ),
+        Recall::Fresh
+    );
+}
+
+#[test]
+fn discarding_an_attempt_prevents_later_admission_of_its_claim() {
+    let (shown, addr, stamp) = evidence(None);
+    shown.discard("call-1");
+    shown.admit("call-1");
+    shown.confirm(&BTreeSet::new());
+    assert_eq!(
+        recall(
+            &shown,
+            &addr,
+            &stamp,
+            Span {
+                offset: 0,
+                lines: 40
+            }
+        ),
+        Recall::Fresh
+    );
+}

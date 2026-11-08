@@ -139,9 +139,13 @@ impl RuleContext {
 
 /// A stateless source of candidates. `skip` is the ordered settlement's
 /// confirmed and pending rooms; discovery skips their files before it
-/// spends any read or retained-text budget. The closure marks nothing.
-pub type RuleCandidates =
-    Arc<dyn Fn(&Address, &Address, &BTreeSet<Address>) -> Vec<RuleCandidate> + Send + Sync>;
+/// spends any read or retained-text budget. The last argument polls cancellation;
+/// cancelled scans produce no candidates. The closure marks nothing.
+pub type RuleCandidates = Arc<
+    dyn Fn(&Address, &Address, &BTreeSet<Address>, &mut dyn FnMut() -> bool) -> Vec<RuleCandidate>
+        + Send
+        + Sync,
+>;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -505,6 +509,7 @@ impl Tool for ReadTool {
     }
 
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        self.shown.discard(&call.id);
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -544,6 +549,7 @@ impl Tool for ReadTool {
         let mut opened = None;
         let mut repeated = None;
         let mut digest = None;
+        let sampled = self.clock.as_ref().and_then(|clock| clock().ok());
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
             Found::Chosen(addr) => match engine::text_of(engine::Request {
@@ -560,13 +566,7 @@ impl Tool for ReadTool {
                     after,
                     addr: landed,
                 } => {
-                    let racy = match self.clock.as_ref() {
-                        Some(clock) => match clock() {
-                            Ok(now) => before.racy_at(now),
-                            Err(_) => true,
-                        },
-                        None => true,
-                    };
+                    let racy = sampled.is_none_or(|now| before.racy_at(now));
                     digest = racy.then(|| B3Hash::digest(text.as_bytes()));
                     looked = Some((addr.clone(), before, after));
                     opened = Some((addr, landed));

@@ -100,7 +100,7 @@ pub(crate) fn read_convention(
     building: &Address,
     path: &Path,
 ) -> Result<Reading, AxError> {
-    match open_convention(city_root, building, path)? {
+    match open_convention(city_root, read_bound(city_root, building.clone()), path)? {
         ConventionOpen::Opened(mut opened) => {
             let mut bytes = Vec::new();
             opened
@@ -124,7 +124,7 @@ enum ConventionOpen {
 /// differs after this point.
 fn open_convention(
     city_root: &Path,
-    building: &Address,
+    bound: runtime::ReadBound,
     path: &Path,
 ) -> Result<ConventionOpen, AxError> {
     match std::fs::symlink_metadata(path) {
@@ -148,7 +148,7 @@ fn open_convention(
     let asked = addressed(city_root, path)?;
     let reader = runtime::BoundReader::new(
         city_root,
-        read_bound(city_root, building.clone()),
+        bound,
         &kernel::layout::CityLayout::new(city_root).cas(),
     );
     match reader.open(asked.as_str(), ACTION) {
@@ -164,12 +164,12 @@ fn open_convention(
 /// is still walked to EOF: an invalid sequence anywhere withholds the
 /// rule, and `dropped` is the exact number of source bytes not retained.
 fn read_nested(
-    city_root: &Path,
-    building: &Address,
+    scope: &RuleScope,
     path: &Path,
     keep: usize,
+    halted: &mut dyn FnMut() -> bool,
 ) -> Option<(String, u64)> {
-    let mut opened = match open_convention(city_root, building, path) {
+    let mut opened = match open_convention(&scope.city_root, Arc::clone(&scope.bound), path) {
         Ok(ConventionOpen::Opened(opened)) => opened,
         Ok(ConventionOpen::Absent | ConventionOpen::Withheld(_)) | Err(_) => return None,
     };
@@ -183,6 +183,9 @@ fn read_nested(
     let mut total = 0u64;
     let mut buffer = [0u8; 8_192];
     loop {
+        if halted() {
+            return None;
+        }
         let read = match opened.read(&mut buffer) {
             Ok(read) => read,
             Err(_) => return None,
@@ -203,7 +206,7 @@ fn read_nested(
             }
         }
     }
-    if !pending.is_empty() {
+    if halted() || !pending.is_empty() {
         return None;
     }
     // The whole stream is valid here. Only the retained prefix can end
@@ -239,16 +242,18 @@ pub(crate) struct RuleScope {
     pub(crate) city_root: PathBuf,
     pub(crate) building: Address,
     pub(crate) room: Address,
+    pub(crate) bound: runtime::ReadBound,
 }
 
 /// Discovers candidates without recording delivery. The ordered account
 /// decides which of them becomes evidence.
 pub(crate) fn nested_rules(
     scope: RuleScope,
-    admitted: &Address,
-    landed: &Address,
+    context: &runtime::RuleContext,
     skip: &BTreeSet<Address>,
+    halted: &mut dyn FnMut() -> bool,
 ) -> Vec<runtime::RuleCandidate> {
+    let runtime::RuleContext { admitted, landed } = context;
     if !admitted.is_within(&scope.building) || !landed.is_within(&scope.building) {
         return Vec::new();
     }
@@ -269,12 +274,13 @@ pub(crate) fn nested_rules(
     for (room, path) in paths.into_iter().filter(|(room, _)| {
         room != &scope.room && room.is_within(&scope.room) && !skip.contains(room)
     }) {
+        if halted() {
+            return Vec::new();
+        }
         if remaining == 0 {
             break;
         }
-        let Some((text, dropped)) =
-            read_nested(&scope.city_root, &scope.building, &path, remaining)
-        else {
+        let Some((text, dropped)) = read_nested(&scope, &path, remaining, halted) else {
             continue;
         };
         remaining = remaining.saturating_sub(text.len());
@@ -286,6 +292,9 @@ pub(crate) fn nested_rules(
         if dropped > 0 {
             break;
         }
+    }
+    if halted() {
+        return Vec::new();
     }
     candidates
 }
@@ -323,14 +332,20 @@ impl RuleDelivery {
             if seen.contains(&candidate.room) {
                 continue;
             }
-            let remaining = cap.saturating_sub(used);
+            let overhead = runtime::rendering::rule_overhead(candidate.room.as_str());
+            let remaining = cap.saturating_sub(used).saturating_sub(overhead);
+            if cap.saturating_sub(used) < overhead {
+                break;
+            }
             let original = candidate
                 .text
                 .len()
                 .saturating_add(usize::try_from(candidate.dropped).unwrap_or(usize::MAX));
             let whole = candidate.dropped == 0 && candidate.text.len() <= remaining;
             if whole {
-                used = used.saturating_add(candidate.text.len());
+                used = used
+                    .saturating_add(candidate.text.len())
+                    .saturating_add(overhead);
                 seen.insert(candidate.room.clone());
                 selected.push(candidate);
                 continue;

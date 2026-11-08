@@ -38,6 +38,13 @@ pub struct Answer {
 
 /// What a repeated read may answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    not(any(windows, target_os = "linux", target_os = "macos", test)),
+    expect(
+        dead_code,
+        reason = "unchanged evidence is queried only by handle fast paths"
+    )
+)]
 pub enum Recall {
     Fresh,
     Repeat(Answer),
@@ -68,6 +75,13 @@ pub(crate) struct Claim {
     stamp: Stamp,
     whole: bool,
     spans: Vec<Span>,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     total_lines: u64,
     bytes: usize,
     digest: Option<B3Hash>,
@@ -133,6 +147,13 @@ impl ReadShown {
     /// Answers from confirmed evidence only. A matching stamp and a
     /// covered interval are necessary but not sufficient: a racy claim
     /// must still be compared by content.
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     pub(crate) fn recall(&self, addr: &Address, now: &Stamp, asked: &str, want: Span) -> Recall {
         let state = self.table();
         let Some(claim) = state.confirmed.get(addr) else {
@@ -188,11 +209,19 @@ impl ReadShown {
         trim(&mut state.staged, SHOWN_MAX_PENDING);
     }
 
+    /// Discards evidence from an attempt whose result was not delivered.
+    pub fn discard(&self, call: &str) {
+        self.table().staged.remove(call);
+    }
+
     /// Moves one staged claim to pending in call order.
     pub fn admit(&self, call: &str) {
         let mut state = self.table();
         if let Some(claim) = state.staged.remove(call) {
-            state.pending.insert(call.to_owned(), claim);
+            let generation = state.next_generation();
+            state
+                .pending
+                .insert(call.to_owned(), claim.with_generation(generation));
             trim(&mut state.pending, SHOWN_MAX_PENDING);
         }
     }
@@ -201,7 +230,9 @@ impl ReadShown {
     pub fn confirm(&self, shortened: &BTreeSet<String>) {
         let mut state = self.table();
         state.staged.clear();
-        for (call, claim) in std::mem::take(&mut state.pending) {
+        let mut pending: Vec<_> = std::mem::take(&mut state.pending).into_iter().collect();
+        pending.sort_by_key(|(_, claim)| claim.generation);
+        for (call, claim) in pending {
             if shortened.contains(&call) {
                 continue;
             }
@@ -221,7 +252,7 @@ impl ReadShown {
                         let first = old.spans.len().saturating_sub(SHOWN_MAX_WINDOWS);
                         old.spans = old.spans.split_off(first);
                     }
-                    old.bytes = old.bytes.saturating_add(claim.bytes);
+                    old.bytes = claim.bytes;
                     old.digest = old.digest.or(claim.digest);
                     old.generation = generation;
                     continue;

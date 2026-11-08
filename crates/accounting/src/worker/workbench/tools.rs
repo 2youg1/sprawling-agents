@@ -29,14 +29,27 @@ mod search;
 mod transcribe;
 
 /// The stateless nested-rule source for one run's tree and room.
-fn nested_rule_candidates(site: &Site, room: &Address) -> runtime::RuleCandidates {
+fn nested_rule_candidates(
+    site: &Site,
+    room: &Address,
+    bound: runtime::ReadBound,
+) -> runtime::RuleCandidates {
     let scope = crate::prompt_chain::RuleScope {
         city_root: site.write_root.clone(),
         building: site.building.addr().clone(),
         room: room.clone(),
+        bound,
     };
-    Arc::new(move |admitted, landed, skip| {
-        crate::prompt_chain::nested_rules(scope.clone(), admitted, landed, skip)
+    Arc::new(move |admitted, landed, skip, halted| {
+        crate::prompt_chain::nested_rules(
+            scope.clone(),
+            &runtime::RuleContext {
+                admitted: admitted.clone(),
+                landed: landed.clone(),
+            },
+            skip,
+            halted,
+        )
     })
 }
 
@@ -140,7 +153,7 @@ impl Laying {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
-        let candidates = nested_rule_candidates(site, addr);
+        let candidates = nested_rule_candidates(site, addr, Arc::clone(&bound));
         let read_clock = Arc::clone(&self.clock);
         let read = runtime::ReadTool::new(
             &site.write_root,

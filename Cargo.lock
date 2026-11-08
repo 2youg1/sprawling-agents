@@ -3161,6 +3161,7 @@ dependencies = [
  "proptest",
  "regex",
  "regex-syntax",
+ "rustix",
  "same-file",
  "serde",
  "serde_json",

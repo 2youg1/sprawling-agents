@@ -53,6 +53,7 @@ fn scope(root: &std::path::Path) -> RuleScope {
         city_root: root.to_path_buf(),
         building: at("lab"),
         room: at("lab"),
+        bound: super::read_bound(root, at("lab")),
     }
 }
 
@@ -69,9 +70,12 @@ fn a_deeper_directory_offers_its_rules_from_the_run_room_downwards() {
     let dir = project();
     let candidates = nested_rules(
         scope(dir.path()),
-        &at("lab/pkg/probe/a.rs"),
-        &at("lab/pkg/probe/a.rs"),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
         &BTreeSet::new(),
+        &mut || false,
     );
     assert_eq!(
         candidates
@@ -96,9 +100,12 @@ fn only_a_strict_descendant_of_the_run_room_and_home_building_is_eligible() {
         assert!(
             nested_rules(
                 scope(dir.path()),
-                &at(admitted),
-                &at(landed),
+                &runtime::RuleContext {
+                    admitted: at(admitted),
+                    landed: at(landed)
+                },
                 &BTreeSet::new(),
+                &mut || false,
             )
             .is_empty(),
             "{admitted} -> {landed} was eligible"
@@ -142,9 +149,12 @@ fn an_oversized_rule_file_is_bounded_and_carries_its_omission() {
     );
     let candidates = nested_rules(
         scope(dir.path()),
-        &at("lab/pkg/probe/a.rs"),
-        &at("lab/pkg/probe/a.rs"),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
         &BTreeSet::new(),
+        &mut || false,
     );
     assert_eq!(candidates.len(), 2);
     assert!(candidates[1].text.len() <= cap);
@@ -163,9 +173,12 @@ fn a_rule_cut_inside_a_multibyte_character_keeps_its_valid_prefix() {
 
     let candidates = nested_rules(
         scope(dir.path()),
-        &at("lab/pkg/probe/a.rs"),
-        &at("lab/pkg/probe/a.rs"),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
         &BTreeSet::new(),
+        &mut || false,
     );
     let probe = candidates
         .iter()
@@ -188,18 +201,24 @@ fn a_rule_behind_an_oversized_one_arrives_on_the_next_read() {
     let mut delivery = RuleDelivery::default();
     let first = nested_rules(
         scope(dir.path()),
-        &at("lab/pkg/probe/a.rs"),
-        &at("lab/pkg/probe/a.rs"),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
         &delivery.seen(),
+        &mut || false,
     );
     assert_eq!(delivery.answer("first", first).len(), 1);
     delivery.complete_wave(&BTreeSet::new());
 
     let second = nested_rules(
         scope(dir.path()),
-        &at("lab/pkg/probe/a.rs"),
-        &at("lab/pkg/probe/a.rs"),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
         &delivery.seen(),
+        &mut || false,
     );
     let selected = delivery.answer("second", second);
     assert_eq!(selected.len(), 1);
@@ -218,11 +237,89 @@ fn non_utf8_after_the_kept_prefix_skips_the_rule_instead_of_leaking_it() {
     assert!(
         nested_rules(
             scope(dir.path()),
-            &at("lab/pkg/probe/a.rs"),
-            &at("lab/pkg/probe/a.rs"),
+            &runtime::RuleContext {
+                admitted: at("lab/pkg/probe/a.rs"),
+                landed: at("lab/pkg/probe/a.rs")
+            },
             &BTreeSet::new(),
+            &mut || false,
         )
         .into_iter()
         .all(|candidate| candidate.room != at("lab/pkg/probe"))
     );
+}
+
+#[test]
+fn cancellation_during_scanning_never_delivers_a_partial_rule() {
+    let dir = project();
+    let mut polls = 0;
+    let candidates = nested_rules(
+        scope(dir.path()),
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
+        &BTreeSet::new(),
+        &mut || {
+            polls += 1;
+            polls > 2
+        },
+    );
+    assert!(candidates.is_empty());
+    assert!(polls > 2);
+}
+
+#[test]
+fn rendered_rule_headings_and_priority_fit_in_the_budget() {
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let mut delivery = RuleDelivery::default();
+    for room in ["lab/pkg", "[lab/pkg"] {
+        let selected = delivery.answer("read", vec![candidate(room, "界".repeat(cap))]);
+        assert_eq!(selected.len(), 1);
+        let payload = kernel::Payload::of(&serde_json::json!({
+            "path": "lab/a.rs", "text": "",
+            "rules": selected.into_iter().map(RuleCandidate::into_json).collect::<Vec<_>>()
+        }))
+        .unwrap();
+        let rendered = runtime::rendering::shown(
+            runtime::rendering::CURRENT,
+            &kernel::ToolName::parse("read").unwrap(),
+            &kernel::event::record::ToolAnswer::Answered { result: payload },
+        )
+        .unwrap();
+        assert!(rendered.len().saturating_sub("lab/a.rs is empty\n".len()) <= cap);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn worktree_rules_use_the_main_city_authorization() {
+    let main = project();
+    let tree = project();
+    write(
+        main.path(),
+        "secret/.sprawling/RULES.toml",
+        b"confidential = true\nwrite = \"everything\"\n",
+    );
+    write(tree.path(), "secret/rules.txt", b"private text\n");
+    let rule = tree.path().join("lab/pkg/AGENTS.md");
+    std::fs::remove_file(&rule).unwrap();
+    std::os::unix::fs::symlink("../../secret/rules.txt", rule).unwrap();
+    let mut scope = scope(tree.path());
+    scope.bound = super::read_bound(main.path(), at("lab"));
+    let candidates = nested_rules(
+        scope,
+        &runtime::RuleContext {
+            admitted: at("lab/pkg/probe/a.rs"),
+            landed: at("lab/pkg/probe/a.rs"),
+        },
+        &BTreeSet::new(),
+        &mut || false,
+    );
+    assert!(
+        candidates
+            .iter()
+            .all(|candidate| !candidate.text.contains("private text"))
+    );
+    assert_eq!(candidates.len(), 1);
 }

@@ -69,7 +69,16 @@ fn deeper_rules_arrive_once_while_the_system_and_tool_bytes_stay_frozen() {
         .collect();
     assert_eq!(bodies.len(), 3, "three scripted turns: {bodies:?}");
     for body in &bodies[1..] {
-        assert_eq!(body["system"], bodies[0]["system"]);
+        let system = |request: &serde_json::Value| {
+            request["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|message| message["role"] == "system")
+                .expect("request contains a system message")["content"]
+                .clone()
+        };
+        assert_eq!(system(body), system(&bodies[0]));
         assert_eq!(body["tools"], bodies[0]["tools"]);
     }
     for heading in [

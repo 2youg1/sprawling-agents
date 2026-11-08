@@ -208,6 +208,17 @@ fn rules(map: &serde_json::Map<String, Value>) -> Option<Vec<(&str, &str)>> {
         .collect()
 }
 
+/// Reserves the rendered heading, priority and separator bytes for a rule.
+/// Includes a trailing newline even when the retained text lacks one.
+pub fn rule_overhead(room: &str) -> usize {
+    let mut rendered = String::from("body");
+    append_rules(&mut rendered, vec![(room, "")]);
+    rendered
+        .len()
+        .saturating_sub("body".len())
+        .saturating_add(1)
+}
+
 /// Appends the project conventions without passing them through the
 /// numbered-body grammar. Every pair of blocks has one blank line
 /// between it, including a body whose last line had no terminator.

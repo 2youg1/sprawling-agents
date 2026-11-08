@@ -50,9 +50,23 @@ type Ticks = Option<u64>;
 /// same modification time rather than a second query.
 pub(crate) struct FileFacts {
     stamp: Stamp,
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     is_file: bool,
 }
 
+#[cfg_attr(
+    not(any(windows, target_os = "linux", target_os = "macos", test)),
+    expect(
+        dead_code,
+        reason = "unchanged evidence is queried only by handle fast paths"
+    )
+)]
 impl FileFacts {
     pub(crate) fn stamp(&self) -> &Stamp {
         &self.stamp
@@ -62,6 +76,13 @@ impl FileFacts {
         self.is_file
     }
 
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     pub(crate) fn len(&self) -> u64 {
         self.stamp.len()
     }
@@ -69,6 +90,13 @@ impl FileFacts {
 
 impl Stamp {
     /// The file length from the same metadata query as the stamp.
+    #[cfg_attr(
+        not(any(windows, target_os = "linux", target_os = "macos", test)),
+        expect(
+            dead_code,
+            reason = "unchanged evidence is queried only by handle fast paths"
+        )
+    )]
     pub(crate) fn len(&self) -> u64 {
         self.len
     }

@@ -101,9 +101,9 @@ pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError>;
 
 - **Windows：先开，再问句柄在哪，再判，再从同一个句柄读。** `File::open` 打开城根拼写下的地址（跟随路上的链接，与 canonicalize 内部那一次 open 相同），问这个句柄的真实位置（`GetFinalPathNameByHandleW`，D113 定由谁来问），交给 `CityRoot::judged_location`（§8-30-1）：不在城根之下即拒，落点的拼写不是所写地址即再 `admit`。判定与读取之间没有可换链接的窗口，所以不需要 `still_judged` 的重求与再开。
 - **Linux：先求真实位置，再判，再开，再核句柄。** Unix 的 canonicalize 不打开文件，所以不在判定前打开链接背后未经判定的东西（FIFO 会让 open 一直阻塞，§8-29-4 的理由照旧）；判过之后打开真实位置，以 `/proc/self/fd/N` 的 `read_link` 核这个句柄的位置仍是判过的位置，不是＝`still_judged` 的那条 `E_GATE_DENIED`。
-- **macOS：同 Linux 的顺序，换一种核法。** macOS 没有命名打开描述符的 procfs，所以打开之后把句柄的卷号与文件号对判定路径此刻指向的文件再求一次，相同才读；不同就走判定路径。
+- **macOS：同 Linux 的顺序，换一种核法。** macOS 没有命名打开描述符的 procfs，所以打开之后把句柄的卷号与文件号对判定路径此刻指向的文件再求一次，保留身份比较，并用 `rustix::fs::getpath`（`F_GETPATH`）取得已打开句柄的位置，重新交给 `judged_location` 授权后才读；位置无法确认或不获授权即 `E_GATE_DENIED`，不使用可替换的路径查询证明句柄位置。
 - **其他平台走 §8-29-4 的判定路径**，不变。
-- **任何失败都退回判定路径重答一遍**：open、元数据、取真实位置、读出错，句柄是目录，字节不是 UTF-8——这些调用本来就答错误或目录，退回由 `land` + `text_at` 给出与 main 相同的那一句，`nearby` 也在那里算。`Floor` 因此只在退回时求。
+- **除 macOS 句柄位置无法确认或不获授权外，失败都退回判定路径重答一遍**：open、元数据、取真实位置、读出错，句柄是目录，字节不是 UTF-8——这些调用本来就答错误或目录，退回由 `land` + `text_at` 给出与 main 相同的那一句，`nearby` 也在那里算。`Floor` 因此只在退回时求。
 - **整读一次，不缓存**：容量按句柄报的长度预留，一次读入，整份校验 UTF-8 不复制；文件字节归操作系统的文件缓存（`crates/sprawling/spec/Serving/Memory.lean` §8-173）。
 
 #### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
@@ -145,7 +145,7 @@ pub fn admit_external(package: &Path,
 ```rust
 pub struct RuleCandidate { pub room: Address, pub text: String, pub dropped: u64 }
 pub struct RuleContext { pub admitted: Address, pub landed: Address }
-pub type RuleCandidates = Arc<dyn Fn(&Address, &Address, &BTreeSet<Address>) -> Vec<RuleCandidate> + Send + Sync>;
+pub type RuleCandidates = Arc<dyn Fn(&Address, &Address, &BTreeSet<Address>, &mut dyn FnMut() -> bool) -> Vec<RuleCandidate> + Send + Sync>;
 pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 impl ReadTool {
     pub fn ruling(self, candidates: RuleCandidates) -> ReadTool;
@@ -170,13 +170,14 @@ pub struct Answer { pub lines: u64, pub total_lines: u64 }
 impl ReadShown {
     pub(crate) fn recall(&self, addr: &Address, now: &Stamp, asked: &str, want: Span) -> Recall;
     pub(crate) fn stage(&self, call: &str, claim: Claim);
+    pub fn discard(&self, call: &str);                      // 丢弃失败或重试前的 staged
     pub fn admit(&self, call: &str);                        // staged → pending，只在有序 account；跨 crate 给 accounting
     pub fn confirm(&self, shortened: &BTreeSet<String>);    // pending → confirmed；清 staged；跨 crate 给 accounting
 }
 ```
 
 - **I1**：只有本 run 的窗口里存在一条完整、未裁切、覆盖本次请求且内容与当前文件相同的普通路径 read 结果，才回 `unchanged`。`seen` 回答 edit 能否落盘，`IdemKey` 回答同一次调用怎样重放，`shown` 回答窗口里有什么；三者互不写入。edit 不写 `shown`，落盘换文件身份使旧记录失效。
-- **Staged → Pending → Confirmed**：工具成功读完后只 stage 私有 claim，不带进结果载荷或账本；`Placing::account` 按调用序 admit；`complete_wave` 只确认未被 exchange 裁切的 pending，并清空未获准入的 staged。同一 wave 内重复读不看 confirmed 之外的新 claim，所以两条都回全文。`ahead` 后未放行的读不影响后续。
+- **Staged → Pending → Confirmed**：工具成功读完后只 stage 私有 claim，不带进结果载荷或账本；`Placing::account` 仅在结果成功交付后按调用序 admit；失败与复用调用 ID 的新尝试先清除旧 staged；`complete_wave` 只确认未被 exchange 裁切的 pending，并清空未获准入的 staged。确认按接纳顺序应用，保留最新版本；正文阈值按本次请求的实际字节数判断，不累加重复确认。同一 wave 内重复读不看 confirmed 之外的新 claim，所以两条都回全文。`ahead` 后未放行的读不影响后续。
 - **覆盖**：整文件未截断的读记 `Whole`；显式窗口只记实际交付区间，最多 8 段，超出丢最旧。未给 `offset`／`limit` 而被行数或字节上限截断的整读不 stage。窗口读 → 更大范围或整读覆盖不足时回全文；截断整读 → 再整读也回全文。空文件与越过末尾只在已知总行数且覆盖成立时回桩。`lines` 是本次请求实际覆盖的行数，`total_lines` 恒给出。
 - **快路径**：参数先经 `Interval::asked_for` 验证，再走 canonicalize／读界／open／句柄复核；失败优先级中参数错误因此先于 IO。Windows、Linux 与 macOS 由 `Stamp::facts` 一次句柄查询同时给出文件类型、长度与戳。`Repeat` 不读文件字节，跳过 UTF-8 校验与 `cut`；`Compare` 仍读字节，只有前后戳相等且 BLAKE3 与已确认内容相同才回桩。其他平台仍走 `judged_read`，不发桩，因为没有同一个句柄快路径可挂。文件戳无法识别一个进程在非竞态窗口内做的同长度、同文件号且恢复旧 mtime 的原地改写；只有竞态claim持有内容摘要，因此这里不声称任意对抗性元数据伪装都能被发现。
 - **racy 判定**：`Stamp` 不含内容。初次读完时若 `now - mtime < 2,000 ms`（mtime 在未来也算）或时钟不可用，claim 记录已读文本的 BLAKE3；之后同戳读到该记录必须走 `Compare`。无摘要的记录才可仅凭戳走 `Repeat`。时间由工作台注入的同一 clock 给出；runtime 不自行读系统钟，未注入或 clock 失败都不使合法 read 失败，而是保守地总是记录并比较摘要。常规本地文件系统上，普通写会改戳，racy 写由摘要兜底；网络卷与刻意伪造元数据不在保证范围内，绝不把该判定说成内容哈希的替代品。
@@ -201,6 +202,10 @@ namespace Runtime.Tools.Read
 structure Span where
   offset : Nat
   lines : Nat
+  /-- 仅无显式窗口且交付未截断整读时为真；lines 总是实际交付行数。 -/
+  complete : Bool := false
+  /-- 字节截断时实际交付的行数；缺省表示请求范围完整交付。 -/
+  deliveredLines : Option Nat := none
   deriving DecidableEq, Repr
 
 /-- 一次成功读产生的私有 claim。`digest = true` 表示同戳重读必须比较内容。 -/
@@ -235,8 +240,9 @@ def covers (claim : Claim) (want : Span) : Bool :=
 
 /-- 当前读产生的 claim；内容 digest 由 racy 判定决定是否必须比较。 -/
 def claimOf (w : World) (want : Span) (racy : Bool) : Claim :=
-  { content := w.currentContent, stamp := w.currentStamp, cover := want,
-    whole := want.offset = 0, digest := racy }
+  { content := w.currentContent, stamp := w.currentStamp,
+    cover := { want with lines := want.deliveredLines.getD want.lines },
+    whole := want.complete, digest := racy }
 
 /-- 一次 read：confirmed 只读 `latest`，同波 staged/pending 不参与回答。 -/
 def look (w : World) (want : Span) (racy : Bool) : World × Recall :=
@@ -447,3 +453,19 @@ end Runtime.Tools.Read
 
 **重开参数**：`winx` 不再随 wasmtime 进锁文件，或某个候选在同机交替测量里比它快出测量误差之外。
 -/
+
+namespace Runtime.Tools.Read
+/-- 首窗口不构成整读证据，不能覆盖后续未交付窗口。 -/
+theorem first_window_does_not_cover_later (w : World) (racy : Bool) :
+    covers (claimOf w { offset := 0, lines := 10 } racy)
+      { offset := 10, lines := 10 } = false := by
+  simp [covers, claimOf]
+end Runtime.Tools.Read
+
+namespace Runtime.Tools.Read
+/-- 请求二十行但只交付十行，不能让二十行请求复用。 -/
+theorem truncated_window_covers_only_delivery (w : World) (racy : Bool) :
+    covers (claimOf w { offset := 0, lines := 20, deliveredLines := some 10 } racy)
+      { offset := 0, lines := 20 } = false := by
+  simp [covers, claimOf]
+end Runtime.Tools.Read

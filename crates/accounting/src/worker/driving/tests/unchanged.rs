@@ -116,7 +116,16 @@ fn a_real_agent_reuses_a_read_but_receives_the_full_text_after_its_edit() {
         .collect();
     assert_eq!(bodies.len(), 5, "five scripted turns: {bodies:?}");
     for body in &bodies[1..] {
-        assert_eq!(body["system"], bodies[0]["system"]);
+        let system = |request: &serde_json::Value| {
+            request["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|message| message["role"] == "system")
+                .expect("request contains a system message")["content"]
+                .clone()
+        };
+        assert_eq!(system(body), system(&bodies[0]));
         assert_eq!(body["tools"], bodies[0]["tools"]);
     }
     let first = latest_tool(&bodies[1]);
