@@ -52,7 +52,7 @@ mod package;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
-use super::shown::{Claim, ReadShown, Span};
+use super::shown::{Claim, Observation, ReadShown, Span};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
 
@@ -546,14 +546,14 @@ impl Tool for ReadTool {
         let mut digest = None;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
-            Found::Chosen(addr) => match engine::text_of(
-                &self.city,
-                &addr,
+            Found::Chosen(addr) => match engine::text_of(engine::Request {
+                city: &self.city,
+                addr: &addr,
                 asked,
-                &*self.reader.bound,
-                &self.shown,
+                bound: &*self.reader.bound,
+                shown: &self.shown,
                 want,
-            )? {
+            })? {
                 engine::Looked::Text {
                     text,
                     before,
@@ -616,6 +616,7 @@ impl Tool for ReadTool {
             {
                 let total = u64::try_from(taken.total).unwrap_or(u64::MAX);
                 let lines = u64::try_from(taken.lines).unwrap_or(u64::MAX);
+                let observed = Observation::new(total, taken.text.len(), digest);
                 let claim = if windowed {
                     Claim::window(
                         addr.clone(),
@@ -624,18 +625,10 @@ impl Tool for ReadTool {
                             offset: interval.offset,
                             lines,
                         },
-                        total,
-                        taken.text.len(),
-                        digest,
+                        observed,
                     )
                 } else {
-                    Claim::whole(
-                        addr.clone(),
-                        before.clone(),
-                        total,
-                        taken.text.len(),
-                        digest,
-                    )
+                    Claim::whole(addr.clone(), before.clone(), observed)
                 };
                 self.shown.stage(&call.id, claim);
             }

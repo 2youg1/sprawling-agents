@@ -9,6 +9,18 @@ fn recall(shown: &ReadShown, addr: &Address, stamp: &Stamp, want: Span) -> Recal
     shown.recall(addr, stamp, "lab/file.txt", want)
 }
 
+fn observed(total: u64, bytes: usize, digest: Option<B3Hash>) -> Observation {
+    Observation::new(total, bytes, digest)
+}
+
+fn whole(addr: Address, stamp: Stamp, observed: Observation) -> Claim {
+    Claim::whole(addr, stamp, observed)
+}
+
+fn window(addr: Address, stamp: Stamp, span: Span, observed: Observation) -> Claim {
+    Claim::window(addr, stamp, span, observed)
+}
+
 fn evidence(digest: Option<B3Hash>) -> (ReadShown, Address, Stamp) {
     let file = tempfile::NamedTempFile::new().unwrap();
     let stamp = Stamp::of(file.path()).unwrap().unwrap();
@@ -16,7 +28,7 @@ fn evidence(digest: Option<B3Hash>) -> (ReadShown, Address, Stamp) {
     let shown = ReadShown::default();
     shown.stage(
         "call-1",
-        Claim::whole(addr.clone(), stamp.clone(), 40, 4_000, digest),
+        whole(addr.clone(), stamp.clone(), observed(40, 4_000, digest)),
     );
     (shown, addr, stamp)
 }
@@ -37,7 +49,7 @@ fn only_an_admitted_unshortened_claim_can_answer_a_repeat() {
 
     shown.stage(
         "call-2",
-        Claim::whole(addr.clone(), stamp.clone(), 40, 4_000, None),
+        whole(addr.clone(), stamp.clone(), observed(40, 4_000, None)),
     );
     shown.admit("call-2");
     shown.confirm(&BTreeSet::new());
@@ -85,16 +97,14 @@ fn windows_cover_only_what_they_actually_delivered() {
     let shown = ReadShown::default();
     shown.stage(
         "call-1",
-        Claim::window(
+        window(
             addr.clone(),
             stamp.clone(),
             Span {
                 offset: 10,
                 lines: 20,
             },
-            100,
-            4_000,
-            None,
+            observed(100, 4_000, None),
         ),
     );
     shown.admit("call-1");
@@ -149,7 +159,11 @@ fn a_conflicting_digest_replaces_rather_than_merges_old_evidence() {
     let after = B3Hash::digest(b"after");
     shown.stage(
         "call-2",
-        Claim::whole(addr.clone(), stamp.clone(), 40, 4_000, Some(after)),
+        whole(
+            addr.clone(),
+            stamp.clone(),
+            observed(40, 4_000, Some(after)),
+        ),
     );
     shown.admit("call-2");
     shown.confirm(&BTreeSet::new());

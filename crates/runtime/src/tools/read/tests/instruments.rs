@@ -62,17 +62,17 @@ fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
 
 /// The handle read with the one-pass cut.
 fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usize {
-    let super::engine::Looked::Text { text, .. } = super::engine::text_of(
+    let super::engine::Looked::Text { text, .. } = super::engine::text_of(super::engine::Request {
         city,
         addr,
-        addr.as_str(),
-        &**bound,
-        &crate::tools::ReadShown::default(),
-        crate::tools::Span {
+        asked: addr.as_str(),
+        bound: &**bound,
+        shown: &crate::tools::ReadShown::default(),
+        want: crate::tools::Span {
             offset: 0,
             lines: u64::from(LINE_CAP),
         },
-    )
+    })
     .unwrap() else {
         panic!("an empty evidence table cannot return a stub")
     };

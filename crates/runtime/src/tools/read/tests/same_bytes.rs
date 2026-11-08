@@ -116,17 +116,17 @@ fn both(root: &Path, bound: ReadBound, asked: &str) -> (String, String) {
         Err(err) => format!("err {}", serde_json::to_string(&err).unwrap()),
     };
     (
-        print(super::engine::text_of(
-            &city,
-            &addr,
+        print(super::engine::text_of(super::engine::Request {
+            city: &city,
+            addr: &addr,
             asked,
-            &*bound,
-            &crate::tools::ReadShown::default(),
-            crate::tools::Span {
+            bound: &*bound,
+            shown: &crate::tools::ReadShown::default(),
+            want: crate::tools::Span {
                 offset: 0,
                 lines: u64::from(super::LINE_CAP),
             },
-        )),
+        })),
         print(super::engine::judged_read(&city, &addr, asked, &*bound)),
     )
 }

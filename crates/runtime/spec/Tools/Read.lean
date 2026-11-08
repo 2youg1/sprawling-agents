@@ -94,8 +94,9 @@ const NEARBY_CAP: usize = 16;
 ```rust
 // read::engine —— 模型选的、已过 admit 的城内地址的整份文本。一次缓冲 open，判定的是读取所用句柄自己的真实位置；
 // 退回时答 land + text_at（§8-29-4）给出的那一个结果，所以每一种拒绝与 main 的判定路径逐字节相同。
-pub(super) fn text_of(city: &CityRoot, addr: &Address, asked: &str,
-    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<String, AxError>;
+pub(super) struct Request<'a> { /* city、addr、asked、bound、shown、want：一次读取的完整上下文 */ }
+pub(super) enum Looked { /* Text：正文与前后戳；Unchanged：同一句柄戳与已确认区间 */ }
+pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError>;
 ```
 
 - **Windows：先开，再问句柄在哪，再判，再从同一个句柄读。** `File::open` 打开城根拼写下的地址（跟随路上的链接，与 canonicalize 内部那一次 open 相同），问这个句柄的真实位置（`GetFinalPathNameByHandleW`，D113 定由谁来问），交给 `CityRoot::judged_location`（§8-30-1）：不在城根之下即拒，落点的拼写不是所写地址即再 `admit`。判定与读取之间没有可换链接的窗口，所以不需要 `still_judged` 的重求与再开。
@@ -177,7 +178,7 @@ impl ReadShown {
 - **Staged → Pending → Confirmed**：工具成功读完后只 stage 私有 claim，不带进结果载荷或账本；`Placing::account` 按调用序 admit；`complete_wave` 只确认未被 exchange 裁切的 pending，并清空未获准入的 staged。同一 wave 内重复读不看 confirmed 之外的新 claim，所以两条都回全文。`ahead` 后未放行的读不影响后续。
 - **覆盖**：整文件未截断的读记 `Whole`；显式窗口只记实际交付区间，最多 8 段，超出丢最旧。未给 `offset`／`limit` 而被行数或字节上限截断的整读不 stage。窗口读 → 更大范围或整读覆盖不足时回全文；截断整读 → 再整读也回全文。空文件与越过末尾只在已知总行数且覆盖成立时回桩。`lines` 是本次请求实际覆盖的行数，`total_lines` 恒给出。
 - **快路径**：参数先经 `Interval::asked_for` 验证，再走 canonicalize／读界／open／句柄复核；失败优先级中参数错误因此先于 IO。Windows 与 Linux 由 `Stamp::facts` 一次句柄查询同时给出文件类型、长度与戳。`Repeat` 不读文件字节，跳过 UTF-8 校验与 `cut`；`Compare` 仍读字节，只有前后戳相等且 BLAKE3 与已确认内容相同才回桩。其他平台仍走 `judged_read`，不发桩，因为没有同一个句柄快路径可挂。文件戳无法识别一个进程在非竞态窗口内做的同长度、同文件号且恢复旧 mtime 的原地改写；只有竞态claim持有内容摘要，因此这里不声称任意对抗性元数据伪装都能被发现。
-- **racy 判据**：`Stamp` 不含内容。初次读完时若 `now - mtime < 2,000 ms`（mtime 在未来也算）或时钟不可用，claim 记录已读文本的 BLAKE3；之后同戳读到该记录必须走 `Compare`。无摘要的记录才可仅凭戳走 `Repeat`。时间由工作台注入的同一 clock 给出；runtime 不自行读系统钟，未注入或 clock 失败都不使合法 read 失败，而是保守地总是记录并比较摘要。常规本地文件系统上，普通写会改戳，racy 写由摘要兜底；网络卷与刻意伪造元数据不在保证范围内，绝不把该判据说成内容哈希的替代品。
+- **racy 判定**：`Stamp` 不含内容。初次读完时若 `now - mtime < 2,000 ms`（mtime 在未来也算）或时钟不可用，claim 记录已读文本的 BLAKE3；之后同戳读到该记录必须走 `Compare`。无摘要的记录才可仅凭戳走 `Repeat`。时间由工作台注入的同一 clock 给出；runtime 不自行读系统钟，未注入或 clock 失败都不使合法 read 失败，而是保守地总是记录并比较摘要。常规本地文件系统上，普通写会改戳，racy 写由摘要兜底；网络卷与刻意伪造元数据不在保证范围内，绝不把该判定说成内容哈希的替代品。
 - **成本阈值与有界状态**：`recall` 在覆盖区间与戳都匹配后，用 V4 的同一 `unchanged` 函数和已确认总行数算出准确桩长；只有先前正文至少为桩的两倍才去重，小文件仍回全文。`SHOWN_MAX_PATHS = 64`，`SHOWN_MAX_PENDING = 256`，按单调 generation 淘汰最旧，路径与 id 都用 `BTreeMap`，决策不读哈希序。表只存戳、区间与可选摘要，不存正文。fork、successor、delegate 子 run 从空表开始；fork 中继承的旧桩仍由 V4 重画，但不会凭空成为新 run 的窗口证据。
 - **载荷与渲染**：`{path, unchanged: true, offset, lines, total_lines}`，不带 `text`、`bytes`，V4 画成一行未变桩（§8-63）。候选规则可在同一次桩上继续递送，规则是否完整进入窗口同样由压缩 id 决定。
 -/
@@ -231,7 +232,7 @@ def covers (claim : Claim) (want : Span) : Bool :=
     (claim.cover.offset ≤ want.offset ∧
       want.offset + want.lines ≤ claim.cover.offset + claim.cover.lines)
 
-/-- 当前读产生的 claim；内容 digest 由 racy 判据决定是否必须比较。 -/
+/-- 当前读产生的 claim；内容 digest 由 racy 判定决定是否必须比较。 -/
 def claimOf (w : World) (want : Span) (racy : Bool) : Claim :=
   { content := w.currentContent, stamp := w.currentStamp, cover := want,
     whole := want.offset = 0, digest := racy }

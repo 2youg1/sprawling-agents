@@ -98,7 +98,13 @@ fn draw(result: &Payload, numbering: Numbering, additions: Additions) -> Option<
         let offset = number(map.get("offset"))??;
         let lines = number(map.get("lines"))??;
         let total = number(map.get("total_lines"))??;
-        let mut out = unchanged(path, offset, lines, total, numbering)?;
+        let mut out = unchanged(Stub {
+            path,
+            offset,
+            lines,
+            total_lines: total,
+            numbering,
+        })?;
         append_rules(&mut out, rules(map)?);
         return Some(out);
     }
@@ -151,35 +157,41 @@ fn draw(result: &Payload, numbering: Numbering, additions: Additions) -> Option<
     Some(out)
 }
 
-/// The unchanged stub used by the renderer and by read's breakeven
-/// decision. `lines == 0` is valid only for an empty file or an offset
-/// past the known end.
-pub(crate) fn unchanged(
-    path: &str,
-    offset: u64,
-    lines: u64,
-    total_lines: u64,
-    numbering: Numbering,
-) -> Option<String> {
+/// Every fact that determines an unchanged stub. Grouping them keeps
+/// the renderer and read's breakeven decision on the same request.
+pub(crate) struct Stub<'a> {
+    pub(crate) path: &'a str,
+    pub(crate) offset: u64,
+    pub(crate) lines: u64,
+    pub(crate) total_lines: u64,
+    pub(crate) numbering: Numbering,
+}
+
+/// Draws a stub. `lines == 0` is valid only for an empty file or an
+/// offset past the known end.
+pub(crate) fn unchanged(stub: Stub<'_>) -> Option<String> {
     const SENTENCE: &str = "unchanged since your earlier read; not repeated";
-    if lines == 0 {
-        return match (offset, total_lines) {
-            (0, 0) => Some(format!("{path} is empty: {SENTENCE}\n")),
+    if stub.lines == 0 {
+        return match (stub.offset, stub.total_lines) {
+            (0, 0) => Some(format!("{} is empty: {SENTENCE}\n", stub.path)),
             (offset, total) if offset >= total => Some(format!(
-                "{path} has {total} lines; offset {} is past the end: {SENTENCE}\n",
-                numbering.shown(offset)?
+                "{} has {total} lines; offset {} is past the end: {SENTENCE}\n",
+                stub.path,
+                stub.numbering.shown(offset)?
             )),
             _ => None,
         };
     }
-    let last = offset.checked_add(lines.checked_sub(1)?)?;
-    if last >= total_lines {
+    let last = stub.offset.checked_add(stub.lines.checked_sub(1)?)?;
+    if last >= stub.total_lines {
         return None;
     }
     Some(format!(
-        "{path} lines {}-{} of {total_lines}: {SENTENCE}\n",
-        numbering.shown(offset)?,
-        numbering.shown(last)?,
+        "{} lines {}-{} of {}: {SENTENCE}\n",
+        stub.path,
+        stub.numbering.shown(stub.offset)?,
+        stub.numbering.shown(last)?,
+        stub.total_lines,
     ))
 }
 

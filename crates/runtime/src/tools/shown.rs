@@ -44,6 +44,23 @@ pub enum Recall {
     Compare { digest: B3Hash, answer: Answer },
 }
 
+/// The observations every confirmed claim carries.
+pub(crate) struct Observation {
+    total_lines: u64,
+    bytes: usize,
+    digest: Option<B3Hash>,
+}
+
+impl Observation {
+    pub(crate) fn new(total_lines: u64, bytes: usize, digest: Option<B3Hash>) -> Observation {
+        Observation {
+            total_lines,
+            bytes,
+            digest,
+        }
+    }
+}
+
 /// Evidence produced by one successful read. Kept private to the run,
 /// never serialized as a tool result.
 pub(crate) struct Claim {
@@ -58,41 +75,28 @@ pub(crate) struct Claim {
 }
 
 impl Claim {
-    pub(crate) fn whole(
-        addr: Address,
-        stamp: Stamp,
-        total_lines: u64,
-        bytes: usize,
-        digest: Option<B3Hash>,
-    ) -> Claim {
+    pub(crate) fn whole(addr: Address, stamp: Stamp, observed: Observation) -> Claim {
         Claim {
             addr,
             stamp,
             whole: true,
             spans: Vec::new(),
-            total_lines,
-            bytes,
-            digest,
+            total_lines: observed.total_lines,
+            bytes: observed.bytes,
+            digest: observed.digest,
             generation: 0,
         }
     }
 
-    pub(crate) fn window(
-        addr: Address,
-        stamp: Stamp,
-        span: Span,
-        total_lines: u64,
-        bytes: usize,
-        digest: Option<B3Hash>,
-    ) -> Claim {
+    pub(crate) fn window(addr: Address, stamp: Stamp, span: Span, observed: Observation) -> Claim {
         Claim {
             addr,
             stamp,
             whole: false,
             spans: vec![span],
-            total_lines,
-            bytes,
-            digest,
+            total_lines: observed.total_lines,
+            bytes: observed.bytes,
+            digest: observed.digest,
             generation: 0,
         }
     }
@@ -156,13 +160,13 @@ impl ReadShown {
             lines,
             total_lines: claim.total_lines,
         };
-        let Some(stub) = crate::rendering::unchanged(
-            asked,
-            want.offset,
-            answer.lines,
-            answer.total_lines,
-            crate::rendering::Numbering::FromOne,
-        ) else {
+        let Some(stub) = crate::rendering::unchanged(crate::rendering::Stub {
+            path: asked,
+            offset: want.offset,
+            lines: answer.lines,
+            total_lines: answer.total_lines,
+            numbering: crate::rendering::Numbering::FromOne,
+        }) else {
             return Recall::Fresh;
         };
         if claim.bytes < stub.len().saturating_mul(2) {
