@@ -7,13 +7,16 @@
 
 <script lang="ts">
   // The page a building is raised on, filled in once and written once
-  // (client/Spec.lean 4-50b): the address, the template, and the
-  // `RULES.toml` that template would write, read from the city and
-  // editable before anything lands. An address naming a folder already
-  // in the city adopts it; the city decides that by looking, and the page
-  // says which it will be before the press. The city reads the rules
-  // before anything is laid out, so a refused text leaves nothing behind
-  // and stays in the box to be corrected.
+  // (client/Spec.lean 4-50b): the address, an optional folder on this
+  // machine to copy in, the template, and the `RULES.toml` that template
+  // would write, read from the city and editable before anything lands.
+  // An address naming a folder already in the city adopts it; the city
+  // decides that by looking, and the page says which it will be before
+  // the press. A path in the import box is the person's other choice: the
+  // folder is copied into the city under that address, and the original
+  // stays where it is. The city reads the rules before anything is laid
+  // out, so a refused text leaves nothing behind and stays in the box to
+  // be corrected.
   import { untrack } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -30,7 +33,7 @@
   import Segmented from "./parts/segmented.svelte";
   import { textBoxWire } from "./building/text_box";
   import TextBox from "./building/text_box.look.svelte";
-  import { fillable, OFFERED, raisingOf } from "./raise";
+  import { fillable, OFFERED, raisingOf, sourceOf, sourceRefusal } from "./raise";
 
   interface Props {
     // The address a link filled in: a folder waiting to be adopted.
@@ -54,6 +57,9 @@
   let addressGroup = $state<HTMLDivElement>();
   let template = $state<Exclude<Template, "hall">>("minimal");
   let rules = $state("");
+  // The folder on this machine to copy in; empty means the box says
+  // nothing and the city creates or adopts at the address itself.
+  let from = $state("");
   // Whether the person changed the rules: until then the box follows
   // the template and the address. The rules belong to that pair, so a
   // new address or template starts the box over from its bytes (4-50b):
@@ -95,6 +101,8 @@
   // Whether the press sends rules the person has seen: their own, or the
   // template's once the city has said what those are.
   const ready = $derived(target !== null && (edited || answered));
+  const importOf = $derived(sourceOf(from));
+  const sourceWhy = $derived(sourceRefusal(from));
   $effect(() => {
     const text = offered;
     if (text !== null && !untrack(() => edited)) rules = text;
@@ -121,13 +129,14 @@
     if (target === null || !ready || sent !== null) return;
     refusal = null;
     const before = $belief.refusal;
-    if (u.send(createBuilding(target, template, edited ? rules : null))) {
+    if (u.send(createBuilding(target, template, edited ? rules : null, importOf))) {
       sent = { addr: target, before };
     }
   }
 
   const fills = $derived(fillable(buildings, typed));
   const note = $derived.by(() => {
+    if (importOf !== null && sourceWhy === null) return say($lang, "raise_will_import");
     switch (raising.kind) {
       case "blank":
         return say($lang, "raise_address_help");
@@ -180,6 +189,21 @@
         </div>
       {/if}
     </div>
+    <!-- The other way a building comes to be: a folder that already
+         exists on this machine, copied in under the address above. The
+         city judges the path; the page only keeps a relative one from
+         leaving, because no machine can make sense of it. -->
+    <Field
+      label={say($lang, "raise_source_label")}
+      value={from}
+      mono
+      placeholder={say($lang, "raise_source_placeholder")}
+      help={say($lang, "raise_source_help")}
+      {...sourceWhy === null ? {} : { error: say($lang, sourceWhy) }}
+      onInput={(value) => {
+        from = value;
+      }}
+    />
     <div class="flex flex-col gap-snug">
       <span class="text-note text-text-quiet">{say($lang, "raise_template")}</span>
       <Segmented
@@ -223,12 +247,21 @@
         type="submit"
         tone="primary"
         loading={sent !== null}
-        label={say($lang, raising.kind === "adopt" ? "raise_adopt" : "raise_build")}
+        label={say(
+          $lang,
+          importOf !== null
+            ? "raise_import"
+            : raising.kind === "adopt"
+              ? "raise_adopt"
+              : "raise_build",
+        )}
         {...target === null
           ? { why: say($lang, "raise_needs_address") }
-          : ready
-            ? {}
-            : { why: say($lang, "raise_rules_waiting") }}
+          : sourceWhy !== null
+            ? { why: say($lang, sourceWhy) }
+            : ready
+              ? {}
+              : { why: say($lang, "raise_rules_waiting") }}
       />
     </div>
   </form>

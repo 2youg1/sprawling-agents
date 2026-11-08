@@ -544,8 +544,8 @@
     "zh": "/halt {addr}"
   },
   "bld_no_rooms": {
-    "en": "no rooms yet",
-    "zh": "还没有房间"
+    "en": "create the first room",
+    "zh": "新建第一个房间"
   },
   "bld_open_talk": {
     "en": "talk",
@@ -592,8 +592,16 @@
     "zh": "继续"
   },
   "bld_room_name": {
-    "en": "name a room to talk in",
-    "zh": "给要说话的房间起个名字"
+    "en": "room name",
+    "zh": "房间名"
+  },
+  "bld_room_name_help": {
+    "en": "this box only names the room; you talk to the building once you are inside it",
+    "zh": "这里只设置房间名，进去之后才开始跟这栋楼说话"
+  },
+  "bld_room_name_example": {
+    "en": "first try",
+    "zh": "第一次尝试"
   },
   "bld_room_talk": {
     "en": "talk there",
@@ -7859,6 +7867,66 @@
     "en": "the city's library",
     "zh": "城市的库"
   },
+  "skill_mount_title": {
+    "en": "folders from this computer",
+    "zh": "本机的 skill 文件夹"
+  },
+  "skill_mount_help": {
+    "en": "the whole folder is mounted read-only: every folder inside it holding a SKILL.md becomes a skill, and nothing is copied",
+    "zh": "整个文件夹只读挂载：里面每个带 SKILL.md 的文件夹都成为一件 skill，内容不复制"
+  },
+  "skill_mount_label": {
+    "en": "absolute path on the machine running the city",
+    "zh": "运行城市那台机器上的绝对路径"
+  },
+  "skill_mount_placeholder": {
+    "en": "~/.claude/skills",
+    "zh": "~/skills 或 ~/.claude/skills"
+  },
+  "skill_mount_add": {
+    "en": "mount this folder",
+    "zh": "挂载这个文件夹"
+  },
+  "skill_mount_none": {
+    "en": "no folder from this computer is mounted yet; the skills above all live in the city",
+    "zh": "还没有挂载本机的文件夹；上面的 skill 都住在城里"
+  },
+  "skill_mount_taken": {
+    "en": "this folder is already mounted",
+    "zh": "这个文件夹已经挂载了"
+  },
+  "skill_mount_needs_path": {
+    "en": "type a folder on this machine first",
+    "zh": "先写下本机的一个文件夹"
+  },
+  "skill_mount_remove": {
+    "en": "unmount",
+    "zh": "取消挂载"
+  },
+  "skill_mount_remove_name": {
+    "en": "unmount {path}",
+    "zh": "取消挂载 {path}"
+  },
+  "skill_mount_untold": {
+    "en": "waiting for the city to say which folders are mounted",
+    "zh": "等城说出已挂载哪些文件夹"
+  },
+  "skill_mount_waiting": {
+    "en": "saving; the list below moves when the city answers",
+    "zh": "正在保存；城答复之后下面的列表才动"
+  },
+  "skill_mount_home": {
+    "en": "name a folder inside your home, such as ~/skills, not the home directory itself",
+    "zh": "请写家目录里的一层，例如 ~/skills，而不是家目录本身"
+  },
+  "skill_mount_relative": {
+    "en": "give an absolute path, or one starting with ~/",
+    "zh": "请填绝对路径，或以 ~/ 开头的路径"
+  },
+  "skill_mount_refused": {
+    "en": "the city did not mount {path}: {why}",
+    "zh": "城没有挂载 {path}：{why}"
+  },
   "skills_missing": {
     "en": "admitted but not on any shelf",
     "zh": "已准入但书架上没有"
@@ -7962,6 +8030,34 @@
   "raise_will_build": {
     "en": "a new, empty building",
     "zh": "新建一栋空楼"
+  },
+  "raise_source": {
+    "en": "import from this computer",
+    "zh": "从本机导入"
+  },
+  "raise_source_label": {
+    "en": "absolute path on the machine running the city",
+    "zh": "运行城市那台机器上的绝对路径"
+  },
+  "raise_source_placeholder": {
+    "en": "C:\\work\\my-project or /home/you/my-project",
+    "zh": "C:\\work\\my-project 或 /home/you/my-project"
+  },
+  "raise_source_help": {
+    "en": "leave it empty to create a building or adopt a folder already in the city; a folder named here is copied in, and the original stays where it is",
+    "zh": "留空就新建一栋楼或接管城里已有的文件夹；填了就把这个文件夹复制进城，原处的文件夹保持原样"
+  },
+  "raise_will_import": {
+    "en": "a copy of that folder, adopted as it is: its files come in unchanged",
+    "zh": "那个文件夹的一份副本，照原样接管：文件原封不动地进来"
+  },
+  "raise_source_relative": {
+    "en": "give an absolute path; a relative one has no meaning on the city's machine",
+    "zh": "请填绝对路径：相对路径在城那台机器上没有起点"
+  },
+  "raise_import": {
+    "en": "import the folder",
+    "zh": "导入这个文件夹"
   },
   "raise_will_adopt": {
     "en": "this folder is already here: it is adopted as it is, and none of its files change; a large folder takes a moment",

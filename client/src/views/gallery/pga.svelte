@@ -243,6 +243,7 @@
   // one mounted from outside the city, which has no address to open.
   const SKILLS: SkillsAnswer = {
     building: LAB,
+    external_shelves: ["~/elsewhere/skills"],
     missing: [],
     skills: [
       {

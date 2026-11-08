@@ -62,7 +62,7 @@
     </select>
   {/if}
   <a
-    class="inline-flex h-control items-center rounded-control bg-raised px-base text-label text-text transition-colors ease-leave hover:bg-raised-hover hover:ease-arrive still:transition-none"
+    class="inline-flex h-control items-center rounded-control bg-accent px-base text-label text-on-accent transition-colors ease-leave hover:bg-accent-hover hover:ease-arrive still:transition-none"
     href={toFragment({ kind: "raise" })}>{say($lang, "workspace_new_import")}</a
   >
 </div>

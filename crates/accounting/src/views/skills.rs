@@ -90,7 +90,7 @@ pub(super) fn skills_answer(
         building: building.clone(),
         skills,
         missing: shelves.missing(&admitted),
-        external_shelves: Vec::new(),
+        external_shelves: city::stated_skill_shelves(city_root).ok()?,
     })
 }
 

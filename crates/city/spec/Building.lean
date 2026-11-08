@@ -32,8 +32,9 @@ pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError>;    // city::build
 pub(crate) fn names_a_building(name: &str) -> Option<Address>;   // all 与 wizard::survey 共用
 pub enum RulesText<'a> { Template, Written(&'a str) }
 pub enum Founding { Built, Adopted }
-pub fn raise(city_root: &Path, addr: &Address, template: BuildingTemplate, rules: RulesText<'_>,
-    source: Option<&Path>) -> Result<(Building, Founding), AxError>; // city::raise_building；source 是城外导入源
+pub fn raise(city_root: &Path, asking: Raising<'_>) -> Result<(Building, Founding), AxError>; // city::raise_building；Raising 收来源
+pub struct Raising<'a> { pub addr: &'a Address, pub template: BuildingTemplate,
+                        pub rules: RulesText<'a>, pub source: Option<&'a Path> }
 pub fn template_rules(addr: &Address, template: BuildingTemplate) -> Result<String, AxError>;
 pub fn has_rules(city_root: &Path, building: &Building) -> Result<bool, AxError>;
 pub fn create(city_root: &Path, addr: &Address, template: BuildingTemplate)

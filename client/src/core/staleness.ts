@@ -140,10 +140,12 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "bytes":
     case "export":
       return "none";
-    // A shelf moves when somebody edits the building's rules, and a
-    // pin appears when a run starts under them.
+    // A shelf moves when somebody mounts one on the city's layer, edits
+    // the building's rules, or a run starts under them and pins a version.
     case "skills":
-      return reached(kind === "building_configured" || kind === "run_started");
+      return reached(
+        kind === "building_configured" || kind === "run_started" || kind === "rules_changed",
+      );
     // The working tree moves whenever a wave writes, and every wave
     // ends in a checkpoint; a file taken back from one moves it too.
     case "git_status":

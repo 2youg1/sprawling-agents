@@ -6,11 +6,11 @@
 <script lang="ts">
   // How the picked building's panel is drawn, and nothing else
   // (`./panel.ts`, `PanelLook`): its name and the close control, the
-  // badges, the way into the building, the standing goal, the problems
-  // and stuck lines, and the newest runs. The way in is a link in the
-  // raised button's paint; it and the run lines change colour under the
-  // pointer on the arrive curve and back on leave
-  // (docs/frontend-method.md §4-43).
+  // badges, the way into the building in the accent a primary action
+  // wears, the standing goal, the problems and stuck lines, and the
+  // newest runs. The way in is a link in the raised button's paint; it
+  // and the run lines change colour under the pointer on the arrive
+  // curve and back on leave (docs/frontend-method.md §4-43).
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import type { PanelLook } from "./panel";
@@ -32,7 +32,7 @@
   {/if}
   <a
     {...look.enter.wire}
-    class="inline-flex h-control items-center self-start rounded-control bg-raised px-base text-label transition-colors ease-leave hover:bg-raised-hover hover:ease-arrive"
+    class="inline-flex h-control items-center self-start rounded-control bg-accent px-base text-label text-on-accent transition-colors ease-leave hover:bg-accent-hover hover:ease-arrive"
   >
     {look.enter.label}
   </a>

@@ -296,8 +296,15 @@ impl RunWorker {
             self.validate_workspace_models(&evaluated)?;
         }
         let written = rules.map_or(city::RulesText::Template, city::RulesText::Written);
-        let (building, founding) =
-            city::raise_building(&self.city_root, addr, template, written, source)?;
+        let (building, founding) = city::raise_building(
+            &self.city_root,
+            city::Raising {
+                addr,
+                template,
+                rules: written,
+                source,
+            },
+        )?;
         match founding {
             city::Founding::Built => self.built(&building, template),
             city::Founding::Adopted => self.adopted(&building, template),

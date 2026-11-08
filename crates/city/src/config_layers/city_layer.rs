@@ -28,6 +28,8 @@ pub enum CitySetting<'a> {
     /// that states nothing reads (`crates/city/spec/ConfigLayers.lean`
     /// §8-4g); an empty table takes the key out.
     Catalog(&'a ExposureTable),
+    /// The city's whole ordered external skill shelf table.
+    SkillShelves(&'a [String]),
 }
 
 /// Writes one fact into the city's own `CONFIG.toml`.
@@ -44,6 +46,7 @@ pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<
             super::catalog::check(table)?;
             Change::Catalog(table)
         }
+        CitySetting::SkillShelves(shelves) => Change::SkillShelves(shelves),
     };
     change_at(&CityLayout::new(city_root).city_config(), change)
 }

@@ -223,6 +223,7 @@
   import { ModelTable } from "../setup/models";
   import { AttachForm, EndpointList } from "../setup/providers";
   import { Shelves } from "../setup/skills";
+  import Stand from "./stand.svelte";
   import { EffortSection } from "../shared/effort";
   import Skyline from "../city/skyline.svelte";
   import Case from "./case.svelte";
@@ -286,8 +287,25 @@ the choosing happens over the composer. -->
   <EffortSection />
 </Case>
 
-<Case label="settings · where this city keeps its skills">
-  <Shelves />
+<Case label="settings · where this city keeps its skills, one folder mounted from this computer">
+  <Stand
+    link={{ kind: "live", city: "sprawling" }}
+    unread={[]}
+    waiting={[]}
+    answers={(query) =>
+      typeof query === "object" && "skills" in query
+        ? {
+            skills: {
+              building: query.skills.building,
+              external_shelves: ["~/.claude/skills"],
+              missing: [],
+              skills: [],
+            },
+          }
+        : undefined}
+  >
+    <Shelves />
+  </Stand>
 </Case>
 
 <!-- The notice drawer: a day of refusals kept where a person can come

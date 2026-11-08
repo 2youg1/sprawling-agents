@@ -44,15 +44,28 @@ pub(crate) const SKILL_PINS_KEY: &str = "[skills.pins]";
 /// (see [`shelf_path`]), and propagates a configuration file that exists
 /// and cannot be read or parsed.
 pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxError> {
-    let layer = ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?;
-    let Some(stated) = layer.shelves() else {
-        return Ok(Vec::new());
-    };
+    let stated = stated_skill_shelves(city_root)?;
     let mut shelves = Vec::with_capacity(stated.len());
-    for raw in stated {
+    for raw in &stated {
         shelves.push(shelf_path(raw, home)?);
     }
     Ok(shelves)
+}
+
+/// The city layer's entries exactly as written, including shelves that
+/// currently contain no skill; this is the table the import form edits.
+pub fn stated_skill_shelves(city_root: &Path) -> Result<Vec<String>, AxError> {
+    let layer = ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?;
+    Ok(layer.shelves().unwrap_or_default().to_vec())
+}
+
+/// Judges a whole proposed table with the reader's one path rule before
+/// any setting beside it is written.
+pub fn check_skill_shelves(shelves: &[String], home: &Path) -> Result<(), AxError> {
+    for raw in shelves {
+        shelf_path(raw, home)?;
+    }
+    Ok(())
 }
 
 /// How one shelf in the city's external shelf list becomes a directory.

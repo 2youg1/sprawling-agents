@@ -68,7 +68,7 @@ pub(crate) use session::forget as forget_session;
 pub use session::{SessionShape, freeze_naming, own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
 pub(crate) use shelves::SHELVES_KEY;
-pub use shelves::city_shelves;
+pub use shelves::{check_skill_shelves, city_shelves, stated_skill_shelves};
 pub use write::{migrate_mcp, migrate_mcp_reference, migrate_skill_pin};
 pub use write::{write_mcp, write_sandbox, write_second_threshold};
 pub use write::{write_mcp_references, write_skill_pins};
