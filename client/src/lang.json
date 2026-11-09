@@ -92,8 +92,8 @@
     "zh": "跟随系统"
   },
   "appearance_local": {
-    "en": "list the installed faces",
-    "zh": "列出已安装的字体"
+    "en": "choose from this computer's faces",
+    "zh": "从本机字体里选"
   },
   "appearance_local_denied": {
     "en": "the browser did not hand over the list; write the stack instead",
@@ -130,6 +130,10 @@
   "appearance_preview": {
     "en": "preview",
     "zh": "预览"
+  },
+  "appearance_preview_note": {
+    "en": "the only sample on this page; it follows every face, size and metric as soon as it lands",
+    "zh": "本页唯一的演示：字体、字号与度量一改这里就跟着变"
   },
   "appearance_reading": {
     "en": "the reading face",

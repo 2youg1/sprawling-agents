@@ -263,6 +263,15 @@ export function stackRefused(stack: string): boolean {
   return stack !== "" && !STACK_SHAPE.test(stack);
 }
 
+// One installed family as a CSS `font-family` list a picker row can wear:
+// the name quoted so spaces and punctuation stay one family, then a
+// generic so a missing face still draws something. The name is never
+// repaired; a caller that only hands `FAMILY_SHAPE` names keeps the
+// quotes from closing the declaration.
+export function faceStyle(family: string): string {
+  return `"${family.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}", ui-sans-serif, system-ui, sans-serif`;
+}
+
 // The fallback chain as the one custom property the family stacks read.
 // Each name is quoted and followed by the comma that joins it to the next
 // family, so one token holds the whole chain: the stacks in

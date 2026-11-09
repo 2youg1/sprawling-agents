@@ -22,6 +22,10 @@ export interface Choice {
   readonly label: string;
   // The second line: a provider, a price, a context window.
   readonly note?: string;
+  // A CSS `font-family` list that draws this row (and the trigger while
+  // this value is in force). Absent means the page's face; present for a
+  // face picker, so each family is read in its own shape.
+  readonly face?: string;
 }
 
 export interface ComboboxProps {
@@ -226,6 +230,8 @@ export interface OptionLook {
   readonly key: string;
   readonly label: string;
   readonly note: string | undefined;
+  // CSS `font-family` for this row, when the choice carries one.
+  readonly face: string | undefined;
   // The value in force, which `aria-selected` says too.
   readonly chosen: boolean;
   // Where the cursor is, which `aria-activedescendant` says too.
@@ -238,6 +244,8 @@ export interface ComboboxLook {
   readonly trigger: TriggerWire;
   // What the trigger says: the chosen label, or the placeholder.
   readonly face: string;
+  // CSS `font-family` for the trigger while a faced choice is in force.
+  readonly faceStyle: string | undefined;
   readonly unset: boolean;
   // Absent until the popup first opens.
   readonly layer: LayerWire | undefined;
@@ -281,6 +289,7 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       [HOLD]: hands.holds.trigger,
     },
     face: chosen?.label ?? props.placeholder,
+    faceStyle: chosen?.face,
     unset: chosen === undefined,
     layer: layer === "unopened" ? undefined : { inert: !open, [HOLD]: hands.holds.layer },
     open,
@@ -312,6 +321,7 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       key: choice.value,
       label: choice.label,
       note: choice.note,
+      face: choice.face,
       chosen: choice.value === props.value,
       cursor: open && index === cursor,
       wire: {

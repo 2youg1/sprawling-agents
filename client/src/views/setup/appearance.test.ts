@@ -13,7 +13,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { fallbackToken } from "./appearance";
+import { faceStyle, fallbackToken } from "./appearance";
 
 const theme = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`../../theme/${name}`, import.meta.url)), "utf8");
@@ -23,6 +23,13 @@ test("each name carries the comma that joins it to the next, and none is a chain
   expect(fallbackToken(["Maple Mono NF CN"])).toBe('"Maple Mono NF CN",');
   expect(fallbackToken(["Maple Mono NF CN", "Noto Sans SC"])).toBe(
     '"Maple Mono NF CN", "Noto Sans SC",',
+  );
+});
+
+test("a picker row quotes the family and keeps a generic behind it", () => {
+  expect(faceStyle("Iosevka")).toBe('"Iosevka", ui-sans-serif, system-ui, sans-serif');
+  expect(faceStyle('Font "Display"')).toBe(
+    '"Font \\"Display\\"", ui-sans-serif, system-ui, sans-serif',
   );
 });
 
