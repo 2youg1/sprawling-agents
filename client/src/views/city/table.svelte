@@ -27,14 +27,12 @@
   const { city, runs, now, picked, onPick }: Props = $props();
   const u = ui();
   const { lang } = u;
+  const editor = u.prefs.editorHeld;
 
   const look = $derived(
-    lookOf(
-      { city, runs, now, picked, lang: $lang, cityFolder: u.prefs.editor().folder },
-      (addr) => {
-        onPick(addr);
-      },
-    ),
+    lookOf({ city, runs, now, picked, lang: $lang, cityFolder: $editor.folder }, (addr) => {
+      onPick(addr);
+    }),
   );
 </script>
 

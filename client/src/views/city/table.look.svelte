@@ -66,8 +66,10 @@
               aria-hidden="true">{row.guide}</span
             >
             <span class="flex min-w-0 flex-1 items-baseline gap-base">
-              <span class="shrink-0 font-mono font-label text-text">{row.name}</span>
-              <span class="min-w-0 truncate font-mono text-note text-text-faint">{row.path}</span>
+              <span class="min-w-0 truncate font-mono font-label text-text">{row.name}</span>
+              <span class="min-w-0 truncate font-mono text-note text-text-faint" title={row.path}
+                >{row.path}</span
+              >
             </span>
             <span class={[COUNT, row.waiting === 0 ? "text-text-quiet" : "text-alert"]}>
               <Glyph name="hand" size="sm" />{String(row.waiting)}

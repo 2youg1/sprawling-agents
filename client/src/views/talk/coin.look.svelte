@@ -34,7 +34,7 @@
   >
     <span class="faces" aria-hidden="true">
       <span class="face" data-face="send"><Glyph name="send" size="key" /></span>
-      <span class="face" data-face="stop"><Glyph name="pause" size="stop" solid /></span>
+      <span class="face" data-face="stop"><Glyph name="stop" size="stop" solid /></span>
     </span>
   </button>
 {/snippet}

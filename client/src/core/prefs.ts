@@ -229,6 +229,9 @@ export interface PreferenceDoor {
   readonly draftUnkept: (at: string) => Readable<boolean>;
   // Facts of the machine this browser runs on, never the city's (client/Spec.lean §4-39).
   readonly editor: () => Pick<Opening, "editor" | "folder">;
+  // Same facts as a store so a seat that draws the city folder can redraw
+  // when the advanced settings card writes a new one.
+  readonly editorHeld: Readable<Pick<Opening, "editor" | "folder">>;
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
   readonly workbench: Readable<Workbench>;
   readonly setWorkbench: (next: Workbench) => void;
@@ -333,6 +336,10 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
   const keeper = writable<Keeper>("browser");
   const workbench = writable<Workbench>(readWorkbench(rows.getItem(ROWS.workbench)));
   const paletteFound = writable<boolean>(rows.getItem(ROWS.paletteFound) === YES);
+  const editorHeld = writable<Pick<Opening, "editor" | "folder">>({
+    editor: readOne(EDITORS, rows.getItem(ROWS.editor), "none"),
+    folder: rows.getItem(ROWS.cityFolder) ?? "",
+  });
   // One write path for every kept change, the city's answer included: the
   // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
@@ -403,13 +410,12 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       else rows.setItem(ROWS.draft + at, text);
     },
     draftUnkept: (at) => derived(rows.unkept, (names) => names.has(ROWS.draft + at)),
-    editor: () => ({
-      editor: readOne(EDITORS, rows.getItem(ROWS.editor), "none"),
-      folder: rows.getItem(ROWS.cityFolder) ?? "",
-    }),
+    editor: () => get(editorHeld),
+    editorHeld,
     setEditor(next) {
       rows.setItem(ROWS.editor, next.editor);
       rows.setItem(ROWS.cityFolder, next.folder);
+      editorHeld.set(next);
     },
     workbench,
     setWorkbench(next) {

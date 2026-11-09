@@ -25,19 +25,16 @@
 
 <div class="flex min-w-0 flex-col gap-wide">
   <div class="flex min-w-0 flex-col gap-snug">
-    <span class="text-note text-text-quiet">{look.scopeLabel}</span>
-    <Segmented
-      label={look.scopeLabel}
-      options={look.scopes}
-      held={look.scope}
-      onPick={look.onScope}
-    />
-    <Segmented
-      label={look.panes[0]?.label ?? ""}
-      options={look.panes}
-      held={look.pane}
-      onPick={look.onPane}
-    />
+    {#if look.scopes.length > 0}
+      <span class="text-note text-text-quiet">{look.scopeLabel}</span>
+      <Segmented
+        label={look.scopeLabel}
+        options={look.scopes}
+        held={look.scope}
+        onPick={look.onScope}
+      />
+    {/if}
+    <Segmented label={look.panesLabel} options={look.panes} held={look.pane} onPick={look.onPane} />
     <p class="text-note">
       <span class="figure text-text-quiet">{look.meter}</span>
       {#if look.delta !== undefined}

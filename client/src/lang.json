@@ -231,6 +231,10 @@
     "en": "the city default",
     "zh": "全城默认"
   },
+  "catalog_panes": {
+    "en": "catalog pane",
+    "zh": "能力分栏"
+  },
   "catalog_meter": {
     "en": "the newest run carried {core} bytes of core tools and a {index}-byte dormant index",
     "zh": "最新的 run 带了 {core} 字节常驻工具与 {index} 字节休眠索引"
@@ -9964,8 +9968,8 @@
     "zh": "楼和它们的 run"
   },
   "city_table_row": {
-    "en": "{name}: {waiting} waiting for you, {working} at work, {done} done",
-    "zh": "{name}：{waiting} 个等你，{working} 个在干活，{done} 个完成"
+    "en": "{name} at {path}: {waiting} waiting for you, {working} at work, {done} done",
+    "zh": "{name}（{path}）：{waiting} 个等你，{working} 个在干活，{done} 个完成"
   },
   "city_table_none": {
     "en": "no runs",

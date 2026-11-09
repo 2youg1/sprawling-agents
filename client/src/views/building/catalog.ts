@@ -308,6 +308,8 @@ export interface CatalogLook {
   readonly scopes: readonly Choice<Scope>[];
   readonly scope: Scope;
   readonly onScope: (scope: Scope) => void;
+  // Own name for the pane radiogroup; never the first pane's label.
+  readonly panesLabel: string;
   readonly panes: readonly Choice<CatalogPane>[];
   readonly pane: CatalogPane;
   readonly onPane: (pane: CatalogPane) => void;
@@ -428,19 +430,22 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     return toolGroup(namespace, members, seat, lang, hands, choices);
   });
   // A connector with no tool row yet still names itself so the pane is
-  // not empty while the city has only the reference.
-  for (const reference of seat.draft.references) {
-    if (mcpGroups.some((group) => group.key === reference.label)) continue;
-    mcpGroups.push({
-      key: reference.label,
-      title: reference.label,
-      summary: say(lang, "catalog_mcp_reference"),
-      open: true,
-      choices: choices(undefined),
-      held: null,
-      onPick: () => undefined,
-      rows: [],
-    });
+  // not empty while the city has only the reference. Under the unused
+  // filter those placeholders are not unused tools, so they stay out.
+  if (!seat.unusedOnly) {
+    for (const reference of seat.draft.references) {
+      if (mcpGroups.some((group) => group.key === reference.label)) continue;
+      mcpGroups.push({
+        key: reference.label,
+        title: reference.label,
+        summary: say(lang, "catalog_mcp_reference"),
+        open: true,
+        choices: choices(undefined),
+        held: null,
+        onPick: () => undefined,
+        rows: [],
+      });
+    }
   }
   const skillGroups = skills.length > 0 ? [skillGroup(skills, seat, lang, hands, choices)] : [];
   const groups =
@@ -458,14 +463,20 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     models: "catalog_door_models",
     rules: "catalog_door_rules",
   };
+  // RULES.toml and model notes are always this building's file; the
+  // catalog's city/building scope is for the tool table alone.
+  const scoped = seat.pane !== "models" && seat.pane !== "rules";
   return {
     scopeLabel: say(lang, "catalog_scope"),
-    scopes: [
-      { value: "building", label: say(lang, "catalog_scope_building") },
-      { value: "city", label: say(lang, "catalog_scope_city") },
-    ],
+    scopes: scoped
+      ? [
+          { value: "building", label: say(lang, "catalog_scope_building") },
+          { value: "city", label: say(lang, "catalog_scope_city") },
+        ]
+      : [],
     scope: seat.scope,
     onScope: hands.scope,
+    panesLabel: say(lang, "catalog_panes"),
     panes: CATALOG_PANES.map((value) => ({ value, label: say(lang, paneWord[value]) })),
     pane: seat.pane,
     onPane: hands.pane,
@@ -514,9 +525,27 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
       },
       offLabel: say(lang, "catalog_turn_off_unused"),
       onOff: () => {
+        // Only the pane on screen: turning off unused MCP tools must not
+        // also clear unused skills the person cannot see.
         let next = seat.draft;
-        for (const row of tools) next = { ...next, catalog: pressRow(next.catalog, row, "off") };
-        for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
+        switch (seat.pane) {
+          case "tools":
+            for (const row of tools.filter((each) => !mcpLabels.has(each.tool.namespace))) {
+              next = { ...next, catalog: pressRow(next.catalog, row, "off") };
+            }
+            break;
+          case "mcp":
+            for (const row of tools.filter((each) => mcpLabels.has(each.tool.namespace))) {
+              next = { ...next, catalog: pressRow(next.catalog, row, "off") };
+            }
+            break;
+          case "skills":
+            for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
+            break;
+          case "models":
+          case "rules":
+            break;
+        }
         hands.edit(next);
       },
     },

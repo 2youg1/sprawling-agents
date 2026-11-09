@@ -98,7 +98,8 @@ export interface TableRowLook {
   readonly key: string;
   readonly guide: string;
   readonly name: string;
-  // City-relative folder path shown beside the building id.
+  // Folder path shown beside the building id: city-relative when no city
+  // folder is set, otherwise absolute under that folder (including `/`).
   readonly path: string;
   readonly picked: boolean;
   readonly waiting: number;
@@ -132,7 +133,10 @@ export interface TableSeat {
 export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableLook {
   const { lang, now } = seat;
   const unadopted = waiting(seat.city.buildings);
-  const folder = seat.cityFolder.replace(/[\\/]+$/u, "");
+  // A bare `/` (or `\`) is the filesystem root, not an unset folder: only
+  // strip a trailing separator when something remains after it.
+  const trimmed = seat.cityFolder.replace(/[\\/]+$/u, "");
+  const folder = trimmed === "" && /^[\\/]+$/u.test(seat.cityFolder) ? "/" : trimmed;
   return {
     label: say(lang, "city_table"),
     folds: FOLDS.filter((fold) => fold.minutes > 0).map((fold) => ({
@@ -143,7 +147,12 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
     now: say(lang, "runs_now"),
     rows: tableOf(seat.city.buildings, seat.runs).map((row) => {
       const name = row.addr === "hall" ? say(lang, "city_hall") : row.addr;
-      const path = folder === "" ? `./${row.addr}` : `${folder}/${row.addr}`.replaceAll("\\", "/");
+      const path =
+        folder === ""
+          ? `./${row.addr}`
+          : folder === "/"
+            ? `/${row.addr}`
+            : `${folder}/${row.addr}`.replaceAll("\\", "/");
       const from = row.since === null ? null : along(row.since, now);
       return {
         key: row.addr,
@@ -172,6 +181,7 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
           "aria-pressed": row.addr === seat.picked,
           "aria-label": fill(say(lang, "city_table_row"), {
             name,
+            path,
             waiting: String(row.waiting),
             working: String(row.working),
             done: String(row.done),

@@ -134,4 +134,20 @@ describe("building table", () => {
       ["notes", "./notes", "not adopted"],
     ]);
   });
+
+  test("a city folder of / keeps the root separator on every path", () => {
+    const city: CityAnswer = {
+      active: 0,
+      frozen: 0,
+      halted: [],
+      pursuits: [],
+      runs: [],
+      buildings: [building("docs")],
+    };
+    const look = lookOf(
+      { city, runs: [], now: 1_000, picked: null, lang: "en", cityFolder: "/" },
+      () => undefined,
+    );
+    expect(look.rows.map((row) => row.path)).toEqual(["/docs"]);
+  });
 });
