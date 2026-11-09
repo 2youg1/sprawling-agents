@@ -6,6 +6,8 @@
 //! Builds the Zig leaf with the standard library alone: `zig build-lib`
 //! into this package's `OUT_DIR`, linked as a static library, on a
 //! Windows target and nowhere else (`crates/desktop/Spec.lean` D12).
+//! When `DOCS_RS` is set, the script returns without Zig: docs.rs has
+//! none, and rustdoc does not link the leaf (`desktop_ffi` D7).
 //!
 //! Three checks run before anything is compiled, because they are cheaper
 //! to read here than as a link error: the leaf's step vocabulary in
@@ -31,6 +33,13 @@ const SYSTEM: [&str; 6] = [
 ];
 
 fn main() -> Result<(), String> {
+    // docs.rs sets DOCS_RS and has no Zig; rustdoc does not link the leaf
+    // (`desktop_ffi` D7). Named so a later build without the variable
+    // reruns this script instead of reusing the skip.
+    println!("cargo::rerun-if-env-changed=DOCS_RS");
+    if documenting() {
+        return Ok(());
+    }
     println!("cargo::rerun-if-changed=zig");
     println!("cargo::rerun-if-changed=src/step.rs");
     println!("cargo::rerun-if-changed=src/confinement.rs");
@@ -58,6 +67,11 @@ fn main() -> Result<(), String> {
         println!("cargo::rustc-link-lib=dylib={system}");
     }
     Ok(())
+}
+
+/// Whether this build is for docs.rs documentation (`DOCS_RS`).
+fn documenting() -> bool {
+    std::env::var_os("DOCS_RS").is_some()
 }
 
 fn variable(name: &str) -> Result<String, String> {
