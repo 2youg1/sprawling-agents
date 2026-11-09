@@ -221,6 +221,10 @@
   // only write door for this pane.
   let lockBox = $state("");
   let lockEdited = $state(false);
+  // True only while a saveLock PutRules is in flight: rulesSaving is
+  // shared with saveRules / saveChoice, so a models-pane save must not
+  // clear an unfinished lock edit.
+  let lockSaving = $state(false);
   $effect(() => {
     if (onDisk === null || lockEdited) return;
     const held = lockOf(onDisk);
@@ -271,14 +275,24 @@
     const next = withLock(onDisk, tokens);
     if (!u.send(putRules(building, onDisk, next))) return;
     rulesDraft = withLock(rulesDraft, tokens);
-    // Keep lockEdited until the write answers: clearing it here re-runs
-    // the sync effect against the still-old onDisk and wipes the box.
+    // Keep lockEdited until this lock write answers: clearing it here
+    // re-runs the sync effect against the still-old onDisk and wipes
+    // the box. Other PutRules saves share rulesSaving and must not clear.
+    lockSaving = true;
     const mine = markSent(onDisk);
     rulesSaving = mine;
     awaitReceipt(mine, rulesSlot);
   }
   $effect(() => {
-    if (rulesSaving.kind === "saved") lockEdited = false;
+    if (!lockSaving) return;
+    if (rulesSaving.kind === "saved") {
+      lockEdited = false;
+      lockSaving = false;
+      return;
+    }
+    if (rulesSaving.kind === "refused" || rulesSaving.kind === "unverified") {
+      lockSaving = false;
+    }
   });
 
   let provider = $state("");
