@@ -269,8 +269,7 @@ model = "ordinary"
 effort = "high"
 "#,
     );
-    let widened =
-        crate::inscribe_choice(&multiline, "house", "strong", kernel::Effort::High);
+    let widened = crate::inscribe_choice(&multiline, "house", "strong", kernel::Effort::High);
     let widened_policy = evaluate(&addr("shop"), &widened)
         .unwrap()
         .workspace_models()

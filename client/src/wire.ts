@@ -6096,6 +6096,20 @@ export const SpineDocument = Schema.Union([
 export type SpineDocument = typeof SpineDocument.Type;
 
 /**
+ * The provider, model and effort a new child session uses, written
+ * through the same rules door as [`RulesWrite`] (`crates/wire/spec/Command/Step.lean` §8-60b).
+ */
+export const WorkspaceChoiceWrite = Schema.Struct({
+  base: Schema.String,
+  building: Address,
+  effort: Effort,
+  endpoint: Schema.String,
+  idem: IdemKey,
+  model: Schema.String,
+}).annotate({ identifier: "WorkspaceChoiceWrite" });
+export type WorkspaceChoiceWrite = typeof WorkspaceChoiceWrite.Type;
+
+/**
  * Commands change state, require authorization, and are idempotent. Deliberately *not*
  * `#[non_exhaustive]`, for the reason the module documentation of `command::wire` gives.
  */
@@ -6289,14 +6303,7 @@ export const Command = Schema.Union([
     put_rules: RulesWrite,
   }),
   Schema.Struct({
-    set_workspace_choice: Schema.Struct({
-      base: Schema.String,
-      building: Address,
-      effort: Effort,
-      endpoint: Schema.String,
-      idem: IdemKey,
-      model: Schema.String,
-    }),
+    set_workspace_choice: WorkspaceChoiceWrite,
   }),
   Schema.Struct({
     restore_file: Schema.Struct({
