@@ -19,7 +19,7 @@ describe("context_lock", () => {
 
   test("inserts the lock in the root table before a nested table", () => {
     const withChoice = [
-      'confidential = false',
+      "confidential = false",
       'write = "everything"',
       "",
       "[workspace_models.choice]",
@@ -38,7 +38,7 @@ describe("context_lock", () => {
   });
 
   test("reads TOML integers that use underscores", () => {
-    const text = 'confidential = false\ncontext_lock_tokens = 262_144\n';
+    const text = "confidential = false\ncontext_lock_tokens = 262_144\n";
     expect(lockOf(text)).toBe(262_144);
     expect(withLock(text, 1000)).toContain("context_lock_tokens = 1000");
     expect(withLock(text, 1000).match(/context_lock_tokens/g)).toHaveLength(1);

@@ -15,10 +15,7 @@
 
 const KEY = "context_lock_tokens";
 // TOML allows underscores in integers (`262_144`); strip them before Number.
-const LINE = new RegExp(
-  `^[ \\t]*${KEY}[ \\t]*=[ \\t]*(\\d(?:_?\\d)*)[ \\t]*(?:#.*)?$`,
-  "m",
-);
+const LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[ \\t]*(\\d(?:_?\\d)*)[ \\t]*(?:#.*)?$`, "m");
 const ANY_LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[^\\n]*\\n?`, "gm");
 const TABLE = /^[ \t]*\[[^\]\n]+\]/m;
 
@@ -44,8 +41,7 @@ export function withLock(text: string, tokens: number | null): string {
   if (table !== null) {
     const before = stripped.slice(0, table.index).replace(/\s*$/, "");
     const after = stripped.slice(table.index);
-    const joined =
-      before.length === 0 ? `${line}\n${after}` : `${before}\n\n${line}\n${after}`;
+    const joined = before.length === 0 ? `${line}\n${after}` : `${before}\n\n${line}\n${after}`;
     return joined.replace(/\n{3,}/g, "\n\n");
   }
   const trimmed = stripped.replace(/\s*$/, "");

@@ -228,14 +228,14 @@
   });
   // Empty clears the key; a non-positive or non-integer value is not a
   // clear — save must refuse rather than delete the lock on disk.
-  const lockField = $derived.by((): { kind: "clear" } | { kind: "set"; tokens: number } | { kind: "invalid" } => {
-    const trimmed = lockBox.trim();
-    if (trimmed === "") return { kind: "clear" };
-    const tokens = Number(trimmed);
-    return Number.isInteger(tokens) && tokens > 0
-      ? { kind: "set", tokens }
-      : { kind: "invalid" };
-  });
+  const lockField = $derived.by(
+    (): { kind: "clear" } | { kind: "set"; tokens: number } | { kind: "invalid" } => {
+      const trimmed = lockBox.trim();
+      if (trimmed === "") return { kind: "clear" };
+      const tokens = Number(trimmed);
+      return Number.isInteger(tokens) && tokens > 0 ? { kind: "set", tokens } : { kind: "invalid" };
+    },
+  );
   const lockTokens = $derived(lockField.kind === "set" ? lockField.tokens : null);
 
   // The direct sub-agent model. Easy / medium / hard fill these three
@@ -264,13 +264,13 @@
 
   function saveLock(): void {
     if (onDisk === null || lockField.kind === "invalid" || rulesSaving.kind === "saving") return;
-    // Prefer the RULES editor draft so a lock save cannot drop unsaved
-    // prose edits on the rules pane (same PutRules door, one document).
-    const base = rulesDraft.length > 0 ? rulesDraft : onDisk;
+    // PutRules writes only the disk base plus the lock key: unfinished
+    // rules-pane prose is not committed by a lock save. The editor draft
+    // still receives the same key rewrite so unsaved prose is not wiped.
     const tokens = lockField.kind === "set" ? lockField.tokens : null;
-    const next = withLock(base, tokens);
+    const next = withLock(onDisk, tokens);
     if (!u.send(putRules(building, onDisk, next))) return;
-    rulesDraft = next;
+    rulesDraft = withLock(rulesDraft, tokens);
     // Keep lockEdited until the write answers: clearing it here re-runs
     // the sync effect against the still-old onDisk and wipes the box.
     const mine = markSent(onDisk);
@@ -586,6 +586,8 @@
       />
       {#if rulesSaving.kind === "saved"}
         <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+      {:else if rulesSaving.kind === "refused"}
+        <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
       {/if}
     </span>
   </div>
