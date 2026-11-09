@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 77 as const;
+export const WIRE_V = 78 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "d7948f0e355c39958caf06056253c0352b5ac857591f855e9b464b36480fb240" as const;
+export const WIRE_HASH = "026e6fa252a7583ae1f4f4d2645cd49ca5f386e12dcc06c605afb09458a9ff8e" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -1371,6 +1371,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
  */
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
+  context_lock_tokens: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
   first: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   search: SettledSearch,

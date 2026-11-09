@@ -10,7 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { fill, say } from "../../core/lang";
-import { barOf, ringOf } from "./gauge";
+import { barOf, contextOf, ringOf, usedPercent } from "./gauge";
 import type { Context } from "./gauge";
 
 const BOTH: Context = { used: 82_400, window: 200_000, first: 30, second: 65 };
@@ -71,5 +71,24 @@ describe("a sessions row's context bar", () => {
 
   test("marks nothing where the room states no handoff", () => {
     expect(barOf("en", { ...BOTH, second: null })?.handoff).toBeUndefined();
+  });
+});
+
+describe("contextOf with a building lock", () => {
+  test("measures against min(model window, lock)", () => {
+    const endpoints = [
+      {
+        name: "house",
+        models: [{ id: "ordinary", context_tokens: 200_000 }],
+      },
+    ] as const;
+    const turns = [{ model: "ordinary", used: { input: 50_000 } }] as const;
+    const reminders = { first: 30, second: 65 };
+    const unlocked = contextOf(turns, endpoints, reminders, null);
+    expect(unlocked?.window).toBe(200_000);
+    expect(usedPercent(unlocked!)).toBe(25);
+    const locked = contextOf(turns, endpoints, reminders, 100_000);
+    expect(locked?.window).toBe(100_000);
+    expect(usedPercent(locked!)).toBe(50);
   });
 });

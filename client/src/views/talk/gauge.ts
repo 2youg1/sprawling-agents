@@ -8,12 +8,14 @@
 // reminders sound.
 //
 // **The pair of numbers is the city's own.** Used is the input tokens
-// the provider reported for the latest turn and the window is the
-// answering model's `context_tokens`, which is the pair the city's own
-// reminder is computed from (glossary: context reminder), so the ring
-// and the reminder a resident hears cannot disagree about how full the
-// window is. The two percents are the room's `ConfigAnswer`, so neither
-// is a number this page keeps.
+// the provider reported for the latest turn; the window is
+// `min(model.context_tokens, ConfigAnswer.context_lock_tokens)` when the
+// building states a lock, else the model window alone — the same
+// effective window the city's reminder measures (glossary: context
+// reminder; client 4-66), so the ring and the reminder a resident hears
+// cannot disagree about how full the window is. The two percents and the
+// lock are the room's `ConfigAnswer`, so neither is a number this page
+// keeps.
 
 import type { Belief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
@@ -43,6 +45,14 @@ export function remindersOf(answer: Answer | undefined): Reminders {
   return { first: answer.config.first ?? null, second: answer.config.second.percent };
 }
 
+// The building's absolute lock from the same `Query::Config` answer, or
+// `null` when absent / an older city omitted the field.
+export function lockOfConfig(answer: Answer | undefined): number | null {
+  if (answer === undefined || !("config" in answer)) return null;
+  const lock = answer.config.context_lock_tokens;
+  return lock === undefined || lock === null || lock <= 0 ? null : lock;
+}
+
 // The reminders as words, the ones the page was told and no others: the
 // ring's tip and the session sheet's context cell say them alike.
 export function remindersSaid(lang: Lang, reminders: Reminders): readonly string[] {
@@ -69,19 +79,23 @@ export function sessionRunOf(belief: Belief, room: Address): RunId | undefined {
 // The context of a session whose turns are `turns`, or null when there
 // is no window to measure against: a model whose endpoint stated no
 // `context_tokens` gets no ring at all, because a fraction with no
-// denominator is a number nobody should draw.
+// denominator is a number nobody should draw. `lockTokens` is the
+// building's absolute lock from `ConfigAnswer.context_lock_tokens`.
 export function contextOf(
   turns: readonly Turn[],
   endpoints: readonly EndpointSummary[],
   reminders: Reminders,
+  lockTokens: number | null = null,
 ): Context | null {
   const latest = turns.filter((turn) => turn.used !== undefined && turn.used !== null).at(-1);
   const model = turns.filter((turn) => typeof turn.model === "string").at(-1)?.model ?? null;
   if (model === null) return null;
-  const window = endpoints
+  const modelWindow = endpoints
     .flatMap((endpoint) => endpoint.models)
     .find((row) => row.id === model)?.context_tokens;
-  if (window === undefined || window === null || window <= 0) return null;
+  if (modelWindow === undefined || modelWindow === null || modelWindow <= 0) return null;
+  const window =
+    lockTokens !== null && lockTokens > 0 ? Math.min(modelWindow, lockTokens) : modelWindow;
   return { used: latest?.used?.input ?? 0, window, ...reminders };
 }
 

@@ -23,7 +23,7 @@
   import { QUERIES } from "../../core/asking";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer, RunId } from "../../wire";
-  import { barOf, contextOf, remindersOf } from "../talk/gauge";
+  import { barOf, contextOf, lockOfConfig, remindersOf } from "../talk/gauge";
   import Look from "./context_bar.look.svelte";
 
   interface Props {
@@ -54,6 +54,7 @@
         rounds?.turns ?? [],
         $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
         remindersOf($config),
+        lockOfConfig($config),
       ),
     ),
   );

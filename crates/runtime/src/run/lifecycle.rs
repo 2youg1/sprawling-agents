@@ -354,15 +354,18 @@ impl Run<Active> {
             .and_then(|usage| self.state.gauge.observe(usage.input_tokens))
         {
             self.state.conversation.push_reminder(&reminder);
-            if reminder.asks_succession() {
-                // The lock has filled: ask the same desk `succeed` writes,
-                // so the landing opens a successor when this run concludes
-                // (write Handoff.md first — the reminder said so).
-                if let Ok(mut desk) = self.plan.succession.lock() {
-                    desk.ask(crate::Succession {
-                        reason: "context lock reached".to_owned(),
-                    });
-                }
+            // Auto-ask the succeed desk only when the run continues: a
+            // zero-call turn concludes in this same step, before the model
+            // can see LockReached or write Handoff.md. Continuing turns
+            // keep the desk ask so landing can open a successor after the
+            // model has had a chance to hand off (or call `succeed`).
+            if reminder.asks_succession()
+                && report.calls_made() > 0
+                && let Ok(mut desk) = self.plan.succession.lock()
+            {
+                desk.ask(crate::Succession {
+                    reason: "context lock reached".to_owned(),
+                });
             }
         }
         if report.calls_made() == 0 {

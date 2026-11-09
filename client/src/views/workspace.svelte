@@ -24,6 +24,7 @@
   import { leaveSheet, openSheet } from "./sheets.svelte";
   import Talk from "./talk.svelte";
   import Past from "./talk/past.svelte";
+  import GaugeStrip from "./talk/gauge_strip.svelte";
   import { PAGE, type Seat } from "./talk/seat";
   import { sessionRun } from "./world/chosen.svelte";
   import PaneMenu from "./world/pane_menu.svelte";
@@ -301,20 +302,30 @@ height on every desktop tier (client D113). -->
       {/each}
     </div>
   {/if}
-  <section
+  <!-- Talk column: the gauge strip stands in this column above the
+  conversation landmark so its run link is not a floating bar inside the
+  conversation (client D113; crates/xtask render talk). -->
+  <div
     style:grid-column={at(layout.talk)}
     class={[
       "relative -mx-wide flex min-h-0 flex-col px-wide narrow:col-span-full narrow:mx-0 narrow:px-0",
       sheet ? "row-[2] pt-base" : "row-[1/3]",
     ]}
-    aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
-    {#if past === undefined || session === undefined}
-      <Talk {address} band={sheet} seat={column} />
-    {:else}
-      <Past {address} {session} stretch={past} band={sheet} seat={column} />
+    {#if !sheet && column.kind === "workbench"}
+      <GaugeStrip here={address} run={gauged} />
     {/if}
-  </section>
+    <section
+      class="flex min-h-0 flex-1 flex-col"
+      aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
+    >
+      {#if past === undefined || session === undefined}
+        <Talk {address} band={sheet} seat={column} />
+      {:else}
+        <Past {address} {session} stretch={past} band={sheet} seat={column} />
+      {/if}
+    </section>
+  </div>
   {#if open}
     <!-- On one column the right side is a sheet over the whole page, from
     the right with its close key at the top on that side (4-52): the page

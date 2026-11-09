@@ -39,6 +39,21 @@ pub struct ConfigAnswer {
 -/
 
 /-!
+### 8-87 绝对上下文锁随配置答复
+
+```rust
+pub struct ConfigAnswer {
+    // …既有字段…
+    #[serde(default)] pub context_lock_tokens: Option<u64>,  // 楼 RULES.toml 的 `context_lock_tokens`
+}
+```
+
+- **环与城的提醒共用一个分母**：有锁时生效窗是 `min(模型 context_tokens, lock)`（`client/Spec.lean` 4-66）；页面的 `talk/gauge.ts` 读这一字段，不另抄一份。
+- **缺席即仅百分比提醒**：与 RULES 里不写该键同义；旧城的答复没有这一字段时 `serde(default)` 为 `None`。
+- `WIRE_V` 随本组改形进一位（D1）。
+-/
+
+/-!
 ### 8-86 网络搜索：生效值、说出它的那一级、城自己写的值与缺省地址
 
 ```rust

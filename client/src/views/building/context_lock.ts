@@ -7,9 +7,16 @@
 // in a building's RULES.toml without becoming a second TOML parser: one
 // line match for the key, and a whole-document rewrite that PutRules
 // evaluates. The city remains the only reader of the schema.
+//
+// When the key is absent, the rewrite inserts it in the root table —
+// before the first `[table]` header — never after a nested table such as
+// `[workspace_models.choice]`, where `deny_unknown_fields` would refuse
+// the save.
 
 const KEY = "context_lock_tokens";
 const LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[ \\t]*(\\d+)[ \\t]*(?:#.*)?$`, "m");
+const ANY_LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[^\\n]*\\n?`, "gm");
+const TABLE = /^[ \t]*\[[^\]\n]+\]/m;
 
 /** The lock tokens stated in `text`, or `null` when the key is absent. */
 export function lockOf(text: string): number | null {
@@ -24,14 +31,21 @@ export function lockOf(text: string): number | null {
 /** `text` with `context_lock_tokens` set to `tokens`, or removed when `null`. */
 export function withLock(text: string, tokens: number | null): string {
   const body = text.replace(/\r\n/g, "\n");
+  const stripped = body.replace(ANY_LINE, "").replace(/\n{3,}/g, "\n\n");
   if (tokens === null) {
-    const stripped = body.replace(LINE, "").replace(/\n{3,}/g, "\n\n");
     return stripped.endsWith("\n") || stripped.length === 0 ? stripped : `${stripped}\n`;
   }
-  const line = `${KEY} = ${String(tokens)}`;
-  if (LINE.test(body)) return body.replace(LINE, line);
-  const trimmed = body.replace(/\s*$/, "");
-  return trimmed.length === 0 ? `${line}\n` : `${trimmed}\n\n${line}\n`;
+  const line = `${KEY} = ${String(tokens)}\n`;
+  const table = TABLE.exec(stripped);
+  if (table !== null) {
+    const before = stripped.slice(0, table.index).replace(/\s*$/, "");
+    const after = stripped.slice(table.index);
+    const joined =
+      before.length === 0 ? `${line}\n${after}` : `${before}\n\n${line}\n${after}`;
+    return joined.replace(/\n{3,}/g, "\n\n");
+  }
+  const trimmed = stripped.replace(/\s*$/, "");
+  return trimmed.length === 0 ? line : `${trimmed}\n\n${line}`;
 }
 
 /** Whole percent of `window` that `lock` is, floored; `null` when unknown. */

@@ -17,6 +17,26 @@ describe("context_lock", () => {
     expect(lockOf(withLock(set, null))).toBeNull();
   });
 
+  test("inserts the lock in the root table before a nested table", () => {
+    const withChoice = [
+      'confidential = false',
+      'write = "everything"',
+      "",
+      "[workspace_models.choice]",
+      'endpoint = "house"',
+      'model = "ordinary"',
+      'effort = "medium"',
+      "",
+    ].join("\n");
+    const set = withLock(withChoice, 262_144);
+    expect(lockOf(set)).toBe(262_144);
+    const choiceAt = set.indexOf("[workspace_models.choice]");
+    const lockAt = set.indexOf("context_lock_tokens");
+    expect(lockAt).toBeGreaterThanOrEqual(0);
+    expect(lockAt).toBeLessThan(choiceAt);
+    expect(set.slice(choiceAt)).not.toContain("context_lock_tokens");
+  });
+
   test("reports the lock as a share of the model window", () => {
     expect(lockShare(262_144, 1_050_000)).toBe(24);
     expect(lockShare(0, 1_000)).toBeNull();

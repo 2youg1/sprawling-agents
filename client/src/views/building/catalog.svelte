@@ -226,11 +226,17 @@
     const held = lockOf(onDisk);
     lockBox = held === null ? "" : String(held);
   });
-  const lockTokens = $derived.by(() => {
-    if (lockBox.trim() === "") return null;
-    const tokens = Number(lockBox);
-    return Number.isInteger(tokens) && tokens > 0 ? tokens : null;
+  // Empty clears the key; a non-positive or non-integer value is not a
+  // clear — save must refuse rather than delete the lock on disk.
+  const lockField = $derived.by((): { kind: "clear" } | { kind: "set"; tokens: number } | { kind: "invalid" } => {
+    const trimmed = lockBox.trim();
+    if (trimmed === "") return { kind: "clear" };
+    const tokens = Number(trimmed);
+    return Number.isInteger(tokens) && tokens > 0
+      ? { kind: "set", tokens }
+      : { kind: "invalid" };
   });
+  const lockTokens = $derived(lockField.kind === "set" ? lockField.tokens : null);
 
   // The direct sub-agent model. Easy / medium / hard fill these three
   // selects; saving writes `[workspace_models.choice]` and leaves the
@@ -257,8 +263,12 @@
   );
 
   function saveLock(): void {
-    if (onDisk === null) return;
-    const next = withLock(onDisk, lockTokens);
+    if (onDisk === null || lockField.kind === "invalid") return;
+    // Prefer the RULES editor draft so a lock save cannot drop unsaved
+    // prose edits on the rules pane (same PutRules door, one document).
+    const base = rulesDraft.length > 0 ? rulesDraft : onDisk;
+    const tokens = lockField.kind === "set" ? lockField.tokens : null;
+    const next = withLock(base, tokens);
     if (!u.send(putRules(building, onDisk, next))) return;
     rulesDraft = next;
     lockEdited = false;
@@ -555,7 +565,16 @@
       <Button
         label={say($lang, "catalog_context_save")}
         tone="primary"
-        {...lockEdited ? {} : { why: say($lang, "catalog_unchanged") }}
+        {...lockEdited && lockField.kind !== "invalid"
+          ? {}
+          : {
+              why: say(
+                $lang,
+                lockField.kind === "invalid"
+                  ? "catalog_context_lock_invalid"
+                  : "catalog_unchanged",
+              ),
+            }}
         onPress={saveLock}
       />
       {#if rulesSaving.kind === "saved"}

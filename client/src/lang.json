@@ -379,6 +379,10 @@
     "en": "save lock",
     "zh": "保存锁"
   },
+  "catalog_context_lock_invalid": {
+    "en": "enter a positive whole number of tokens, or leave the box empty to clear the lock",
+    "zh": "填入正整数 token，或留空以清除锁"
+  },
   "catalog_mcp_reference": {
     "en": "connector reference · tools appear once a run has listed them",
     "zh": "连接器引用 · 有 run 列出工具后才会出现"
