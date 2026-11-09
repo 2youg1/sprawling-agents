@@ -289,8 +289,7 @@
   import { SPECIMEN } from "../talk/seat";
   import Delivered from "../talk/delivered.svelte";
   import Head from "../talk/head.svelte";
-  import Reasoning from "../talk/reasoning.look.svelte";
-  import { lengthOf as reasoningLength } from "../talk/reasoning";
+  import Reasoning from "../talk/reasoning.svelte";
   import SteerPin from "../talk/steer_pin.look.svelte";
   import Unread from "../talk/unread.look.svelte";
   import Case from "./case.svelte";
@@ -353,18 +352,8 @@ way down. -->
   width={760}
 >
   <div class="flex flex-col gap-base">
-    <Reasoning
-      label={say($lang, "talk_reasoning")}
-      length={reasoningLength($lang, THOUGHT)}
-      text={THOUGHT}
-      open={false}
-    />
-    <Reasoning
-      label={say($lang, "talk_reasoning")}
-      length={reasoningLength($lang, THOUGHT)}
-      text={THOUGHT}
-      open
-    />
+    <Reasoning text={THOUGHT} open={false} />
+    <Reasoning text={THOUGHT} open />
     <p class="text-body">{SAID} <SteerPin /></p>
     <div class="self-center">
       <Unread

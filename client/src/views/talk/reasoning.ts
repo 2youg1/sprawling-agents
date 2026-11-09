@@ -31,3 +31,10 @@ const utf8 = new TextEncoder();
 export function lengthOf(lang: Lang, text: string): string {
   return fill(say(lang, "talk_reasoning_length"), { n: count(utf8.encode(text).length) });
 }
+
+// The whole value the look draws: the fold's name and length in the
+// person's language, the text the seat has painted, and whether the fold
+// starts open.
+export function lookOf(lang: Lang, text: string, open: boolean): ReasoningLook {
+  return { label: say(lang, "talk_reasoning"), length: lengthOf(lang, text), text, open };
+}
