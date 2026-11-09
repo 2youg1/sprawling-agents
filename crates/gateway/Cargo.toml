@@ -43,6 +43,9 @@ zeroize.workspace = true
 # The one base64 encoder both provider wires take pictures in, and the
 # encoding the encrypted vault file records a nonce and a ciphertext in.
 base64.workspace = true
+# A provider's documented pixel ceiling is applied at the request edge;
+# only an image past that ceiling is decoded, resized and re-encoded.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 # The encrypted vault file (`crates/gateway/Spec.lean` §8-21): one AEAD, one password KDF.
 # `FileVault` is the only reader of either, and it reaches them only on a
 # machine whose credential service refuses to keep a value.

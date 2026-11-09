@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use kernel::event::Scope;
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome,
+    ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -50,10 +50,12 @@ const ACTIONS: &str =
     "use `list`, `raise` (name, template) or `adopt` (name, for a directory already here)";
 
 impl CityTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below.
-    pub fn new(city_root: &Path) -> Result<CityTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
             (
@@ -84,16 +86,28 @@ impl CityTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("action".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("city")?,
+            description: "This city's buildings: list them, raise a new one, or adopt a \
+                          directory that is already here. A run may list; raising and \
+                          adopting are refused in a run, because the shape of the city \
+                          is the User's decision, taken outside a run."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema, neither of
+    /// which can happen with the literals below.
+    pub fn new(city_root: &Path) -> Result<CityTool, AxError> {
+        let defined = Self::definition()?;
         Ok(CityTool {
             city_root: city_root.to_path_buf(),
             meta: ToolMeta {
-                name: ToolName::parse("city")?,
-                disclosure: "This city's buildings: list them, raise a new one, or adopt a \
-                             directory that is already here. A run may list; raising and \
-                             adopting are refused in a run, because the shape of the city \
-                             is the User's decision, taken outside a run."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Govern,
                 cost_tier: CostTier::Light,
                 timeout: None,

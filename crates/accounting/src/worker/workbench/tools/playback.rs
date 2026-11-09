@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, RunId, Seq, Temporal, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome, Writes,
+    ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome, Writes,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -96,12 +96,12 @@ impl Laying {
 }
 
 impl PlaybackTool {
-    /// The tool for a run in `room`, whose building is `building`.
+    /// The name, disclosure and schema `new` registers.
     ///
     /// # Errors
     /// Refuses a name or a parameter schema that does not build, which
     /// the literals below cannot produce.
-    fn new(city_root: &Path, building: Address, room: Address) -> Result<PlaybackTool, AxError> {
+    pub(super) fn definition() -> Result<ToolDef, AxError> {
         let params = json!({
             "type": "object",
             "properties": {
@@ -151,19 +151,32 @@ impl PlaybackTool {
             )
             .with_recovery("report this against accounting::worker::workbench::tools::playback"));
         };
+        Ok(ToolDef {
+            name: ToolName::parse(ACTION)?,
+            description: "Look back at this city's history as your building may read it. \
+                          `export` writes a playback bundle, or a playback page when you \
+                          pass `page`, into your building's playback exports and never over \
+                          an earlier one; `check` checks one of those exports against the \
+                          city and reports each item on its own. The playback skill says how \
+                          to write a page."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// The tool for a run in `room`, whose building is `building`.
+    ///
+    /// # Errors
+    /// Propagates [`Self::definition`].
+    fn new(city_root: &Path, building: Address, room: Address) -> Result<PlaybackTool, AxError> {
+        let defined = Self::definition()?;
         Ok(PlaybackTool {
             city_root: city_root.to_path_buf(),
             building,
             meta: ToolMeta {
-                name: ToolName::parse(ACTION)?,
-                disclosure: "Look back at this city's history as your building may read it. \
-                             `export` writes a playback bundle, or a playback page when you \
-                             pass `page`, into your building's playback exports and never over \
-                             an earlier one; `check` checks one of those exports against the \
-                             city and reports each item on its own. The playback skill says how \
-                             to write a page."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 // An export writes a file. The effect is the registration's,
                 // so `check` rides the same door and is never run ahead.
                 effect: Effect::Write { domain: room },

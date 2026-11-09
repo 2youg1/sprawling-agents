@@ -113,16 +113,30 @@ struct Reaching {
 }
 
 impl WebSearch {
+    /// The name, disclosure and schema `new` registers for `supplier`.
+    ///
+    /// # Errors
+    /// A schema or a name that does not build, which a parsed supplier
+    /// cannot produce.
+    pub(super) fn definition(supplier: &SearchSupplier) -> Result<kernel::ToolDef, AxError> {
+        Ok(kernel::ToolDef {
+            name: kernel::ToolName::parse(NAME)?,
+            description: format!(
+                "Search the web through {}. The result is the service's own answer, as it \
+                 gave it.",
+                supplier.id.as_str()
+            ),
+            input_schema: kernel::Payload::new(mapping::parameters(supplier))?,
+        })
+    }
+
     fn new(supplier: SearchSupplier, reaching: Reaching) -> Result<WebSearch, AxError> {
+        let defined = Self::definition(&supplier)?;
         Ok(WebSearch {
             meta: ToolMeta {
-                name: kernel::ToolName::parse(NAME)?,
-                disclosure: format!(
-                    "Search the web through {}. The result is the service's own answer, as it \
-                     gave it.",
-                    supplier.id.as_str()
-                ),
-                params: kernel::Payload::new(mapping::parameters(&supplier))?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: kernel::Effect::Connector {
                     label: supplier.id.clone(),
                 },

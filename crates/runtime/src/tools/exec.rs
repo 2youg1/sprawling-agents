@@ -31,7 +31,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use kernel::{
     AxCode, AxError, CostTier, Effect, EnvVarName, ExecArm, Payload, RenderIntent, RunId, Temporal,
-    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -144,26 +144,59 @@ pub struct ExecTool {
 }
 
 impl ExecTool {
+    /// The schema `new` registers, with `disclosure` as its description.
+    /// A run passes the sentence [`disclosure::describe`] builds; the
+    /// catalog page passes [`Self::standing_definition`].
+    ///
+    /// # Errors
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition(disclosure: String) -> Result<ToolDef, AxError> {
+        Ok(ToolDef {
+            name: ToolName::parse("exec")?,
+            description: disclosure,
+            input_schema: Payload::of(&serde_json::json!({
+                "type": "object",
+                "properties": {
+                    COMMAND: { "type": "string", "description": "the command to execute" },
+                    PYTHON: { "type": "string", "description": "a Python script to run instead \
+                        of a command: a short script against the standard library - pathlib, \
+                        difflib, re, itertools, collections - with no classes, no exception \
+                        handlers and no comments; read the error when it fails" },
+                    "where": { "type": "string", "enum": ["sandbox", "host"], "description":
+                        "where the command runs: sandbox (the default) or host" },
+                },
+            }))?,
+        })
+    }
+
+    /// The definition a page shows before a run freezes one. Confinement
+    /// is this machine's, the probe a run makes. `shell` is whether the
+    /// frozen sandbox offers the shell arm; the interpreter's path is
+    /// named only once a run resolves it.
+    ///
+    /// # Errors
+    /// Propagates [`Self::definition`].
+    pub fn standing_definition(shell: bool) -> Result<ToolDef, AxError> {
+        let confinement = Confined::detect();
+        let shell_sentence = if shell {
+            " A command runs under the shell this building configured.".to_owned()
+        } else {
+            shell::Shell::Absent.statement()
+        };
+        Self::definition(disclosure::sentence(
+            &confinement.statement(),
+            &shell_sentence,
+        ))
+    }
+
     pub fn new(
         setup: ExecSetup,
         sandbox: Box<dyn Sandbox>,
         backlog: Backlog,
     ) -> Result<ExecTool, AxError> {
-        let params = serde_json::json!({
-            "type": "object",
-            "properties": {
-                COMMAND: { "type": "string", "description": "the command to execute" },
-                PYTHON: { "type": "string", "description": "a Python script to run instead \
-                    of a command: a short script against the standard library - pathlib, \
-                    difflib, re, itertools, collections - with no classes, no exception \
-                    handlers and no comments; read the error when it fails" },
-                "where": { "type": "string", "enum": ["sandbox", "host"], "description":
-                    "where the command runs: sandbox (the default) or host" },
-            },
-        });
         let domain = setup.domain.clone();
         let confinement = Confined::detect();
-        let disclosure = disclosure::describe(&setup, &confinement);
+        let defined = Self::definition(disclosure::describe(&setup, &confinement))?;
         Ok(ExecTool {
             setup,
             container: None,
@@ -172,9 +205,9 @@ impl ExecTool {
             backlog,
             confinement: Mutex::new(confinement),
             meta: ToolMeta {
-                name: ToolName::parse("exec")?,
-                disclosure,
-                params: Payload::of(&params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Heavy,
                 timeout: None,

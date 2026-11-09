@@ -41,6 +41,9 @@
         <span class="figure text-text">· {look.delta}</span>
       {/if}
     </p>
+    {#if look.beforeRun !== undefined}
+      <p class="text-note text-text-quiet">{look.beforeRun}</p>
+    {/if}
     <div class="flex min-w-0 flex-wrap items-center gap-base">
       <Button
         label={look.unused.label}

@@ -29,7 +29,7 @@
 
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
-    Temporal, TimeMs, Tokens, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Temporal, TimeMs, Tokens, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -143,15 +143,34 @@ impl StatusTool {
     /// the desk lives in `collab` and this crate may not depend on it -
     /// the assembly layer owns both ends and hands one to the other.
     ///
+    /// The name, disclosure and schema `watching` registers. The catalog
+    /// page reads the same value before a run has frozen a table.
+    ///
+    /// # Errors
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
+        let mut params = Map::new();
+        params.insert("type".to_owned(), Value::String("object".to_owned()));
+        params.insert("properties".to_owned(), Value::Object(Map::new()));
+        Ok(ToolDef {
+            name: ToolName::parse(Self::NAME)?,
+            description: "Report your current situation in fourteen lines: who you are, where you \
+                          are, your mode and run policy, context used against the window, your trust, your write \
+                          domain and its locks, the worktree and its size, the signals waiting, your \
+                          children, the clock, whether the provider is serving, your neighbours, your backlog, \
+                          and your catalog counts and bytes. None of it is stated anywhere else."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
     /// # Errors
     /// Propagates a malformed parameter schema.
     pub fn watching(
         snapshot: StatusSnapshot,
         children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
     ) -> Result<StatusTool, AxError> {
-        let mut params = Map::new();
-        params.insert("type".to_owned(), Value::String("object".to_owned()));
-        params.insert("properties".to_owned(), Value::Object(Map::new()));
+        let defined = Self::definition()?;
         Ok(StatusTool {
             snapshot,
             children,
@@ -160,15 +179,9 @@ impl StatusTool {
             clock: ClockReading::default(),
             catalog: Box::new(|| None),
             meta: ToolMeta {
-                name: ToolName::parse(Self::NAME)?,
-                disclosure:
-                    "Report your current situation in fourteen lines: who you are, where you \
-                     are, your mode and run policy, context used against the window, your trust, your write \
-                     domain and its locks, the worktree and its size, the signals waiting, your \
-                     children, the clock, whether the provider is serving, your neighbours, your backlog, \
-                     and your catalog counts and bytes. None of it is stated anywhere else."
-                        .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Free,
                 timeout: None,
