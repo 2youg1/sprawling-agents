@@ -279,18 +279,17 @@ impl RunWorker {
     /// the line.
     pub(in crate::worker) fn set_workspace_choice(
         &mut self,
-        building: &kernel::Address,
-        base: &str,
-        endpoint: &str,
-        model: &str,
-        effort: kernel::Effort,
+        write: &wire::WorkspaceChoiceWrite,
     ) -> Result<(), AxError> {
-        let building = city::Building::of(building)?;
-        let body = city::inscribe_choice(base, endpoint, model, effort);
+        let building = city::Building::of(&write.building)?;
+        let body = city::inscribe_choice(&write.base, &write.endpoint, &write.model, write.effort);
         city::write_rules_against_with(
             &self.city_root,
             building.addr(),
-            city::RulesEdit { base, text: &body },
+            city::RulesEdit {
+                base: &write.base,
+                text: &body,
+            },
             |rules| self.validate_workspace_models(rules),
         )?;
         self.book_document(

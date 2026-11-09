@@ -74,10 +74,19 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 ### 8-60b `SetWorkspaceChoice`：页面写子代理的直接选择
 
 ```rust
-SetWorkspaceChoice { building: Address, base: String, endpoint: String, model: String, effort: Effort, idem: IdemKey }
+SetWorkspaceChoice(WorkspaceChoiceWrite)
+pub struct WorkspaceChoiceWrite {
+    pub building: Address,
+    pub base: String,
+    pub endpoint: String,
+    pub model: String,
+    pub effort: Effort,
+    pub idem: IdemKey,
+}
 ```
 
 城用 `base` 作起点，只把 `[workspace_models.choice]` 写进楼规（没有这一节时补上一节，三档与选择相同），再走 `PutRules` 同一扇 `write_rules_against`：先求值、再守基线、端点簿拒绝未登记或不提供该 effort 的模型。文件已不是 `base` 时什么都不写。三档推荐若已在文件里则不动，页面仍可把某一档填进选择器后再发这一帧。
+- **载荷是一个值。** 与 `PutRules` 同形：线上仍是 `{"set_workspace_choice":{…}}`，`Command` 与调度臂各占一行。
 - **远程设备带不进来。** 楼规决定一栋楼能出网、能开浏览器与桌面，所以它在 §19-2 的 `class` 列是 `LocalOnly`：不论设备配对成什么，这条帧都只能在城自己的机器上发。
 - 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。
 -/

@@ -249,6 +249,40 @@ fn a_direct_choice_is_read_and_a_missing_section_gains_one() {
         "strong",
         "inscribing a choice leaves the difficulty shortcuts"
     );
+    let multiline = ordinary(
+        r#"[workspace_models]
+allowed = [
+  { endpoint = "house", model = "ordinary" },
+]
+max_effort = "high"
+[workspace_models.recommendations.easy]
+endpoint = "house"
+model = "ordinary"
+effort = "low"
+[workspace_models.recommendations.medium]
+endpoint = "house"
+model = "ordinary"
+effort = "medium"
+[workspace_models.recommendations.hard]
+endpoint = "house"
+model = "ordinary"
+effort = "high"
+"#,
+    );
+    let widened =
+        crate::inscribe_choice(&multiline, "house", "strong", kernel::Effort::High);
+    let widened_policy = evaluate(&addr("shop"), &widened)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert!(
+        widened_policy
+            .allowed()
+            .iter()
+            .any(|each| each.model == "strong"),
+        "a multiline allowed pool gains the chosen model"
+    );
     let fresh = crate::inscribe_choice(&ordinary(""), "house", "ordinary", kernel::Effort::High);
     let opened = evaluate(&addr("shop"), &fresh).unwrap();
     assert_eq!(

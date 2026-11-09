@@ -15,7 +15,12 @@
   import { readable } from "svelte/store";
 
   import { readAnswer } from "../../core/answered";
-  import { configureCatalog, configureCityCatalog, putRules, setWorkspaceChoice } from "../../core/commands";
+  import {
+    configureCatalog,
+    configureCityCatalog,
+    putRules,
+    setWorkspaceChoice,
+  } from "../../core/commands";
   import { readDocument } from "../../core/document";
   import { fill, say } from "../../core/lang";
   import { QUERIES } from "../../core/asking";
@@ -167,8 +172,18 @@
   $effect(() => {
     const at = building;
     if (onDisk === null) return;
+    const prior = untrack(() => rulesSaving);
     rulesSaving = answered(rulesSaving, onDisk);
-    if (rulesWas !== at || rulesSaving.kind === "held" || rulesSaving.kind === "saved") {
+    // A choice-only write must not wipe unsaved RULES.toml edits on the
+    // same pane: sync the draft only when it still matches the base the
+    // save was made against (or when the card is held / the building moved).
+    if (rulesWas !== at || rulesSaving.kind === "held") {
+      rulesDraft = onDisk;
+    } else if (
+      rulesSaving.kind === "saved" &&
+      prior.kind === "saving" &&
+      rulesDraft === prior.from
+    ) {
       rulesDraft = onDisk;
     }
     if (rulesWas !== at) rulesSaving = HELD;
@@ -228,7 +243,10 @@
 
   function saveChoice(): void {
     if (onDisk === null || provider === "" || modelId === "") return;
-    u.send(setWorkspaceChoice(building, onDisk, provider, modelId, level));
+    if (!u.send(setWorkspaceChoice(building, onDisk, provider, modelId, level))) return;
+    const mine = markSent(onDisk);
+    rulesSaving = mine;
+    awaitReceipt(mine, rulesSlot);
   }
 
   const look = $derived(
@@ -377,6 +395,8 @@
         />
         {#if rulesSaving.kind === "saved"}
           <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+        {:else if rulesSaving.kind === "refused"}
+          <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
         {/if}
       </span>
     {/if}
