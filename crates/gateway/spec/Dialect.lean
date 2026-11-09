@@ -31,7 +31,7 @@
 ```rust
 pub enum DialectKind { Anthropic, OpenAi, OpenAiResponses }   // 定义在 kernel::model::wire；第三支见 §8-20
 pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes, spelling: ChatSpelling) -> Result<serde_json::Value, AxError>;
-                                    // spelling 只有 chat 面读；另两面各只有一种拼法（§8-17 厂商拼法列）
+                                    // chat 面读整行；responses 面读 responses_tool_pictures；messages 面不读（§8-17）
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
 pub fn increment_of(kind: DialectKind, frame: &serde_json::Value) -> Option<Increment>;          // §8-13
 #[cfg(test)]
@@ -76,27 +76,37 @@ Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17
 // gateway::dialect::images（形状 2 value）
 pub struct ImageBytes(BTreeMap<String, String>);   // 键＝Locator 的规范拼写，值＝标准 base64
 impl ImageBytes {
-    pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>);   // 插入时编码一次，原始字节随即释放
+    pub fn insert(&mut self, picture: &ImageRef, bytes: Vec<u8>, max_side: Option<NonZeroU32>) -> Result<(), AxError>;
+                                    // 仅超限图片先转换；插入时编码一次，原始字节随即释放
     pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
     pub(crate) fn encoded(&self, at: &Locator) -> Result<&str, AxError>;  // 借用已编码文本
 }
 // request_wire 收 &ImageBytes，签名见上文 §8-1 那一块（第四个参数是 ChatSpelling）
 ```
 
-- **dialect 仍是数据的纯函数**。字节不在这里取：`ImageBytes` 是参数，不是一个 store 句柄。同一份 `(ChatRequest, ImageBytes)` 永远翻出同一串字节，重放因此仍能重推当时实发的请求。
+- **dialect 仍是数据的纯函数**。字节不在这里取：`ImageBytes` 是参数，不是一个 store 句柄。同一份 `(ChatRequest, ImageBytes)` 永远翻出同一串字节，重放因此仍能重推当时实发的请求。`insert` 的转换同样是纯计算：它只读调用方交来的字节，不写 CAS，也不访问文件或网络。
 - **为何以规范拼写和编码文本为键值**：`Locator` 不实现 `Ord`（它内含的 `Range` 也不），而给 `kernel::locator` 加一对 derive 是在另一个模块的文件上改公共面。以规范拼写为键让排序只取决于内容；值在插入时编码，使原始字节不必留到翻译结束。「解不出字节」这条失败路径归值本身拿着，而不是散在两家 dialect 里。
 - **位置**：`dialect/images.rs` 与 `mismatch` 同层——两家都读、谁都不回头指，所以依赖仍是单向的。
 - **locator 解不出字节即 `E_WIRE_MISMATCH`**（fail-closed）：一张描述存在、字节不在的图，发上线就是一个模型看不见的空位。
 - **Anthropic 侧**：Image 块→`{type:"image", source:{type:"base64", media_type:…, data:…}}`；带 `attachments` 的 tool_result 的 `content` 由字符串改写为块数组 `[{type:"text",text},{type:"image",…}…]`（无附件时仍写字符串，既有 golden 字节不变）。两处形状都是 provider 自己的：<https://platform.claude.com/docs/en/build-with-claude/vision>。
 - **OpenAI 侧**：user 消息的 `content` 由字符串改写为部件数组 `[{type:"text",text},{type:"image_url",image_url:{url:"data:<mime>;base64,…"}}]`。
-- **工具产出的图随主机拼法走**（`ChatSpelling.tool_pictures`，§8-17）。`FollowingUser`（OpenAI 规格与未登记主机）：`role:"tool"`／`function_call_output` 的 `content`／`output` 只收字符串，所以 tool_result 的 `attachments` 不随它走，而是落到紧跟其后的一条 user 消息里——图没丢，丢的是「这张图是那次工具调用的结果」这层归属；与断点位、思考块同一规则，**文档声明，不静默**，由测试钉住。`InToolContent`（`api.deepseek.com` 与 Moonshot／Kimi 三台主机）：chat 面的 tool 消息 `content` 收部件数组（含 `image_url`），responses 面的 `function_call_output.output` 收含 `input_image` 的部件列表（DeepSeek：<https://api-docs.deepseek.com/api/create-chat-completion>、<https://api-docs.deepseek.com/guides/responses_api>；Kimi：<https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart>），图留在那次工具结果上，不再另插一条 user 消息——在思考＋工具的对话里，tool 结果与下一轮 assistant 之间多出一条只带图的 user 会被对端以 400 拒掉。
+- **工具产出的图随主机与接口面走**（`ChatSpelling.chat_tool_pictures`／`responses_tool_pictures`，§8-17）。`FollowingUser` 把 tool_result 的 `attachments` 落到紧跟其后的一条 user 消息里——图没丢，丢的是「这张图是那次工具调用的结果」这层归属；与断点位、思考块同一规则，**文档声明，不静默**，由测试钉住。`InToolContent` 把图留在 tool 结果上：chat 面写 `role:"tool"` 的部件数组（含 `image_url`），responses 面写 `function_call_output.output` 的部件列表（含 `input_image`）。DeepSeek 的 chat 面是 `FollowingUser`，responses 面是 `InToolContent`；Kimi 的 chat 面是 `InToolContent`；未登记主机两面都取 `FollowingUser`。
 - **base64 依赖**：`base64 0.22` 本就在 `Cargo.lock` 的图里（reqwest／git2 一系已携），直接命名不向锁里添包；自己写一份编码器才是新权威。
 
-/-! D66 工具产出的图在 OpenAI 兼容面上随主机拼法走：规格跟在 user 后，DeepSeek 留在 tool 结果上
+/-! D66 工具产出的图按主机与接口面选择位置，DeepSeek 的 chat 与 responses 不共用一档
 
-决定：`ChatSpelling` 增加 `tool_pictures`：`FollowingUser`（`DOCUMENTED` 与未登记主机）把 tool_result 的附件写进紧随其后的 user 消息；`InToolContent`（`api.deepseek.com`，以及 Moonshot／Kimi 三台主机 `api.moonshot.ai`／`api.moonshot.cn`／`api.kimi.com`）把附件写进 chat 面的 `role:"tool"` 部件数组，或 responses 面的 `function_call_output.output` 部件列表。人自己附上的 `Image` 块仍写在 user／developer 消息里，与拼法无关。Anthropic Messages 面不读这一列：图本来就写在 `tool_result` 的内容块里（见上文 Anthropic 侧）。
+决定：`ChatSpelling` 以 `chat_tool_pictures` 与 `responses_tool_pictures` 分别回答两面。`FollowingUser` 把 tool_result 的附件写进紧随其后的 user 消息；`InToolContent` 把附件写进 chat 面的 `role:"tool"` 部件数组，或 responses 面的 `function_call_output.output` 部件列表。`DOCUMENTED` 与未登记主机两面都取 `FollowingUser`。`api.deepseek.com` 的 chat 面取 `FollowingUser`、responses 面取 `InToolContent`；Moonshot／Kimi 三台主机 `api.moonshot.ai`／`api.moonshot.cn`／`api.kimi.com` 的两列都取 `InToolContent`；本表没有为它们登记 responses 面，responses 列不是对该面上游能力的新声明。人自己附上的 `Image` 块仍写在 user／developer 消息里，与拼法无关。Anthropic Messages 面不读这两列：图本来就写在 `tool_result` 的内容块里（见上文 Anthropic 侧）。
 
-理由：DeepSeek 的 chat 与 responses 文档都写明工具结果可带图；本城每一次派活都带工具且 DeepSeek 默认开启思考，tool 结果与下一轮之间若再插一条只为图存在的 user 消息，对端答 400（会话里 `provider_degraded`，status 400）。Kimi K2.6 的多模态工具示例把 `image_url`／`video_url` 部件直接作为 `role:"tool"` 的 `content` 数组交回（<https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart>），与 DeepSeek 同一档，三台 Moonshot／Kimi 主机共用 `MOONSHOT_CHAT`。对照其余官方文档后，跟在 user 后对另外几家是安全形状：①OpenAI Chat Completions 的 `ChatCompletionToolMessageParam.content` 只收 `string` 或「仅 `text` 部件」的数组，`image_url` 不在 tool 消息上（<https://developers.openai.com/api/reference/resources/chat>）；Responses 虽允许 `function_call_output.output` 带 `input_image`（<https://developers.openai.com/api/docs/guides/function-calling>），但同一 host 的 chat 面仍只收文本，一列拼法不能拆成两面各一套，故 `api.openai.com` 整站保持 `FollowingUser`。②xAI／Grok 的 Image Understanding 只示范 `role:"user"` 上的 `image_url`／`input_image`（<https://docs.x.ai/developers/model-capabilities/images/understanding>、<https://docs.x.ai/developers/model-capabilities/legacy/chat-completions>），未写 tool／function_call_output 收图，`api.x.ai` 保持 `FollowingUser`。③Anthropic 的 vision 页写明 `tool_result` 内可嵌 `image` 块（<https://platform.claude.com/docs/en/build-with-claude/vision>），由 Anthropic dialect 直接写，不经本列。被否：①一律 `InToolContent`——OpenAI chat 与未登记主机会对带 `image_url` 的 tool content 答 400；②`api.openai.com` 按面拆两档——`ChatSpelling` 是按 host 查的一次答案，拆开就是同一事实的两个家；③图一律剥成占位文字——能看见的模型被弄瞎。重开参数：①另一家主机的文档同样在 tool／function_call_output 上收图、且实测跟在 user 后会 400 时，给它的 `chat` 行改 `InToolContent`；②OpenAI 废弃 chat 面、responses 成为唯一面时，可把 `api.openai.com` 改成 `InToolContent`。
+理由：DeepSeek 的 Vision 指南明确限制「Images are supported in `user` messages only」，所以 chat 面的 tool 消息不能携带图片；其 Responses 指南另写明 `input_image` 可出现在 `function_call_output`／`custom_tool_call_output` 的 `output` 中（<https://api-docs.deepseek.com/guides/vision>、<https://api-docs.deepseek.com/guides/responses_api#image-input>）。这是同一主机两个接口面的两种事实，不能合成一档。Kimi K2.6 的多模态工具示例把 `image_url`／`video_url` 部件直接作为 `role:"tool"` 的 `content` 数组交回（<https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart>），三台 Moonshot／Kimi 主机共用这条 chat 拼法；它们没有在本表登记 responses 面，responses 列保持同一常量原有的值，不构成一次上游能力调查。OpenAI chat 的 tool content 只收文本，xAI 的图片文档只示范 user 消息，二者保持 `FollowingUser`；Anthropic 的 vision 页写明 `tool_result` 内可嵌 `image` 块，由 Anthropic dialect 直接写。
+
+被否：①整个主机只设一档——DeepSeek 两面支持的图片位置不同；②一律 `InToolContent`——DeepSeek chat、OpenAI chat 与未登记主机会拒绝带 `image_url` 的 tool content；③图一律剥成占位文字——能看见的模型被弄瞎。重开参数：厂商文档改变某一面的图片位置时，只改对应面的那一列，并以该面的真实请求回归测试守住。
+-/
+
+/-! D67 供应方的单边像素上限在请求出口执行，CAS 与 canonical 图片仍指原图
+
+决定：`ModelPreset.image_max_side` 是厂商文档陈述的单边像素上限，经 `model_for` 的同一选行规则作答。`Endpoint::pictures_for` 把这个可选值交给 `ImageBytes::insert`；没有上限，或 `ImageRef` 的两边都不超限，原始字节直接编码。超限图片先完整解码，应用 EXIF 方向，再保持宽高比把最长边缩到上限，以原格式编码。PNG／WebP／GIF 动画不以丢弃后续帧的方式通过这条路径：超限动画以 `E_INVALID_ARGS` 拒绝，恢复语让人选择静态帧或已经合规的图片。解码、方向读取或编码失败同样以 `E_INVALID_ARGS` 报出 locator 与上限，不交给供应方猜。
+
+理由：DeepSeek Vision 把单边上限写为 8192 px（本城一次最多四张图，因此文档在十五张图起使用的 4096 px 档不可达）；只移动图片在消息里的位置不能让一张超限图片变得可读。转换留在请求出口，城市的历史、CAS 内容地址与其他 provider 的原图路径都不变；供应方随后仍会按自己的规则缩放用于推理，因此这里只移除它拒绝输入的那个条件。被否：①在 `read` 时改写成缩图——所有 provider 被迫共用一家的限制，CAS 也不再是原图；②超限即拒而不给转换——一张内容完整、供应方本来就会缩放的图片被无谓地排除；③动画静默取首帧——模型看到的是另一份内容。重开参数：动画保真转换有生产场景与测试时，可让动画逐帧走同一上限；其他模型文档给出不同上限时，在对应模型行填值。
 -/
 
 /-! D65 同一 locator 在一次请求里只兑付并编码一次，原始字节不随整次翻译驻留

@@ -178,7 +178,12 @@ pub(crate) fn request(
     }
     for message in req.messages.iter() {
         match message.role {
-            Role::User => user_items(&message.content, images, spelling.tool_pictures, &mut input)?,
+            Role::User => user_items(
+                &message.content,
+                images,
+                spelling.responses_tool_pictures,
+                &mut input,
+            )?,
             Role::Assistant => assistant_items(&message.content, &mut input)?,
         }
     }
@@ -227,7 +232,7 @@ pub(crate) fn request(
 mod tests {
     use super::*;
     use crate::dialect::request::{sample_request, sample_seeing};
-    use crate::provider::preset::{ChatSpelling, ToolPictureCarry};
+    use crate::provider::preset::ChatSpelling;
 
     /// What this face carries that the chat face cannot: the segment
     /// edges this city already computes, stated to the provider rather
@@ -279,18 +284,15 @@ mod tests {
     }
 
     /// DeepSeek's responses face takes `input_image` inside
-    /// `function_call_output.output`, so the picture keeps the call it
-    /// came from and no following user message is invented for it.
+    /// `function_call_output.output`, unlike its chat face. The real
+    /// host preset must preserve that difference.
     #[test]
-    fn a_host_that_takes_tool_pictures_keeps_them_on_the_output() {
+    fn deepseek_responses_tool_pictures_stay_on_the_function_output() {
         let (chat, images) = sample_seeing();
         let wire = request(
             &chat,
             &images,
-            ChatSpelling {
-                tool_pictures: ToolPictureCarry::InToolContent,
-                ..ChatSpelling::DOCUMENTED
-            },
+            crate::provider::preset::chat_spelling("https://api.deepseek.com"),
         )
         .unwrap();
         let input = wire["input"].as_array().unwrap();
