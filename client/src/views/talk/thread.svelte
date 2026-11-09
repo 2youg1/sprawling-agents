@@ -35,8 +35,7 @@
   import { phaseOf } from "../runs/lineage";
   import TurnView from "./turn.svelte";
   import AsideLink from "./aside_link.look.svelte";
-  import Reasoning from "./reasoning.look.svelte";
-  import { lengthOf as reasoningLength } from "./reasoning";
+  import Reasoning from "./reasoning.svelte";
   import Rule from "./rule.look.svelte";
   import SteerPin from "./steer_pin.look.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
@@ -339,12 +338,7 @@
        and it speaks once. -->
   {#if through === null && !frozen && run.thinking.length > 0 && whole}
     <div class="my-tight">
-      <Reasoning
-        label={say($lang, "talk_reasoning")}
-        length={reasoningLength($lang, run.thinking)}
-        text={run.thinking}
-        open
-      />
+      <Reasoning text={run.thinking} open />
     </div>
   {/if}
   {#if streaming}
