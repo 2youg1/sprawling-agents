@@ -246,14 +246,9 @@ fn has_exact_header(text: &str, header: &str) -> bool {
 fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
     let lines: Vec<&str> = text.lines().collect();
     let start = lines.iter().position(|line| line.trim() == header)?;
-    let end = lines
-        .iter()
-        .enumerate()
-        .skip(start + 1)
-        .find(|(_, line)| line.trim().starts_with('['))
-        .map_or(lines.len(), |(index, _)| index);
+    let end = next_header_index(&lines, start, |_| true);
     let mut out = String::new();
-    for line in &lines[..start] {
+    for line in lines.iter().take(start) {
         out.push_str(line);
         out.push('\n');
     }
@@ -261,7 +256,7 @@ fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
     if !section.ends_with('\n') {
         out.push('\n');
     }
-    for line in &lines[end..] {
+    for line in lines.iter().skip(end) {
         out.push_str(line);
         out.push('\n');
     }
@@ -273,17 +268,9 @@ fn insert_before_next_header(text: &str, header: &str, section: &str) -> String 
     let Some(start) = lines.iter().position(|line| line.trim() == header) else {
         return text.to_owned();
     };
-    let end = lines
-        .iter()
-        .enumerate()
-        .skip(start + 1)
-        .find(|(_, line)| {
-            let trimmed = line.trim();
-            trimmed.starts_with('[') && trimmed != header
-        })
-        .map_or(lines.len(), |(index, _)| index);
+    let end = next_header_index(&lines, start, |trimmed| trimmed != header);
     let mut out = String::new();
-    for line in &lines[..end] {
+    for line in lines.iter().take(end) {
         out.push_str(line);
         out.push('\n');
     }
@@ -291,11 +278,25 @@ fn insert_before_next_header(text: &str, header: &str, section: &str) -> String 
         out.push('\n');
     }
     out.push_str(section);
-    for line in &lines[end..] {
+    for line in lines.iter().skip(end) {
         out.push_str(line);
         out.push('\n');
     }
     out
+}
+
+/// Index of the next `[...]` header after `start`, or `lines.len()`.
+fn next_header_index(lines: &[&str], start: usize, keep: impl Fn(&str) -> bool) -> usize {
+    let after = start.saturating_add(1);
+    lines
+        .iter()
+        .enumerate()
+        .skip(after)
+        .find(|(_, line)| {
+            let trimmed = line.trim();
+            trimmed.starts_with('[') && keep(trimmed)
+        })
+        .map_or(lines.len(), |(index, _)| index)
 }
 
 fn ensure_allowed(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
@@ -307,49 +308,78 @@ fn ensure_allowed(text: &str, endpoint: &str, model: &str, effort: Effort) -> St
     else {
         return text.to_owned();
     };
-    let end = lines
+    let end = next_header_index(&lines, start, |_| true);
+    let Some(allowed_at) = lines
         .iter()
         .enumerate()
-        .skip(start + 1)
-        .find(|(_, line)| line.trim().starts_with('['))
-        .map_or(lines.len(), |(index, _)| index);
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .find(|(_, line)| line.trim().starts_with("allowed"))
+        .map(|(index, _)| index)
+    else {
+        return insert_after_header(
+            text,
+            "[workspace_models]",
+            &format!("allowed = [{{ {pair} }}]\n"),
+        );
+    };
+    let close_at = lines
+        .iter()
+        .enumerate()
+        .skip(allowed_at)
+        .take(end.saturating_sub(allowed_at))
+        .find(|(_, line)| line.contains(']'))
+        .map_or(allowed_at, |(index, _)| index);
+    let pool: String = lines
+        .iter()
+        .skip(allowed_at)
+        .take(close_at.saturating_sub(allowed_at).saturating_add(1))
+        .copied()
+        .collect::<Vec<_>>()
+        .join("\n");
+    let rewritten = if pool.contains(&pair) {
+        pool
+    } else {
+        with_pair_in_pool(&pool, &pair)
+    };
     let mut out = String::new();
-    let mut allowed = false;
     for (index, line) in lines.iter().enumerate() {
-        if (start..end).contains(&index) && line.trim().starts_with("allowed") {
-            allowed = true;
-            if line.contains(&pair) {
-                out.push_str(line);
-            } else if let Some(bracket) = line.rfind(']') {
-                let (head, tail) = line.split_at(bracket);
-                let joiner = if head.trim_end().ends_with('[') {
-                    ""
-                } else {
-                    ", "
-                };
-                out.push_str(head);
-                out.push_str(joiner);
-                out.push_str(&format!("{{ {pair} }}"));
-                out.push_str(tail);
-            } else {
-                out.push_str(line);
+        if index == allowed_at {
+            out.push_str(&rewritten);
+            if !rewritten.ends_with('\n') {
+                out.push('\n');
             }
-        } else if (start..end).contains(&index) && line.trim().starts_with("max_effort") {
+            continue;
+        }
+        if index > allowed_at && index <= close_at {
+            continue;
+        }
+        if (start..end).contains(&index) && line.trim().starts_with("max_effort") {
             out.push_str(&raised_max(line, effort));
         } else {
             out.push_str(line);
         }
         out.push('\n');
     }
-    if !allowed {
-        // The table named no pool. Put one on the line after its header.
-        return insert_after_header(
-            &out,
-            "[workspace_models]",
-            &format!("allowed = [{{ {pair} }}]\n"),
-        );
-    }
     out
+}
+
+/// Inserts `{ pair }` before the closing `]` of an `allowed` pool that
+/// may span several lines (the shape the building template leaves).
+fn with_pair_in_pool(pool: &str, pair: &str) -> String {
+    let Some(bracket) = pool.rfind(']') else {
+        return pool.to_owned();
+    };
+    let (head, tail) = pool.split_at(bracket);
+    let trimmed = head.trim_end();
+    let joiner = if trimmed.ends_with('[') {
+        ""
+    } else if trimmed.ends_with(',') {
+        " "
+    } else {
+        ", "
+    };
+    format!("{trimmed}{joiner}{{ {pair} }}{tail}")
 }
 
 fn raised_max(line: &str, effort: Effort) -> String {
