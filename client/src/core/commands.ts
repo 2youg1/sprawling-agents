@@ -399,6 +399,21 @@ export function putRules(building: Address, base: string, body: string): Command
   return { put_rules: { building, base, body, idem: mintIdem() } };
 }
 
+// The provider, model and effort a new child session uses. The city
+// writes it into this building's RULES.toml and leaves the rest of the
+// file, including the easy/medium/hard shortcuts.
+export function setWorkspaceChoice(
+  building: Address,
+  base: string,
+  endpoint: string,
+  model: string,
+  effort: Effort,
+): Command {
+  return {
+    set_workspace_choice: { building, base, endpoint, model, effort, idem: mintIdem() },
+  };
+}
+
 // One file of the city's own tree, taken back to what a checkpoint holds,
 // or away when it holds none. The city refuses while a run works there.
 export function restoreFile(at: Address, point: GitOid): Command {

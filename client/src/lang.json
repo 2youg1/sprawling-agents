@@ -352,8 +352,40 @@
     "zh": "这一栏还没有内容。"
   },
   "catalog_models_note": {
-    "en": "Delegated tasks read [workspace_models] in this building's RULES.toml. Edit the file below; a change takes effect on the next run.",
-    "zh": "委派任务读这栋楼 RULES.toml 里的 [workspace_models]。在下方编辑；改动在下一个 run 生效。"
+    "en": "The choice here is for a new delegated session that does not name a model. An existing child session keeps its frozen model. Easy, medium and hard stay as shortcuts. The change is saved in this building's RULES.toml and takes effect on the next new delegation.",
+    "zh": "这里的选择只用于未显式指定模型的新委派会话；已有子会话仍用其冻结的模型。容易、中等、困难三档仍是快捷方式。改动写进这栋楼的 RULES.toml，在下一次新委派生效。"
+  },
+  "subagent_provider": {
+    "en": "provider",
+    "zh": "供应方"
+  },
+  "subagent_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "subagent_effort": {
+    "en": "effort",
+    "zh": "强度"
+  },
+  "subagent_save": {
+    "en": "save subagent model",
+    "zh": "保存子代理模型"
+  },
+  "subagent_shortcut": {
+    "en": "use {tier}",
+    "zh": "用{tier}"
+  },
+  "subagent_no_endpoint": {
+    "en": "No provider is attached yet. Attach one in settings, then choose it here.",
+    "zh": "还没有接上供应方。先在设置里接上，再在这里选择。"
+  },
+  "subagent_no_effort": {
+    "en": "This model offers no effort levels, so it cannot be saved as a subagent choice here.",
+    "zh": "这个模型没有可用的强度档位，这里不能把它存成子代理选择。"
+  },
+  "subagent_saving": {
+    "en": "saving the subagent choice…",
+    "zh": "正在保存子代理选择…"
   },
   "catalog_rules_note": {
     "en": "This building's RULES.toml: exposure, skills, sandbox and workspace models. The city refuses text it cannot read.",

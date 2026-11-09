@@ -107,7 +107,7 @@ pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{BuildingSettings, CitySettings, GovernedDocument, HaltScope, IdentityCard};
 pub use command::{Carry, Command, WireCommand};
 pub use command::{DoorAnswer, DoorOpening, DoorStep, SecretForgetting};
-pub use command::{NoSecret, RulesWrite};
+pub use command::{NoSecret, RulesWrite, WorkspaceChoiceWrite};
 pub use command::{PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, SessionNaming};
 pub use command::{PromptStep, PromptWrite, PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};

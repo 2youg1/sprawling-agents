@@ -30,7 +30,7 @@ use super::no_secret::NoSecret;
 use super::step::{
     AgentAdding, AgentLoginStart, BuildingSettings, CityClosing, CitySettings, DeviceForgetting,
     DoorAnswer, DoorOpening, DoorStep, PolicyChange, PromptWrite, ProposalDecisions, RangeWrite,
-    RulesWrite, SecretForgetting, SessionNaming,
+    RulesWrite, SecretForgetting, SessionNaming, WorkspaceChoiceWrite,
 };
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
@@ -62,6 +62,7 @@ impl<Secret> Command<Secret> {
             | Self::PutDocument { ref idem, .. }
             | Self::PutIdentity { ref idem, .. }
             | Self::PutRules(RulesWrite { ref idem, .. })
+            | Self::SetWorkspaceChoice(WorkspaceChoiceWrite { ref idem, .. })
             | Self::ConfigureCity(CitySettings { ref idem, .. })
             | Self::RestoreFile { ref idem, .. }
             | Self::PutGuide { ref idem, .. }
@@ -240,6 +241,7 @@ impl From<WireCommand> for Command {
             },
             Command::PutIdentity { card, base, idem } => Self::PutIdentity { card, base, idem },
             Command::PutRules(write) => Self::PutRules(write),
+            Command::SetWorkspaceChoice(write) => Self::SetWorkspaceChoice(write),
             Command::RestoreFile { at, point, idem } => Self::RestoreFile { at, point, idem },
             Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),

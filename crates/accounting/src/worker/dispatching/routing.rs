@@ -33,6 +33,23 @@ impl RunWorker {
         let frozen = (!opens).then_some(own).filter(|own| own.model().is_some());
         let workspace = rules.workspace_models().filter(|_| frozen.is_none());
         if let Some(policy) = workspace.filter(|_| at.parent.is_some() && at.model.is_none()) {
+            if let Some(choice) = policy.choice() {
+                let chosen = self
+                    .credentials
+                    .book
+                    .select_ref(choice.model(), rules.policy())?;
+                admit_choice(&chosen, choice.effort())?;
+                at.effort = Some(choice.effort());
+                return Ok((
+                    chosen,
+                    routing(
+                        at,
+                        &chosen,
+                        Some(policy.digest()?),
+                        ModelSelectionSource::Choice,
+                    ),
+                ));
+            }
             let requested = at.difficulty;
             let difficulty = requested.unwrap_or(Difficulty::Medium);
             let recommendation = policy.recommendation(difficulty);
@@ -122,6 +139,13 @@ impl RunWorker {
         let Some(policy) = rules.workspace_models() else {
             return Ok(());
         };
+        if let Some(choice) = policy.choice() {
+            let chosen = self
+                .credentials
+                .book
+                .select_ref(choice.model(), rules.policy())?;
+            admit_choice(&chosen, choice.effort())?;
+        }
         let recommendations = policy.recommendations();
         for (difficulty, recommendation) in [Difficulty::Easy, Difficulty::Medium, Difficulty::Hard]
             .into_iter()
@@ -201,6 +225,18 @@ fn routing(
         policy,
         source,
     }
+}
+
+/// The direct choice, judged by the same offer as a recommendation.
+fn admit_choice(chosen: &gateway::Chosen<'_>, effort: Effort) -> Result<(), AxError> {
+    let offer = gateway::thinking_offer(chosen.endpoint, &chosen.entry.id);
+    offer.admit(Some(effort), &chosen.entry.id).map_err(|error| {
+        let levels = offer.levels.iter().map(Effort::as_str).collect::<Vec<_>>();
+        AxError::failure(*error.code(), error.action(), error.subject()).with_recovery(format!(
+            "correct [workspace_models.choice] in this building's RULES.toml; provider supports effort levels: {}",
+            if levels.is_empty() { "none".to_owned() } else { levels.join(", ") }
+        ))
+    })
 }
 
 /// Keeps provider admission authoritative while naming the policy a person can repair.

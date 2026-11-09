@@ -15,11 +15,19 @@
   import { readable } from "svelte/store";
 
   import { readAnswer } from "../../core/answered";
-  import { configureCatalog, configureCityCatalog, putRules } from "../../core/commands";
+  import {
+    configureCatalog,
+    configureCityCatalog,
+    putRules,
+    setWorkspaceChoice,
+  } from "../../core/commands";
   import { readDocument } from "../../core/document";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
+  import { QUERIES } from "../../core/asking";
   import { ui } from "../../ui";
-  import type { Address, Answer, CatalogAnswer, Query } from "../../wire";
+  import type { Address, Answer, CatalogAnswer, Effort, Query } from "../../wire";
+  import { TIERS, choiceOf, tiersOf } from "./subagent";
+  import type { Tier } from "./subagent";
   import Button from "../parts/button.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { rulesAt } from "../settings/files";
@@ -149,14 +157,22 @@
   // RULES.toml for the models and rules panes: the same PutRules door
   // the settings page uses, so a change here is a change there.
   const rulesHeld = $derived(u.conn.asking.ask({ document: { at: rulesAt(building) } }));
+  const rulesRead = $derived(readDocument($rulesHeld));
+  // Missing file is an empty base the writer may initialise. Any other
+  // unanswered document read stays unanswered; it is not an empty file.
   const onDisk = $derived.by(() => {
-    const readRules = readDocument($rulesHeld);
-    return readRules.kind === "held"
-      ? readRules.value.text
-      : readRules.kind === "unavailable"
-        ? ""
-        : null;
+    switch (rulesRead.kind) {
+      case "held":
+        return rulesRead.value.text;
+      case "unavailable":
+        return rulesRead.reason === null ? "" : null;
+      case "asking":
+        return null;
+    }
   });
+  const rulesFailed = $derived(
+    rulesRead.kind === "unavailable" && rulesRead.reason !== null ? rulesRead : null,
+  );
   let rulesDraft = $state("");
   let rulesSaving = $state.raw<Saving>(HELD);
   const rulesSlot: Slot = { now: () => rulesSaving, mark: (next) => (rulesSaving = next) };
@@ -164,8 +180,18 @@
   $effect(() => {
     const at = building;
     if (onDisk === null) return;
+    const prior = untrack(() => rulesSaving);
     rulesSaving = answered(rulesSaving, onDisk);
-    if (rulesWas !== at || rulesSaving.kind === "held" || rulesSaving.kind === "saved") {
+    // A choice-only write must not wipe unsaved RULES.toml edits on the
+    // same pane: sync the draft only when it still matches the base the
+    // save was made against (or when the card is held / the building moved).
+    if (rulesWas !== at || rulesSaving.kind === "held") {
+      rulesDraft = onDisk;
+    } else if (
+      rulesSaving.kind === "saved" &&
+      prior.kind === "saving" &&
+      rulesDraft === prior.from
+    ) {
       rulesDraft = onDisk;
     }
     if (rulesWas !== at) rulesSaving = HELD;
@@ -181,6 +207,79 @@
 
   function saveRules(): void {
     if (onDisk === null || !u.send(putRules(building, onDisk, rulesDraft))) return;
+    const mine = markSent(onDisk);
+    rulesSaving = mine;
+    awaitReceipt(mine, rulesSlot);
+  }
+
+  // The direct sub-agent model. Easy / medium / hard fill these three
+  // selects; saving writes `[workspace_models.choice]` and leaves the
+  // shortcuts in the file.
+  const endpointAsked = $derived(u.conn.asking.ask(QUERIES.endpoints));
+  const endpointRead = $derived(
+    readAnswer($endpointAsked, (held) => ("endpoints" in held ? held.endpoints : undefined)),
+  );
+  const endpointList = $derived(endpointRead.kind === "held" ? endpointRead.value.endpoints : []);
+  let provider = $state("");
+  let modelId = $state("");
+  let level = $state<Effort>("medium");
+  let choiceDirty = $state(false);
+  let choiceAt: Address | null = null;
+  function applyChoice(text: string): void {
+    const picked = choiceOf(text) ?? tiersOf(text).medium;
+    if (picked === undefined) {
+      provider = "";
+      modelId = "";
+      level = "medium";
+      return;
+    }
+    provider = picked.endpoint;
+    modelId = picked.model;
+    level = picked.effort;
+  }
+  $effect(() => {
+    const at = building;
+    const text = onDisk;
+    if (text === null) return;
+    const moved = choiceAt !== at;
+    choiceAt = at;
+    if (moved) {
+      applyChoice(text);
+      choiceDirty = false;
+      return;
+    }
+    if (choiceDirty) return;
+    applyChoice(text);
+  });
+  $effect(() => {
+    if (rulesSaving.kind === "saved") choiceDirty = false;
+  });
+  const providerModels = $derived(
+    endpointList.find((each) => each.name === provider)?.models ?? [],
+  );
+  const levels = $derived.by((): readonly Effort[] => {
+    return providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
+  });
+  const shortcuts = $derived(onDisk === null ? {} : tiersOf(onDisk));
+  const choiceBlocked = $derived.by((): string | undefined => {
+    if (rulesSaving.kind === "saving") return say($lang, "subagent_saving");
+    if (provider === "" || modelId === "") return say($lang, "subagent_no_endpoint");
+    if (levels.length === 0 || !levels.includes(level)) return say($lang, "subagent_no_effort");
+    return undefined;
+  });
+
+  function useTier(tier: Tier): void {
+    const picked = shortcuts[tier];
+    if (picked === undefined) return;
+    provider = picked.endpoint;
+    modelId = picked.model;
+    level = picked.effort;
+    choiceDirty = true;
+  }
+
+  function saveChoice(): void {
+    if (onDisk === null || choiceBlocked !== undefined || rulesSaving.kind === "saving") return;
+    if (!u.send(setWorkspaceChoice(building, onDisk, provider, modelId, level))) return;
     const mine = markSent(onDisk);
     rulesSaving = mine;
     awaitReceipt(mine, rulesSlot);
@@ -231,9 +330,122 @@
 
 {#snippet rules()}
   <div class="flex min-w-0 flex-col gap-base">
-    {#if onDisk === null}
+    {#if rulesFailed !== null}
+      <Unanswered
+        query={rulesFailed.query}
+        reason={rulesFailed.reason}
+        asked={{ document: { at: rulesAt(building) } }}
+      />
+    {:else if onDisk === null}
       <p class="text-text-faint">…</p>
     {:else}
+      {#if pane === "models"}
+        {#if endpointRead.kind === "unavailable"}
+          <Unanswered
+            query={endpointRead.query}
+            reason={endpointRead.reason}
+            asked={QUERIES.endpoints}
+          />
+        {:else if endpointRead.kind === "asking"}
+          <p class="text-text-faint">…</p>
+        {:else if endpointList.length === 0}
+          <p class="text-note text-text-faint">{say($lang, "subagent_no_endpoint")}</p>
+        {:else}
+          <div class="flex min-w-0 flex-wrap items-end gap-base">
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_provider")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={provider}
+                onchange={(event) => {
+                  provider = event.currentTarget.value;
+                  const next = endpointList.find((each) => each.name === provider);
+                  modelId = next?.models[0]?.id ?? "";
+                  const offered = next?.models[0]?.thinking.levels ?? [];
+                  const first = offered[0];
+                  level = first ?? "medium";
+                  choiceDirty = true;
+                }}
+              >
+                <option value=""></option>
+                {#each endpointList as endpoint (endpoint.name)}
+                  <option value={endpoint.name}>{endpoint.label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_model")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={modelId}
+                onchange={(event) => {
+                  modelId = event.currentTarget.value;
+                  const offered =
+                    providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
+                  const first = offered[0];
+                  if (first === undefined) level = "medium";
+                  else if (!offered.includes(level)) level = first;
+                  choiceDirty = true;
+                }}
+              >
+                {#each providerModels as facts (facts.id)}
+                  <option value={facts.id}>{facts.id}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_effort")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={level}
+                onchange={(event) => {
+                  const next = levels.find((each) => each === event.currentTarget.value);
+                  if (next !== undefined) {
+                    level = next;
+                    choiceDirty = true;
+                  }
+                }}
+              >
+                {#each levels as effort (effort)}
+                  <option value={effort}>{effort}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+          {#if modelId !== "" && levels.length === 0}
+            <p class="text-note text-text-faint">{say($lang, "subagent_no_effort")}</p>
+          {/if}
+          <span class="flex flex-wrap items-center gap-base">
+            {#each TIERS as tier (tier)}
+              {#if shortcuts[tier] !== undefined}
+                <Button
+                  label={fill(say($lang, "subagent_shortcut"), { tier })}
+                  tone="quiet"
+                  onPress={() => {
+                    useTier(tier);
+                  }}
+                />
+              {/if}
+            {/each}
+            <Button
+              label={say($lang, "subagent_save")}
+              tone="primary"
+              loading={rulesSaving.kind === "saving"}
+              {...choiceBlocked === undefined ? {} : { why: choiceBlocked }}
+              onPress={saveChoice}
+            />
+            {#if rulesSaving.kind === "saved"}
+              <span class="text-note text-text-quiet" role="status"
+                >{say($lang, "catalog_saved")}</span
+              >
+            {:else if rulesSaving.kind === "refused"}
+              <span class="text-note text-text-quiet" role="status"
+                >{rulesSaving.error.recovery}</span
+              >
+            {/if}
+          </span>
+        {/if}
+      {/if}
       <TextBox
         size="document"
         wire={textBoxWire(rulesDraft, say($lang, "rules_title"), false, (next) => {
@@ -250,6 +462,8 @@
         />
         {#if rulesSaving.kind === "saved"}
           <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+        {:else if rulesSaving.kind === "refused"}
+          <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
         {/if}
       </span>
     {/if}

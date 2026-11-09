@@ -70,6 +70,23 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 - **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（`crates/city/Spec.lean` §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
 - **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（`crates/kernel/Spec.lean` §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
 - **载荷是一个值。** `PutRules` 与 `ConfigureCity` 各带一个结构体而不是平铺的字段，线上形状与平铺时相同（`{"put_rules":{…}}`）；理由是 `Command` 住的文件与 `From<WireCommand>` 那个函数都已经贴着长度上限，一个值占一行。
+
+### 8-60b `SetWorkspaceChoice`：页面写子代理的直接选择
+
+```rust
+SetWorkspaceChoice(WorkspaceChoiceWrite)
+pub struct WorkspaceChoiceWrite {
+    pub building: Address,
+    pub base: String,
+    pub endpoint: String,
+    pub model: String,
+    pub effort: Effort,
+    pub idem: IdemKey,
+}
+```
+
+城用 `base` 作起点，只把 `[workspace_models.choice]` 写进楼规（没有这一节时补上一节，三档与选择相同），再走 `PutRules` 同一扇 `write_rules_against`：先求值、再守基线、端点簿拒绝未登记或不提供该 effort 的模型。文件已不是 `base` 时什么都不写。三档推荐若已在文件里则不动，页面仍可把某一档填进选择器后再发这一帧。
+- **载荷是一个值。** 与 `PutRules` 同形：线上仍是 `{"set_workspace_choice":{…}}`，`Command` 与调度臂各占一行。
 - **远程设备带不进来。** 楼规决定一栋楼能出网、能开浏览器与桌面，所以它在 §19-2 的 `class` 列是 `LocalOnly`：不论设备配对成什么，这条帧都只能在城自己的机器上发。
 - 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。
 -/

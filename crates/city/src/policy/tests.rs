@@ -215,6 +215,136 @@ fn a_workspace_model_policy_is_read_from_the_rules() {
         }
     );
     assert_eq!(policy.digest().unwrap(), policy.digest().unwrap());
+    assert!(policy.choice().is_none());
+}
+
+#[test]
+fn a_direct_choice_is_read_and_a_missing_section_gains_one() {
+    let chosen = format!(
+        "{}\n[workspace_models.choice]\nendpoint = \"house\"\nmodel = \"strong\"\neffort = \"high\"\n",
+        workspace_rules()
+    );
+    let policy = evaluate(&addr("shop"), &chosen)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        policy.choice().map(crate::ModelRecommendation::model),
+        Some(&kernel::ModelRef {
+            endpoint: "house".to_owned(),
+            model: "strong".to_owned(),
+        })
+    );
+    let inscribed =
+        crate::inscribe_choice(&workspace_rules(), "house", "ordinary", kernel::Effort::Low);
+    let again = evaluate(&addr("shop"), &inscribed)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert_eq!(again.choice().unwrap().effort(), kernel::Effort::Low);
+    assert_eq!(
+        again.recommendation(kernel::Difficulty::Hard).model().model,
+        "strong",
+        "inscribing a choice leaves the difficulty shortcuts"
+    );
+    let multiline = ordinary(
+        r#"[workspace_models]
+allowed = [
+  { endpoint = "house", model = "ordinary" },
+]
+max_effort = "high"
+[workspace_models.recommendations.easy]
+endpoint = "house"
+model = "ordinary"
+effort = "low"
+[workspace_models.recommendations.medium]
+endpoint = "house"
+model = "ordinary"
+effort = "medium"
+[workspace_models.recommendations.hard]
+endpoint = "house"
+model = "ordinary"
+effort = "high"
+"#,
+    );
+    let widened = crate::inscribe_choice(&multiline, "house", "strong", kernel::Effort::High);
+    let widened_policy = evaluate(&addr("shop"), &widened)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert!(
+        widened_policy
+            .allowed()
+            .iter()
+            .any(|each| each.model == "strong"),
+        "a multiline allowed pool gains the chosen model"
+    );
+    let fresh = crate::inscribe_choice(&ordinary(""), "house", "ordinary", kernel::Effort::High);
+    let opened = evaluate(&addr("shop"), &fresh).unwrap();
+    assert_eq!(
+        opened
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "ordinary"
+    );
+    let from_missing = crate::inscribe_choice("", "house", "ordinary", kernel::Effort::Medium);
+    let missing = evaluate(&addr("shop"), &from_missing).unwrap();
+    assert_eq!(
+        missing
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "ordinary",
+        "an empty RULES.toml opens with ordinary confidential/write before the choice"
+    );
+    let quoted =
+        crate::inscribe_choice(&ordinary(""), "house", "vendor\"model", kernel::Effort::Low);
+    assert!(
+        quoted.contains('\'') || quoted.contains("\\\""),
+        "model ids with quotes are TOML-escaped: {quoted}"
+    );
+    let quoted_policy = evaluate(&addr("shop"), &quoted).unwrap();
+    assert_eq!(
+        quoted_policy
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "vendor\"model"
+    );
+    let commented = format!(
+        "{}\n[workspace_models.choice] # selected\nendpoint = \"house\"\nmodel = \"ordinary\"\neffort = \"low\"\n",
+        workspace_rules()
+    );
+    let replaced = crate::inscribe_choice(&commented, "house", "strong", kernel::Effort::High);
+    assert_eq!(
+        replaced.matches("[workspace_models.choice]").count(),
+        1,
+        "a choice header with a trailing comment is replaced, not duplicated"
+    );
+    let replaced_policy = evaluate(&addr("shop"), &replaced).unwrap();
+    assert_eq!(
+        replaced_policy
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "strong"
+    );
 }
 
 #[test]

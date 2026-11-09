@@ -139,6 +139,7 @@ inductive Command where
   | PutDocument
   | PutIdentity
   | PutRules
+  | SetWorkspaceChoice
   | ConfigureCity
   | RestoreFile
   | PutGuide
@@ -236,6 +237,8 @@ def Command.reach : Command → Reach
   | .PutIdentity => .client
   -- 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60）
   | .PutRules => .client
+  -- 写这栋楼直接选定的子代理 provider、model 与 effort，仍经楼规那一扇门
+  | .SetWorkspaceChoice => .client
   -- 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61）
   | .ConfigureCity => .client
   -- 把城工作树里的一个文件换回一个检查点里的那一份，检查点里没有就删去（§8-62(b)）
@@ -319,6 +322,7 @@ def Command.verbClass : Command → VerbClass
   | .PutDocument => .LocalOnly
   | .PutIdentity => .LocalOnly
   | .PutRules => .LocalOnly
+  | .SetWorkspaceChoice => .LocalOnly
   | .ConfigureCity => .LocalOnly
   | .RestoreFile => .LocalOnly
   | .PutGuide => .LocalOnly

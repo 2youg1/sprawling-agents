@@ -96,7 +96,7 @@ pub use library::{install as install_skill, plan_install as plan_skill_install};
 pub use library::{materialize, skill_digest};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
-pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
+pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache, inscribe_choice};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{ModelRecommendation, WorkspaceModelPolicy, WorkspaceRecommendations};
 pub use policy::{RulesEdit, write_rules_against_with};
