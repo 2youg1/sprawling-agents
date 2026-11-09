@@ -71,10 +71,15 @@
     {/if}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render look.table()}
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-    {@render look.generation()}
     {#if look.status !== undefined}
       <p role="status" class="text-note text-text-quiet">{look.status}</p>
     {/if}
   </div>
 </details>
+<!-- Generation stays outside the model-table disclosure so Access always
+  shows the sampling defaults without opening another fold. -->
+<div class="mt-snug flex flex-col gap-snug border-t border-edge pt-snug">
+  <h4 class="text-label font-label text-text-quiet">{look.generationHeading}</h4>
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+  {@render look.generation()}
+</div>

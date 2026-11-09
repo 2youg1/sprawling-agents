@@ -41,7 +41,7 @@ it is for. -->
           {#if picker.menu !== undefined}<Picker menu={picker.menu} />{/if}
           <button
             type="button"
-            class="token inline-flex h-touch min-w-0 max-w-full items-center rounded-control text-note text-text-quiet hover:text-text aria-expanded:text-text"
+            class="token inline-flex h-touch min-w-0 max-w-full items-center rounded-control text-note text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100 aria-expanded:text-text"
             {...picker.token}
           >
             {#each picker.segments as part, at (part.segment)}

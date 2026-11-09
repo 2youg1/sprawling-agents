@@ -97,6 +97,8 @@ export interface AlertLook {
 
 export interface ModelEditorLook {
   readonly summary: string;
+  // Always drawn under the disclosure: sampling defaults for the chosen models.
+  readonly generationHeading: string;
   readonly busy: string | undefined;
   readonly removal: string | undefined;
   readonly refresh: ButtonProps;
@@ -476,6 +478,7 @@ export function lookOf(editor: ModelEditor, hands: Hands, lang: Lang): ModelEdit
       : saveWhy(editor, plan, answer, lang);
   return {
     summary: fill(say(lang, "setup_models_toggle"), { n: String(summary?.models.length ?? 0) }),
+    generationHeading: say(lang, "setup_generation"),
     busy: busy === null ? undefined : say(lang, busy),
     removal:
       removed.length === 0

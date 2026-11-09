@@ -8,11 +8,19 @@
 <script lang="ts">
   // The unified catalog look. All behaviour and wording arrives from
   // `catalog.ts`; this file places the existing controls and plain-text versions.
+  // The RULES.toml editor arrives as a snippet from the seat when the
+  // models or rules pane is open.
+  import type { Snippet } from "svelte";
+
   import Button from "../parts/button.svelte";
   import Segmented from "../parts/segmented.svelte";
   import type { CatalogLook } from "./catalog";
 
-  const look: CatalogLook = $props();
+  interface Props extends CatalogLook {
+    readonly rules?: Snippet | undefined;
+  }
+
+  const look: Props = $props();
 </script>
 
 <div class="flex min-w-0 flex-col gap-wide">
@@ -24,6 +32,7 @@
       held={look.scope}
       onPick={look.onScope}
     />
+    <Segmented label={look.panes[0]?.label ?? ""} options={look.panes} held={look.pane} onPick={look.onPane} />
     <p class="text-note">
       <span class="figure text-text-quiet">{look.meter}</span>
       {#if look.delta !== undefined}
@@ -63,7 +72,13 @@
       </p>
     {/if}
   </div>
-  {#if look.empty !== undefined}
+  {#if look.rulesNote !== undefined}
+    <p class="text-note text-text-quiet">{look.rulesNote}</p>
+  {/if}
+  {#if look.rules !== undefined}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render look.rules()}
+  {:else if look.empty !== undefined}
     <p class="text-note text-text-faint">{look.empty}</p>
   {:else}
     <ul class="flex min-w-0 flex-col gap-snug">
@@ -77,12 +92,14 @@
               <span class="min-w-0 flex-1 text-text-faint">{group.summary}</span>
             </summary>
             <div class="flex min-w-0 flex-col gap-snug pt-snug">
-              <Segmented
-                label={group.summary}
-                options={group.choices}
-                held={group.held}
-                onPick={group.onPick}
-              />
+              {#if group.rows.length > 0}
+                <Segmented
+                  label={group.summary}
+                  options={group.choices}
+                  held={group.held}
+                  onPick={group.onPick}
+                />
+              {/if}
               <ul class="flex min-w-0 flex-col">
                 {#each group.rows as row (row.key)}
                   <li class="flex min-w-0 flex-col border-t border-edge py-snug text-note">

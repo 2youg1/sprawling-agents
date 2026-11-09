@@ -6,14 +6,16 @@
 -->
 
 <script lang="ts">
-  // The current building's one catalog count, opening the same unified
-  // panel as the building page. No second count is computed here.
-  import { readAnswer } from "../../core/answered";
-  import { fill, say } from "../../core/lang";
+  // Four quiet doors under the composer into the building's catalog and
+  // its neighbours: tools, skills, MCP, and the session's worktree. The
+  // counts that used to stand here (Always / On call) named no action a
+  // hand could take, so the letters name the doors instead.
+  import { say } from "../../core/lang";
   import { buildingOf } from "../../core/route";
   import { ui } from "../../ui";
-  import type { Address, Query } from "../../wire";
-  import Button from "../parts/button.svelte";
+  import type { Address } from "../../wire";
+  import { focusCatalog } from "../building/catalog_focus.svelte";
+  import type { CatalogFocus } from "../building/catalog_focus.svelte";
 
   interface Props {
     readonly room: Address;
@@ -23,27 +25,53 @@
   const u = ui();
   const { lang } = u;
   const building = $derived(buildingOf(room));
-  const question = $derived<Query>({ catalog: { building } });
-  const asked = $derived(u.conn.asking.ask(question));
-  const read = $derived(
-    readAnswer($asked, (answer) => ("catalog" in answer ? answer.catalog : undefined)),
-  );
-  const answer = $derived(read.kind === "held" ? read.value : undefined);
+
+  const DOORS: readonly {
+    readonly key: CatalogFocus;
+    readonly letter: string;
+    readonly word: "catalog_door_tools" | "catalog_door_skills" | "catalog_door_mcp" | "catalog_door_worktree";
+  }[] = [
+    { key: "tools", letter: "A", word: "catalog_door_tools" },
+    { key: "skills", letter: "B", word: "catalog_door_skills" },
+    { key: "mcp", letter: "C", word: "catalog_door_mcp" },
+    { key: "worktree", letter: "D", word: "catalog_door_worktree" },
+  ];
+
+  function open(focus: CatalogFocus): void {
+    focusCatalog(focus);
+    if (focus === "mcp") {
+      u.go({ kind: "mcp" });
+      return;
+    }
+    if (focus === "worktree") {
+      u.go({ kind: "building", address: building });
+      return;
+    }
+    u.go({ kind: "building", address: building, section: "catalog" });
+  }
 </script>
 
-{#if answer !== undefined}
-  <span class="flex min-w-0">
-    <Button
-      label={fill(say($lang, "catalog_chip"), {
-        always: String(answer.always),
-        dormant: String(answer.dormant),
-        skills: String(answer.skills),
-        changed: String(answer.changed),
-      })}
-      tone="quiet"
-      onPress={() => {
-        u.go({ kind: "building", address: building, section: "catalog" });
+<span
+  class="flex min-w-0 flex-wrap items-center gap-hair px-tight text-note text-text-faint"
+  role="group"
+  aria-label={say($lang, "bld_catalog")}
+>
+  {#each DOORS as door, at (door.key)}
+    {#if at > 0}
+      <!-- wording-ok: a visual separator between lettered doors, not a word -->
+      <span aria-hidden="true" class="text-text-faint">/</span>
+    {/if}
+    <button
+      type="button"
+      class="inline-flex h-touch items-center gap-hair rounded-control px-tight transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100"
+      aria-label="{door.letter} {say($lang, door.word)}"
+      onclick={() => {
+        open(door.key);
       }}
-    />
-  </span>
-{/if}
+    >
+      <!-- wording-ok: the letter is the door's mnemonic key, same in every language -->
+      <span class="font-mono text-text-quiet">{door.letter}</span>
+      <span>{say($lang, door.word)}</span>
+    </button>
+  {/each}
+</span>

@@ -60,21 +60,30 @@ export const TREE: readonly Branch[] = [
       group("you"),
       { kind: "page", view: { kind: "city" }, word: "settings_city_overview" },
       { kind: "nest", nest: "buildings", word: "settings_buildings" },
-    ],
-    more: [
       { kind: "page", view: { kind: "registry" }, word: "nav_registry" },
       { kind: "page", view: { kind: "cost" }, word: "cost_title" },
     ],
+    more: [],
   },
   {
+    // Access keeps one list: accounts (providers, generation defaults
+    // and models), agents, then how the city reaches the network and
+    // which browsers hold a key. A second "more" fold under this branch
+    // made the side look deeper than it was.
     word: "settings_branch_access",
-    entries: [group("accounts"), group("agents")],
-    more: [group("network"), group("remote"), group("devices")],
+    entries: [
+      group("accounts"),
+      group("agents"),
+      group("network"),
+      group("remote"),
+      group("devices"),
+    ],
+    more: [],
   },
   {
     word: "settings_branch_running",
-    entries: [group("run"), group("rules"), group("performance")],
-    more: [group("automation")],
+    entries: [group("run"), group("rules"), group("performance"), group("automation")],
+    more: [],
   },
   {
     word: "settings_branch_extensions",
@@ -92,14 +101,15 @@ export const TREE: readonly Branch[] = [
       { kind: "nest", nest: "record", word: "nav_the_record" },
       { kind: "page", view: { kind: "monitor" }, word: "monitor_title" },
       group("tools"),
-    ],
-    // The guide stays reachable after the person has left it
-    // (refrain 3-15): its steps are where a skipped setting is made.
-    more: [
       group("about"),
+      group("privacy"),
+    ],
+    // The guide and the developer's tools stay one fold down: they are
+    // reached after the person has left them (refrain 3-15), not on the
+    // first reading of what went wrong.
+    more: [
       { kind: "page", view: { kind: "welcome" }, word: "welcome_title" },
       group("advanced"),
-      group("privacy"),
     ],
   },
 ];

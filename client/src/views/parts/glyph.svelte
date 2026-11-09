@@ -44,6 +44,7 @@
   import Lock from "@lucide/svelte/icons/lock";
   import MessageSquare from "@lucide/svelte/icons/message-square";
   import Mic from "@lucide/svelte/icons/mic";
+  import Pause from "@lucide/svelte/icons/pause";
   import Pin from "@lucide/svelte/icons/pin";
   import Search from "@lucide/svelte/icons/search";
   import Settings from "@lucide/svelte/icons/settings";
@@ -80,6 +81,7 @@
     check: Check,
     tool: Wrench,
     stop: Square,
+    pause: Pause,
     capped: ArrowRightToLine,
     send: ArrowUp,
     layers: Layers,

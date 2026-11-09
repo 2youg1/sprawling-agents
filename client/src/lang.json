@@ -307,6 +307,54 @@
     "en": "{always} Always · {dormant} On call · {skills} skills · {changed} Changed",
     "zh": "{always} 常驻 · {dormant} 按需 · {skills} 个 skill · {changed} 已变更"
   },
+  "catalog_door_tools": {
+    "en": "tools",
+    "zh": "工具"
+  },
+  "catalog_door_skills": {
+    "en": "SKILL",
+    "zh": "SKILL"
+  },
+  "catalog_door_mcp": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
+  "catalog_door_worktree": {
+    "en": "worktree",
+    "zh": "工作树"
+  },
+  "catalog_door_models": {
+    "en": "subagents",
+    "zh": "子代理模型"
+  },
+  "catalog_door_rules": {
+    "en": "RULES.toml",
+    "zh": "RULES.toml"
+  },
+  "catalog_mcp_reference": {
+    "en": "connector reference · tools appear once a run has listed them",
+    "zh": "连接器引用 · 有 run 列出工具后才会出现"
+  },
+  "catalog_mcp_empty": {
+    "en": "No MCP connector is referenced in this building yet.",
+    "zh": "这栋楼还没有引用任何 MCP 连接器。"
+  },
+  "catalog_pane_empty": {
+    "en": "Nothing in this pane yet.",
+    "zh": "这一栏还没有内容。"
+  },
+  "catalog_models_note": {
+    "en": "Delegated tasks read [workspace_models] in this building's RULES.toml. Edit the file below; a change takes effect on the next run.",
+    "zh": "委派任务读这栋楼 RULES.toml 里的 [workspace_models]。在下方编辑；改动在下一个 run 生效。"
+  },
+  "catalog_rules_note": {
+    "en": "This building's RULES.toml: exposure, skills, sandbox and workspace models. The city refuses text it cannot read.",
+    "zh": "这栋楼的 RULES.toml：曝光、技能、沙箱与子代理模型。城市拒绝读不懂的文本。"
+  },
+  "catalog_save_rules": {
+    "en": "save RULES.toml",
+    "zh": "保存 RULES.toml"
+  },
   "catalog_more": {
     "en": "{n} bytes more in every request",
     "zh": "每次请求多 {n} 字节"
@@ -7048,8 +7096,12 @@
     "zh": "运行这座城市的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
   },
   "setup_group_hint_accounts": {
-    "en": "who the city may call, and with which key",
-    "zh": "城市能调用谁，用哪把钥匙"
+    "en": "who the city may call, with which key, and each model's generation defaults (temperature, top_p, top_k, output)",
+    "zh": "城市能调用谁、用哪把钥匙，以及每个模型的采样默认（temperature、top_p、top_k、输出上限）"
+  },
+  "setup_generation": {
+    "en": "generation defaults",
+    "zh": "模型高级设置"
   },
   "setup_group_hint_you": {
     "en": "what the city calls you and the Mayor; a change takes effect in the next session",

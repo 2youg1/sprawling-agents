@@ -24,14 +24,13 @@
     readonly group: SetupGroup;
     readonly beneath: View;
     readonly onPick: (group: SetupGroup) => void;
-    readonly onClose: () => void;
     // Leaves for the conversation in the zen tier.
     readonly onHome: () => void;
     // The id the group's heading carries, which names the panel.
     readonly titleId: string;
   }
 
-  const { group, beneath, onPick, onClose, onHome, titleId }: Props = $props();
+  const { group, beneath, onPick, onHome, titleId }: Props = $props();
   const { lang } = ui();
 
   let body = $state<HTMLElement | undefined>(undefined);
@@ -54,10 +53,12 @@
     <div
       class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
     >
-      <div class="flex items-center justify-between gap-snug px-snug">
+      <div class="flex items-center gap-snug px-snug">
         <!-- Hover lifts the wash, a press yields by the theme's press
         scale, release returns on the leave curve (§4-43): three distinct
-        answers so the key never feels still. -->
+        answers so the key never feels still. Escape and a press on the
+        dialog's blank frame still leave for the page beneath; a second
+        close mark here only repeated that path. -->
         <button
           type="button"
           class="-ml-tight flex h-control-sm min-w-0 items-center gap-tight rounded-control pr-snug text-note text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100"
@@ -66,14 +67,6 @@
         >
           <Glyph name="chevron" size="sm" class="shrink-0 rotate-180" />
           <span class="truncate">{say($lang, "settings_home_zen")}</span>
-        </button>
-        <button
-          type="button"
-          class="-mr-tight flex size-control-sm shrink-0 items-center justify-center rounded-control text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100"
-          aria-label={say($lang, "settings_close")}
-          onclick={onClose}
-        >
-          <Glyph name="cross" size="sm" />
         </button>
       </div>
       <p class="px-snug text-label font-label text-text">{say($lang, "nav_settings")}</p>

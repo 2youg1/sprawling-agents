@@ -104,12 +104,13 @@ describe("building table", () => {
         now: 1_000,
         picked: Address.make("docs"),
         lang: "en",
+        cityFolder: "/city",
       },
       (addr) => picks.push(addr),
     );
-    expect(look.rows.map((row) => [row.name, row.wire["aria-pressed"]])).toEqual([
-      ["docs", true],
-      ["City Hall", false],
+    expect(look.rows.map((row) => [row.name, row.path, row.wire["aria-pressed"]])).toEqual([
+      ["docs", "/city/docs", true],
+      ["City Hall", "/city/hall", false],
     ]);
     look.rows[1]?.wire.onclick();
     expect(picks).toEqual(["hall"]);
@@ -124,10 +125,13 @@ describe("building table", () => {
       runs: [],
       buildings: [building("docs"), building("notes", true)],
     };
-    const look = lookOf({ city, runs: [], now: 1_000, picked: null, lang: "en" }, () => undefined);
-    expect(look.rows.map((row) => [row.name, row.latest])).toEqual([
-      ["docs", "no runs"],
-      ["notes", "not adopted"],
+    const look = lookOf(
+      { city, runs: [], now: 1_000, picked: null, lang: "en", cityFolder: "" },
+      () => undefined,
+    );
+    expect(look.rows.map((row) => [row.name, row.path, row.latest])).toEqual([
+      ["docs", "./docs", "no runs"],
+      ["notes", "./notes", "not adopted"],
     ]);
   });
 });
