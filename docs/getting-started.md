@@ -251,7 +251,7 @@ To build the complete deliverable from a checkout, use `just dist`. A `cargo bui
 
 ### Follow a nightly snapshot
 
-A nightly is an automatically built snapshot of `main`, not a curated release. Its tag is `nightly-YYMMDD-fullSHA`, where the date is UTC and the complete commit SHA is included. Every nightly's release notes open with the same fixed instability warning, in English and in Chinese, and then carry the curated baseline and commit count, a comparison with the previous nightly, and GitHub's generated list of merged PRs since that baseline. Nightly archives are published only for Windows x86-64, macOS on Apple silicon and Linux x86-64, and only the two newest published snapshots are retained.
+A nightly is an automatically built snapshot of `main`, not a curated release. Its tag is `nightly-YYMMDD-fullSHA`, where the date is UTC and the complete commit SHA is included. Every nightly's release notes open with the same fixed instability warning, in English and in Chinese, and then carry the curated baseline and commit count, a comparison with the previous nightly, and GitHub's generated list of merged PRs since that baseline. Nightly archives are published only for Windows x86-64, macOS on Apple silicon and Linux x86-64, and only the two newest published snapshots are retained. A curated release takes over from the snapshots whose commits it already contains: the next nightly publication deletes them, and the newest snapshot always stays, so the nightly channel is never empty.
 
 The default shell installer stays on curated releases. Opt into the nightly channel explicitly:
 

@@ -25,8 +25,7 @@ bar and the thread cannot disagree about where a round is. -->
   import ForkButton from "./fork_button.svelte";
   import Head from "./head.svelte";
   import NoteLine from "./note_line.svelte";
-  import Reasoning from "./reasoning.look.svelte";
-  import { lengthOf as reasoningLength } from "./reasoning";
+  import Reasoning from "./reasoning.svelte";
   import { noteAt } from "./note_line";
   import { rhythmOf } from "./rhythm";
   import { cutOff, silentTurn } from "./silence";
@@ -98,12 +97,7 @@ bar and the thread cannot disagree about where a round is. -->
         </div>
       {/if}
       {#if turn.thought && whole}
-        <Reasoning
-          label={say($lang, "talk_reasoning")}
-          length={reasoningLength($lang, turn.thought)}
-          text={turn.thought}
-          open={false}
-        />
+        <Reasoning text={turn.thought} open={false} />
       {/if}
       {#if said !== ""}
         <div class="text-body"><Prose text={said} /></div>
