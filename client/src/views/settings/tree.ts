@@ -12,11 +12,11 @@
 // D19), so this table is also the list of those pages.
 //
 // The branches answer one question each: the city's own facts, what
-// the city can reach, what a run is allowed, what the city has taken
-// in, what belongs to this person and this browser alone, and where to
-// look when something went wrong. An entry whose page does not exist
-// yet is not in the table, because a row that goes nowhere is a dead
-// button.
+// the city can reach (connections), what a run is allowed, what the
+// city has taken in, what belongs to this person on this machine
+// (including privacy), and where to look when something went wrong. An
+// entry whose page does not exist yet is not in the table, because a
+// row that goes nowhere is a dead button.
 
 import { createAttachmentKey, type Attachment } from "svelte/attachments";
 
@@ -24,6 +24,7 @@ import type { Key } from "../../core/lang";
 import { initialOf, type LineMove } from "../../core/lines";
 import { toFragment, type SetupGroup, type View } from "../../core/route";
 import type { Address } from "../../wire";
+import type { GlyphName } from "../parts/glyph";
 import { HEADING } from "../setup/groups";
 import type { Fold, Folds } from "./folds";
 
@@ -91,8 +92,10 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
+    // Privacy sits with preferences: it is what this person allows on
+    // the machine, not a reading taken after something went wrong.
     word: "settings_branch_preferences",
-    entries: [group("appearance"), group("colours"), group("keys")],
+    entries: [group("appearance"), group("colours"), group("keys"), group("privacy")],
     more: [],
   },
   {
@@ -102,7 +105,6 @@ export const TREE: readonly Branch[] = [
       { kind: "page", view: { kind: "monitor" }, word: "monitor_title" },
       group("tools"),
       group("about"),
-      group("privacy"),
     ],
     // The guide and the developer's tools stay one fold down: they are
     // reached after the person has left them (refrain 3-15), not on the
@@ -110,6 +112,17 @@ export const TREE: readonly Branch[] = [
     more: [{ kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced")],
   },
 ];
+
+// A branch mark only when an existing glyph names the object clearly;
+// a weak fit is left blank (docs/ui-design.md: no icon is better than a
+// wrong one).
+const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
+  settings_branch_city: "city",
+  settings_branch_access: "key",
+  settings_branch_running: "pulse",
+  settings_branch_preferences: "setup",
+  settings_branch_diagnosis: "search",
+};
 
 // Where the panel stands: the branch drawn open, and whether that
 // branch's "more" fold is open with it.
@@ -306,6 +319,8 @@ export interface MoreLook {
 
 export interface BranchLook {
   readonly key: string;
+  // Absent when no shipped glyph names this branch cleanly.
+  readonly mark: GlyphName | null;
   readonly fold: FoldLook;
   readonly entries: readonly (LeafLook | NestLook)[];
   readonly more: MoreLook | null;
@@ -371,6 +386,7 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
       const list = `${uid}-${String(at)}`;
       return {
         key: branch.word,
+        mark: BRANCH_MARK[branch.word] ?? null,
         fold: foldOf(branch.word, state.folds.branch === at, list, { kind: "branch", at }),
         entries: branch.entries.map((entry) =>
           entry.kind === "nest" ? nestLookOf(entry.nest, entry.word) : leafOf(entry),
