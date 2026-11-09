@@ -1322,6 +1322,25 @@ D21 **生成器只发 Effect 4 的写法，不留 3.x 的分支。** 理由：`c
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
+/-! ### 8-53 nightlies 的保留：一份滚动窗口，稳定版取代它已包含的快照（裁决）
+
+D42 **nightly 保留最新一份，加上稳定版尚未包含的那一份。** `.github/workflows/nightly-release.yml` 的 publish job 在公开之后重读 `releases?per_page=100`，只认已公开、tag 以 `nightly-` 开头、`target_commitish` 是 40 位十六进制的条目，按 `published_at` 倒序：第三份及以后删除，第二份再问一次祖先关系——以它自己的提交为 base、以最新已公开 curated release 的提交为 head 调 `compare`，返回 `ahead` 或 `identical` 时删除。最新一份永不删。
+
+**为什么**：nightly 是滚动窗口而不是归档（`docs/getting-started.md` 的 nightly 一段写明只保留最新两份）。稳定版包含某份快照的提交时，那份快照的代码就在稳定版里，而且是 curated 通道支持的那一份；留着它，下载页上就有一份比 curated 通道更旧的代码。判据只能是祖先关系：tag 的发布时刻不说明它包含哪些提交，重切一个 tag 或从较旧的提交切版时，按时间删除会删掉唯一带着更新代码的快照。curated release 的 `target_commitish` 写的是分支名 `main`，所以提交要从 tag ref 读，annotated tag 再剥一层——本仓的 `v0.0.15-Alpha-261102` 就是 annotated tag。
+
+**最新一份为什么留**：`install.sh` 在选定通道为空时以「no published release is available」拒装，而 prepare 的「候选必须延伸当前 nightly」守卫要最新已公开 SHA 作 base；删空会让 nightly 通道失败到下一次发布，并把那道守卫关掉一轮。
+
+**失败方向**：curated tag 解析不出来、`compare` 调用失败、还没有 curated release，都保留。清理失败让这次运行红，但不带走任何一份 nightly。
+
+**已有的代价**：最新那份的说明在删除之前生成，「Previous nightly」的标签链接可能指向刚被删的一份。这不是新的一类缺陷：保留两份时，第三份发布就会删掉第一份，第二份的说明从那以后也指着一份已经不存在的 nightly；这次只是让它提前一轮，而比较链接按提交，一直有效。
+
+**被否**：①在 `.github/workflows/release.yml` 的 publish 里删——nightly 保留从此有两个权威，而且是在不可逆的公开动作之后加一个删除步骤，失败会把一次已公开的发布变成红色运行；要即时生效，就把这段判据抽成 `workflow_call` 的 job，由 nightly 发布与 `release: published` 共同调用，而不是抄一份。②按发布时间删——见上。③把被包含的两份都删——通道会空到下一次发布。④判每一份是否被任一 curated release 包含——只被更旧的 release 包含的快照会留着；这是保守方向，留着不损坏任何承诺，删错则删掉唯一带着更新代码的那份。
+
+**验证**：`.github/workflows/test-nightly-release.sh` 用 mock 的 GitHub 响应驱动这一步，覆盖三份、被包含、`identical`、annotated tag、快照领先稳定版、`diverged`、没有 curated release、tag ref 缺失、`compare` 失败、以及上限与被包含同时命中的十种情形。
+
+**重开参数**：curated release 的频率高到「最多滞后一次 nightly 发布」不可接受，或 nightly 通道需要保留可回退的上一份——那时改的是保留几份，不是这条判据。
+-/
+
 /-! ## 9 工作流程
 
 `cargo xtask <gate>` → 定位仓库根（`root::judged`，见 D3）→ 读数据面（`architecture.toml`／ARCHITECTURE.md／`lexicon.toml`／`budgets.toml`）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）；汇合取哪个退出码，见 `spec/Report.lean`。
