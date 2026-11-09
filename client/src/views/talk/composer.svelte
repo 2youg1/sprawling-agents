@@ -422,6 +422,9 @@
       {sending}
       onStop={() => {
         onStop();
+        // Stopping with an empty box turns the coin idle and unmounts it;
+        // return focus to the field so the next keystrokes still land here.
+        field.element?.focus();
       }}
     />
   </Gauge>
