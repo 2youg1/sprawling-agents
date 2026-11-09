@@ -435,9 +435,13 @@
               onPress={saveChoice}
             />
             {#if rulesSaving.kind === "saved"}
-              <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+              <span class="text-note text-text-quiet" role="status"
+                >{say($lang, "catalog_saved")}</span
+              >
             {:else if rulesSaving.kind === "refused"}
-              <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
+              <span class="text-note text-text-quiet" role="status"
+                >{rulesSaving.error.recovery}</span
+              >
             {/if}
           </span>
         {/if}
