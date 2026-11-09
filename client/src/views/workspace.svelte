@@ -304,19 +304,20 @@ height on every desktop tier (client D113). -->
   {/if}
   <!-- Talk column: the gauge strip stands in this column above the
   conversation landmark so its run link is not a floating bar inside the
-  conversation (client D113; crates/xtask render talk). -->
+  conversation (client D113; crates/xtask render talk). The landmark keeps
+  `-mx-wide px-wide` so thread chrome may bleed into that padding without
+  crossing the region's box. -->
   <div
     style:grid-column={at(layout.talk)}
-    class={[
-      "relative -mx-wide flex min-h-0 flex-col px-wide narrow:col-span-full narrow:mx-0 narrow:px-0",
-      sheet ? "row-[2] pt-base" : "row-[1/3]",
-    ]}
+    class={["flex min-h-0 flex-col narrow:col-span-full", sheet ? "row-[2] pt-base" : "row-[1/3]"]}
   >
     {#if !sheet && column.kind === "workbench"}
-      <GaugeStrip here={address} run={gauged} />
+      <div class="-mx-wide px-wide narrow:mx-0 narrow:px-0">
+        <GaugeStrip here={address} run={gauged} />
+      </div>
     {/if}
     <section
-      class="flex min-h-0 flex-1 flex-col"
+      class="relative -mx-wide flex min-h-0 flex-1 flex-col px-wide narrow:mx-0 narrow:px-0"
       aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
     >
       {#if past === undefined || session === undefined}

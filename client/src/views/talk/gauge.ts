@@ -22,7 +22,24 @@ import { heldIn } from "../../core/belief/rooms";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { kilo } from "../../core/time";
-import type { Address, Answer, EndpointSummary, RunId, Turn } from "../../wire";
+import type { Address, Answer, RunId } from "../../wire";
+
+/** What `contextOf` reads off a turn: the model id and the input used. */
+export interface ContextTurn {
+  readonly model?: string | null | undefined;
+  readonly used?: { readonly input: number } | null | undefined;
+}
+
+/** What `contextOf` reads off each model row of an endpoint summary. */
+export interface ContextModel {
+  readonly id: string;
+  readonly context_tokens?: number | null | undefined;
+}
+
+/** What `contextOf` reads off an endpoint list: its models and windows. */
+export interface ContextEndpoint {
+  readonly models: readonly ContextModel[];
+}
 
 // The percents at which the two reminders sound, or null where the page
 // has not been told: a city that does not answer one gets no checkpoint
@@ -82,8 +99,8 @@ export function sessionRunOf(belief: Belief, room: Address): RunId | undefined {
 // denominator is a number nobody should draw. `lockTokens` is the
 // building's absolute lock from `ConfigAnswer.context_lock_tokens`.
 export function contextOf(
-  turns: readonly Turn[],
-  endpoints: readonly EndpointSummary[],
+  turns: readonly ContextTurn[],
+  endpoints: readonly ContextEndpoint[],
   reminders: Reminders,
   lockTokens: number | null = null,
 ): Context | null {

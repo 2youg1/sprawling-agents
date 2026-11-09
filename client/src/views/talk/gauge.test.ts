@@ -78,17 +78,20 @@ describe("contextOf with a building lock", () => {
   test("measures against min(model window, lock)", () => {
     const endpoints = [
       {
-        name: "house",
         models: [{ id: "ordinary", context_tokens: 200_000 }],
       },
-    ] as const;
-    const turns = [{ model: "ordinary", used: { input: 50_000 } }] as const;
+    ];
+    const turns = [{ model: "ordinary", used: { input: 50_000 } }];
     const reminders = { first: 30, second: 65 };
     const unlocked = contextOf(turns, endpoints, reminders, null);
-    expect(unlocked?.window).toBe(200_000);
-    expect(usedPercent(unlocked!)).toBe(25);
+    expect(unlocked).not.toBeNull();
+    if (unlocked === null) return;
+    expect(unlocked.window).toBe(200_000);
+    expect(usedPercent(unlocked)).toBe(25);
     const locked = contextOf(turns, endpoints, reminders, 100_000);
-    expect(locked?.window).toBe(100_000);
-    expect(usedPercent(locked!)).toBe(50);
+    expect(locked).not.toBeNull();
+    if (locked === null) return;
+    expect(locked.window).toBe(100_000);
+    expect(usedPercent(locked)).toBe(50);
   });
 });

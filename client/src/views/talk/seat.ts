@@ -8,8 +8,9 @@
 // screen"): the address line, which every tier draws in the box's
 // placeholder or at a past session's head (4-10a), and the frozen facts
 // of the session - model, effort, mode, policy, sandbox - which the first
-// message head states unless the panorama gauge strip inside the column
-// already does (docs/frontend-method.md §7D, client D113).
+// message head states unless the panorama gauge strip above the
+// conversation landmark already does (docs/frontend-method.md §7D,
+// client D113).
 //
 // `page` is the conversation on the zen and blend page; `workbench` is the
 // same column in the panorama tier with a gauge strip that states the
