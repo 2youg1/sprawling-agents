@@ -10,6 +10,7 @@ use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
 use crate::mismatch::mismatch;
+use crate::provider::preset::{ChatSpelling, ToolPictureCarry};
 
 /// One picture as this face spells it: a data URL in an `input_image`
 /// part. `detail` is required by the schema, and `auto` is the value
@@ -57,24 +58,48 @@ fn system_item(req: &ChatRequest) -> Option<Value> {
 /// One user turn: every tool result it closes, then whatever the person
 /// said and showed.
 ///
+/// One tool result's `output`: a string when there are no pictures or
+/// the host cannot take them here; otherwise a part list that keeps
+/// the pictures with the call they came from.
+fn function_output(
+    output: &str,
+    attachments: &[ImageRef],
+    images: &ImageBytes,
+    carry: ToolPictureCarry,
+) -> Result<Value, AxError> {
+    if attachments.is_empty() || carry == ToolPictureCarry::FollowingUser {
+        return Ok(Value::String(output.to_owned()));
+    }
+    let mut parts = Vec::new();
+    if !output.is_empty() {
+        parts.push(json!({ "type": "input_text", "text": output }));
+    }
+    for picture in attachments {
+        parts.push(image_part(picture, images)?);
+    }
+    Ok(Value::Array(parts))
+}
+
 /// The results come first because each one answers a call the previous
 /// assistant turn made, and this face reads the array in order.
 fn user_items(
     content: &[ContentBlock],
     images: &ImageBytes,
+    carry: ToolPictureCarry,
     into: &mut Vec<Value>,
 ) -> Result<(), AxError> {
     for block in content {
         if let ContentBlock::ToolResult {
             tool_use_id,
             content: output,
+            attachments,
             ..
         } = block
         {
             into.push(json!({
                 "type": "function_call_output",
                 "call_id": tool_use_id,
-                "output": output,
+                "output": function_output(output, attachments, images, carry)?,
             }));
         }
     }
@@ -85,17 +110,18 @@ fn user_items(
                 parts.push(json!({ "type": "input_text", "text": text }));
             }
             ContentBlock::Image(picture) => parts.push(image_part(picture, images)?),
-            ContentBlock::ToolResult { attachments, .. } => {
-                // A picture a tool produced rides in the same turn as
-                // the output it belongs to. This face has no image part
+            ContentBlock::ToolResult { attachments, .. }
+                if carry == ToolPictureCarry::FollowingUser =>
+            {
+                // Under `FollowingUser` this face has no image part
                 // inside `function_call_output`, so what is lost is the
-                // statement that the picture came out of that call, and
-                // the picture itself arrives.
+                // statement that the picture came out of that call.
                 for picture in attachments {
                     parts.push(image_part(picture, images)?);
                 }
             }
-            ContentBlock::Text { .. }
+            ContentBlock::ToolResult { .. }
+            | ContentBlock::Text { .. }
             | ContentBlock::Thinking { .. }
             | ContentBlock::RedactedThinking { .. }
             | ContentBlock::ToolUse { .. } => {}
@@ -141,14 +167,20 @@ fn assistant_items(content: &[ContentBlock], into: &mut Vec<Value>) -> Result<()
     Ok(())
 }
 
-pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
+pub(crate) fn request(
+    req: &ChatRequest,
+    images: &ImageBytes,
+    spelling: ChatSpelling,
+) -> Result<Value, AxError> {
     let mut input = Vec::new();
     if let Some(system) = system_item(req) {
         input.push(system);
     }
     for message in req.messages.iter() {
         match message.role {
-            Role::User => user_items(&message.content, images, &mut input)?,
+            Role::User => {
+                user_items(&message.content, images, spelling.tool_pictures, &mut input)?
+            }
             Role::Assistant => assistant_items(&message.content, &mut input)?,
         }
     }
@@ -197,13 +229,19 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
 mod tests {
     use super::*;
     use crate::dialect::request::{sample_request, sample_seeing};
+    use crate::provider::preset::{ChatSpelling, ToolPictureCarry};
 
     /// What this face carries that the chat face cannot: the segment
     /// edges this city already computes, stated to the provider rather
     /// than left to prefix matching.
     #[test]
     fn a_cached_segment_carries_the_breakpoint_this_face_reads() {
-        let wire = request(&sample_request(), &ImageBytes::default()).unwrap();
+        let wire = request(
+            &sample_request(),
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         let parts = wire["input"][0]["content"].as_array().unwrap();
         assert_eq!(wire["input"][0]["role"], "developer");
         assert_eq!(parts.len(), 2, "one part per system segment");
@@ -213,7 +251,7 @@ mod tests {
         }
         let mut unmarked = sample_request();
         unmarked.system[1].cache = false;
-        let wire = request(&unmarked, &ImageBytes::default()).unwrap();
+        let wire = request(&unmarked, &ImageBytes::default(), ChatSpelling::DOCUMENTED).unwrap();
         assert!(
             wire["input"][0]["content"][1]
                 .get("prompt_cache_breakpoint")
@@ -228,24 +266,64 @@ mod tests {
     #[test]
     fn a_tool_result_is_its_own_item_and_precedes_the_turn_it_sits_in() {
         let (chat, images) = sample_seeing();
-        let wire = request(&chat, &images).unwrap();
+        let wire = request(&chat, &images, ChatSpelling::DOCUMENTED).unwrap();
         let input = wire["input"].as_array().unwrap();
         let output_at = input
             .iter()
             .position(|item| item["type"] == "function_call_output")
             .expect("the tool result crosses as an item of its own");
         assert_eq!(input[output_at]["call_id"], "tu_1");
+        assert!(input[output_at]["output"].is_string());
         // The picture the tool produced rides in the turn that follows.
         let following = &input[output_at.saturating_add(1)];
         assert_eq!(following["role"], "user");
         assert_eq!(following["content"][0]["type"], "input_image");
     }
 
+    /// DeepSeek's responses face takes `input_image` inside
+    /// `function_call_output.output`, so the picture keeps the call it
+    /// came from and no following user message is invented for it.
+    #[test]
+    fn a_host_that_takes_tool_pictures_keeps_them_on_the_output() {
+        let (chat, images) = sample_seeing();
+        let wire = request(
+            &chat,
+            &images,
+            ChatSpelling {
+                tool_pictures: ToolPictureCarry::InToolContent,
+                ..ChatSpelling::DOCUMENTED
+            },
+        )
+        .unwrap();
+        let input = wire["input"].as_array().unwrap();
+        let output = input
+            .iter()
+            .find(|item| item["type"] == "function_call_output")
+            .expect("the tool result crosses as an item of its own");
+        let parts = output["output"].as_array().expect("parts, not a string");
+        assert_eq!(parts[0]["type"], "input_text");
+        assert_eq!(parts[1]["type"], "input_image");
+        let following_images: Vec<_> = input
+            .iter()
+            .filter(|item| item["role"] == "user")
+            .flat_map(|item| item["content"].as_array().into_iter().flatten())
+            .filter(|part| part["type"] == "input_image")
+            .collect();
+        // The person's own attached picture still rides a user message;
+        // only the tool's picture stayed on the output.
+        assert_eq!(following_images.len(), 1);
+    }
+
     /// A call the model made crosses as a `function_call` item whose
     /// `call_id` is the id the result will answer with.
     #[test]
     fn a_call_and_the_result_that_answers_it_share_one_identifier() {
-        let wire = request(&sample_request(), &ImageBytes::default()).unwrap();
+        let wire = request(
+            &sample_request(),
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         let input = wire["input"].as_array().unwrap();
         let made = input
             .iter()
@@ -262,7 +340,12 @@ mod tests {
 
     #[test]
     fn nothing_this_city_sends_is_stored_upstream() {
-        let wire = request(&sample_request(), &ImageBytes::default()).unwrap();
+        let wire = request(
+            &sample_request(),
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(wire["store"], false);
     }
 }
