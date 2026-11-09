@@ -65,6 +65,16 @@ mod toolkits;
 mod waking;
 mod workbench;
 
+/// The built-ins a catalog page lists before a run, outside `sprawling`.
+///
+/// # Errors
+/// Propagates a definition whose schema does not build.
+pub(crate) fn catalog_builtins(
+    search: Option<&kernel::config::SearchSupplier>,
+) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {
+    workbench::catalog_builtins(search)
+}
+
 use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
