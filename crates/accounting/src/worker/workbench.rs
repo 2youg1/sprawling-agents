@@ -29,12 +29,7 @@ mod tools;
 
 pub(super) use standing::{Lending, Placing, lend_tree};
 
-/// See [`tools::catalog_builtins`].
-pub(super) fn catalog_builtins(
-    search: Option<&kernel::config::SearchSupplier>,
-) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {
-    tools::catalog_builtins(search)
-}
+pub(crate) use tools::catalog_builtins;
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is

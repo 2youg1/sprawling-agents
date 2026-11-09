@@ -801,10 +801,12 @@ function comparisonOf(
   currentSchema: Readonly<Record<string, unknown>> | undefined,
   audit: string | undefined,
 ): RowLook["comparison"] {
-  if (pinnedText === undefined && currentText === undefined) return undefined;
+  // A standing row has only `current`; opening a compare control for it
+  // would show an empty pinned column with no accessible name.
+  if (pinnedText === undefined || currentText === undefined) return undefined;
   return {
-    pinned: `${pinnedText ?? ""}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
-    current: `${currentText ?? ""}\n${JSON.stringify(currentSchema ?? {}, null, 2)}`,
+    pinned: `${pinnedText}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
+    current: `${currentText}\n${JSON.stringify(currentSchema ?? {}, null, 2)}`,
     audit,
   };
 }

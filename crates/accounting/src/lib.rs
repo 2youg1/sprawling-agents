@@ -42,6 +42,7 @@ pub mod plan_view;
 pub mod playback;
 mod prompt_chain;
 mod roster;
+mod standing_catalog;
 pub mod toolkit_broker;
 pub mod trace;
 mod tuning;

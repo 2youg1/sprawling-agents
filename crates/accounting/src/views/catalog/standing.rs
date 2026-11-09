@@ -30,7 +30,7 @@ pub(super) fn rows(
         offered_search(&config.search)
     };
     let mut tools = builtin(city::vocation_of(rules.addr()), config.sandbox.shell)?;
-    tools.extend(crate::worker::catalog_builtins(search.as_ref())?);
+    tools.extend(crate::standing_catalog::builtins(search.as_ref())?);
     let mut rows = Vec::with_capacity(tools.len());
     for (namespace, defined) in tools {
         rows.push(row(namespace, defined, &config.catalog, evidence)?);
