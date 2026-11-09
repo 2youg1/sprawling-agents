@@ -13,7 +13,7 @@ use crate::claim_effect::ClaimEffect;
 use kernel::spine::check_roadmap_shape;
 use kernel::{
     AxCode, AxError, CostTier, Effect, NewChild, NodeId, Payload, PlanTree, RenderIntent,
-    RoadmapShape, StopCause, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    RoadmapShape, StopCause, Temporal, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -27,22 +27,12 @@ pub struct ClaimTool {
 }
 
 impl ClaimTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below.
-    pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, AxError> {
-        let room = desk
-            .lock()
-            .map_err(|_| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "reach the plan desk",
-                    "the desk was left locked by a thread that died",
-                )
-                .with_recovery("restart this city")
-            })?
-            .room
-            .clone();
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -71,15 +61,39 @@ impl ClaimTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("action".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("plan")?,
+            // The question sits in the cached prefix, so it costs no
+            // latency and no spend; the method stays the model's.
+            description: "Take a node of this building's plan before unassigned work. \
+                          Must this be expanded?"
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema, neither of
+    /// which can happen with the literals below, and a desk left locked.
+    pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, AxError> {
+        let defined = Self::definition()?;
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the plan desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         Ok(ClaimTool {
             meta: ToolMeta {
-                name: ToolName::parse("plan")?,
-                // The question sits in the cached prefix, so it costs no
-                // latency and no spend; the method stays the model's.
-                disclosure: "Take a node of this building's plan before unassigned work. \
-                             Must this be expanded?"
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,

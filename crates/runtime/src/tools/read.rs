@@ -45,7 +45,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, B3Hash, CostTier, Effect, ImageRef, Payload, RenderIntent, Temporal,
-    TimeMs, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    TimeMs, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -356,16 +356,12 @@ impl ReadTool {
     /// Internal ordinary-path context, removed by ordered accounting.
     pub const RULE_CONTEXT: &'static str = "rule_context";
 
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
-    /// city root's real location does not resolve.
-    pub fn new(
-        city_root: &Path,
-        catalog: Arc<Mutex<Catalog>>,
-        bound: ReadBound,
-        block_store: &Path,
-    ) -> Result<ReadTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         let mut properties = Map::new();
@@ -402,6 +398,29 @@ impl ReadTool {
             "required".to_owned(),
             Value::Array(vec![Value::String(Self::FILE_PATH.to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse(Self::NAME)?,
+            description: "Reads a file by its path, or a skill by the name the catalog \
+                          lists it under, with line numbers counted from 1. A truncated \
+                          answer states the total and the line to continue from. PNG, JPEG, \
+                          WebP and GIF come back as picture attachments within the picture \
+                          size limit. Reading a directory or a missing file is refused."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed parameter schema, which is a build-time
+    /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
+    /// city root's real location does not resolve.
+    pub fn new(
+        city_root: &Path,
+        catalog: Arc<Mutex<Catalog>>,
+        bound: ReadBound,
+        block_store: &Path,
+    ) -> Result<ReadTool, AxError> {
+        let defined = Self::definition()?;
         Ok(ReadTool {
             catalog,
             reader: BoundReader::new(city_root, bound, block_store),
@@ -412,14 +431,9 @@ impl ReadTool {
             clock: None,
             rules: None,
             meta: ToolMeta {
-                name: ToolName::parse(Self::NAME)?,
-                disclosure: "Reads a file by its path, or a skill by the name the catalog \
-                             lists it under, with line numbers counted from 1. A truncated \
-                             answer states the total and the line to continue from. PNG, JPEG, \
-                             WebP and GIF come back as picture attachments within the picture \
-                             size limit. Reading a directory or a missing file is refused."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Light,
                 timeout: None,

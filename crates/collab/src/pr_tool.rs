@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, B3Hash, CostTier, Effect, Locator, Payload, RenderIntent, Temporal,
-    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -239,9 +239,12 @@ pub struct PrTool {
 }
 
 impl PrTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema.
-    pub fn new(room: Address, desk: Arc<Mutex<PrDesk>>) -> Result<PrTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -273,14 +276,24 @@ impl PrTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("action".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("pr")?,
+            description: "Offer your work for review, or check someone else's; nothing you wrote \
+                          reaches the building until another resident has checked it."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema.
+    pub fn new(room: Address, desk: Arc<Mutex<PrDesk>>) -> Result<PrTool, AxError> {
+        let defined = Self::definition()?;
         Ok(PrTool {
             meta: ToolMeta {
-                name: ToolName::parse("pr")?,
-                disclosure:
-                    "Offer your work for review, or check someone else's; nothing you wrote \
-                     reaches the building until another resident has checked it."
-                        .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,

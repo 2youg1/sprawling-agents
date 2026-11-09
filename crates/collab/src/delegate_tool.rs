@@ -28,7 +28,7 @@
 
 use kernel::{
     Address, AxCode, AxError, CostTier, DelegateKind, Depth, Difficulty, Effect, GateOutcome,
-    Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 use std::sync::Arc;
@@ -189,12 +189,12 @@ pub struct DelegateTool {
 }
 
 impl DelegateTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
-    pub fn new(
-        desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
-    ) -> Result<DelegateTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
             ("room", "where the delegate works, as building/room"),
@@ -252,16 +252,30 @@ impl DelegateTool {
                     .collect(),
             ),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("delegate")?,
+            description: "Hand one piece of work to another agent in this building, one \
+                          level down. Nobody is asked: one level is the whole rule, and \
+                          the types hold it, so the call either names the room the work \
+                          will happen in or is refused."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed parameter schema, which is a build-time
+    /// defect rather than a runtime one.
+    pub fn new(
+        desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
+    ) -> Result<DelegateTool, AxError> {
+        let defined = Self::definition()?;
         Ok(DelegateTool {
             desk,
             meta: ToolMeta {
-                name: ToolName::parse("delegate")?,
-                disclosure: "Hand one piece of work to another agent in this building, one \
-                             level down. Nobody is asked: one level is the whole rule, and \
-                             the types hold it, so the call either names the room the work \
-                             will happen in or is refused."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Spawn,
                 cost_tier: CostTier::Heavy,
                 timeout: None,

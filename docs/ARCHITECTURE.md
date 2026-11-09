@@ -400,7 +400,11 @@ than any diagram of boxes.
    `accounting::views::catalog` reads that recorded table against the
    configuration on disk for the building page instead of assembling a
    fresh catalog, which could start a server or a browser just to answer
-   a page. `city::neighbourhood` is scanned at the same time, so the run
+   a page. Before any run has recorded a table, the same answer lists the
+   built-in tools that building's vocation admits, from each tool's own
+   definition, so the tiers can be read and saved before the first session;
+   connectors, browsers and the endpoint-book tools stay absent until a
+   run records them. `city::neighbourhood` is scanned at the same time, so the run
    also knows which addresses it can reach and who stands at them;
    without that scan, `signal` would take an address the model had to be
    told.

@@ -17,8 +17,8 @@
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::Value;
 
@@ -53,32 +53,49 @@ impl ToolTool {
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
+    /// # Errors
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
+        Ok(ToolDef {
+            name: ToolName::parse(Self::NAME)?,
+            description: "Reach what this building admits beyond your tool list. `list` names \
+                          the namespaces, or the members of one; `find` gives the closest \
+                          tools to a few words; `detail` gives a tool's whole description and \
+                          input schema; `run` runs it with its arguments, which are refused \
+                          with the schema when they do not fit."
+                .to_owned(),
+            input_schema: Payload::of(&serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "op": { "type": "string", "enum": ["list", "find", "detail", "run"] },
+                    "namespace": { "type": "string", "description": "list: the namespace \
+                        to open; leave it out to list the namespaces" },
+                    "query": { "type": "string", "description": "find: a few words of \
+                        what you need" },
+                    "name": { "type": "string", "description": "detail, run: a tool's \
+                        whole name, as list or find spells it" },
+                    "args": { "type": "object", "description": "run: the tool's own \
+                        arguments, as its input schema asks" },
+                },
+                "required": ["op"],
+            }))?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed parameter schema, which is a build-time
+    /// defect rather than a runtime one.
     pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<ToolTool, AxError> {
+        let defined = Self::definition()?;
         Ok(ToolTool {
             catalog,
             meta: ToolMeta {
-                name: ToolName::parse(Self::NAME)?,
-                disclosure: "Reach what this building admits beyond your tool list. `list` names \
-                             the namespaces, or the members of one; `find` gives the closest \
-                             tools to a few words; `detail` gives a tool's whole description and \
-                             input schema; `run` runs it with its arguments, which are refused \
-                             with the schema when they do not fit."
-                    .to_owned(),
-                params: Payload::of(&serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "op": { "type": "string", "enum": ["list", "find", "detail", "run"] },
-                        "namespace": { "type": "string", "description": "list: the namespace \
-                            to open; leave it out to list the namespaces" },
-                        "query": { "type": "string", "description": "find: a few words of \
-                            what you need" },
-                        "name": { "type": "string", "description": "detail, run: a tool's \
-                            whole name, as list or find spells it" },
-                        "args": { "type": "object", "description": "run: the tool's own \
-                            arguments, as its input schema asks" },
-                    },
-                    "required": ["op"],
-                }))?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Free,
                 timeout: None,

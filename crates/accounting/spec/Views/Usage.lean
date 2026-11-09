@@ -47,7 +47,7 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 - **导出**的列与格式照 wire D33；JSONL 与 CSV 由同一张行表写出，行表由 `skills` 与 `mcp` 两个答复展开。
 - **三个平台**：只读账本与书架，Windows、macOS 与 Linux 相同；CSV 的 `\r\n` 是 RFC 4180 的。
 - **工具的使用证据**（`Query::Catalog`，wire §8-99）：同一遍里每一行 `run_started` 记下它的 run 与开在的地址，每一行 `tool_called` 按它记的工具名归到它的 run，留下最后一次的时刻；经 `tool` 的 `run` 调用的一行记的是那件工具本身（runtime §8-61），所以数的是能力而不是门。`tool_evidence` 取开在这栋楼或它的房间里、账上最新的至多 `window` 个 run，答每件工具被其中几个 run 调过、最后一次在何时，以及数过几个 run。
-- **能力一问**：`views::catalog` 在快照里只取这栋楼最新 run 第一行 `prompt_assembled` 的 `seq`（`Views::building_prompts`，由 `run_started` 的地址与第一行提示一起折出），「最新」按 `run_started` 在账上的先后算，不按提示落账的先后：run 在自己的模型通道上冻结提示，晚于它的 `run_started`，同一栋楼两个房间的 run 并行时，后开始的可能先冻结，而它冻下的工具表仍是较新的那张；放开之后读那一行的 `tools`、`city::load_config` 冻结的两张 `[catalog]` 表与 `tool_evidence`，按 `runtime::catalog::exposure` 算每一行的档位（D55）。地址不是楼、配置读不动、账本打不开都答 `Unavailable` 带原因；这栋楼还没有 run 时 `run` 为 `None`、行为空，不读账本。
+- **能力一问**：`views::catalog` 在快照里只取这栋楼最新 run 第一行 `prompt_assembled` 的 `seq`（`Views::building_prompts`，由 `run_started` 的地址与第一行提示一起折出），「最新」按 `run_started` 在账上的先后算，不按提示落账的先后：run 在自己的模型通道上冻结提示，晚于它的 `run_started`，同一栋楼两个房间的 run 并行时，后开始的可能先冻结，而它冻下的工具表仍是较新的那张；放开之后读那一行的 `tools`、`city::load_config` 冻结的两张 `[catalog]` 表与 `tool_evidence`，按 `runtime::catalog::exposure` 算每一行的档位（D55）。地址不是楼、配置读不动、账本打不开都答 `Unavailable` 带原因。这栋楼还没有冻过提示时 `run` 为 `None`，行是它按职业会准入的内建工具（各工具的 `definition`，与工作台写进 `ToolMeta` 的是同一份），不装配工作台、不读那一行账；连接器与浏览器仍不在这份名单里。
 - 验收：`views::tests::newest_prompt::a_building_keeps_the_prompt_of_the_run_it_started_last`（两个房间的 run 先后开始、提示倒序落账，楼仍取后开始的那个 run）；`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats`；`views::usage::model_tests` 的两条 proptest 判模型的三条性质。
 -/
 
@@ -62,15 +62,15 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 **重开参数**：一座城的使用表答复超过 100 ms 时（wire D33），改成常驻折叠。
 -/
 
-/-! D55 能力一问读最新 run 记下的工具表，使用证据数这栋楼最新的 50 个 run
+/-! D55 能力一问在已有冻结表时读那张表；还没有时读各工具的 definition，不装配工作台
 
-**决定**：`Query::Catalog` 的行取这栋楼最新 run 的 `prompt_assembled.tools`，不在答问时装配工作台；档位用此刻盘上的表经 runtime 的同一个函数算。使用证据在 D49 的同一遍账本折叠里数：这栋楼最新的至多 50 个 run 里，每件工具被几个 run 调过、最后一次何时。`Views` 只多两张小表（每栋楼一个 `seq`，以及还没折到第一行提示的 run 的地址），用来一步找到那一行。
+**决定**：这栋楼已经冻过 `prompt_assembled.tools` 时，`Query::Catalog` 的行取最新那一张，不在答问时装配工作台。还没有这样的 run 时，行是这栋楼按职业会准入的内建工具：名字、命名空间、说明与参数模式取各工具的 `definition`，与装配时写入 `ToolMeta` 的是同一份；档位仍用此刻盘上的两张 `[catalog]` 表，经 `runtime::catalog::exposure::exposure_of` 计算。`always`、`dormant` 与 `core_bytes` 由这些行数出（`core_bytes` 是常驻行定义字节之和，不是之后 run 序列化的工具数组）；`index_bytes` 与 `reading_bytes` 仍为 0，休眠索引与 Always skill 正文要等 run 装配。连接器工具、浏览器，以及要查端点簿才存在的 `ocr` 与 `transcribe`，不在这份名单里。已配置且不保密的 `web_search` 在，因为它只读盘上的 `[search]`。使用证据在 D49 的同一遍账本折叠里数：这栋楼最新的至多 50 个 run 里，每件工具被几个 run 调过、最后一次何时。`Views` 只多两张小表（每栋楼一个 `seq`，以及还没折到第一行提示的 run 的地址），用来一步找到那一行。
 
-**理由**：装配一次工作台要与这栋楼的每台 MCP 服务器握手，还可能起浏览器，只为了画一个页面；最新 run 记下的表就是这栋楼此刻真实建得出的工具，差别只在上一个 run 之后新加的服务器，那要到下一个 run 才出现，页面照实写。按 run 数而不按次数，是因为一件工具在一个 run 里调一百次与调一次对「这栋楼还用不用它」是同一个答案；50 个 run 覆盖一栋常用的楼几天的工作，又让一次重构之前的旧习惯在几十个 run 之后退出窗口。
+**理由**：装配一次工作台要与这栋楼的每台 MCP 服务器握手，还可能起浏览器，只为了画一个页面；有过 run 之后，最新 run 记下的表就是这栋楼那时真实建得出的工具，差别只在那之后新加的服务器，页面照实写。没有过 run 时那张表不存在，页面若因此空白，第一个会话就带着没人看过的默认档位出发，而那些内建工具的定义不出进程就能读到。按 run 数而不按次数，是因为一件工具在一个 run 里调一百次与调一次对「这栋楼还用不用它」是同一个答案；50 个 run 覆盖一栋常用的楼几天的工作，又让一次重构之前的旧习惯在几十个 run 之后退出窗口。
 
-**被否**：①答问时装配：见理由；②证据按天或按次数：一件只在长 run 里被反复调用的工具会显得比每个 run 都用一次的工具更重要；③把证据做成常驻折叠：D49 的理由照旧成立，能力节只在人打开时问。
+**被否**：①答问时装配完整工作台：见理由；②没有 run 时行留空：人不能在第一个会话之前查看或修改档位；③页面自备一份工具名：与 `definition` 分成两个权威；④证据按天或按次数：一件只在长 run 里被反复调用的工具会显得比每个 run 都用一次的工具更重要；⑤把证据做成常驻折叠：D49 的理由照旧成立，能力节只在人打开时问。
 
-**重开参数**：窗口内的 run 常常多于 50 而人觉得证据过时，或一问的答复超过 100 ms（与 D49 同一个数）。
+**重开参数**：窗口内的 run 常常多于 50 而人觉得证据过时，或一问的答复超过 100 ms（与 D49 同一个数）。内建名单与工作台登记的名字对不上时，改调用 `definition` 的那一处，不在页面上另写一份。
 -/
 
 namespace Accounting.Views.Usage

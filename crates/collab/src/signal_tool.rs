@@ -10,8 +10,8 @@
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -32,23 +32,12 @@ pub struct SignalTool {
 }
 
 impl SignalTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below — the fallibility is the
-    /// constructors' contract, not a runtime condition.
-    pub fn new(desk: Arc<Mutex<SignalDesk>>) -> Result<SignalTool, AxError> {
-        let room = desk
-            .lock()
-            .map_err(|_| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "reach the signal desk",
-                    "the desk was left locked by a thread that died",
-                )
-                .with_recovery("restart this city")
-            })?
-            .room
-            .clone();
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
             (
@@ -88,14 +77,39 @@ impl SignalTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("action".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("signal")?,
+            description:
+                "Speak to another resident, or to every one of them, or take the signals waiting \
+                          for you; call it when `status` says signals are pending."
+                    .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema, neither of
+    /// which can happen with the literals below — the fallibility is the
+    /// constructors' contract, not a runtime condition — and a desk left locked.
+    pub fn new(desk: Arc<Mutex<SignalDesk>>) -> Result<SignalTool, AxError> {
+        let defined = Self::definition()?;
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the signal desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         Ok(SignalTool {
             meta: ToolMeta {
-                name: ToolName::parse("signal")?,
-                disclosure:
-                    "Speak to another resident, or to every one of them, or take the signals waiting \
-                     for you; call it when `status` says signals are pending."
-                        .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,

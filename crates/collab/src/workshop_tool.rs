@@ -27,7 +27,7 @@ use std::collections::BTreeSet;
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -167,13 +167,12 @@ mod op;
 use op::Op;
 
 impl WorkshopTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
-    pub fn new(
-        desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
-        delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
-    ) -> Result<WorkshopTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -210,17 +209,32 @@ impl WorkshopTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("op".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("workshop")?,
+            description: "Split one creation into nodes that run in dependency order, each \
+                          in its own room, and judge what comes back. Fan-out over \
+                          delegation, and bounded by the same rule as `delegate`: a \
+                          node hands work down no further."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed parameter schema, which is a build-time
+    /// defect rather than a runtime one.
+    pub fn new(
+        desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
+        delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
+    ) -> Result<WorkshopTool, AxError> {
+        let defined = Self::definition()?;
         Ok(WorkshopTool {
             desk,
             delegates,
             meta: ToolMeta {
-                name: ToolName::parse("workshop")?,
-                disclosure: "Split one creation into nodes that run in dependency order, each \
-                             in its own room, and judge what comes back. Fan-out over \
-                             delegation, and bounded by the same rule as `delegate`: a \
-                             node hands work down no further."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Spawn,
                 cost_tier: CostTier::Heavy,
                 timeout: None,
