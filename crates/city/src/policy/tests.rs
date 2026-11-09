@@ -307,12 +307,8 @@ effort = "high"
         "ordinary",
         "an empty RULES.toml opens with ordinary confidential/write before the choice"
     );
-    let quoted = crate::inscribe_choice(
-        &ordinary(""),
-        "house",
-        "vendor\"model",
-        kernel::Effort::Low,
-    );
+    let quoted =
+        crate::inscribe_choice(&ordinary(""), "house", "vendor\"model", kernel::Effort::Low);
     assert!(
         quoted.contains('\'') || quoted.contains("\\\""),
         "model ids with quotes are TOML-escaped: {quoted}"
@@ -332,12 +328,9 @@ effort = "high"
         "{}\n[workspace_models.choice] # selected\nendpoint = \"house\"\nmodel = \"ordinary\"\neffort = \"low\"\n",
         workspace_rules()
     );
-    let replaced =
-        crate::inscribe_choice(&commented, "house", "strong", kernel::Effort::High);
+    let replaced = crate::inscribe_choice(&commented, "house", "strong", kernel::Effort::High);
     assert_eq!(
-        replaced
-            .matches("[workspace_models.choice]")
-            .count(),
+        replaced.matches("[workspace_models.choice]").count(),
         1,
         "a choice header with a trailing comment is replaced, not duplicated"
     );
