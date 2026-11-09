@@ -11,8 +11,11 @@
   //
   // A page entry carries an arrow because following it leaves the
   // panel; a group entry draws the letter it is reached by at the row's
-  // end (client D40). What opens arrives with `drop`; what folds goes at
-  // once.
+  // end (client D40), only once the row is hovered or focused so the
+  // tree stays a list of words rather than a wall of initials. What
+  // opens arrives with `drop`; what folds goes at once. Branch children
+  // share one left rail so a nest and a page sit on the same column,
+  // and a closed nest never reads as another branch.
 
   import Glyph from "../parts/glyph.svelte";
   import { Kbd } from "../parts/kbd.svelte";
@@ -21,26 +24,27 @@
   const { nav, branches }: TreeLook = $props();
 
   const ENTRY =
-    "relative flex min-h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-label " +
+    "group/entry relative flex min-h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-label " +
     "text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive " +
     "active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100";
   // Every row ends in one slot of the same width - the arrow of a page,
-  // the chevron of a branch, or nothing - so every label is as wide as
-  // the next and the rows' words start on one line.
+  // the chevron of a fold, or the letter of a group - so every label is
+  // as wide as the next and the rows' words start on one line.
   const MARK = "flex w-glyph-sm shrink-0 justify-center text-text-faint";
   // The accent bar (`chosen`) says which group is the one drawn
   // (docs/frontend-method.md §7B). The page under the panel is named too,
   // but only in its ink: two bars in one tree would leave the eye to guess
   // which is the selection.
   const HERE = "chosen bg-raised text-text";
-  // First-level entries share the branch title's first mark (the nav-column
-  // geometry gate). Only a nest or "more" draws a second rail inside.
-  const NESTED = "drop ml-base flex flex-col gap-hair border-l border-edge pl-tight";
+  // One rail for every child of a branch; a nest or "more" draws a
+  // second rail inside so the third level stays readable.
+  const CHILDREN = "drop ml-snug flex flex-col gap-hair border-l border-edge pl-snug pb-base";
+  const NESTED = "drop ml-snug flex flex-col gap-hair border-l border-edge pl-snug";
 </script>
 
 {#snippet page(each: PageLook)}
   <a {...each.wire} class={[ENTRY, each.here && "text-text"]}>
-    <span class="min-w-0 flex-1 truncate ps-pane">{each.label}</span>
+    <span class="min-w-0 flex-1 truncate">{each.label}</span>
     {#if each.reading !== null}
       <span class="shrink-0 font-mono text-note text-text-faint">{each.reading}</span>
     {/if}
@@ -57,8 +61,15 @@
 {#snippet leaf(entry: LeafLook)}
   {#if entry.kind === "group"}
     <button {...entry.wire} class={[ENTRY, entry.here && HERE]}>
-      <span class="min-w-0 flex-1 truncate ps-pane">{entry.label}</span>
-      <span class={MARK} aria-hidden="true">
+      <span class="min-w-0 flex-1 truncate">{entry.label}</span>
+      <span
+        class={[
+          MARK,
+          "opacity-0 transition-opacity ease-leave group-hover/entry:opacity-100 group-focus-within/entry:opacity-100",
+          entry.here && "opacity-100",
+        ]}
+        aria-hidden="true"
+      >
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
         {@render Kbd({ initial: entry.initial })}
       </span>
@@ -71,7 +82,7 @@
 
 <!-- The arrow keys the wire bag carries move between the links and
   buttons inside: the APG pattern for this navigation. -->
-<nav {...nav} class="flex flex-col gap-hair">
+<nav {...nav} class="flex flex-col gap-tight">
   {#each branches as branch (branch.key)}
     <div class="flex flex-col gap-hair">
       <button
@@ -82,16 +93,21 @@
           branch.fold.open ? "text-text-quiet" : "text-text-faint",
         ]}
       >
+        {#if branch.mark !== null}
+          <span class={MARK} aria-hidden="true">
+            <Glyph name={branch.mark} size="sm" />
+          </span>
+        {/if}
         <span class="min-w-0 flex-1 truncate">{branch.fold.label}</span>
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
         {@render chevron(branch.fold.open)}
       </button>
       {#if branch.fold.open}
-        <ul id={branch.fold.list} class="drop flex flex-col gap-hair pb-base">
+        <ul id={branch.fold.list} class={CHILDREN}>
           {#each branch.entries as entry (entry.key)}
             <li>
               {#if entry.kind === "nest"}
-                <button {...entry.fold.wire} class={ENTRY}>
+                <button {...entry.fold.wire} class={[ENTRY, "text-text-quiet"]}>
                   <span class="min-w-0 flex-1 truncate">{entry.fold.label}</span>
                   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                   {@render chevron(entry.fold.open)}
@@ -111,8 +127,11 @@
             </li>
           {/each}
           {#if branch.more !== null}
-            <li>
-              <button {...branch.more.fold.wire} class={ENTRY}>
+            <li class="mt-hair">
+              <button
+                {...branch.more.fold.wire}
+                class={[ENTRY, "text-note text-text-faint hover:text-text-quiet"]}
+              >
                 <span class="min-w-0 flex-1 truncate">{branch.more.fold.label}</span>
                 <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                 {@render chevron(branch.more.fold.open)}
