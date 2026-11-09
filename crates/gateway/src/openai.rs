@@ -197,7 +197,7 @@ pub(crate) fn request(
                                 content,
                                 attachments,
                                 images,
-                                spelling.tool_pictures,
+                                spelling.chat_tool_pictures,
                             )?,
                         }));
                     }
@@ -209,7 +209,7 @@ pub(crate) fn request(
                 // blocks the person attached still need this slot.
                 let text = joined_text(&message.content);
                 let pictures =
-                    pictures_following(&message.content, images, spelling.tool_pictures)?;
+                    pictures_following(&message.content, images, spelling.chat_tool_pictures)?;
                 if pictures.is_empty() {
                     if !text.is_empty() {
                         messages.push(json!({ "role": "user", "content": text }));

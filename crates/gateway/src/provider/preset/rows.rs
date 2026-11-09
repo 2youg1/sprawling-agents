@@ -118,15 +118,15 @@ pub const PRESETS: [HostPreset; 13] = [
         // Thinking is on by default, and a request with tools whose
         // history lacks the earlier `reasoning_content` answers 400;
         // the switch is `thinking.type`, with the level beside it.
-        // Tool-produced pictures ride the tool result: the chat schema
-        // takes `image_url` parts on `role: tool`, and the responses
-        // face takes `input_image` in `function_call_output.output`
-        // (<https://api-docs.deepseek.com/api/create-chat-completion>,
-        // <https://api-docs.deepseek.com/guides/responses_api>).
+        // Chat accepts images on user messages only; responses also
+        // takes `input_image` in `function_call_output.output`
+        // (<https://api-docs.deepseek.com/guides/vision>,
+        // <https://api-docs.deepseek.com/guides/responses_api#image-input>).
         chat: ChatSpelling {
             effort: EffortField::ThinkingToggle,
             reasoning: ReasoningReturn::AsReasoningContent,
-            tool_pictures: ToolPictureCarry::InToolContent,
+            chat_tool_pictures: ToolPictureCarry::FollowingUser,
+            responses_tool_pictures: ToolPictureCarry::InToolContent,
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
@@ -183,7 +183,8 @@ pub const PRESETS: [HostPreset; 13] = [
             ceiling: CeilingField::MaxTokens,
             effort: EffortField::ReasoningObject,
             reasoning: ReasoningReturn::AsReasoningContent,
-            tool_pictures: ToolPictureCarry::FollowingUser,
+            chat_tool_pictures: ToolPictureCarry::FollowingUser,
+            responses_tool_pictures: ToolPictureCarry::FollowingUser,
         },
         session_header: None,
         cache_key_field: None,
@@ -363,7 +364,8 @@ const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxCompletionTokens,
     effort: EffortField::ThinkingToggle,
     reasoning: ReasoningReturn::AsReasoningContent,
-    tool_pictures: ToolPictureCarry::InToolContent,
+    chat_tool_pictures: ToolPictureCarry::InToolContent,
+    responses_tool_pictures: ToolPictureCarry::InToolContent,
 };
 
 /// Zhipu's chat face, read at
@@ -375,7 +377,8 @@ const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxTokens,
     effort: EffortField::ThinkingToggle,
     reasoning: ReasoningReturn::AsReasoningContent,
-    tool_pictures: ToolPictureCarry::FollowingUser,
+    chat_tool_pictures: ToolPictureCarry::FollowingUser,
+    responses_tool_pictures: ToolPictureCarry::FollowingUser,
 };
 
 /// Anthropic's documented ceilings. The Messages API requires
@@ -393,6 +396,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -402,6 +406,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -411,6 +416,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -420,6 +426,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -429,6 +436,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 32_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -438,6 +446,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -447,6 +456,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -456,6 +466,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 8_192,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
@@ -477,6 +488,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: Some(PresetThinking {
             levels: &LOW_TO_MAX,
             default: Some(Effort::Medium),
@@ -490,6 +502,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: Some(PresetThinking {
             levels: &LOW_TO_MAX,
             default: None,
@@ -503,6 +516,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
@@ -512,6 +526,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
@@ -521,6 +536,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: Some(PresetThinking {
             levels: &LOW_TO_MAX,
             default: Some(Effort::Medium),
@@ -534,6 +550,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: Some(PresetThinking {
             levels: &LOW_TO_MAX,
             default: Some(Effort::Medium),
@@ -547,6 +564,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: Some(PresetThinking {
             levels: &LOW_TO_MAX,
             default: Some(Effort::Medium),
@@ -560,6 +578,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_047_576,
         max_output_tokens: 32_768,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/gpt-4.1",
@@ -569,6 +588,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 128_000,
         max_output_tokens: 16_384,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/gpt-4o",
@@ -578,6 +598,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/o3",
@@ -587,35 +608,49 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/o4-mini",
     },
 ];
 
-/// DeepSeek's two families. The API reference states the ceiling
-/// exactly - "between 1 and 384K (393216)" - and the models page states
-/// a `1M` window for both, read at a thousand to the `K`
-/// (<https://api-docs.deepseek.com/quick_start/pricing>). The retired
-/// `deepseek-v4-flash` name is still accepted and served by the flash
-/// model, so the `deepseek-v4` prefix answers for it too.
+/// DeepSeek's current families and the retired Flash names. The API
+/// reference states the ceiling exactly - "between 1 and 384K
+/// (393216)" - and the models page states a `1M` window, read at a
+/// thousand to the `K` (<https://api-docs.deepseek.com/quick_start/pricing>).
+/// Vision is Flash-only; both retired Flash prefixes select that row,
+/// while the more specific Pro row remains text-only
+/// (<https://api-docs.deepseek.com/guides/vision>).
 const DEEPSEEK_MODELS: &[ModelPreset] = &[
     ModelPreset {
         id_prefix: "deepseek-flash",
         context_tokens: 1_000_000,
         max_output_tokens: 393_216,
         input: InputKinds::TextImage,
+        image_max_side: std::num::NonZeroU32::new(8192),
         thinking: None,
         cache_min_tokens: None,
         source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
     ModelPreset {
-        id_prefix: "deepseek-v4",
+        id_prefix: "deepseek-v4-flash",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::TextImage,
+        image_max_side: std::num::NonZeroU32::new(8192),
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://api-docs.deepseek.com/guides/vision",
+    },
+    ModelPreset {
+        id_prefix: "deepseek-v4-pro",
         context_tokens: 1_000_000,
         max_output_tokens: 393_216,
         input: InputKinds::Text,
+        image_max_side: None,
         thinking: None,
         cache_min_tokens: None,
-        source: "https://api-docs.deepseek.com/api/create-chat-completion",
+        source: "https://api-docs.deepseek.com/quick_start/pricing",
     },
 ];
