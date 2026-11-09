@@ -76,9 +76,10 @@
 #
 # Rust cache hashes the installed toolchains, Cargo/Rust environment and
 # dependency files; shared-key separates each compilation use. Bun keys on
-# `client/bun.lock`, and only the branch everyone builds on writes a cache:
-# a pull request's save is readable by that pull request alone, and it
-# pushes the shared entry out of the repository's cache budget by age.
+# `client/bun.lock`. Rust and Bun entries are written only by main: a pull
+# request's save is readable by that pull request alone and pushes the shared
+# entry out of the cache budget by age. The small `ci-tools` entries are the
+# exception: pull requests may save them, and pressure pruning removes them.
 # Every job that compiles installs its toolchain through
 # `./.github/actions/toolchain`, which leaves the pinned toolchain alone
 # in its rustup home, so a runner image that moves its own `stable` no
@@ -261,7 +262,7 @@ jobs:
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       # `fmt-check` includes `bun fmt --check`, so Bun has to be present.
@@ -276,6 +277,9 @@ jobs:
       - name: fmt
         if: ${{ !cancelled() }}
         run: just fmt-check
+      - name: CI tool cache contract
+        if: ${{ !cancelled() }}
+        run: bash .github/workflows/test-ci-tools.sh
       - name: the gates that read sources
         if: ${{ !cancelled() }}
         run: just gates-sources
@@ -317,7 +321,7 @@ jobs:
         with:
           shared-key: gates
           save-if: false
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - uses: ./.github/actions/client-artifacts
@@ -363,7 +367,7 @@ jobs:
         with:
           shared-key: gates
           save-if: false
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - uses: ./.github/actions/client-artifacts
@@ -380,7 +384,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - uses: ./.github/actions/lean
@@ -406,7 +410,7 @@ jobs:
         with:
           shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - name: clippy
@@ -460,7 +464,7 @@ jobs:
           shared-key: test-registry
           cache-targets: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-nextest,just
       # The binary embeds the bundle, so the archive carries the one a
@@ -520,7 +524,7 @@ jobs:
       # trybuild compiles `sprawling-runtime`, which builds the Zig leaf.
       - uses: ./.github/actions/zig
         if: matrix.environment == 'compile'
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-nextest,just
       # The trybuild suites are cold rather than slow: one suite is 21.4s
@@ -594,7 +598,7 @@ jobs:
         with:
           shared-key: core
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-nextest,just
       # The same scratch the `compile` test slice keeps, for the same
@@ -631,7 +635,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-deny,just
       - name: licences, bans and sources
@@ -650,7 +654,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: client/package.json
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
