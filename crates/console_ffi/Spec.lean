@@ -248,3 +248,16 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 被否：只把 `page` 换成 `WebUI`——仍没有说明人要输入命令；给整句换蓝色或黄色——静态提示既不是「在动或被选中」，也不是「需要人或出了缺」。`console_ffi::tests::a_session_reads_as_one_left_edge_with_times_beside_it` 比对整句与命令的 SGR 样式。
 -/
+
+/-! D10 docs.rs 构建不编译 Zig 叶子
+
+决定：`build.rs` 在环境变量 `DOCS_RS` 已设时直接成功返回，不读钉、不起 `zig`、不发出链接指令；并以 `cargo::rerun-if-env-changed=DOCS_RS` 登记该变量，使随后未设该变量的构建重跑脚本、而不是沿用这次跳过。docs.rs 的沙箱无 Zig、无外网；`cargo rustdoc` 只为库生成文档，不链接原生叶子，安全包装的 rustdoc 不依赖那片静态库。
+
+理由：crates.io 读者打开 docs.rs 上的 `sprawling` 应看到 rustdoc；失败原因若是缺 Zig，文档就不可达。
+
+被否：①在 docs.rs 装 Zig——沙箱无网络且无 Zig；②发出指向空归档的链接指令——rustdoc 不链接，空归档是多余步骤。
+
+代价：docs.rs 上的文档描述的是安全 Rust 包装的接口；叶子的机器码与 `zig test` 行为不在那里验证。
+
+重开参数：docs.rs 开始要求最终链接原生库，或文档需要展示叶子的符号。
+-/

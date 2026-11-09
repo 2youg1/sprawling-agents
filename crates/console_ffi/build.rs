@@ -6,7 +6,8 @@
 //! Builds the console's Zig leaf with the standard library alone: `zig
 //! build-lib` into this package's `OUT_DIR`, linked as a static library,
 //! on every target the binary ships for (`crates/console_ffi/Spec.lean`
-//! D1).
+//! D1). When `DOCS_RS` is set, the script returns without Zig: docs.rs
+//! has none, and rustdoc does not link the leaf (`Spec.lean` D10).
 //!
 //! Two checks run before anything is compiled, because they are cheaper
 //! to read here than as a wrong frame: the scene's words in
@@ -30,6 +31,13 @@ const SIBLING_PIN: &str = "../desktop/ffi/zig-version";
 const LIBRARY: &str = "sprawling_console_leaf";
 
 fn main() -> Result<(), String> {
+    // docs.rs sets DOCS_RS and has no Zig; rustdoc does not link the leaf
+    // (`crates/console_ffi/Spec.lean` D10). Named so a later build without
+    // the variable reruns this script instead of reusing the skip.
+    println!("cargo::rerun-if-env-changed=DOCS_RS");
+    if documenting() {
+        return Ok(());
+    }
     println!("cargo::rerun-if-changed=zig");
     println!("cargo::rerun-if-changed=src/part.rs");
     println!("cargo::rerun-if-changed={PIN}");
@@ -43,6 +51,11 @@ fn main() -> Result<(), String> {
     println!("cargo::rustc-link-search=native={}", out.display());
     println!("cargo::rustc-link-lib=static={LIBRARY}");
     Ok(())
+}
+
+/// Whether this build is for docs.rs documentation (`DOCS_RS`).
+fn documenting() -> bool {
+    std::env::var_os("DOCS_RS").is_some()
 }
 
 fn variable(name: &str) -> Result<String, String> {

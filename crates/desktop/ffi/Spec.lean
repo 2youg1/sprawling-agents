@@ -616,6 +616,8 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 
 **D3 Zig 的版本只写在 `crates/desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。`build.rs` 只在 `zig/`、两份 Rust 记录文件或这份钉变了时重跑，不随 `PATH` 重跑，理由与被否的做法同 `crates/console_ffi/Spec.lean` D1：叶子由钉住的版本编出，Zig 换目录不改变它，随 `PATH` 重跑则 CI 的每个作业与桌面上每次换 shell 都重编叶子和依赖它的 `runtime`、`desktop`、`sprawling`。
 
+**D7 docs.rs 构建不编译 Zig 叶子。** `build.rs` 在环境变量 `DOCS_RS` 已设时直接成功返回，不读钉、不起 `zig`、不发出链接指令，并以 `cargo::rerun-if-env-changed=DOCS_RS` 登记该变量（同 console_ffi D10）。理由与被否同 `crates/console_ffi/Spec.lean` D10：docs.rs 沙箱无 Zig，而 `cargo rustdoc` 不链接原生叶子；安全包装的文档不依赖那片静态库。非 Windows 目标本就不编叶子；本决定让 Windows 目标上的文档构建同样不依赖 Zig。重开参数同 console_ffi D10。
+
 缓冲的起始大小与重试次数（`top_level` 1024 个句柄、加 64、四次；`clipboard` 4096 个单元、四次）是我们的选择：一台桌面的顶层窗口数是几百，绝大多数剪贴板文本在四千单元以内；改它们只改一次调用的往返次数，不改结果。
 -/
 
