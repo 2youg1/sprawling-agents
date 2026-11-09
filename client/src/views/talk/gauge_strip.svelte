@@ -10,7 +10,6 @@
   // never moves. Asks the same rounds question the thread asks; `asking`
   // merges them by content.
   import { fill, say } from "../../core/lang";
-  import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer, RunId } from "../../wire";
   import Sheet from "../world/sheet.svelte";
@@ -41,7 +40,11 @@
 
 {#if run !== null}
   <div class="shrink-0" aria-label={say($lang, "world_session")}>
-    <div class="mb-snug flex items-baseline justify-between gap-pane">
+    <!-- Worktree and base stay as facts; the run-page door stays on the
+         chosen-session pane (world/session.svelte). A link here would sit
+         above the composer inside the conversation region and fail the
+         render gate's no-floating-bar rule. -->
+    <div class="mb-snug flex items-baseline gap-pane">
       <p class="flex min-w-0 items-baseline gap-snug text-note text-text-quiet">
         {#if worktree !== null}
           <span class="min-w-0 truncate"
@@ -58,10 +61,6 @@
           >
         {/if}
       </p>
-      <a
-        class="shrink-0 text-note text-accent hover:text-accent-hover"
-        href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a
-      >
     </div>
     <Sheet {here} {run} {rounds} />
   </div>

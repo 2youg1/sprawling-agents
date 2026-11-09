@@ -73,12 +73,11 @@ pub use blockage::{Blockage, Notice, RedNode};
 pub use budget::{BudgetUse, ByteLen, Tokens, UsdMicros};
 pub use change::{FileChange, How, Lines};
 pub use completion::{Completion, Evidence, PlannedProgress, Progress, UnplannedProgress};
+pub use config::ContextLock;
 pub use config::{ClockStampGranularity, ClockZone, FrozenConfig};
 pub use config::{ContainerImage, ContainerLimits};
 pub use config::{EnvVarName, Interpreter, LayeredValue, LiveConfig, SandboxArm, SandboxLimits};
-pub use config::{
-    ContextLock, McpDefinition, McpLayer, McpReference, McpServer, McpTransport, SecondThreshold,
-};
+pub use config::{McpDefinition, McpLayer, McpReference, McpServer, McpTransport, SecondThreshold};
 pub use delegation::{Delegate, DelegateKind, DelegationVerdict, Delegator, Depth, Difficulty};
 pub use discard::Restoration;
 pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardVerdict};
