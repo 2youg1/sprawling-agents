@@ -5,10 +5,9 @@
 
 <script lang="ts">
   // The type cards of the appearance group: the interface face, the mono
-  // face, the reading face with a sample set in it, the fallback chain, the
-  // body size, the three ratios that set a line, the features the bundled
-  // faces carry, and a preview of the interface and mono faces side by
-  // side.
+  // face, the reading face, the fallback chain, the body size, the three
+  // ratios that set a line, the features the bundled faces carry, and one
+  // preview that wears the three roles together so a change is read once.
   //
   // The record and its writing are the group's (`appearance.svelte`):
   // this file is handed the record as it stands, the one way to write a
@@ -48,11 +47,13 @@
     cellsOf,
     drawnLeading,
     drawnSize,
+    faceStyle,
     stackRefused,
   } from "./appearance";
   import type { Axis, Setting } from "./appearance";
   import type { ReceiptLook } from "./card";
   import Card from "./card.look.svelte";
+  import type { Choice } from "../parts/combobox";
 
   // The two states of one feature switch. A word of this card rather than
   // of the wire: the wire records which features are on, and a switch has
@@ -86,9 +87,15 @@
   let leading = $state("");
   let tracking = $state("");
   // The faces this machine has, once a person asks for them and the
-  // browser agrees. Empty until both happen.
+  // browser agrees. Empty until both happen. Both axes and the fallback
+  // slots share one list, so the person is asked once.
   let installed = $state<readonly string[]>([]);
   let note = $state<string | undefined>(undefined);
+  // Each family drawn in its own face so the list is a comparison, not a
+  // roster of identical labels.
+  const localChoices: readonly Choice[] = $derived(
+    installed.map((family) => ({ value: family, label: family, face: faceStyle(family) })),
+  );
 
   onMount(() => {
     box = look.body === null ? drawnSize(document.documentElement) : String(look.body);
@@ -210,7 +217,13 @@
     }
     void ask()
       .then((faces) => {
-        installed = [...new Set(faces.map((face) => face.family))].sort();
+        // Only names a fallback slot or a single-family stack can keep:
+        // a family with a comma or quote would splice the CSS list.
+        installed = [
+          ...new Set(
+            faces.map((face) => face.family).filter((family) => FAMILY_SHAPE.test(family)),
+          ),
+        ].sort((a, b) => a.localeCompare(b));
         note = undefined;
       })
       .catch(() => {
@@ -255,6 +268,36 @@
     ratioOf(tracking, TRACKING_FLOOR).kind === "refused" ? { error: trackingFloor() } : {};
 </script>
 
+{#snippet localAsk()}
+  {#if offered()}
+    {#if installed.length === 0}
+      <Button label={say($lang, "appearance_local")} onPress={list} />
+    {/if}
+  {:else}
+    <p class="text-note text-text-faint">{say($lang, "appearance_local_none")}</p>
+  {/if}
+  {#if note !== undefined}
+    <p class="text-note text-alert" role="alert">{note}</p>
+  {/if}
+{/snippet}
+
+{#snippet localPicker(label: string, held: string, onPick: (family: string) => void)}
+  {#if localChoices.length > 0}
+    <!-- A machine has hundreds of faces, so they are searched rather
+    than scrolled; each row wears that family so two neighbours can be
+    told apart by eye. The families are this machine's own words, never
+    translated. -->
+    <Combobox
+      {label}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      choices={localChoices}
+      value={held}
+      {onPick}
+    />
+  {/if}
+{/snippet}
+
 {#snippet stackFor(axis: Axis, name: Key)}
   <div class="flex flex-col gap-tight">
     <Field
@@ -270,29 +313,16 @@
         );
       }}
     />
-    {#if offered()}
-      <Button label={say($lang, "appearance_local")} onPress={list} />
-    {:else}
-      <p class="text-note text-text-faint">{say($lang, "appearance_local_none")}</p>
-    {/if}
-    {#if note !== undefined}
-      <p class="text-note text-alert" role="alert">{note}</p>
-    {/if}
-    {#if installed.length > 0}
-      <!-- A machine has hundreds of faces, so they are searched rather
-      than scrolled; the families are this machine's own words, never
-      translated. -->
-      <Combobox
-        label={fill(say($lang, "appearance_local_for"), { face: say($lang, name) })}
-        placeholder={say($lang, "part_search")}
-        empty={say($lang, "part_no_match")}
-        choices={installed.map((family) => ({ value: family, label: family }))}
-        value={axis === "sans" ? look.sansStack : look.monoStack}
-        onPick={(family: string) => {
-          wear(axis, family);
-        }}
-      />
-    {/if}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render localAsk()}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render localPicker(
+      fill(say($lang, "appearance_local_for"), { face: say($lang, name) }),
+      axis === "sans" ? look.sansStack : look.monoStack,
+      (family: string) => {
+        wear(axis, family);
+      },
+    )}
   </div>
 {/snippet}
 
@@ -347,13 +377,6 @@
       write({ ...look, reading }, "reading");
     }}
   />
-  <!-- The sample carries the card's own choice, so it shows the face this card holds wherever the card is drawn. -->
-  <p
-    class="rounded-card bg-chrome p-base font-read text-body leading-read text-text"
-    data-read={look.reading}
-  >
-    {say($lang, "appearance_reading_sample")}
-  </p>
 </Card>
 
 <Card
@@ -363,6 +386,8 @@
   receipt={receipt("fallbacks")}
 >
   <div class="flex flex-col gap-tight">
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render localAsk()}
     <Field
       label={say($lang, "appearance_fallback_first")}
       {...slotRefusal(slot1)}
@@ -371,6 +396,10 @@
         wearFallback(0, typed);
       }}
     />
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render localPicker(say($lang, "appearance_fallback_first"), slot1, (family: string) => {
+      wearFallback(0, family);
+    })}
     <!-- A chain with no gap: the second name is taken once the first
     holds one, so a name typed into the second slot is never read back in
     the first. -->
@@ -386,6 +415,12 @@
         wearFallback(1, typed);
       }}
     />
+    {#if slot1.trim() !== ""}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+      {@render localPicker(say($lang, "appearance_fallback_second"), slot2, (family: string) => {
+        wearFallback(1, family);
+      })}
+    {/if}
   </div>
 </Card>
 
@@ -474,9 +509,23 @@
   </div>
 </Card>
 
-<Card title={say($lang, "appearance_preview")}>
-  <div class="flex flex-col gap-tight rounded-card bg-chrome p-base">
-    <p class="font-sans text-body text-text">{say($lang, "appearance_sample")}</p>
-    <p class="font-mono text-body text-text-quiet">{say($lang, "appearance_sample")}</p>
+<!-- One sample for the whole group: the three roles update as soon as
+a face, size or metric lands, so the person never hunts a second preview. -->
+<Card title={say($lang, "appearance_preview")} note={say($lang, "appearance_preview_note")}>
+  <div class="flex flex-col gap-base rounded-card bg-chrome p-base">
+    <div class="flex flex-col gap-tight">
+      <span class="text-note text-text-faint">{say($lang, "appearance_face")}</span>
+      <p class="font-sans text-body text-text">{say($lang, "appearance_sample")}</p>
+    </div>
+    <div class="flex flex-col gap-tight">
+      <span class="text-note text-text-faint">{say($lang, "appearance_mono")}</span>
+      <p class="font-mono text-body text-text-quiet">{say($lang, "appearance_sample")}</p>
+    </div>
+    <div class="flex flex-col gap-tight">
+      <span class="text-note text-text-faint">{say($lang, "appearance_reading")}</span>
+      <p class="font-read text-body leading-read text-text" data-read={look.reading}>
+        {say($lang, "appearance_reading_sample")}
+      </p>
+    </div>
   </div>
 </Card>
