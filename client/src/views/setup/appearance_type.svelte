@@ -293,7 +293,7 @@
       empty={say($lang, "part_no_match")}
       choices={localChoices}
       value={held}
-      onPick={onPick}
+      {onPick}
     />
   {/if}
 {/snippet}

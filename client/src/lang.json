@@ -93,7 +93,7 @@
   },
   "appearance_local": {
     "en": "choose from this computer's faces",
-    "zh": "从本机字体里选"
+    "zh": "从这台电脑的字体里选"
   },
   "appearance_local_denied": {
     "en": "the browser did not hand over the list; type the family name instead",
