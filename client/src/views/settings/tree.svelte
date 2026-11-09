@@ -26,7 +26,7 @@
   // (`tree.ts`) builds every word, state and wire bag, and the look
   // (`tree.look.svelte`) draws them.
 
-  import { onDestroy } from "svelte";
+  import { onDestroy, tick } from "svelte";
 
   import { initialTyped, lineWalker } from "../../core/lines";
   import { pressedOf } from "../../core/press";
@@ -88,16 +88,23 @@
 
   const lines = lineWalker();
 
-  // A group drawn by the address rather than by a press here (a link in
-  // the body, the palette, the back button) takes the focus with it while
-  // the focus is in the tree, so the ring never stays on an entry the
-  // body no longer shows.
+  // A group or page drawn by the address rather than by a press here (a
+  // link in the body, the palette, the back button) opens the branch that
+  // holds it and takes the focus with it while the focus is in the tree,
+  // so a cross-branch door (advanced → privacy) does not leave the old
+  // fold open, and the ring never stays on an entry the body no longer
+  // shows.
   let drawn: SetupGroup | null = null;
+  let stood: View | null = null;
   $effect(() => {
-    if (group === drawn) return;
+    if (group === drawn && beneath === stood) return;
     drawn = group;
+    stood = beneath;
+    folds = foldsOf(group, beneath);
     if (!nav?.contains(document.activeElement)) return;
-    nav.querySelector<HTMLElement>("[aria-current=true]")?.focus();
+    void tick().then(() => {
+      nav?.querySelector<HTMLElement>("[aria-current=true]")?.focus();
+    });
   });
 
   function walk(event: KeyboardEvent): void {

@@ -284,134 +284,150 @@
 </script>
 
 <form
-  class="flex flex-col gap-base"
+  class="flex flex-col gap-wide"
   onsubmit={(event) => {
     event.preventDefault();
   }}
 >
-  <Combobox
-    label={say($lang, "setup_known_host")}
-    placeholder={say($lang, "setup_known_host_pick")}
-    empty={say($lang, "part_no_match")}
-    choices={hostChoices(hosts)}
-    value={row?.host ?? null}
-    onPick={(host: string) => {
-      const chosenRow = hosts.find((each) => each.host === host);
-      const filled = chosenRow === undefined ? null : picked(chosenRow, draft.wireApi);
-      if (filled === null) return;
-      draft.wireApi = filled.wireApi;
-      edit("baseUrl", filled.baseUrl);
-    }}
-  />
-
-  <div class="flex flex-col gap-tight">
-    <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
-    <Field
-      placeholder="https://api.openai.com/v1"
-      label={say($lang, "setup_base_url")}
-      pattern={BASE_URL.source}
-      mono
-      value={draft.baseUrl}
-      onInput={(value: string) => {
-        edit("baseUrl", value);
+  <!-- Three stages on one form: where to call, how to authenticate,
+  then which models to take. Each stage is one job so a person finishes
+  one before scrolling into the next. -->
+  <fieldset class="flex min-w-0 flex-col gap-base border-0 p-0">
+    <legend class="px-0 text-note font-label text-text-quiet">
+      {say($lang, "setup_form_provider")}
+    </legend>
+    <Combobox
+      label={say($lang, "setup_known_host")}
+      placeholder={say($lang, "setup_known_host_pick")}
+      empty={say($lang, "part_no_match")}
+      choices={hostChoices(hosts)}
+      value={row?.host ?? null}
+      onPick={(host: string) => {
+        const chosenRow = hosts.find((each) => each.host === host);
+        const filled = chosenRow === undefined ? null : picked(chosenRow, draft.wireApi);
+        if (filled === null) return;
+        draft.wireApi = filled.wireApi;
+        edit("baseUrl", filled.baseUrl);
       }}
     />
-    {#if called !== null}
-      <span class="text-note text-text-faint">
-        {fill(say($lang, "setup_base_url_normalised"), { recorded: called })}
-      </span>
+
+    <div class="flex flex-col gap-tight">
+      <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
+      <Field
+        placeholder="https://api.openai.com/v1"
+        label={say($lang, "setup_base_url")}
+        pattern={BASE_URL.source}
+        mono
+        value={draft.baseUrl}
+        onInput={(value: string) => {
+          edit("baseUrl", value);
+        }}
+      />
+      {#if called !== null}
+        <span class="text-note text-text-faint">
+          {fill(say($lang, "setup_base_url_normalised"), { recorded: called })}
+        </span>
+      {/if}
+    </div>
+
+    <div class="flex flex-col gap-tight text-note text-text-quiet">
+      {say($lang, "setup_wire_api")}
+      <Segmented
+        label={say($lang, "setup_wire_api")}
+        options={faces}
+        held={draft.wireApi}
+        onPick={(api: WireApi) => {
+          draft.wireApi = api;
+          const moved = row === null ? null : followed(row, draft.baseUrl, api);
+          if (moved !== null) edit("baseUrl", moved);
+        }}
+      />
+    </div>
+    <Advanced {draft} {setDraft} onRenamed={retire} />
+  </fieldset>
+
+  <fieldset class="flex min-w-0 flex-col gap-base border-0 p-0">
+    <legend class="px-0 text-note font-label text-text-quiet">
+      {say($lang, "setup_form_credentials")}
+    </legend>
+    <div class="flex flex-col gap-tight text-note text-text-quiet">
+      <Field
+        label={say($lang, "setup_key")}
+        kind="password"
+        mono
+        value={draft.key}
+        {...keyed ? { placeholder: say($lang, "setup_key_kept") } : {}}
+        onInput={(value: string) => {
+          edit("key", value);
+        }}
+      />
+      {#if field.kind === "stored"}
+        <span class="text-text-faint">{say($lang, "setup_key_stored")}</span>
+        <span class="font-mono text-text-faint">{reference}</span>
+        <span class="flex gap-snug">
+          <Button
+            label={say($lang, "setup_key_replace")}
+            tone="quiet"
+            onPress={() => {
+              held = null;
+            }}
+          />
+          <Button
+            label={say($lang, "setup_key_clear")}
+            tone="quiet"
+            onPress={() => {
+              held = null;
+              draft.key = "";
+            }}
+          />
+        </span>
+        <span class="text-text-faint">{say($lang, "setup_key_vault_note")}</span>
+      {/if}
+    </div>
+  </fieldset>
+
+  <fieldset class="flex min-w-0 flex-col gap-base border-0 p-0">
+    <legend class="px-0 text-note font-label text-text-quiet">
+      {say($lang, "setup_form_models")}
+    </legend>
+    <div class="flex flex-wrap items-center gap-snug">
+      <Button
+        label={say($lang, "setup_look")}
+        tone="secondary"
+        loading={busy}
+        {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
+        onPress={probeNow}
+      />
+      <Button
+        label={say($lang, "setup_attach_btn")}
+        tone="primary"
+        loading={busy}
+        {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
+        onPress={attachNow}
+      />
+    </div>
+
+    <!-- What came back stands under the controls that asked for it,
+    then the two readings of the draft at the foot. -->
+    {#if note !== null}
+      <p class="text-note text-alert">{note}</p>
     {/if}
-  </div>
-
-  <div class="flex flex-col gap-tight text-note text-text-quiet">
-    {say($lang, "setup_wire_api")}
-    <Segmented
-      label={say($lang, "setup_wire_api")}
-      options={faces}
-      held={draft.wireApi}
-      onPick={(api: WireApi) => {
-        draft.wireApi = api;
-        const moved = row === null ? null : followed(row, draft.baseUrl, api);
-        if (moved !== null) edit("baseUrl", moved);
-      }}
-    />
-  </div>
-
-  <div class="flex flex-col gap-tight text-note text-text-quiet">
-    <Field
-      label={say($lang, "setup_key")}
-      kind="password"
-      mono
-      value={draft.key}
-      {...keyed ? { placeholder: say($lang, "setup_key_kept") } : {}}
-      onInput={(value: string) => {
-        edit("key", value);
-      }}
-    />
-    {#if field.kind === "stored"}
-      <span class="text-text-faint">{say($lang, "setup_key_stored")}</span>
-      <span class="font-mono text-text-faint">{reference}</span>
-      <span class="flex gap-snug">
-        <Button
-          label={say($lang, "setup_key_replace")}
-          tone="quiet"
-          onPress={() => {
-            held = null;
-          }}
-        />
-        <Button
-          label={say($lang, "setup_key_clear")}
-          tone="quiet"
-          onPress={() => {
-            held = null;
-            draft.key = "";
-          }}
-        />
-      </span>
-      <span class="text-text-faint">{say($lang, "setup_key_vault_note")}</span>
+    <Reach probed={answered} error={unreached} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
+    {#if looking}
+      <p class="text-note text-text-quiet">
+        {fill(say($lang, "setup_probe_busy"), { host: hostOf(draft.baseUrl) ?? "" })}
+      </p>
     {/if}
-  </div>
 
-  <div class="flex flex-wrap items-center gap-snug">
-    <Button
-      label={say($lang, "setup_look")}
-      tone="secondary"
-      loading={busy}
-      {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
-      onPress={probeNow}
+    <ModelTable
+      served={facts}
+      {about}
+      onChosen={(rows: readonly ModelRow[]) => {
+        chosen = rows;
+      }}
     />
-    <Button
-      label={say($lang, "setup_attach_btn")}
-      tone="primary"
-      loading={busy}
-      {...complete ? {} : { why: say($lang, "setup_form_incomplete") }}
-      onPress={attachNow}
-    />
-  </div>
+    <Reach probed={null} error={refused} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
 
-  <!-- What came back stands under the controls that asked for it,
-  then the boxes that stay folded away, then the two readings of the
-  draft at the foot. -->
-  {#if note !== null}
-    <p class="text-note text-alert">{note}</p>
-  {/if}
-  <Reach probed={answered} error={unreached} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
-  {#if looking}
-    <p class="text-note text-text-quiet">
-      {fill(say($lang, "setup_probe_busy"), { host: hostOf(draft.baseUrl) ?? "" })}
-    </p>
-  {/if}
-
-  <Advanced {draft} {setDraft} onRenamed={retire} />
-
-  <ModelTable
-    served={facts}
-    {about}
-    onChosen={(rows: readonly ModelRow[]) => {
-      chosen = rows;
-    }}
-  />
-  <Reach probed={null} error={refused} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
-
-  <Previews {draft} {reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
+    <Previews {draft} {reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
+  </fieldset>
 </form>

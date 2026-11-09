@@ -218,32 +218,47 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
     {#if shown === "you"}
       <You />
     {:else if shown === "accounts"}
+      <!-- Five stages, top to bottom: what is already attached, how to
+          attach another, which models fill the city's roles, the run
+          defaults those models inherit, then web search. The form takes
+          the conversation's 760 rather than a measure, because what a
+          person pastes into it is a base URL and a key and 520 cut both
+          off (docs/frontend-method.md §4-33, 4-36). -->
       <div class="flex flex-col gap-wide">
-        <!-- The form takes the conversation's 760 rather than a
-            measure, because what a person pastes into it is a base
-            URL and a key and 520 cut both off (docs/frontend-method.md §4-33,
-            4-36). -->
-        <div class="min-w-0 max-w-talk">
-          <ProviderDoor />
+        <div class="min-w-0">
+          <ProviderDoor stepped />
         </div>
-        <div class="min-w-0 max-w-talk">
-          <SearchCard />
-        </div>
-        <div class="flex flex-col gap-base">
-          <h3 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h3>
+        <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
+          <header class="flex min-w-0 flex-col gap-tight">
+            <h3 class="text-label font-label text-text">{say($lang, "setup_step_models")}</h3>
+            <p class="text-note text-text-faint">{say($lang, "setup_step_models_hint")}</p>
+          </header>
           {#if answer !== undefined}
             <ModelChoice {answer} />
           {/if}
-        </div>
+        </section>
         <!-- The default thinking level sits beside the default model,
             because both answer what the city reaches for by default
             (client D52). -->
-        <div class="grid grid-fit items-start gap-base">
-          <div class="min-w-0 rounded-card bg-raised px-base py-snug">
-            <EffortSection />
+        <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
+          <header class="flex min-w-0 flex-col gap-tight">
+            <h3 class="text-label font-label text-text">{say($lang, "setup_step_defaults")}</h3>
+            <p class="text-note text-text-faint">{say($lang, "setup_step_defaults_hint")}</p>
+          </header>
+          <div class="grid grid-fit items-start gap-base">
+            <div class="min-w-0 rounded-card bg-raised px-base py-snug">
+              <EffortSection />
+            </div>
+            <CityLayer />
           </div>
-          <CityLayer />
-        </div>
+        </section>
+        <section class="flex min-w-0 max-w-talk flex-col gap-snug border-t border-edge pt-wide">
+          <header class="flex min-w-0 flex-col gap-tight">
+            <h3 class="text-label font-label text-text">{say($lang, "setup_step_search")}</h3>
+            <p class="text-note text-text-faint">{say($lang, "setup_step_search_hint")}</p>
+          </header>
+          <SearchCard />
+        </section>
       </div>
     {:else if shown === "agents"}
       <Agents />

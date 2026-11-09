@@ -73,6 +73,63 @@ describe("the settings tree", () => {
       { kind: "building", address: Address.make("hall") },
     ]);
   });
+
+  test("seats privacy with preferences, and about with diagnostics", () => {
+    const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
+    const preferences = TREE.findIndex((branch) => branch.word === "settings_branch_preferences");
+    const diagnosis = TREE.findIndex((branch) => branch.word === "settings_branch_diagnosis");
+    expect(standingOf("privacy", talk)).toEqual({ branch: preferences, more: false });
+    expect(standingOf("about", talk)).toEqual({ branch: diagnosis, more: false });
+  });
+
+  // The advanced group's door to privacy is a cross-branch jump: the seat
+  // must open preferences, not leave diagnosis (and its more) open.
+  test("a cross-branch jump opens the destination's folds", () => {
+    const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
+    const preferences = TREE.findIndex((branch) => branch.word === "settings_branch_preferences");
+    const diagnosis = TREE.findIndex((branch) => branch.word === "settings_branch_diagnosis");
+    expect(foldsOf("advanced", talk)).toEqual({
+      branch: diagnosis,
+      more: true,
+      nests: { buildings: false, record: false },
+    });
+    expect(foldsOf("privacy", talk)).toEqual({
+      branch: preferences,
+      more: false,
+      nests: { buildings: false, record: false },
+    });
+  });
+});
+
+describe("the settings tree's branch marks", () => {
+  test("names a glyph only where one already fits the object", () => {
+    const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
+    const look = lookOf(
+      {
+        group: "you",
+        beneath: talk,
+        folds: foldsOf("you", talk),
+        leaves: { buildings: [], record: [] },
+        reading: null,
+      },
+      "t",
+      {
+        words: (key) => key,
+        pick: () => undefined,
+        toggle: () => undefined,
+        walk: () => undefined,
+        hold: () => undefined,
+      },
+    );
+    expect(Object.fromEntries(look.branches.map((branch) => [branch.key, branch.mark]))).toEqual({
+      settings_branch_city: "city",
+      settings_branch_access: "key",
+      settings_branch_running: "pulse",
+      settings_branch_extensions: null,
+      settings_branch_preferences: "setup",
+      settings_branch_diagnosis: "search",
+    });
+  });
 });
 
 // The look is handed every role, state and handler of client/Spec.lean
