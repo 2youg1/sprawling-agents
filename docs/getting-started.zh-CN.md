@@ -251,7 +251,7 @@ gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
 
 ### 跟随 nightly 快照
 
-nightly 是 main 的自动构建快照，不是整理过的正式发行。tag 为 `nightly-YYMMDD-fullSHA`，日期按 UTC，并保留完整 commit SHA。每份 nightly 的发行说明都以同一段固定的不稳定警告开头，英文和中文都有，之后是正式版基准与 commit 数、相对上一份 nightly 的比较，以及 GitHub 自动生成的基准范围内 merged PR 列表。nightly 归档只为 Windows x86-64、Apple 芯片的 macOS 和 Linux x86-64 发布，只保留最新两份公开快照。
+nightly 是 main 的自动构建快照，不是整理过的正式发行。tag 为 `nightly-YYMMDD-fullSHA`，日期按 UTC，并保留完整 commit SHA。每份 nightly 的发行说明都以同一段固定的不稳定警告开头，英文和中文都有，之后是正式版基准与 commit 数、相对上一份 nightly 的比较，以及 GitHub 自动生成的基准范围内 merged PR 列表。nightly 归档只为 Windows x86-64、Apple 芯片的 macOS 和 Linux x86-64 发布，只保留最新两份公开快照。正式发行会取代它已经包含的那些快照：下一次 nightly 发布时删掉它们，而最新一份始终保留，nightly 通道不会为空。
 
 shell 安装器默认仍然选择正式发行。要明确选择 nightly 通道：
 
