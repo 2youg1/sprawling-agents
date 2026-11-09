@@ -479,6 +479,85 @@ describe("the capabilities draft", () => {
   });
 });
 
+describe("a building with no run yet", () => {
+  const hands = {
+    scope: () => undefined,
+    pane: () => undefined,
+    edit: () => undefined,
+    save: () => undefined,
+    unused: () => undefined,
+    copy: () => undefined,
+  };
+  const answer: CatalogAnswer = {
+    building: Address.make("lab"),
+    run: null,
+    core_bytes: 0,
+    index_bytes: 0,
+    reading_bytes: 0,
+    always: 1,
+    dormant: 1,
+    skills: 0,
+    changed: 0,
+    open_sessions: 0,
+    runs_seen: 0,
+    tools: [row(0, 0, 10, false, "core").tool, row(1, 0, 8, false, "dormant").tool],
+    skill_rows: [],
+    references: [],
+    skill_pins: {},
+    reading_room: [],
+    city: {},
+    stated: {},
+  };
+
+  test("lists the standing tools and says a save reaches the first run", () => {
+    const look = catalogLook(
+      {
+        answer,
+        scope: "building",
+        draft: selectionOfStanding(),
+        edited: false,
+        now: 0,
+        unusedOnly: false,
+        buildings: [],
+        pane: "tools",
+      },
+      "en",
+      hands,
+    );
+    expect(look.empty).toBeUndefined();
+    expect(look.beforeRun).toContain("No run yet");
+    expect(look.groups.length).toBeGreaterThan(0);
+  });
+
+  test("an empty tools pane still says there is nothing to edit", () => {
+    const look = catalogLook(
+      {
+        answer: { ...answer, tools: [] },
+        scope: "building",
+        draft: selectionOfStanding(),
+        edited: false,
+        now: 0,
+        unusedOnly: false,
+        buildings: [],
+        pane: "tools",
+      },
+      "en",
+      hands,
+    );
+    expect(look.beforeRun).toBeUndefined();
+    expect(look.empty).toContain("No run yet");
+  });
+});
+
+function selectionOfStanding(): Selection {
+  return {
+    catalog: { tools: {}, namespaces: {}, skills: {} },
+    references: [],
+    skillPins: {},
+    readingRoom: [],
+  };
+}
+
 describe("settleSave", () => {
   test("a landed save acknowledges only a draft the person has not moved on from", () => {
     const sent = selection([]);

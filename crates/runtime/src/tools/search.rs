@@ -17,8 +17,8 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -99,48 +99,62 @@ impl SearchTool {
     /// `mode::core_tools`.
     pub const NAME: &'static str = "search";
 
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
+    /// # Errors
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
+        Ok(ToolDef {
+            name: ToolName::parse(Self::NAME)?,
+            description: "Searches the lines of files under one path for a regular \
+                          expression in ripgrep's syntax, or with `glob` alone finds files by \
+                          name. The line numbers it reports count from 1 and are the `offset` \
+                          `read` continues from."
+                .to_owned(),
+            input_schema: Payload::of(&serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "pattern": { "type": "string", "description": "the regular expression \
+                        to search the lines of files for, in ripgrep's syntax; leave it out \
+                        and give `glob` to find files by name" },
+                    "path": { "type": "string", "description": "a city-relative directory \
+                        or file to search under; everything you may read when omitted" },
+                    "glob": { "type": "string", "description": "only files this glob \
+                        names, such as `*.rs` or `src/**/*.ts`; one without `/` is matched \
+                        against the file name" },
+                    "output_mode": { "type": "string",
+                        "enum": ["files_with_matches", "content", "count"],
+                        "description": "files_with_matches (default): the files that hold \
+                        a match; content: every matching line with its line number; count: \
+                        each such file with how many lines matched" },
+                    "-i": { "type": "boolean", "description": "match without regard to \
+                        case" },
+                    "-B": { "type": "integer", "description": "lines to show before each \
+                        match in content, 0 to 4" },
+                    "-A": { "type": "integer", "description": "lines to show after each \
+                        match in content, 0 to 4" },
+                    "-C": { "type": "integer", "description": "lines to show before and \
+                        after each match in content, 0 to 4" },
+                    "context": { "type": "integer", "description": "the same as `-C`" },
+                },
+            }))?,
+        })
+    }
+
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
     /// city root's real location does not resolve.
     pub fn new(city_root: &Path, bound: ReadBound) -> Result<SearchTool, AxError> {
+        let defined = Self::definition()?;
         Ok(SearchTool {
             city: chosen_path::CityRoot::anchor(city_root, "search")?,
             bound,
             meta: ToolMeta {
-                name: ToolName::parse(Self::NAME)?,
-                disclosure: "Searches the lines of files under one path for a regular \
-                             expression in ripgrep's syntax, or with `glob` alone finds files by \
-                             name. The line numbers it reports count from 1 and are the `offset` \
-                             `read` continues from."
-                    .to_owned(),
-                params: Payload::of(&serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "pattern": { "type": "string", "description": "the regular expression \
-                            to search the lines of files for, in ripgrep's syntax; leave it out \
-                            and give `glob` to find files by name" },
-                        "path": { "type": "string", "description": "a city-relative directory \
-                            or file to search under; everything you may read when omitted" },
-                        "glob": { "type": "string", "description": "only files this glob \
-                            names, such as `*.rs` or `src/**/*.ts`; one without `/` is matched \
-                            against the file name" },
-                        "output_mode": { "type": "string",
-                            "enum": ["files_with_matches", "content", "count"],
-                            "description": "files_with_matches (default): the files that hold \
-                            a match; content: every matching line with its line number; count: \
-                            each such file with how many lines matched" },
-                        "-i": { "type": "boolean", "description": "match without regard to \
-                            case" },
-                        "-B": { "type": "integer", "description": "lines to show before each \
-                            match in content, 0 to 4" },
-                        "-A": { "type": "integer", "description": "lines to show after each \
-                            match in content, 0 to 4" },
-                        "-C": { "type": "integer", "description": "lines to show before and \
-                            after each match in content, 0 to 4" },
-                        "context": { "type": "integer", "description": "the same as `-C`" },
-                    },
-                }))?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Light,
                 timeout: None,

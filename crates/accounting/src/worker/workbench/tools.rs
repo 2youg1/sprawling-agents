@@ -218,6 +218,10 @@ impl Laying {
         // knows which tools are the city's own.
         let own =
             |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
+        // The same built-ins, read from each tool's `definition`, are what
+        // the catalog page lists before any run freezes a table
+        // (`views::catalog::standing`). A tool added to this vec and not
+        // there stays off that page until the first run.
         let mut admitted: Vec<Filed> = vec![
             own(Box::new(archive_tool)),
             own(Box::new(claim_tool)),
@@ -514,4 +518,30 @@ impl Laying {
             .clocked(site.clock.clone())
             .cataloging(Box::new(read_catalog)))
     }
+}
+
+/// The built-in tools filed outside `sprawling` that a catalog page can
+/// name before a run connects anything: playback and proposal always,
+/// `web_search` when the frozen `[search]` names a supplier.
+///
+/// # Errors
+/// Propagates a definition whose schema does not build.
+pub(super) fn catalog_builtins(
+    search: Option<&kernel::config::SearchSupplier>,
+) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {
+    let record = kernel::ReservedNamespace::Record.as_str();
+    let mut tools = vec![
+        (record, playback::PlaybackTool::definition()?),
+        (
+            record,
+            proposal::ProposalTool::<crate::worker::Relay>::definition()?,
+        ),
+    ];
+    if let Some(supplier) = search {
+        tools.push((
+            kernel::ReservedNamespace::Web.as_str(),
+            search::WebSearch::definition(supplier)?,
+        ));
+    }
+    Ok(tools)
 }

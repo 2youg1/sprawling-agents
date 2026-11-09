@@ -14,8 +14,8 @@
 //! there to take it.
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -29,10 +29,12 @@ pub struct NeighboursTool {
 }
 
 impl NeighboursTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below.
-    pub fn new(seen: Neighbourhood) -> Result<NeighboursTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut scope = Map::new();
         scope.insert("type".to_owned(), Value::String("string".to_owned()));
         scope.insert(
@@ -48,15 +50,27 @@ impl NeighboursTool {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         params.insert("properties".to_owned(), Value::Object(properties));
+        Ok(ToolDef {
+            name: ToolName::parse("neighbours")?,
+            description: "Who else this building has, and what each of them is for; call it \
+                          before signalling or delegating to an address you have not been \
+                          given."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema, neither of
+    /// which can happen with the literals below.
+    pub fn new(seen: Neighbourhood) -> Result<NeighboursTool, AxError> {
+        let defined = Self::definition()?;
         Ok(NeighboursTool {
             seen,
             meta: ToolMeta {
-                name: ToolName::parse("neighbours")?,
-                disclosure: "Who else this building has, and what each of them is for; call it \
-                             before signalling or delegating to an address you have not been \
-                             given."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Free,
                 timeout: None,

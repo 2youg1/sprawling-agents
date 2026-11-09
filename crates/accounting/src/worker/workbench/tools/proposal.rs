@@ -22,7 +22,8 @@ use kernel::event::record::ProposalWithdrawn;
 use kernel::layout::CityLayout;
 use kernel::{
     Address, AxCode, AxError, B3Hash, CostTier, Effect, EventDraft, EventKind, Ledger, Payload,
-    RenderIntent, RunId, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome, Writes,
+    RenderIntent, RunId, Temporal, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
+    Writes,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -137,14 +138,12 @@ impl Laying {
 }
 
 impl<L: Ledger> ProposalTool<L> {
+    /// The name, disclosure and schema `new` registers.
+    ///
     /// # Errors
     /// Refuses a name or a parameter schema that does not build, which
     /// the literals below cannot produce.
-    fn new(
-        reader: runtime::BoundReader,
-        filing: Filing,
-        ledger: L,
-    ) -> Result<ProposalTool<L>, AxError> {
+    pub(super) fn definition() -> Result<ToolDef, AxError> {
         let params = json!({
             "type": "object",
             "properties": {
@@ -174,6 +173,27 @@ impl<L: Ledger> ProposalTool<L> {
             )
             .with_recovery("report this against accounting::worker::workbench::tools::proposal"));
         };
+        Ok(ToolDef {
+            name: ToolName::parse(ACTION)?,
+            description: "Suggest a change to a document for the User to decide. `offer` \
+                          quotes `old` exactly as the city's copy of the document holds it \
+                          - not your own tree's copy - and suggests `new`; the User sees a \
+                          card and accepts or rejects it sentence by sentence, and nothing in \
+                          the document changes until they do. `withdraw` takes back a card \
+                          you offered while it is still open."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates [`Self::definition`].
+    fn new(
+        reader: runtime::BoundReader,
+        filing: Filing,
+        ledger: L,
+    ) -> Result<ProposalTool<L>, AxError> {
+        let defined = Self::definition()?;
         let room = filing.room.clone();
         Ok(ProposalTool {
             reader,
@@ -183,15 +203,9 @@ impl<L: Ledger> ProposalTool<L> {
                 cards: BTreeMap::new(),
             }),
             meta: ToolMeta {
-                name: ToolName::parse(ACTION)?,
-                disclosure: "Suggest a change to a document for the User to decide. `offer` \
-                             quotes `old` exactly as the city's copy of the document holds it \
-                             - not your own tree's copy - and suggests `new`; the User sees a \
-                             card and accepts or rejects it sentence by sentence, and nothing in \
-                             the document changes until they do. `withdraw` takes back a card \
-                             you offered while it is still open."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 // A card is a line on the history, so an offer and the
                 // withdrawal after it run in order, never ahead.
                 effect: Effect::Write { domain: room },

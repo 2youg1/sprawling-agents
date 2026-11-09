@@ -4,9 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The building's unified catalog answer (`crates/wire/spec/Answer/Catalog.lean`
-//! §8-99, accounting D55, D112). It joins the newest frozen tool table,
-//! current selections, Ledger drift and usage, and verified CAS versions.
-//! Nothing here assembles a workbench or connects a server.
+//! §8-99, accounting D55, D112). It joins the newest frozen tool table —
+//! or, before any run has frozen one, the built-in tools that building's
+//! vocation admits — with current selections, Ledger drift and usage, and
+//! verified CAS versions. Nothing here assembles a workbench or connects
+//! a server.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -72,28 +74,28 @@ impl CatalogAsk {
         let cas =
             storage::Cas::open(&kernel::layout::CityLayout::new(&self.ledger.city_root).cas())
                 .map_err(storage::StorageError::into_ax)?;
-        let (run, table) = frozen.map_or((None, None), |(run, table)| (Some(run), table));
-        let table = table.unwrap_or(PromptTools {
-            hash: B3Hash::digest(b""),
-            len: 0,
-            index: 0,
-            reading: 0,
-            always: 0,
-            dormant: 0,
-            skills: 0,
-            rows: Vec::new(),
-        });
-        let tools = tool_rows(
-            &table,
-            ToolRead {
-                stated: &config.catalog,
-                references: &config.mcp_references,
-                evidence: &evidence,
-                drifts: &drifts,
-                cas: &cas,
-                newest: self.newest,
-            },
-        )?;
+        let (run, recorded) = match frozen {
+            None => (None, None),
+            Some((run, table)) => (Some(run), table),
+        };
+        let read = ToolRead {
+            stated: &config.catalog,
+            references: &config.mcp_references,
+            evidence: &evidence,
+            drifts: &drifts,
+            cas: &cas,
+            newest: self.newest,
+        };
+        // A run whose prompt predates the tool table keeps the drift
+        // projection. A building that has never frozen a prompt lists the
+        // built-ins its first run admits (accounting D55).
+        let tools = if let Some(table) = &recorded {
+            tool_rows(table, read)?
+        } else if run.is_none() {
+            standing::rows(&config, &rules, &evidence)?
+        } else {
+            tool_rows(&empty_table(), read)?
+        };
         let home = crate::home::Home::detect()?;
         let read = |digest: &B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
         let shelves = city::Library::scan(
@@ -116,15 +118,41 @@ impl CatalogAsk {
             .filter(|row| row.change.is_some())
             .count()
             .saturating_add(skill_rows.iter().filter(|row| row.change.is_some()).count());
+        let (core_bytes, index_bytes, reading_bytes, always, dormant, skills) = match &recorded {
+            Some(table) => (
+                table.len,
+                table.index,
+                table.reading,
+                table.always,
+                table.dormant,
+                table.skills,
+            ),
+            None if run.is_none() => {
+                let (always, dormant, core_bytes) = standing::tier_counts(&tools)?;
+                let admitted = skill_rows
+                    .iter()
+                    .filter(|row| row.exposure != kernel::config::Exposure::Off)
+                    .count();
+                (
+                    core_bytes,
+                    0,
+                    0,
+                    always,
+                    dormant,
+                    counted_u32(admitted, "admitted skills")?,
+                )
+            }
+            None => (0, 0, 0, 0, 0, 0),
+        };
         Ok(wire::CatalogAnswer {
             building: building.addr().clone(),
             run,
-            core_bytes: table.len,
-            index_bytes: table.index,
-            reading_bytes: table.reading,
-            always: table.always,
-            dormant: table.dormant,
-            skills: table.skills,
+            core_bytes,
+            index_bytes,
+            reading_bytes,
+            always,
+            dormant,
+            skills,
             changed: counted_u32(changed, "changed catalog rows")?,
             open_sessions,
             runs_seen: evidence.runs_seen,
@@ -416,6 +444,8 @@ fn counted_bytes(len: usize, subject: &str) -> Result<u64, AxError> {
     })
 }
 
+mod standing;
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -425,3 +455,16 @@ fn counted_bytes(len: usize, subject: &str) -> Result<u64, AxError> {
     reason = "test code"
 )]
 mod tests;
+
+fn empty_table() -> PromptTools {
+    PromptTools {
+        hash: B3Hash::digest(b""),
+        len: 0,
+        index: 0,
+        reading: 0,
+        always: 0,
+        dormant: 0,
+        skills: 0,
+        rows: Vec::new(),
+    }
+}

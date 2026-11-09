@@ -24,8 +24,8 @@
 //! when the run concludes; a cancelled run is not succeeded.
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -72,12 +72,12 @@ pub struct SucceedTool {
 }
 
 impl SucceedTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
-    pub fn new(
-        desk: std::sync::Arc<std::sync::Mutex<SuccessionDesk>>,
-    ) -> Result<SucceedTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut reason = Map::new();
         reason.insert("type".to_owned(), Value::String("string".to_owned()));
         reason.insert(
@@ -93,16 +93,27 @@ impl SucceedTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("reason".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("succeed")?,
+            description: "Replace yourself with a successor at this address when the \
+                          window fills: same tools, same depth, without asking the User. Write \
+                          Handoff.md in your room first; the successor starts from it and \
+                          from your transcript."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    pub fn new(
+        desk: std::sync::Arc<std::sync::Mutex<SuccessionDesk>>,
+    ) -> Result<SucceedTool, AxError> {
+        let defined = Self::definition()?;
         Ok(SucceedTool {
             desk,
             meta: ToolMeta {
-                name: ToolName::parse("succeed")?,
-                disclosure: "Replace yourself with a successor at this address when the \
-                             window fills: same tools, same depth, without asking the User. Write \
-                             Handoff.md in your room first; the successor starts from it and \
-                             from your transcript."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Read,
                 cost_tier: CostTier::Heavy,
                 timeout: None,

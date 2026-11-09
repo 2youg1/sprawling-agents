@@ -29,6 +29,13 @@ mod tools;
 
 pub(super) use standing::{Lending, Placing, lend_tree};
 
+/// See [`tools::catalog_builtins`].
+pub(super) fn catalog_builtins(
+    search: Option<&kernel::config::SearchSupplier>,
+) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {
+    tools::catalog_builtins(search)
+}
+
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
 /// laid out in the lane that drives the run (`crates/sprawling/Spec.lean` §8-113).
