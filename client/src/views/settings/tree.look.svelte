@@ -33,10 +33,8 @@
   // but only in its ink: two bars in one tree would leave the eye to guess
   // which is the selection.
   const HERE = "chosen bg-raised text-text";
-  // One indent under the open branch: every child shares the rail, so a
-  // nest or a "more" is a second rail inside rather than a peer of the
-  // branch title.
-  const BRANCH = "drop ml-snug flex flex-col gap-hair border-l border-edge pl-snug";
+  // First-level entries share the branch title's first mark (the nav-column
+  // geometry gate). Only a nest or "more" draws a second rail inside.
   const NESTED = "drop ml-base flex flex-col gap-hair border-l border-edge pl-tight";
 </script>
 
@@ -89,12 +87,12 @@
         {@render chevron(branch.fold.open)}
       </button>
       {#if branch.fold.open}
-        <ul id={branch.fold.list} class="{BRANCH} pb-base">
+        <ul id={branch.fold.list} class="drop flex flex-col gap-hair pb-base">
           {#each branch.entries as entry (entry.key)}
             <li>
               {#if entry.kind === "nest"}
                 <button {...entry.fold.wire} class={ENTRY}>
-                  <span class="min-w-0 flex-1 truncate ps-pane">{entry.fold.label}</span>
+                  <span class="min-w-0 flex-1 truncate">{entry.fold.label}</span>
                   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                   {@render chevron(entry.fold.open)}
                 </button>
@@ -115,7 +113,7 @@
           {#if branch.more !== null}
             <li>
               <button {...branch.more.fold.wire} class={ENTRY}>
-                <span class="min-w-0 flex-1 truncate ps-pane">{branch.more.fold.label}</span>
+                <span class="min-w-0 flex-1 truncate">{branch.more.fold.label}</span>
                 <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                 {@render chevron(branch.more.fold.open)}
               </button>

@@ -32,7 +32,12 @@
       held={look.scope}
       onPick={look.onScope}
     />
-    <Segmented label={look.panes[0]?.label ?? ""} options={look.panes} held={look.pane} onPick={look.onPane} />
+    <Segmented
+      label={look.panes[0]?.label ?? ""}
+      options={look.panes}
+      held={look.pane}
+      onPick={look.onPane}
+    />
     <p class="text-note">
       <span class="figure text-text-quiet">{look.meter}</span>
       {#if look.delta !== undefined}

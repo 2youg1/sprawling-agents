@@ -29,7 +29,8 @@
   const DOORS: readonly {
     readonly key: CatalogFocus;
     readonly letter: string;
-    readonly word: "catalog_door_tools" | "catalog_door_skills" | "catalog_door_mcp" | "catalog_door_worktree";
+    readonly word:
+      "catalog_door_tools" | "catalog_door_skills" | "catalog_door_mcp" | "catalog_door_worktree";
   }[] = [
     { key: "tools", letter: "A", word: "catalog_door_tools" },
     { key: "skills", letter: "B", word: "catalog_door_skills" },
@@ -38,7 +39,8 @@
   ];
 
   function open(focus: CatalogFocus): void {
-    focusCatalog(focus);
+    // MCP and the worktree leave the catalog page, so a focus left for
+    // them would stick until a later catalog visit and open the wrong pane.
     if (focus === "mcp") {
       u.go({ kind: "mcp" });
       return;
@@ -47,6 +49,7 @@
       u.go({ kind: "building", address: building });
       return;
     }
+    focusCatalog(focus);
     u.go({ kind: "building", address: building, section: "catalog" });
   }
 </script>

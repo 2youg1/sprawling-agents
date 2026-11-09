@@ -42,12 +42,12 @@ describe("the coin key's wiring", () => {
     const looks = (["send", "stop", "idle"] as const).map((face) =>
       lookOf(face, "steer", "en", () => undefined),
     );
-    expect(
-      looks.map((look) => [look.wire.type, look.wire["aria-disabled"], look.command]),
-    ).toEqual([
-      ["submit", undefined, "/steer"],
-      ["button", undefined, "/stop"],
-      ["submit", "true", undefined],
-    ]);
+    expect(looks.map((look) => [look.wire.type, look.wire["aria-disabled"], look.command])).toEqual(
+      [
+        ["submit", undefined, "/steer"],
+        ["button", undefined, "/stop"],
+        ["submit", "true", undefined],
+      ],
+    );
   });
 });

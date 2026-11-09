@@ -23,7 +23,14 @@
   import Button from "../parts/button.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { rulesAt } from "../settings/files";
-  import { HELD, answered, awaitReceipt, edited as markEdited, refused, sent as markSent } from "../settings/saving";
+  import {
+    HELD,
+    answered,
+    awaitReceipt,
+    edited as markEdited,
+    refused,
+    sent as markSent,
+  } from "../settings/saving";
   import type { Saving, Slot } from "../settings/saving";
   import { useBuildings } from "../shared/buildings";
   import { catalogLook, draftOf, selectionOf, settleSave } from "./catalog";

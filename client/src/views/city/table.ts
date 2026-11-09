@@ -143,10 +143,7 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
     now: say(lang, "runs_now"),
     rows: tableOf(seat.city.buildings, seat.runs).map((row) => {
       const name = row.addr === "hall" ? say(lang, "city_hall") : row.addr;
-      const path =
-        folder === ""
-          ? `./${row.addr}`
-          : `${folder}/${row.addr}`.replaceAll("\\", "/");
+      const path = folder === "" ? `./${row.addr}` : `${folder}/${row.addr}`.replaceAll("\\", "/");
       const from = row.since === null ? null : along(row.since, now);
       return {
         key: row.addr,

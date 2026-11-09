@@ -107,10 +107,7 @@ export const TREE: readonly Branch[] = [
     // The guide and the developer's tools stay one fold down: they are
     // reached after the person has left them (refrain 3-15), not on the
     // first reading of what went wrong.
-    more: [
-      { kind: "page", view: { kind: "welcome" }, word: "welcome_title" },
-      group("advanced"),
-    ],
+    more: [{ kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced")],
   },
 ];
 

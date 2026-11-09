@@ -301,13 +301,7 @@ const CHANGE_WORD: Record<CatalogChange, Key> = {
 // the RULES.toml editor itself.
 export type CatalogPane = "tools" | "skills" | "mcp" | "models" | "rules";
 
-export const CATALOG_PANES: readonly CatalogPane[] = [
-  "tools",
-  "skills",
-  "mcp",
-  "models",
-  "rules",
-];
+export const CATALOG_PANES: readonly CatalogPane[] = ["tools", "skills", "mcp", "models", "rules"];
 
 export interface CatalogLook {
   readonly scopeLabel: string;
