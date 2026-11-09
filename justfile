@@ -421,7 +421,7 @@ test-slice file environment filter:
     nextest=(cargo nextest)
     if ! command -v cargo >/dev/null 2>&1; then
         if ! command -v cargo-nextest >/dev/null 2>&1; then
-            echo "test-slice: need cargo or cargo-nextest to run an archive" >&2
+            echo "test-slice: need the cargo-nextest binary to run an archive" >&2
             exit 2
         fi
         nextest=(cargo-nextest nextest)
