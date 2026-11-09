@@ -178,9 +178,7 @@ pub(crate) fn request(
     }
     for message in req.messages.iter() {
         match message.role {
-            Role::User => {
-                user_items(&message.content, images, spelling.tool_pictures, &mut input)?
-            }
+            Role::User => user_items(&message.content, images, spelling.tool_pictures, &mut input)?,
             Role::Assistant => assistant_items(&message.content, &mut input)?,
         }
     }
