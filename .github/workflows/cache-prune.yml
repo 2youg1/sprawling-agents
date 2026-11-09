@@ -76,7 +76,7 @@ jobs:
           ceiling=$((8500 * 1048576))
           if [ "$total" -gt "$ceiling" ]; then
             jq -r '
-              [.[] | select(.key | test("^(trybuild-|bun-|setup-zig-tarball-|v0-rust-title-)"))]
+              [.[] | select(.key | test("^(trybuild-|bun-|setup-zig-tarball-|setup-zig-cache-v2-|v0-rust-title-)"))]
               | sort_by(.createdAt)
               | .[]
               | [.id, .sizeInBytes, .ref, .key]

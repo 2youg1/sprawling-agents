@@ -408,8 +408,9 @@ test-slice-coverage out:
 # Unpack at the checkout path compiled into tests that spawn workspace
 # binaries. A `compile` slice fetches first, because trybuild compiles its
 # own project offline; the other environments read no registry. `plain`
-# and `client` CI slices may lack a full Rust toolchain: prefer
-# `cargo-nextest nextest` when `cargo` is absent (D27).
+# and `client` CI slices skip the full toolchain: prefer the installed
+# `cargo-nextest` binary so a preinstalled `cargo` cannot pull the pinned
+# toolchain through rustup before the archive runs (D27).
 test-slice file environment filter:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -418,13 +419,13 @@ test-slice file environment filter:
         client | plain) ;;
         *) echo "test-slice: unknown environment '{{environment}}'; test-slice-plan names compile, client and plain" >&2; exit 2 ;;
     esac
-    nextest=(cargo nextest)
-    if ! command -v cargo >/dev/null 2>&1; then
-        if ! command -v cargo-nextest >/dev/null 2>&1; then
-            echo "test-slice: need the cargo-nextest binary to run an archive" >&2
-            exit 2
-        fi
+    if command -v cargo-nextest >/dev/null 2>&1; then
         nextest=(cargo-nextest nextest)
+    elif command -v cargo >/dev/null 2>&1; then
+        nextest=(cargo nextest)
+    else
+        echo "test-slice: need the cargo-nextest binary to run an archive" >&2
+        exit 2
     fi
     "${nextest[@]}" run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
 
