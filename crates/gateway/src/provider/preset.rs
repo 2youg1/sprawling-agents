@@ -187,17 +187,16 @@ pub fn known_hosts() -> Result<Vec<KnownHost>, kernel::AxError> {
         .collect()
 }
 
-/// The four fields of the OpenAI-compatible chat (and responses) faces
-/// whose spelling each vendor's documentation decides for itself.
-///
-/// One value because the four are read together, at the one place a
-/// request is written, and a host that states one states all four.
+/// The OpenAI-compatible fields whose spelling each vendor's
+/// documentation decides for itself. Picture placement is per face:
+/// DeepSeek's chat and responses faces document different locations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChatSpelling {
     pub ceiling: CeilingField,
     pub effort: EffortField,
     pub reasoning: ReasoningReturn,
-    pub tool_pictures: ToolPictureCarry,
+    pub chat_tool_pictures: ToolPictureCarry,
+    pub responses_tool_pictures: ToolPictureCarry,
 }
 
 impl ChatSpelling {
@@ -209,27 +208,26 @@ impl ChatSpelling {
     /// ceiling silently dropped. `reasoning_effort` because it is the
     /// specification's own field. An earlier turn's reasoning is not
     /// sent back, because the specification's assistant message has no
-    /// field that carries it. Tool pictures follow in a user message,
-    /// because the specification's `tool` message is a string.
+    /// field that carries it. On either face a tool picture follows in
+    /// a user message unless that face documents a tool-result slot.
     pub const DOCUMENTED: ChatSpelling = ChatSpelling {
         ceiling: CeilingField::MaxTokens,
         effort: EffortField::ReasoningEffort,
         reasoning: ReasoningReturn::Dropped,
-        tool_pictures: ToolPictureCarry::FollowingUser,
+        chat_tool_pictures: ToolPictureCarry::FollowingUser,
+        responses_tool_pictures: ToolPictureCarry::FollowingUser,
     };
 }
 
 /// Where a picture a tool produced rides on the OpenAI-compatible faces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolPictureCarry {
-    /// The specification's shape: `tool` / `function_call_output` is a
-    /// string, so the picture lands in the user message that follows.
+    /// The face takes no picture on its tool result, so the picture
+    /// lands in the user message that follows.
     FollowingUser,
-    /// The host's schema takes image parts on the tool result itself
-    /// (DeepSeek and Kimi/Moonshot chat `tool` content arrays; DeepSeek
-    /// responses `function_call_output.output` lists). A following user
-    /// message between tool results and the next assistant turn answers
-    /// 400 under thinking-with-tools, so the picture must ride here.
+    /// This face's schema takes image parts on the tool result itself:
+    /// Kimi/Moonshot chat `tool` content arrays and DeepSeek responses
+    /// `function_call_output.output` lists document this shape.
     InToolContent,
 }
 
@@ -287,6 +285,8 @@ pub struct ModelPreset {
     /// row that cannot state one states nothing instead.
     pub max_output_tokens: u64,
     pub input: InputKinds,
+    /// The vendor's largest accepted image side, where it states one.
+    pub image_max_side: Option<std::num::NonZeroU32>,
     /// The thinking levels this vendor documents for the model; `None`
     /// where its page states none, which is not "no thinking".
     pub thinking: Option<PresetThinking>,
@@ -415,6 +415,23 @@ pub fn window_for(base_url: &str, id: &str) -> Option<kernel::Window> {
 #[must_use]
 pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
     model_for(base_url, id).map(|row| row.input)
+}
+
+/// The largest picture side this model's vendor documents. The request
+/// edge reads the same row as modality, window and ceiling.
+#[must_use]
+pub(crate) fn image_max_side(
+    base_url: &str,
+    id: &str,
+    picture_parts: usize,
+) -> Option<std::num::NonZeroU32> {
+    let row = model_for(base_url, id)?;
+    let ceiling = row.image_max_side?;
+    if row.id_prefix.starts_with("deepseek-") && picture_parts >= 15 {
+        std::num::NonZeroU32::new(4096).map(|limit| ceiling.min(limit))
+    } else {
+        Some(ceiling)
+    }
 }
 
 /// The thinking levels this table documents for one model. Read only by
@@ -550,7 +567,11 @@ mod tests {
             ReasoningReturn::AsReasoningContent
         );
         assert_eq!(
-            chat_spelling("https://api.deepseek.com").tool_pictures,
+            chat_spelling("https://api.deepseek.com").chat_tool_pictures,
+            ToolPictureCarry::FollowingUser
+        );
+        assert_eq!(
+            chat_spelling("https://api.deepseek.com").responses_tool_pictures,
             ToolPictureCarry::InToolContent
         );
         // Kimi's multimodal tool example puts image/video parts on
@@ -561,7 +582,7 @@ mod tests {
             "https://api.kimi.com/coding/v1",
         ] {
             assert_eq!(
-                chat_spelling(base).tool_pictures,
+                chat_spelling(base).chat_tool_pictures,
                 ToolPictureCarry::InToolContent,
                 "{base}"
             );
@@ -569,11 +590,11 @@ mod tests {
         // OpenAI chat tool content is text-only; xAI only documents
         // images on user messages — both keep the following-user carry.
         assert_eq!(
-            chat_spelling("https://api.openai.com/v1").tool_pictures,
+            chat_spelling("https://api.openai.com/v1").chat_tool_pictures,
             ToolPictureCarry::FollowingUser
         );
         assert_eq!(
-            chat_spelling("https://api.x.ai/v1").tool_pictures,
+            chat_spelling("https://api.x.ai/v1").chat_tool_pictures,
             ToolPictureCarry::FollowingUser
         );
         assert_eq!(
@@ -653,6 +674,28 @@ mod tests {
         let deepseek = "https://api.deepseek.com/anthropic";
         assert_eq!(at(deepseek, "deepseek-flash"), Some((1_000_000, 393_216)));
         assert_eq!(at(deepseek, "deepseek-v4-pro"), Some((1_000_000, 393_216)));
+    }
+
+    /// The retired Flash names are served by the vision-capable Flash
+    /// model, while V4 Pro remains text-only on the vendor's model table.
+    #[test]
+    fn deepseek_model_names_keep_their_documented_image_capabilities() {
+        let answered = [
+            "deepseek-flash",
+            "deepseek-v4-flash",
+            "deepseek-v4-flash-vision-exp",
+            "deepseek-v4-pro",
+        ]
+        .map(|id| input_for("https://api.deepseek.com", id).unwrap());
+        assert_eq!(
+            answered,
+            [
+                InputKinds::TextImage,
+                InputKinds::TextImage,
+                InputKinds::TextImage,
+                InputKinds::Text,
+            ]
+        );
     }
 
     #[test]
@@ -768,6 +811,7 @@ mod tests {
             context_tokens: 1,
             max_output_tokens: 1,
             input: InputKinds::Text,
+            image_max_side: None,
             thinking: None,
             cache_min_tokens: None,
             source: "test",

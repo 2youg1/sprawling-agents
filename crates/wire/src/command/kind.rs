@@ -17,7 +17,7 @@ use crate::command::shelf::Shelf;
 use crate::command::step::{
     BuildingSettings, Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument,
     HaltScope, IdentityCard, PolicyChange, PromptWrite, ProposalDecisions, PursuitStep, RangeWrite,
-    RulesWrite, SecretForgetting, SessionNaming, SpineDocument,
+    RulesWrite, SecretForgetting, SessionNaming, SpineDocument, WorkspaceChoiceWrite,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -298,6 +298,10 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Writes a building's `RULES.toml` whole (`crates/wire/spec/Command/Step.lean` §8-60).
     PutRules(RulesWrite),
+    /// Sets the provider, model and effort a new child session uses,
+    /// rewriting only `[workspace_models.choice]` through the same rules
+    /// door as [`Command::PutRules`].
+    SetWorkspaceChoice(WorkspaceChoiceWrite),
     /// Takes one file of the city's own tree back to what a checkpoint
     /// holds, or away when it holds none (`crates/wire/spec/Answer/Automation.lean` §8-62).
     RestoreFile {

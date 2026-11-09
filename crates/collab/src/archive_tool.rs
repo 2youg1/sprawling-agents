@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -147,22 +147,12 @@ pub struct ArchiveTool {
 }
 
 impl ArchiveTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which the literals below can provoke.
-    pub fn new(desk: Arc<Mutex<ArchiveDesk>>) -> Result<ArchiveTool, AxError> {
-        let room = desk
-            .lock()
-            .map_err(|_| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "reach the archive desk",
-                    "the desk was left locked by a thread that died",
-                )
-                .with_recovery("restart this city")
-            })?
-            .room
-            .clone();
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
             (
@@ -191,13 +181,37 @@ impl ArchiveTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("action".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("archive")?,
+            description: "Write down what this building should not have to be told twice, or \
+                          read what it already knows."
+                .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema, neither of
+    /// which the literals below can provoke, and a desk left locked.
+    pub fn new(desk: Arc<Mutex<ArchiveDesk>>) -> Result<ArchiveTool, AxError> {
+        let defined = Self::definition()?;
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the archive desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         Ok(ArchiveTool {
             meta: ToolMeta {
-                name: ToolName::parse("archive")?,
-                disclosure: "Write down what this building should not have to be told twice, or \
-                             read what it already knows."
-                    .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,

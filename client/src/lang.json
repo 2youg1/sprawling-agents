@@ -93,19 +93,19 @@
   },
   "appearance_local": {
     "en": "choose from this computer's faces",
-    "zh": "从本机字体里选"
+    "zh": "从这台电脑的字体里选"
   },
   "appearance_local_denied": {
-    "en": "the browser did not hand over the list; write the stack instead",
-    "zh": "浏览器没有交出字体列表，请改为手写字体栈"
+    "en": "the browser did not hand over the list; type the family name instead",
+    "zh": "浏览器没有交出字体列表，请改为手写字体名"
   },
   "appearance_local_for": {
     "en": "{face}, from the faces this computer has",
     "zh": "{face}：从这台电脑装好的字体里选"
   },
   "appearance_local_none": {
-    "en": "this browser does not offer its installed faces; write the stack instead",
-    "zh": "这个浏览器不提供已装字体列表，请改为手写字体栈"
+    "en": "this browser does not offer its installed faces; type the family name instead",
+    "zh": "这个浏览器不提供已装字体列表，请改为手写字体名"
   },
   "appearance_mono": {
     "en": "the mono face",
@@ -392,8 +392,40 @@
     "zh": "这一栏还没有内容。"
   },
   "catalog_models_note": {
-    "en": "Delegated tasks read [workspace_models] in this building's RULES.toml. Edit the file below; a change takes effect on the next run.",
-    "zh": "委派任务读这栋楼 RULES.toml 里的 [workspace_models]。在下方编辑；改动在下一个 run 生效。"
+    "en": "The choice here is for a new delegated session that does not name a model. An existing child session keeps its frozen model. Easy, medium and hard stay as shortcuts. The change is saved in this building's RULES.toml and takes effect on the next new delegation.",
+    "zh": "这里的选择只用于未显式指定模型的新委派会话；已有子会话仍用其冻结的模型。容易、中等、困难三档仍是快捷方式。改动写进这栋楼的 RULES.toml，在下一次新委派生效。"
+  },
+  "subagent_provider": {
+    "en": "provider",
+    "zh": "供应方"
+  },
+  "subagent_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "subagent_effort": {
+    "en": "effort",
+    "zh": "强度"
+  },
+  "subagent_save": {
+    "en": "save subagent model",
+    "zh": "保存子代理模型"
+  },
+  "subagent_shortcut": {
+    "en": "use {tier}",
+    "zh": "用{tier}"
+  },
+  "subagent_no_endpoint": {
+    "en": "No provider is attached yet. Attach one in settings, then choose it here.",
+    "zh": "还没有接上供应方。先在设置里接上，再在这里选择。"
+  },
+  "subagent_no_effort": {
+    "en": "This model offers no effort levels, so it cannot be saved as a subagent choice here.",
+    "zh": "这个模型没有可用的强度档位，这里不能把它存成子代理选择。"
+  },
+  "subagent_saving": {
+    "en": "saving the subagent choice…",
+    "zh": "正在保存子代理选择…"
   },
   "catalog_rules_note": {
     "en": "This building's RULES.toml: exposure, skills, sandbox and workspace models. The city refuses text it cannot read.",
@@ -411,9 +443,13 @@
     "en": "{n} bytes less in every request",
     "zh": "每次请求少 {n} 字节"
   },
+  "catalog_before_run": {
+    "en": "No run yet. These are the tools the next run starts with, and a save applies to that run. A connector's own tools appear after a run connects it.",
+    "zh": "还没有 run。这里是下一个 run 起步时的工具，保存对那个 run 生效。连接器自己的工具要等一次 run 连上之后才列出。"
+  },
   "catalog_no_run": {
-    "en": "No run yet: the tools appear here once this building's first run has started.",
-    "zh": "还没有 run：这栋楼的第一个 run 开始之后，这里列出它的工具。"
+    "en": "No run yet, and this building lists no built-in tools.",
+    "zh": "还没有 run，这栋楼也没有列出内建工具。"
   },
   "catalog_group": {
     "en": "{n} tools · {core} core · {dormant} on demand · {off} off",
@@ -5809,7 +5845,7 @@
   },
   "provider_refused": {
     "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
-    "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"
+    "zh": "Provider 以 {status} 拒绝了请求：检查这个接口的模型名、密钥和 API 协议"
   },
   "provider_refused_busy": {
     "en": "the provider answered {status}: busy or broken for now; the same request is worth sending again",
@@ -5829,7 +5865,7 @@
   },
   "provider_unreadable": {
     "en": "the provider answered in a shape the city cannot read; check this endpoint's dialect",
-    "zh": "供应方的回答城市读不懂：检查这个接口的接口形态"
+    "zh": "Provider 的回答城市读不懂：检查这个接口的 API 协议"
   },
   "rec_archive": {
     "en": "the archive",
@@ -6320,8 +6356,8 @@
     "zh": "这座城市是从源码构建的，因此不属于任何一个已发布版本。"
   },
   "release_title": {
-    "en": "which release this is",
-    "zh": "这是哪一版"
+    "en": "about",
+    "zh": "关于"
   },
   "remote_about": {
     "en": "The remote door lets a phone or a second computer reach this city from outside its network. It is opened, and devices are paired and revoked, at the city's own console and nowhere else: no page, device or resident can do it.",
@@ -7045,7 +7081,7 @@
   },
   "setup_attach_btn": {
     "en": "attach",
-    "zh": "添加"
+    "zh": "接入"
   },
   "setup_autonomy": {
     "en": "approvals",
@@ -7092,8 +7128,8 @@
     "zh": "一次 run 在起点冻结它的强度，此刻的改动因此只到下一次 run，永远到不了正在跑的那一次；每改一次，供应方为这段对话建好的 prompt 缓存都会作废。每个模型提供的档位各不相同，选择器只列出它提供的那几档；关掉思考的 none 不在其中。不选也不等于把决定权留给供应方：没写档位时，模型提供 high 就用 high，否则用供应方声明的默认档。"
   },
   "setup_group_accounts": {
-    "en": "accounts and providers",
-    "zh": "账户与供应方"
+    "en": "providers",
+    "zh": "Provider"
   },
   "setup_group_advanced": {
     "en": "advanced",
@@ -7144,12 +7180,12 @@
     "zh": "运行这座城市的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
   },
   "setup_group_hint_accounts": {
-    "en": "who the city may call, with which key, and each model's generation defaults (temperature, top_p, top_k, output)",
-    "zh": "城市能调用谁、用哪把钥匙，以及每个模型的采样默认（temperature、top_p、top_k、输出上限）"
+    "en": "attach a provider, choose models, and set generation defaults",
+    "zh": "接入 Provider、选择模型，并设定生成参数"
   },
   "setup_generation": {
     "en": "generation defaults",
-    "zh": "模型高级设置"
+    "zh": "生成参数"
   },
   "setup_group_hint_you": {
     "en": "what the city calls you and the Mayor; a change takes effect in the next session",
@@ -7185,11 +7221,11 @@
   },
   "setup_group_tools": {
     "en": "dependencies",
-    "zh": "依赖项安装"
+    "zh": "依赖"
   },
   "setup_group_you": {
-    "en": "you and the main agent",
-    "zh": "你与主 Agent"
+    "en": "identity",
+    "zh": "身份"
   },
   "setup_group_rules": {
     "en": "rules",
@@ -7220,11 +7256,11 @@
     "zh": "城市"
   },
   "settings_branch_access": {
-    "en": "access",
-    "zh": "接入"
+    "en": "connections",
+    "zh": "连接"
   },
   "settings_branch_running": {
-    "en": "running",
+    "en": "runtime",
     "zh": "运行"
   },
   "settings_branch_preferences": {
@@ -7232,7 +7268,7 @@
     "zh": "偏好"
   },
   "settings_branch_diagnosis": {
-    "en": "diagnosis",
+    "en": "diagnostics",
     "zh": "诊断"
   },
   "settings_city_overview": {
@@ -7241,7 +7277,7 @@
   },
   "settings_buildings": {
     "en": "buildings",
-    "zh": "楼"
+    "zh": "建筑"
   },
   "settings_next_run": {
     "en": "takes effect for the runs that start after this",
@@ -7544,8 +7580,8 @@
     "zh": "就在这台电脑上"
   },
   "setup_look": {
-    "en": "list models",
-    "zh": "获取模型列表"
+    "en": "fetch models",
+    "zh": "拉取模型"
   },
   "setup_main": {
     "en": "main · thinks",
@@ -7632,8 +7668,60 @@
     "zh": "搜索模型"
   },
   "setup_models": {
-    "en": "which model thinks",
-    "zh": "哪个模型来想"
+    "en": "default models",
+    "zh": "默认模型"
+  },
+  "setup_step_connected": {
+    "en": "1 · Connected providers",
+    "zh": "1 · 已接入的 Provider"
+  },
+  "setup_step_connected_hint": {
+    "en": "edit accounts and models on a provider you already attached",
+    "zh": "管理已接入 Provider 的账号与模型"
+  },
+  "setup_step_attach": {
+    "en": "2 · Add a provider",
+    "zh": "2 · 接入 Provider"
+  },
+  "setup_step_attach_hint": {
+    "en": "pick a known host or enter a base URL, dialect, and key",
+    "zh": "选择已知主机，或填写 base URL、协议与密钥"
+  },
+  "setup_step_models": {
+    "en": "3 · Default models",
+    "zh": "3 · 默认模型"
+  },
+  "setup_step_models_hint": {
+    "en": "which model fills each role the city asks for",
+    "zh": "城市各角色默认使用哪个模型"
+  },
+  "setup_step_defaults": {
+    "en": "4 · Defaults",
+    "zh": "4 · 默认参数"
+  },
+  "setup_step_defaults_hint": {
+    "en": "thinking effort and the city layer a new run starts with",
+    "zh": "新 run 默认的思考强度与城市层"
+  },
+  "setup_step_search": {
+    "en": "5 · Web search",
+    "zh": "5 · 网络搜索"
+  },
+  "setup_step_search_hint": {
+    "en": "which service answers the web_search tool",
+    "zh": "web_search 工具把查询发给哪家服务"
+  },
+  "setup_form_provider": {
+    "en": "provider",
+    "zh": "Provider"
+  },
+  "setup_form_credentials": {
+    "en": "credentials",
+    "zh": "凭证"
+  },
+  "setup_form_models": {
+    "en": "models",
+    "zh": "模型"
   },
   "setup_models_empty": {
     "en": "choose at least one model",
@@ -7701,7 +7789,7 @@
   },
   "setup_next_dialect": {
     "en": "this endpoint does not speak the wire_api chosen above",
-    "zh": "这个端点不说上面选的接口形态"
+    "zh": "这个端点不说上面选的 API 协议"
   },
   "setup_next_other": {
     "en": "nothing on this form can act on this; copy the details",
@@ -7716,8 +7804,8 @@
     "zh": "等待期间没有任何回应：先查代理，再查 base_url"
   },
   "setup_no_endpoints": {
-    "en": "no provider attached",
-    "zh": "还没接上供应方"
+    "en": "no provider attached yet",
+    "zh": "尚未接入 Provider"
   },
   "setup_no_models": {
     "en": "no models",
@@ -7956,8 +8044,8 @@
     "zh": "未配密钥"
   },
   "setup_wire_api": {
-    "en": "wire_api",
-    "zh": "接口形态"
+    "en": "API dialect",
+    "zh": "API 协议"
   },
   "setup_wire_api_unsupported": {
     "en": "this city speaks chat and messages; it cannot call a responses endpoint",
@@ -9152,12 +9240,12 @@
     "zh": "这个主机说的是 {faces}"
   },
   "setup_known_host": {
-    "en": "a provider the city knows",
-    "zh": "城市认得的供应方"
+    "en": "known provider",
+    "zh": "已知 Provider"
   },
   "setup_known_host_pick": {
     "en": "pick a provider",
-    "zh": "选一家供应方"
+    "zh": "选择 Provider"
   },
   "setup_form_incomplete": {
     "en": "finish the fields first",

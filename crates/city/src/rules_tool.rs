@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use kernel::event::Scope;
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome,
+    ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -37,10 +37,12 @@ pub struct RulesTool {
 }
 
 impl RulesTool {
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
-    pub fn new(city_root: &Path, building: Address) -> Result<RulesTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut op = Map::new();
         op.insert("type".to_owned(), Value::String("string".to_owned()));
         op.insert(
@@ -60,16 +62,28 @@ impl RulesTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("op".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("rules")?,
+            description: format!(
+                "What this building's runs are judged by. `read` shows them. No run may \
+                 change them: the User edits the {RULES_FILE}."
+            ),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed parameter schema, which is a build-time
+    /// defect rather than a runtime one.
+    pub fn new(city_root: &Path, building: Address) -> Result<RulesTool, AxError> {
+        let defined = Self::definition()?;
         Ok(RulesTool {
             city_root: city_root.to_path_buf(),
             building,
             meta: ToolMeta {
-                name: ToolName::parse("rules")?,
-                disclosure: format!(
-                    "What this building's runs are judged by. `read` shows them. No run may \
-                     change them: the User edits the {RULES_FILE}."
-                ),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Govern,
                 cost_tier: CostTier::Light,
                 timeout: None,

@@ -86,6 +86,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::PutDocument { .. }
         | wire::Command::PutIdentity { .. }
         | wire::Command::PutRules(_)
+        | wire::Command::SetWorkspaceChoice(_)
         | wire::Command::RestoreFile { .. }
         | wire::Command::ConfigureCity(_)
         | wire::Command::ConnectToolkit { .. }

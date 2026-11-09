@@ -38,7 +38,7 @@ pub use step::{BuildingSettings, PromptStep, PromptWrite};
 pub use step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,
-    SecretForgetting, SessionNaming,
+    SecretForgetting, SessionNaming, WorkspaceChoiceWrite,
 };
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

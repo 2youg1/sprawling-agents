@@ -118,6 +118,21 @@ pub struct RulesWrite {
     pub idem: IdemKey,
 }
 
+/// The provider, model and effort a new child session uses, written
+/// through the same rules door as [`RulesWrite`] (`crates/wire/spec/Command/Step.lean` §8-60b).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct WorkspaceChoiceWrite {
+    pub building: Address,
+    /// The `RULES.toml` text the page read. A file that has moved is
+    /// refused rather than written over.
+    pub base: String,
+    pub endpoint: String,
+    pub model: String,
+    pub effort: Effort,
+    pub idem: IdemKey,
+}
+
 /// What a building's runs may reach: the sandbox's limits, the external
 /// servers its tools come from, the windows on this person's own machine
 /// its desktop connector may touch, the context reminder's second rung,

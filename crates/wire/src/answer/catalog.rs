@@ -6,11 +6,13 @@
 //! How each tool a building admits reaches its runs
 //! (`crates/wire/spec/Answer/Catalog.lean` §8-99).
 //!
-//! The rows are the tools the building's newest run was frozen with,
-//! because assembling a workbench to answer a page would shake hands with
-//! every server and may start a browser. What each row is exposed as is
-//! read against the `[catalog]` tables on disk now, so the page shows
-//! what the next run gets and edits the tables that decide it.
+//! Once a run has frozen a tool table, the rows are that table, because
+//! assembling a workbench to answer a page would shake hands with every
+//! server and may start a browser. Before any run has, the rows are the
+//! built-in tools that building's vocation admits, each from the same
+//! `definition` the bench writes into `ToolMeta`. What each row is exposed
+//! as is read against the `[catalog]` tables on disk now, so the page
+//! shows what the next run gets and edits the tables that decide it.
 
 use kernel::config::{Exposure, ExposureFrom, ExposureTable};
 use kernel::event::record::AuditVerdict;

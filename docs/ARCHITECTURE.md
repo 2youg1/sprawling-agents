@@ -400,7 +400,11 @@ than any diagram of boxes.
    `accounting::views::catalog` reads that recorded table against the
    configuration on disk for the building page instead of assembling a
    fresh catalog, which could start a server or a browser just to answer
-   a page. `city::neighbourhood` is scanned at the same time, so the run
+   a page. Before any run has recorded a table, the same answer lists the
+   built-in tools that building's vocation admits, from each tool's own
+   definition, so the tiers can be read and saved before the first session;
+   connectors, browsers and the endpoint-book tools stay absent until a
+   run records them. `city::neighbourhood` is scanned at the same time, so the run
    also knows which addresses it can reach and who stands at them;
    without that scan, `signal` would take an address the model had to be
    told.
@@ -637,7 +641,7 @@ on connect: a page from a different build refuses rather than misreads.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->49<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Command` | <!-- xtask:begin command_frames -->50<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
 | `Query` | <!-- xtask:begin query_frames -->64<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |

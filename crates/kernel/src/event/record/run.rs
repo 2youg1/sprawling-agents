@@ -56,6 +56,8 @@ pub enum ModelSelectionSource {
     Difficulty,
     /// A configured workspace used its medium recommendation by default.
     MediumDefault,
+    /// The person named a provider, model and effort for delegated work.
+    Choice,
     /// The existing session or the city-wide main tag answered as before.
     Main,
 }
