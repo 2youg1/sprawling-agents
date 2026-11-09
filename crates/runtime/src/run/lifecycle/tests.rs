@@ -103,6 +103,8 @@ fn plan() -> RunPlan {
             context_tokens: 0,
         },
         second_threshold: None,
+        context_lock: None,
+        succession: std::sync::Arc::new(std::sync::Mutex::new(crate::SuccessionDesk::new())),
         context: crate::ContextReading::default(),
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),

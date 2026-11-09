@@ -34,6 +34,7 @@ enum Sounded {
     Nothing,
     First,
     Handover,
+    Locked,
 }
 
 /// The line the run is given, with the figures it is computed from.
@@ -43,6 +44,9 @@ pub enum ContextReminder {
     Usage { used: Tokens, window: Tokens },
     /// The second rung is reached: still enough to hand over, not for long.
     HandoverWindow { used: Tokens, window: Tokens },
+    /// The building's absolute context lock is full: write a handoff and
+    /// `succeed` so the next run continues under the same lock.
+    LockReached { used: Tokens, window: Tokens },
 }
 
 impl ContextReminder {
@@ -64,7 +68,21 @@ impl ContextReminder {
                 used.get(),
                 window.get()
             ),
+            ContextReminder::LockReached { used, window } => format!(
+                "[context] the building's context lock is full ({} of {} input tokens). Write \
+                 Handoff.md and call `succeed` now so the next run continues in this room under \
+                 the same lock.",
+                used.get(),
+                window.get()
+            ),
         }
+    }
+
+    /// Whether this reminder asks the city to succeed when the run next
+    /// concludes (the absolute lock), so a desk ask can ride with it.
+    #[must_use]
+    pub fn asks_succession(&self) -> bool {
+        matches!(self, ContextReminder::LockReached { .. })
     }
 }
 
@@ -102,24 +120,38 @@ impl ContextReading {
 
 /// One run's gauge. Fed the provider's `input_tokens` after every call;
 /// answers a reminder the first time each threshold is crossed.
+///
+/// `window` is already the effective window (`min(model, lock)` when a
+/// building lock is set), so percentage rungs and the lock ceiling share
+/// one denominator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContextGauge {
     window: Tokens,
     /// Where the second rung sits, as a whole percent: the city's rung
     /// when a layer stated one, else `CTX_REMINDER_SECOND_DEFAULT`.
     second_at: u64,
+    /// Whether `window` came from a building lock (so 100% is LockReached).
+    locked: bool,
     sounded: Sounded,
 }
 
 impl ContextGauge {
     /// `second` is the configuration ladder's answer for this run, and
     /// `None` means no layer spoke: the default applies here, at the one
-    /// place a rung is read.
+    /// place a rung is read. `locked` is true when `window` is a building
+    /// context lock's effective ceiling.
     #[must_use]
     pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge {
+        ContextGauge::locked(window, second, false)
+    }
+
+    /// Same as [`ContextGauge::new`], naming whether the window is a lock.
+    #[must_use]
+    pub fn locked(window: Tokens, second: Option<SecondThreshold>, locked: bool) -> ContextGauge {
         ContextGauge {
             window,
             second_at: second.map_or(CTX_REMINDER_SECOND_DEFAULT, SecondThreshold::percent),
+            locked,
             sounded: Sounded::Nothing,
         }
     }
@@ -133,6 +165,10 @@ impl ContextGauge {
         }
         let at = percent(used, self.window);
         let window = self.window;
+        if self.locked && at >= 100 && self.sounded != Sounded::Locked {
+            self.sounded = Sounded::Locked;
+            return Some(ContextReminder::LockReached { used, window });
+        }
         match self.sounded {
             Sounded::Nothing | Sounded::First if at >= self.second_at => {
                 self.sounded = Sounded::Handover;
@@ -142,7 +178,7 @@ impl ContextGauge {
                 self.sounded = Sounded::First;
                 Some(ContextReminder::Usage { used, window })
             }
-            Sounded::Nothing | Sounded::First | Sounded::Handover => None,
+            Sounded::Nothing | Sounded::First | Sounded::Handover | Sounded::Locked => None,
         }
     }
 }
@@ -265,5 +301,22 @@ mod tests {
     #[test]
     fn an_overflowing_product_reads_as_full_rather_than_wrapping() {
         assert_eq!(percent(Tokens::new(u64::MAX), Tokens::new(1_000)), u64::MAX);
+    }
+
+    #[test]
+    fn a_building_lock_sounds_when_the_effective_window_fills() {
+        let mut gauge = ContextGauge::locked(Tokens::new(256), None, true);
+        assert!(matches!(
+            gauge.observe(Tokens::new(200)),
+            Some(ContextReminder::HandoverWindow { .. })
+        ));
+        assert_eq!(
+            gauge.observe(Tokens::new(256)),
+            Some(ContextReminder::LockReached {
+                used: Tokens::new(256),
+                window: Tokens::new(256)
+            })
+        );
+        assert!(gauge.observe(Tokens::new(256)).is_none());
     }
 }

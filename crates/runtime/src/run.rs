@@ -93,6 +93,12 @@ pub struct RunPlan {
     /// setting here, so "each rung sounds once per run" cannot depend on
     /// when somebody edited a file.
     pub second_threshold: Option<kernel::SecondThreshold>,
+    /// Absolute building context lock, when `RULES.toml` stated one.
+    /// The gauge measures against `min(shape.context_tokens, lock)`.
+    pub context_lock: Option<kernel::ContextLock>,
+    /// Desk the lock shares with `succeed`: hitting the lock asks here so
+    /// the landing can open a successor when the run next concludes.
+    pub succession: std::sync::Arc<std::sync::Mutex<crate::SuccessionDesk>>,
     /// Where this run records the provider's count after each call. The
     /// caller keeps a clone for whatever reports the reading, which is
     /// `status`: the run writes it and nothing else does.

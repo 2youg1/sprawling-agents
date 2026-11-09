@@ -167,6 +167,67 @@ impl From<SecondThreshold> for u64 {
     }
 }
 
+/// Absolute context lock for a building, in input tokens: the effective
+/// window is `min(model.context_tokens, lock)`, so a long-window model
+/// still costs like the lock. One construction point,
+/// [`ContextLock::parse`], so a zero lock cannot be spelled.
+///
+/// Lives in the building's `RULES.toml` as `context_lock_tokens`, not in
+/// `CONFIG.toml`: a hard lock is a building capability, not a run-reminder
+/// rung (`crates/city/spec/Policy.lean`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "u64", into = "u64")]
+pub struct ContextLock(u64);
+
+impl ContextLock {
+    /// Sole constructor. `raw` is a whole token count.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` when `raw` is zero: a lock of nothing would make
+    /// every turn sound the lock, and leaving the key out is how a
+    /// building says it has no hard lock.
+    pub fn parse(raw: u64) -> Result<ContextLock, AxError> {
+        if raw == 0 {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "set a building context lock",
+                "0".to_owned(),
+            )
+            .with_recovery(
+                "state a positive whole number of input tokens, or leave `context_lock_tokens` \
+                 out for reminder-only behaviour",
+            ));
+        }
+        Ok(ContextLock(raw))
+    }
+
+    /// The lock, as whole input tokens.
+    #[must_use]
+    pub fn tokens(self) -> crate::Tokens {
+        crate::Tokens::new(self.0)
+    }
+
+    /// The effective window: the smaller of the model's window and this lock.
+    #[must_use]
+    pub fn effective(self, model_window: crate::Tokens) -> crate::Tokens {
+        crate::Tokens::new(self.0.min(model_window.get()))
+    }
+}
+
+impl TryFrom<u64> for ContextLock {
+    type Error = AxError;
+
+    fn try_from(raw: u64) -> Result<ContextLock, AxError> {
+        ContextLock::parse(raw)
+    }
+}
+
+impl From<ContextLock> for u64 {
+    fn from(lock: ContextLock) -> u64 {
+        lock.0
+    }
+}
+
 /// One value across the City -> Building -> Resident override ladder.
 /// Lower layers win; absence falls through upward.
 #[derive(Debug, Clone, PartialEq, Eq)]

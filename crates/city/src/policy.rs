@@ -34,7 +34,8 @@ use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, EntropyAllowlist, WriteDomain,
+    Address, AxCode, AxError, BuildingPolicy, ContextLock, EgressAllowlist, EntropyAllowlist,
+    WriteDomain,
 };
 
 mod cache;
@@ -107,6 +108,8 @@ pub struct BuildingRules {
     workspace_models: Option<WorkspaceModelPolicy>,
     /// Exact repository paths whose entropy-only checkpoint hits are exempt.
     checkpoint_entropy_allow: EntropyAllowlist,
+    /// Absolute context lock in input tokens, when the file states one.
+    context_lock: Option<ContextLock>,
 }
 
 impl BuildingRules {
@@ -231,6 +234,13 @@ impl BuildingRules {
     #[must_use]
     pub fn checkpoint_entropy_allow(&self) -> &EntropyAllowlist {
         &self.checkpoint_entropy_allow
+    }
+
+    /// Absolute context lock in input tokens, or `None` when the file
+    /// leaves the key out (reminder-only behaviour).
+    #[must_use]
+    pub fn context_lock(&self) -> Option<ContextLock> {
+        self.context_lock
     }
 
     /// What this building's residents may write inside their prefixes.
@@ -425,6 +435,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
                     harness_minutes: None,
                     workspace_models: None,
                     checkpoint_entropy_allow: EntropyAllowlist::default(),
+                    context_lock: None,
                 }),
             }
         }

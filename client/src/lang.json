@@ -335,9 +335,49 @@
     "en": "subagents",
     "zh": "子代理模型"
   },
+  "catalog_door_context": {
+    "en": "context lock",
+    "zh": "上下文锁"
+  },
   "catalog_door_rules": {
     "en": "RULES.toml",
     "zh": "RULES.toml"
+  },
+  "catalog_context_note": {
+    "en": "An absolute input-token lock in this building's RULES.toml. The effective window is the smaller of the model window and the lock; past the lock the city asks for a handoff and succession in the same room. City keep-warm stays under Settings → city layer.",
+    "zh": "写在本楼 RULES.toml 里的绝对输入 token 锁。生效窗口是模型窗口与锁的较小值；越过锁后城在同一房间要求交接并接替。城层暖缓存仍在设置 → 城层。"
+  },
+  "catalog_context_lock": {
+    "en": "context lock",
+    "zh": "上下文锁"
+  },
+  "catalog_context_lock_unit": {
+    "en": "tokens",
+    "zh": "token"
+  },
+  "catalog_context_lock_hint": {
+    "en": "empty keeps reminder-only behaviour",
+    "zh": "留空则仅百分比提醒"
+  },
+  "catalog_context_window": {
+    "en": "model window {window}",
+    "zh": "模型窗口 {window}"
+  },
+  "catalog_context_share": {
+    "en": "lock is {n}% of the model window",
+    "zh": "锁约占模型窗口的 {n}%"
+  },
+  "catalog_context_window_unknown": {
+    "en": "no model window is known yet — pick a model in a room of this building to see the share",
+    "zh": "尚不知模型窗口——在本楼某房间选定模型后可看到占比"
+  },
+  "catalog_context_warm": {
+    "en": "Keep-warm (city layer) renews the prompt cache on a timer; the lock caps how large that cache window can grow.",
+    "zh": "暖缓存（城层）按计时续期 prompt 缓存；锁限制该窗口能长到多大。"
+  },
+  "catalog_context_save": {
+    "en": "save lock",
+    "zh": "保存锁"
   },
   "catalog_mcp_reference": {
     "en": "connector reference · tools appear once a run has listed them",

@@ -10,10 +10,10 @@
   // - words flowing down it, the box at its foot. Every run in the room
   // is a stretch of the same thread; what waits for the person is a card
   // in it; and the box either steers the run that is going or opens the
-  // next one. On the panorama workbench the column stands under the chosen
-  // session and draws the whole thread (client/Spec.lean §7K); only on one
-  // column, under the world layer's sheet, is it a band: the last thing
-  // said, and the same box (docs/frontend-method.md §7I).
+  // next one. On the panorama tier the gauge strip sits above the scroller
+  // inside this same column (client D113 / §7K); only on one column, under
+  // the world layer's sheet, is it a band: the last thing said, and the
+  // same box (docs/frontend-method.md §7I).
   //
   // A session is a stretch of the room, not the room: runs
   // before it fold behind one line, and how it began is drawn where the
@@ -36,6 +36,7 @@
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
   import AddressLine from "./talk/address_line.svelte";
+  import GaugeStrip from "./talk/gauge_strip.svelte";
   import { drawsAddress, factsAt } from "./talk/seat";
   import type { Seat } from "./talk/seat";
   import Composer from "./talk/composer.svelte";
@@ -460,6 +461,9 @@ composition is rebuilt on the way. -->
   class={["flex min-h-0 flex-col", band ? "" : "h-full"]}
   style:container-type={band ? undefined : "size"}
 >
+  {#if !band && seat.kind === "workbench"}
+    <GaugeStrip here={address} run={seat.gauged} />
+  {/if}
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
       {#if shown.length > 0 || origin !== null}

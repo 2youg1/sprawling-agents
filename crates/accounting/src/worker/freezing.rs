@@ -346,6 +346,8 @@ impl Freezing<'_> {
                 context_tokens: site.model.context_tokens,
             },
             second_threshold: site.config.second_threshold,
+            context_lock: site.rules.context_lock(),
+            succession: std::sync::Arc::clone(&workbench.succession),
             context: workbench.context.clone(),
             prefix,
             policy: site.rules.policy().clone(),

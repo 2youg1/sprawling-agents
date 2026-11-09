@@ -248,6 +248,8 @@ pub fn run_scenario_on(
             context_tokens: 0,
         },
         second_threshold: None,
+        context_lock: None,
+        succession: std::sync::Arc::new(std::sync::Mutex::new(runtime::SuccessionDesk::new())),
         context: runtime::ContextReading::default(),
         prefix,
         policy: BuildingPolicy::default(),

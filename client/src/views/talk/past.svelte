@@ -15,8 +15,8 @@
   // client D100): until then the line under the rule says it is
   // opening, and a refusal stays there with `/stop` beside it.
   //
-  // In the panorama tier's band only the way back stands; the session
-  // pane above it shows the session.
+  // In the panorama tier's band only the way back stands; on the desktop
+  // the gauge strip inside this column shows the session (client D113).
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
   import { say } from "../../core/lang";
@@ -29,6 +29,7 @@
   import AsideLink from "./aside_link.look.svelte";
   import { branchInto } from "./branching";
   import { noteOf } from "./branch_note";
+  import GaugeStrip from "./gauge_strip.svelte";
   import Scroller from "./scroller.svelte";
   import type { ForkPlan } from "./forking";
   import { drawsAddress, factsAt } from "./seat";
@@ -73,6 +74,9 @@
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]}>
   {#if !band && drawsAddress(seat)}
     <AddressLine {address} {session} />
+  {/if}
+  {#if !band && seat.kind === "workbench"}
+    <GaugeStrip here={address} run={seat.gauged} />
   {/if}
   {#if !band}
     <Scroller

@@ -560,3 +560,14 @@ fn a_person_browser_value_that_is_neither_a_switch_nor_an_address_is_refused() {
         assert_eq!(err.code(), &AxCode::ConfigInvalid, "{bad}");
     }
 }
+
+#[test]
+fn a_context_lock_is_read_from_rules_and_zero_is_refused() {
+    let rules = evaluate(&addr("lab"), &ordinary("context_lock_tokens = 262144\n")).unwrap();
+    assert_eq!(
+        rules.context_lock().map(kernel::ContextLock::tokens),
+        Some(kernel::Tokens::new(262_144))
+    );
+    let err = evaluate(&addr("lab"), &ordinary("context_lock_tokens = 0\n")).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+}
