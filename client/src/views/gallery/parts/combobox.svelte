@@ -21,7 +21,19 @@
   let model = $state<string | null>(null);
   let held = $state<string | null>(MODELS.at(-1)?.id ?? CHOSEN.id);
   let edge = $state<string | null>(CHOSEN.id);
+  let face = $state<string | null>("Georgia");
   const choices = MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }));
+  // Each row wears its own family so the appearance group's local-face
+  // picker can be measured: the label is the family name drawn in that face.
+  const faces = [
+    { value: "Georgia", label: "Georgia", face: '"Georgia", ui-serif, serif' },
+    { value: "Courier New", label: "Courier New", face: '"Courier New", ui-monospace, monospace' },
+    {
+      value: "Trebuchet MS",
+      label: "Trebuchet MS",
+      face: '"Trebuchet MS", ui-sans-serif, sans-serif',
+    },
+  ];
 </script>
 
 <!-- Stacked as the settings page stacks them: the open list covers the second trigger.
@@ -90,5 +102,24 @@ showing. -->
         starts="open"
       />
     </div>
+  </div>
+</Case>
+
+<!-- A face picker: every row is drawn in the family it names, so two
+neighbours can be told apart by eye. The families are stock faces every
+engine ships, so the fixture does not need Local Font Access. -->
+<Case label="combobox · each row wears the face it names">
+  <div class="pb-output">
+    <Combobox
+      label={say($lang, "appearance_local")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      choices={faces}
+      value={face}
+      onPick={(value) => {
+        face = value;
+      }}
+      starts="open"
+    />
   </div>
 </Case>

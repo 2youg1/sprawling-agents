@@ -92,20 +92,20 @@
     "zh": "跟随系统"
   },
   "appearance_local": {
-    "en": "list the installed faces",
-    "zh": "列出已安装的字体"
+    "en": "choose from this computer's faces",
+    "zh": "从这台电脑的字体里选"
   },
   "appearance_local_denied": {
-    "en": "the browser did not hand over the list; write the stack instead",
-    "zh": "浏览器没有交出字体列表，请改为手写字体栈"
+    "en": "the browser did not hand over the list; type the family name instead",
+    "zh": "浏览器没有交出字体列表，请改为手写字体名"
   },
   "appearance_local_for": {
     "en": "{face}, from the faces this computer has",
     "zh": "{face}：从这台电脑装好的字体里选"
   },
   "appearance_local_none": {
-    "en": "this browser does not offer its installed faces; write the stack instead",
-    "zh": "这个浏览器不提供已装字体列表，请改为手写字体栈"
+    "en": "this browser does not offer its installed faces; type the family name instead",
+    "zh": "这个浏览器不提供已装字体列表，请改为手写字体名"
   },
   "appearance_mono": {
     "en": "the mono face",
@@ -130,6 +130,10 @@
   "appearance_preview": {
     "en": "preview",
     "zh": "预览"
+  },
+  "appearance_preview_note": {
+    "en": "the only sample on this page; it follows every face, size and metric as soon as it lands",
+    "zh": "本页唯一的演示：字体、字号与度量一改这里就跟着变"
   },
   "appearance_reading": {
     "en": "the reading face",

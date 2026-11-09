@@ -214,7 +214,53 @@ describe("the value a look is given", () => {
     expect(look.options.at(2)?.wire.id).toBe(rowId("c1", 2));
     expect(look.search["aria-controls"]).toBe(look.list.id);
     expect(look.search["aria-expanded"]).toBe(true);
-    expect([look.face, look.unset]).toEqual(["glm-5", false]);
+    expect([look.face, look.unset, look.faceStyle]).toEqual(["glm-5", false, undefined]);
+  });
+
+  test("a choice that carries a face hands it to its row and to the trigger while chosen", () => {
+    const faced: readonly Choice[] = [
+      { value: "Iosevka", label: "Iosevka", face: '"Iosevka", sans-serif' },
+      { value: "Cascadia Code", label: "Cascadia Code", face: '"Cascadia Code", sans-serif' },
+    ];
+    const hands: Hands = {
+      toggle: () => undefined,
+      act: () => undefined,
+      type: () => undefined,
+      point: () => undefined,
+      take: () => undefined,
+      leave: () => undefined,
+      holds: {
+        root: () => undefined,
+        trigger: () => undefined,
+        layer: () => undefined,
+        search: () => undefined,
+        list: () => undefined,
+      },
+    };
+    const look = lookOf(
+      {
+        props: {
+          label: "Face",
+          placeholder: "Search",
+          empty: "No match",
+          choices: faced,
+          value: "Cascadia Code",
+          onPick: () => undefined,
+        },
+        uid: "f1",
+        layer: "open",
+        query: "",
+        cursor: 0,
+        rows: faced,
+        side: "below",
+      },
+      hands,
+    );
+    expect(look.faceStyle).toBe('"Cascadia Code", sans-serif');
+    expect(look.options.map((each) => each.face)).toEqual([
+      '"Iosevka", sans-serif',
+      '"Cascadia Code", sans-serif',
+    ]);
   });
 
   test("a closed popup names no cursor, takes no focus, and is not built before it first opens", () => {

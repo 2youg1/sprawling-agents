@@ -24,7 +24,9 @@
     class="flex h-control w-full min-w-0 items-center justify-between gap-snug rounded-control border border-edge-input bg-raised px-base text-body text-text hover:bg-raised-hover"
     {...look.trigger}
   >
-    <span class={["truncate", look.unset && "text-text-faint"]}>{look.face}</span>
+    <span class={["truncate", look.unset && "text-text-faint"]} style:font-family={look.faceStyle}>
+      {look.face}
+    </span>
   </button>
   {#if look.layer !== undefined}
     <!-- The theme's popover layer, because every combobox root is
@@ -57,7 +59,7 @@
             ]}
             {...option.wire}
           >
-            <span class="truncate">{option.label}</span>
+            <span class="truncate" style:font-family={option.face}>{option.label}</span>
             {#if option.note !== undefined}
               <span class="shrink-0 text-note text-text-faint">{option.note}</span>
             {/if}
