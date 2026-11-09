@@ -39,8 +39,20 @@ const MODEL_LIST_PAGES: usize = 16;
 pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     let mut found = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
-    for message in chat.messages.iter() {
-        for block in &message.content {
+    for picture in picture_parts(chat) {
+        if seen.insert(picture.locator.to_string()) {
+            found.push(picture);
+        }
+    }
+    found
+}
+
+/// Every image position the dialect will write, including repeated locators and tool attachments.
+fn picture_parts<'a>(chat: &'a ChatRequest<'_>) -> impl Iterator<Item = &'a ImageRef> {
+    chat.messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .flat_map(|block| {
             let pictures: &[ImageRef] = match block {
                 ContentBlock::Image(picture) => std::slice::from_ref(picture),
                 ContentBlock::ToolResult { attachments, .. } => attachments,
@@ -49,14 +61,8 @@ pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
                 | ContentBlock::RedactedThinking { .. }
                 | ContentBlock::ToolUse { .. } => &[],
             };
-            for picture in pictures {
-                if seen.insert(picture.locator.to_string()) {
-                    found.push(picture);
-                }
-            }
-        }
-    }
-    found
+            pictures.iter()
+        })
 }
 
 /// The id one conversation carries to a host that asks for one.
@@ -289,11 +295,16 @@ impl Endpoint {
     fn pictures_for(&self, chat: &ChatRequest) -> Result<ImageBytes, AxError> {
         let found = pictures_in(chat);
         IMAGES_PER_TURN.admit(found.len())?;
+        let max_side = crate::provider::preset::image_max_side(
+            &self.config.base_url,
+            &chat.model,
+            picture_parts(chat).count(),
+        );
         let mut images = ImageBytes::default();
         for picture in found {
             let bytes = (self.redemption.images)(&picture.locator)?;
             IMAGE_MAX_BYTES.admit(&picture.locator, bytes.len())?;
-            images.insert(&picture.locator, bytes);
+            images.insert(picture, bytes, max_side)?;
         }
         Ok(images)
     }
@@ -424,6 +435,183 @@ mod tests {
         });
         req
     }
+    /// One DeepSeek request carrying the bytes and dimensions the
+    /// resolver supplied, through the real host preset and chat writer.
+    fn deepseek_picture(
+        bytes: Vec<u8>,
+        media_type: kernel::ImageType,
+        width: u32,
+        height: u32,
+    ) -> (Endpoint, ModelRequest<'static>) {
+        let picture = kernel::ImageRef {
+            locator: kernel::Locator::cas(kernel::B3Hash::digest(&bytes)),
+            media_type,
+            width,
+            height,
+        };
+        let mut called = request();
+        called.chat.messages.to_mut().push(kernel::ChatMessage {
+            role: kernel::Role::User,
+            content: vec![ContentBlock::Image(picture)],
+        });
+        let mut configured = config("https://api.deepseek.com");
+        configured.dialect = DialectKind::OpenAi;
+        configured.model = "deepseek-flash".to_owned();
+        configured.pricing = None;
+        let endpoint = Endpoint::new(
+            configured,
+            Redemption::new(
+                resolver(),
+                std::sync::Arc::new(move |_at: &kernel::Locator| Ok(bytes.clone())),
+            ),
+        )
+        .unwrap();
+        (endpoint, called)
+    }
+
+    /// Decode the one picture in the one-user-message fixture.
+    fn wire_picture(wire: &Value) -> Vec<u8> {
+        use base64::Engine as _;
+        let url = wire["messages"][0]["content"][0]["image_url"]["url"]
+            .as_str()
+            .unwrap();
+        let (_, encoded) = url.split_once(',').unwrap();
+        base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap()
+    }
+
+    /// The real failure shape: a valid tall JPEG whose height is twice
+    /// DeepSeek's documented ceiling must not cross unchanged.
+    #[test]
+    fn a_deepseek_picture_over_the_side_ceiling_is_resized_at_the_request_edge() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(1356, 16384)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Jpeg,
+            )
+            .unwrap();
+        let (endpoint, called) = deepseek_picture(bytes, kernel::ImageType::Jpeg, 1356, 16384);
+
+        let wire = endpoint.wire_request(&called).unwrap();
+        let sent = wire_picture(&wire);
+        let dimensions = image::ImageReader::new(std::io::Cursor::new(sent))
+            .with_guessed_format()
+            .unwrap()
+            .into_dimensions()
+            .unwrap();
+        assert_eq!(dimensions, (678, 8192));
+    }
+
+    /// CAS dimensions govern every occurrence even when references understate them.
+    #[test]
+    fn understated_picture_dimensions_cannot_bypass_the_ceiling() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(8, 9000)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+        let (endpoint, mut called) = deepseek_picture(bytes, kernel::ImageType::Png, 1, 1);
+        let ContentBlock::Image(mut second) = called.chat.messages[0].content[0].clone() else {
+            panic!("fixture must contain a picture");
+        };
+        second.width = 8;
+        second.height = 9000;
+        called.chat.messages.to_mut()[0]
+            .content
+            .push(ContentBlock::Image(second));
+        let wire = endpoint.wire_request(&called).unwrap();
+        let sent = image::load_from_memory(&wire_picture(&wire)).unwrap();
+        assert_eq!((sent.width(), sent.height()), (7, 8192));
+    }
+
+    /// Repeated wire parts reach the lower tier while sharing one CAS redemption.
+    #[test]
+    fn fifteen_repeated_picture_parts_use_the_lower_ceiling() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(8, 5000)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+        let (mut endpoint, mut called) =
+            deepseek_picture(bytes.clone(), kernel::ImageType::Png, 8, 5000);
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = reads.clone();
+        endpoint.redemption = Redemption::new(
+            resolver(),
+            std::sync::Arc::new(move |_| {
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(bytes.clone())
+            }),
+        );
+        let content = &mut called.chat.messages.to_mut()[0].content;
+        let picture = content[0].clone();
+        content.resize(14, picture.clone());
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(
+            image::load_from_memory(&wire_picture(&wire))
+                .unwrap()
+                .height(),
+            5000
+        );
+        called.chat.messages.to_mut()[0].content.push(picture);
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(wire["messages"][0]["content"].as_array().unwrap().len(), 15);
+        assert_eq!(
+            image::load_from_memory(&wire_picture(&wire))
+                .unwrap()
+                .height(),
+            4096
+        );
+        assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    /// A picture within the documented ceiling pays no decode or
+    /// re-encode: exactly the resolver's bytes reach the wire.
+    #[test]
+    fn a_deepseek_picture_within_the_side_ceiling_keeps_its_original_bytes() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(8, 8)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Jpeg,
+            )
+            .unwrap();
+        let (endpoint, called) =
+            deepseek_picture(bytes.clone(), kernel::ImageType::Jpeg, 9000, 9000);
+
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(wire_picture(&wire), bytes);
+    }
+
+    /// Resizing a GIF into one static frame would silently discard
+    /// content. An animated picture past the ceiling is refused instead.
+    #[test]
+    fn an_animated_picture_over_the_side_ceiling_is_not_silently_flattened() {
+        let mut bytes = Vec::new();
+        image::codecs::gif::GifEncoder::new(&mut bytes)
+            .encode_frames([
+                image::Frame::new(image::RgbaImage::new(4, 16384)),
+                image::Frame::new(image::RgbaImage::new(4, 16384)),
+            ])
+            .unwrap();
+        let (endpoint, called) = deepseek_picture(bytes, kernel::ImageType::Gif, 4, 16384);
+
+        let refused = endpoint.wire_request(&called);
+        assert!(
+            refused.is_err(),
+            "an animated picture crossed without a refusal"
+        );
+        let err = refused.unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+        assert!(err.recovery().contains("static frame"), "{err}");
+    }
+
     #[test]
     fn a_success_round_trip_settles_and_maps_the_wave() {
         let body = serde_json::json!({

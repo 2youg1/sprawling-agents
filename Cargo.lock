@@ -3124,6 +3124,7 @@ dependencies = [
  "base64 0.23.1",
  "chacha20poly1305",
  "getrandom 0.4.3",
+ "image",
  "insta",
  "keyring-core",
  "linux-keyutils-keyring-store",
