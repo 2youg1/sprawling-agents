@@ -263,7 +263,7 @@
   );
 
   function saveLock(): void {
-    if (onDisk === null || lockField.kind === "invalid") return;
+    if (onDisk === null || lockField.kind === "invalid" || rulesSaving.kind === "saving") return;
     // Prefer the RULES editor draft so a lock save cannot drop unsaved
     // prose edits on the rules pane (same PutRules door, one document).
     const base = rulesDraft.length > 0 ? rulesDraft : onDisk;
@@ -569,14 +569,17 @@
       <Button
         label={say($lang, "catalog_context_save")}
         tone="primary"
-        {...lockEdited && lockField.kind !== "invalid"
+        loading={rulesSaving.kind === "saving"}
+        {...lockEdited && lockField.kind !== "invalid" && rulesSaving.kind !== "saving"
           ? {}
           : {
               why: say(
                 $lang,
                 lockField.kind === "invalid"
                   ? "catalog_context_lock_invalid"
-                  : "catalog_unchanged",
+                  : rulesSaving.kind === "saving"
+                    ? "subagent_saving"
+                    : "catalog_unchanged",
               ),
             }}
         onPress={saveLock}
