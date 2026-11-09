@@ -407,7 +407,9 @@ test-slice-coverage out:
 
 # Unpack at the checkout path compiled into tests that spawn workspace
 # binaries. A `compile` slice fetches first, because trybuild compiles its
-# own project offline; the other environments read no registry.
+# own project offline; the other environments read no registry. `plain`
+# and `client` CI slices may lack a full Rust toolchain: prefer
+# `cargo-nextest nextest` when `cargo` is absent (D27).
 test-slice file environment filter:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -416,7 +418,15 @@ test-slice file environment filter:
         client | plain) ;;
         *) echo "test-slice: unknown environment '{{environment}}'; test-slice-plan names compile, client and plain" >&2; exit 2 ;;
     esac
-    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
+    nextest=(cargo nextest)
+    if ! command -v cargo >/dev/null 2>&1; then
+        if ! command -v cargo-nextest >/dev/null 2>&1; then
+            echo "test-slice: need cargo or cargo-nextest to run an archive" >&2
+            exit 2
+        fi
+        nextest=(cargo-nextest nextest)
+    fi
+    "${nextest[@]}" run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
 
 # Compare completed successful Actions inventories, exported with:
 # gh run view <id> --json conclusion,headSha,startedAt,updatedAt,jobs
@@ -463,11 +473,11 @@ test-timings baseline current:
             print(f"{label} {job['name']}: {seconds(job['startedAt'], job['completedAt']):g}s")
     PY
 
-# The packages every platform builds and tests. The desktop server
-# and its FFI seam serve a Windows desktop only, and xtask judges the
-# repository rather than shipping in it, so `ci.yml` lints and tests
-# those three on Windows alone; on macOS and Linux the two desktop
-# packages compile only as what the binary links.
+# The packages every non-Windows platform builds and tests. The desktop
+# server and its FFI seam serve a Windows desktop only, and xtask judges
+# the repository rather than shipping in it, so `ci.yml` lints and tests
+# those three on Windows alone; Linux `core` and `platforms.yml`'s macOS
+# job compile the two desktop packages only as what the binary links.
 core_packages := "--workspace --exclude sprawling-desktop --exclude sprawling-desktop-ffi --exclude xtask"
 
 # Clippy and the suite over the core packages, on whatever platform runs it.

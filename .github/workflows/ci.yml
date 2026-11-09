@@ -7,49 +7,47 @@
 # alone cannot hold: the commit messages of the range under review, and the
 # kani proofs, which need a Linux host.
 #
-#   gates     fmt, the gates that read sources, the commit messages, the
-#             desktop server's Zig leaf (whose tests no cargo command
-#             runs), then the gates that judge the built client bundle;
-#             compiles only xtask
+#   gates-sources / gates-artifacts / gates
+#             source half (fmt, source gates, commits, Zig leaf tests) and
+#             artifact half (bundle gates) in parallel; `gates` collects
+#             both so branch protection keeps one name
 #   swap      every look under client/swap/ drawn in place of the shipped
 #             one, and judged by render as the shipped bundle is
 #   models    the Lean specifications under `crates/`
-#   clippy    the zero-warning build of every target and feature, the
-#             feature combinations `just features` runs, and a stable compile
-#             of the standalone fuzz targets without executing them
+#   clippy    the zero-warning build of every target and feature, and the
+#             feature combinations `just features` runs
 #   nix-eval  evaluation of the Nix package when one of its inputs moves
 #   test build, test (<slice>), test
 #             the suite, compiled once into a nextest archive and run in
 #             four slices on separate runners; `test` collects all
 #             verdicts, so the check a branch protection names stays one
 #   core      clippy and the suite of the packages every platform ships
-#             (`just check-core`), on ubuntu and macOS
+#             (`just check-core`), on ubuntu when Rust paths moved; macOS
+#             check-core lives in `platforms.yml`
 #   supply    licences, bans and sources; compiles nothing
 #   client    the client's own linter, typecheck and tests
 #   proof     the kernel propositions kani can hold; `changes` decides
 #             whether a change touched anything a proof is about
 #
 # The nine phases of `just check-all` map onto these jobs one to one or
-# into a job that holds several: fmt, desktop, build-web and gates (both
-# halves) -> gates, clippy and features -> clippy, test -> the test jobs,
-# the supply-chain read of `just gates` -> supply, models -> models,
-# client -> client.
+# into a job that holds several: fmt, desktop and source gates ->
+# gates-sources, build-web and artifact gates -> gates-artifacts, clippy
+# and features -> clippy, test -> the test jobs, the supply-chain read of
+# `just gates` -> supply, models -> models, client -> client.
 #
 # The order a red arrives in is fmt, then the source gates, then clippy,
-# then the suite, then the client, because every job starts in the first
-# second of the run and the cheap ones finish first, and `gates` runs its
-# cheap verdicts before it builds the bundle. Chaining jobs with `needs`
-# would buy the same order and cost the sum of the jobs as wall clock
-# instead of the slowest one.
+# then the suite, then the client, because every job that can start does
+# so in the first second and the cheap ones finish first. Chaining the
+# heavy jobs with `needs` would buy the same order and cost the sum of
+# the jobs as wall clock instead of the slowest one.
 #
 # A job is a runner, and the account runs about twenty at once across
 # every workflow, so a run that starts more jobs than it needs queues
-# behind itself and behind the next branch's run. A job that only needs
-# a few seconds of work therefore rides in a job that already holds its
-# tools: the Zig leaf's tests and the source gates ride in `gates`, which
-# installs Zig and compiles xtask for its artifact gates anyway. Each
-# verdict step in such a job runs even after an earlier one failed
-# (`!cancelled()`), so one red does not hide the others.
+# behind itself and behind the next branch's run. Path filters therefore
+# split `rust` from `client` from `lean`: a client-only change skips the
+# Windows suite and clippy; a Rust-only change skips `client` and `swap`.
+# Each verdict step in a multi-verdict job runs even after an earlier one
+# failed (`!cancelled()`), so one red does not hide the others.
 #
 # Which jobs a pull request must pass is a repository setting rather than a
 # line in this file. `changes` is deliberately not required: it exists to
@@ -61,15 +59,16 @@
 #
 # Windows for everything a person can reproduce at their desk, because it is
 # the platform the project is developed on, so a red job is a red local run.
-# Four jobs run on ubuntu because the tool they drive runs better or only
-# there, or because their verdict cannot depend on the host: `client`
-# drives bun, `models` drives Lean, `proof` drives kani, whose upstream
-# builds for Linux only, and `supply` reads `Cargo.lock` for every target
-# (`deny.toml` names none) and compiles nothing; `core` runs on ubuntu and
-# macOS because a person on either runs the same binary. The macOS source
-# gates, byte-identity and the Nix leg are `platforms.yml`, nightly, and
-# the runs nobody waits for on every push - mutation, citysim, the
-# screenshots, a release build of a ref - are `on-demand.yml`.
+# Jobs on ubuntu because the tool they drive runs better or only there, or
+# because their verdict cannot depend on the host: `client` drives bun,
+# `models` drives Lean, `proof` drives kani, whose upstream builds for
+# Linux only, `supply` reads `Cargo.lock` for every target (`deny.toml`
+# names none) and compiles nothing, and `core` lints the packages a Linux
+# person runs. macOS check-core and the macOS source gates, byte-identity
+# and the Nix leg are `platforms.yml`; nightly and the runs nobody waits
+# for on every push - mutation, citysim, the screenshots, a release build
+# of a ref - are `on-demand.yml`. The stable compile of the standalone
+# fuzz targets rides in `nightly.yml` with the sanitizer campaign.
 #
 # Any branch can ask for this run by hand (`gh workflow run ci.yml --ref
 # wave/<name>`); nothing below assumes the ref is `main` except the cache
@@ -140,6 +139,8 @@ jobs:
     outputs:
       proof: ${{ steps.filter.outputs.proof }}
       nix: ${{ steps.filter.outputs.nix }}
+      rust: ${{ steps.filter.outputs.rust }}
+      client: ${{ steps.filter.outputs.client }}
       code: ${{ steps.filter.outputs.code }}
       lean: ${{ steps.filter.outputs.lean }}
     steps:
@@ -168,10 +169,28 @@ jobs:
               - 'crates/desktop/ffi/zig-version'
               - 'crates/xtask/src/package/**'
               - 'crates/xtask/src/bundle.rs'
-            # Product code, client, gates machinery, and the files that
-            # change what `just check` compiles or judges. A docs-only
-            # pull request leaves this false so the heavy Windows jobs
-            # stay off (`crates/xtask/Spec.lean` D27).
+            # Rust product code, gates machinery, and the files that
+            # change what the Rust half of `just check` compiles or judges.
+            rust:
+              - 'crates/**'
+              - 'tools/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - 'clippy.toml'
+              - '.cargo/**'
+              - 'justfile'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'architecture.toml'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'deny.toml'
+            # Client sources and the formatter config that judges them.
+            client:
+              - 'client/**'
+              - 'bunfig.toml'
+            # Either product face: kept for readers that still want one bit.
             code:
               - 'crates/**'
               - 'client/**'
@@ -218,14 +237,13 @@ jobs:
       - name: evaluate the complete application without building it
         run: nix eval --raw .#packages.x86_64-linux.default.drvPath --no-update-lock-file
 
-  # The verdicts that compile nothing but xtask, in the order they cost:
-  # the source half first, then the Zig leaf, then the bundle and the
-  # three gates that judge it. Every verdict step runs even after an
-  # earlier one failed, so a red fmt still reports the gates.
+  # Source half of the gates: fmt, the gates that read sources, commit
+  # messages, and the Zig leaves' own tests. Parallel with the artifact
+  # half so render does not sit behind zig test on the same runner.
   #
   # `fetch-depth: 0` because the commit-message check judges every commit
   # in the change-set, and a base branch can sit any distance back.
-  gates:
+  gates-sources:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -246,9 +264,7 @@ jobs:
       - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
         with:
           tool: just
-      # `fmt-check` includes `bun fmt --check`, so Bun has to be present
-      # before the early verdicts rather than only inside client-artifacts
-      # below, which prepares the later bundle gates.
+      # `fmt-check` includes `bun fmt --check`, so Bun has to be present.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: client/package.json
@@ -284,29 +300,11 @@ jobs:
       - name: the console leaf's own tests
         if: ${{ !cancelled() }}
         run: just check-console
-      - uses: ./.github/actions/client-artifacts
-        if: ${{ !cancelled() }}
-      # `--no-deps` because the action above has just run `build-web`,
-      # the recipe's one dependency; a second bundle build would cost
-      # half a minute and judge the same bytes.
-      - name: the gates that judge the client bundle
-        if: ${{ !cancelled() }}
-        run: just --no-deps gates-artifacts
 
-  # Every replacement look under client/swap/ drawn in place of the
-  # shipped one, and the client still typechecks, keeps its wiring tests
-  # and passes render (crates/xtask/Spec.lean section 8-13).
-  #
-  # A job of its own rather than a step of `gates`: its render opens the
-  # five passes again, 159 s of a gates job that ended at 486 s, the
-  # median of 40 runs, and a render pass keeps two to three processors
-  # busy, so the two renders cannot share one four-processor runner
-  # without slowing each other.
-  swap:
-    needs: changes
-    # `always()` so a release-validation call still runs when `changes` is
-    # skipped; docs-only pull requests leave `code` false and stay off.
-    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
+  # Bundle half of the gates: npm, render and budget. Its own runner so
+  # the five render passes do not share four processors with zig test
+  # (crates/xtask/Spec.lean D27).
+  gates-artifacts:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -315,8 +313,52 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain
       - uses: ./.github/actions/zig
-      # The entry `gates` saves holds what xtask is built from; this job
-      # reads it and writes none of its own.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: gates
+          save-if: false
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        with:
+          tool: just
+      - uses: ./.github/actions/client-artifacts
+      # `--no-deps` because the action above has just run `build-web`.
+      - name: the gates that judge the client bundle
+        run: just --no-deps gates-artifacts
+
+  # The one gates verdict branch protection names. Reads both halves.
+  gates:
+    needs: [gates-sources, gates-artifacts]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: both halves passed
+        run: |
+          test "${{ needs.gates-sources.result }}" = success
+          test "${{ needs.gates-artifacts.result }}" = success
+
+  # Every replacement look under client/swap/ drawn in place of the
+  # shipped one, and the client still typechecks, keeps its wiring tests
+  # and passes render (crates/xtask/Spec.lean section 8-13).
+  #
+  # A job of its own rather than a step of `gates-artifacts`: its render
+  # opens the five passes again, and a render pass keeps two to three
+  # processors busy, so the two renders cannot share one four-processor
+  # runner without slowing each other.
+  swap:
+    needs: changes
+    # `always()` so a release-validation call still runs when `changes` is
+    # skipped; client-only (and full-code) pull requests turn `client` on.
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.client == 'true')) }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/zig
+      # The entry `gates-sources` saves holds what xtask is built from.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: gates
@@ -333,7 +375,7 @@ jobs:
   # check (`adversary.yml` runs it nightly).
   models:
     needs: changes
-    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.lean == 'true'))) }}
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.lean == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -347,7 +389,7 @@ jobs:
 
   clippy:
     needs: changes
-    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.rust == 'true')) }}
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -369,16 +411,12 @@ jobs:
           tool: just
       - name: clippy
         run: just clippy
-      # Two check-mode passes, seconds on the cache this job already holds,
+      # Check-mode passes, seconds on the cache this job already holds,
       # so they ride here rather than paying a runner of their own.
+      # The standalone fuzz workspace's stable compile lives in
+      # `nightly.yml` with the sanitizer campaign (D27).
       - name: the feature combinations
         run: just features
-      # The standalone fuzz workspace is deliberately outside the root one,
-      # so workspace clippy cannot see a target whose parser API has drifted.
-      # Stable check is enough for that contract; nightly remains responsible
-      # for the sanitizer instrumentation and the fresh random input.
-      - name: compile the fuzz targets without running them
-        run: cargo check --manifest-path crates/fuzz/Cargo.toml --all-targets
 
   # The suite, compiled once. The archive carries every test binary and
   # the workspace binaries they spawn; the slices below run it on
@@ -404,7 +442,7 @@ jobs:
   test-build:
     name: test build
     needs: changes
-    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.rust == 'true')) }}
     outputs:
       slices: ${{ steps.plan.outputs.slices }}
     runs-on: windows-latest
@@ -463,10 +501,10 @@ jobs:
           mode: save
 
   # Disjoint slices, whose union is checked before the matrix starts.
-  # Every slice installs the toolchain, because nextest runs as a cargo
-  # subcommand; the rest of its setup follows the `environment`
-  # `just test-slice-plan` gives it, so a slice that compiles nothing
-  # does not pay a minute for a client tree or a Zig it never opens.
+  # A `compile` slice installs the toolchain and Zig; `plain` and `client`
+  # only install nextest and just, because running an archive needs no
+  # rustc (`crates/xtask/Spec.lean` D27). The rest of the setup follows
+  # the `environment` `just test-slice-plan` gives it.
   test-slice:
     name: test (${{ matrix.name }})
     needs: test-build
@@ -478,6 +516,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
+        if: matrix.environment == 'compile'
       # trybuild compiles `sprawling-runtime`, which builds the Zig leaf.
       - uses: ./.github/actions/zig
         if: matrix.environment == 'compile'
@@ -534,18 +573,17 @@ jobs:
           test "${{ needs.test-build.result }}" = success
           test "${{ needs.test-slice.result }}" = success
 
-  # The packages a person on macOS or Linux runs, linted and tested
-  # where they run. Not a required check: a red here is read and fixed
-  # forward, and the required set stays the one a Windows desk reproduces.
+  # The packages a person on Linux runs, linted and tested where they
+  # run. Not a required check: a red here is read and fixed forward, and
+  # the required set stays the one a Windows desk reproduces. macOS
+  # check-core lives in `platforms.yml` (D27): it was the longest single
+  # job on every PR without blocking the merge.
   core:
-    if: ${{ !inputs.release-validation }}
-    name: core (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    needs: changes
+    if: ${{ always() && !cancelled() && !inputs.release-validation && (github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.rust == 'true')) }}
+    name: core (ubuntu-latest)
+    runs-on: ubuntu-latest
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
@@ -559,32 +597,9 @@ jobs:
       - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
         with:
           tool: cargo-nextest,just
-      # macOS's `sh` is what `install.sh` runs under for a person on a Mac,
-      # and it accepts less than the shells the other platforms run
-      # (`crates/sprawling/spec/Install.lean` section 8-118).
-      - name: the shell scripts parse under the sh macOS ships
-        if: runner.os == 'macOS'
-        run: git ls-files -z '*.sh' | xargs -0 -n 1 sh -n
-      - name: the macOS sandbox mechanism supplied by this runner
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p target/platform-evidence
-          sw_vers > target/platform-evidence/sw-vers.txt
-          command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
-          MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
-          test -s target/platform-evidence/sandbox-exec.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: always() && runner.os == 'macOS'
-        with:
-          name: macos-mechanism-${{ github.sha }}-${{ github.run_attempt }}
-          path: target/platform-evidence
-          if-no-files-found: error
       # The same scratch the `compile` test slice keeps, for the same
-      # reason: cold, the five trybuild suites are most of this job's
-      # test run (219 s for one of them on macOS). Restored after the
-      # Rust cache, which never holds `target/tests` (see below).
+      # reason: cold, the trybuild suites dominate this job's test run.
+      # Restored after the Rust cache, which never holds `target/tests`.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: trybuild-scratch
         with:
@@ -627,7 +642,7 @@ jobs:
   # non-exhaustive switch.
   client:
     needs: changes
-    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
+    if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.client == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -720,7 +735,7 @@ jobs:
   # failure or cancel anywhere fails the tree. `changes` is on this list
   # so a red or broken filter job cannot skip the suite and still leave
   # validation green. This is the shared verdict, so release has no
-  # second list of checks.
+  # second list of checks. `gates` here is the collector over both halves.
   validation:
     needs: [changes, models, clippy, test, gates, swap, supply, client]
     if: ${{ always() }}

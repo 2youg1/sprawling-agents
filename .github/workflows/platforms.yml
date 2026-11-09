@@ -1,9 +1,9 @@
 # What ci.yml deliberately does not ask on every push.
 #
 # Four claims live here, and each is about machines rather than about a
-# change. The repository's gates hold on macOS, where ci.yml lints and
-# tests the core packages but never runs xtask, so a platform this
-# workflow does not run is a promise rather than a fact. The published
+# change. The repository's gates and `just check-core` hold on macOS:
+# ci.yml keeps Linux core on the PR path and leaves macOS here, so a
+# push does not wait on the longest single runner (D27). The published
 # packages build with the oldest compiler `rust-version` names, which
 # every other job here, pinned to `rust-toolchain.toml`, never runs. The flake
 # claims a person on NixOS can build this tree with the Rust version
@@ -76,38 +76,76 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # The repository's own gates, on macOS.
-  #
-  # Only the gates: ci.yml's `core` job lints and tests on macOS for every
-  # push, and the desktop server is not a macOS target, so its
-  # packages are judged on Windows alone. What is left for this job is
-  # xtask, which judges the tree the same way on every platform and has
-  # to be shown to.
+  # macOS: source gates, check-core, and the shell/sandbox evidence a
+  # Windows desk cannot supply. ci.yml no longer runs check-core here on
+  # every PR (D27); this scheduled job is the macOS half of that contract.
   macos:
     needs: moved
     if: needs.moved.outputs.verdict == 'run' && (github.event_name != 'workflow_dispatch' || inputs.job == 'all')
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       # `guard` reads one commit and its parent; ci.yml
       # gives the reasoning.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 2
-      - name: install pinned toolchain
-        run: rustup show
+      - uses: ./.github/actions/toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          workspaces: . -> target
+          shared-key: platforms-macos
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # The Zig the console's renderer is built with on every platform
       # (`crates/console_ffi/Spec.lean` D1).
       - uses: ./.github/actions/zig
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        with:
+          tool: cargo-nextest,just
+      # macOS's `sh` is what `install.sh` runs under for a person on a Mac,
+      # and it accepts less than the shells the other platforms run
+      # (`crates/sprawling/spec/Install.lean` section 8-118).
+      - name: the shell scripts parse under the sh macOS ships
+        if: ${{ !cancelled() }}
+        run: git ls-files -z '*.sh' | xargs -0 -n 1 sh -n
+      - name: the macOS sandbox mechanism supplied by this runner
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/platform-evidence
+          sw_vers > target/platform-evidence/sw-vers.txt
+          command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
+          MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
+          test -s target/platform-evidence/sandbox-exec.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: macos-mechanism-${{ github.sha }}-${{ github.run_attempt }}
+          path: target/platform-evidence
+          if-no-files-found: error
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        if: ${{ !cancelled() }}
+        id: trybuild-scratch
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          restore-keys: trybuild-${{ runner.os }}-core-
+      - name: clippy and the suite of the core packages
+        if: ${{ !cancelled() }}
+        run: just check-core
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+      - name: clear the trybuild scratch before later steps
+        if: always()
+        shell: bash
+        run: rm -rf target/tests
       # What the npm and render gates judge. This job repeats the commands
       # ci.yml runs, and repeated its omission as well: both gates refuse
       # an absent tree rather than skipping it, so without this step the
-      # two below are red on a bare runner. The schedule has taken the
-      # `moved` job's skip branch since that change landed, which is the
-      # only reason this was still theoretical here and not there.
+      # two below are red on a bare runner.
       - uses: ./.github/actions/client-artifacts
         if: ${{ !cancelled() }}
       # The render gate drives a Chromium-family engine with `--dump-dom`.

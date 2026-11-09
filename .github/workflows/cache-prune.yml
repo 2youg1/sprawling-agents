@@ -67,3 +67,29 @@ jobs:
             fi
           done < doomed.tsv
           echo "freed $((freed / 1048576)) MiB in $(wc -l < doomed.tsv) entries" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Pressure valve: when the 10 GB budget is nearly full, delete
+          # the oldest disposable families so warm-target and the main
+          # rust-cache keys are not the ones GitHub evicts (D27).
+          gh api --paginate 'repos/{owner}/{repo}/actions/caches?per_page=100' \
+            | jq -s '[.[].actions_caches[] | {id, key, ref, createdAt: .created_at, sizeInBytes: .size_in_bytes}]' > caches.json
+          total=$(jq '[.[].sizeInBytes] | add // 0' caches.json)
+          ceiling=$((8500 * 1048576))
+          if [ "$total" -gt "$ceiling" ]; then
+            jq -r '
+              [.[] | select(.key | test("^(trybuild-|bun-|setup-zig-tarball-|v0-rust-title-)"))]
+              | sort_by(.createdAt)
+              | .[]
+              | [.id, .sizeInBytes, .ref, .key]
+              | @tsv' caches.json > pressure.tsv
+            pressure_freed=0
+            while IFS=$'\t' read -r id size ref key; do
+              [ "$total" -gt "$ceiling" ] || break
+              if gh cache delete "$id"; then
+                total=$((total - size))
+                pressure_freed=$((pressure_freed + size))
+                echo "pressure-deleted $ref $key"
+              fi
+            done < pressure.tsv
+            echo "pressure freed $((pressure_freed / 1048576)) MiB; remaining $((total / 1048576)) MiB" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
