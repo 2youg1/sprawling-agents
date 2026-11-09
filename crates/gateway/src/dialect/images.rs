@@ -35,8 +35,8 @@ impl ImageBytes {
     /// and resized; every other picture crosses byte for byte.
     ///
     /// # Errors
-    /// `E_INVALID_ARGS` when an oversized picture cannot be decoded or
-    /// encoded, or when resizing would discard its animation frames.
+    /// `E_INVALID_ARGS` when dimensions cannot be read, resizing fails,
+    /// or resizing would discard animation frames.
     pub fn insert(
         &mut self,
         picture: &ImageRef,
@@ -44,10 +44,8 @@ impl ImageBytes {
         max_side: Option<NonZeroU32>,
     ) -> Result<(), AxError> {
         let bytes = match max_side {
-            Some(limit) if picture.width.max(picture.height) > limit.get() => {
-                resize_picture(picture, &bytes, limit)?
-            }
-            Some(_) | None => bytes,
+            Some(limit) => resize_picture(picture, bytes, limit)?,
+            None => bytes,
         };
         self.0.insert(
             picture.locator.to_string(),
@@ -118,8 +116,14 @@ fn is_animated(format: image::ImageFormat, bytes: &[u8]) -> image::ImageResult<b
             Ok(image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(bytes))?.has_animation())
         }
         image::ImageFormat::Gif => {
-            let mut frames =
-                image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes))?.into_frames();
+            let mut decoder = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes))?;
+            let limits = image::Limits::default();
+            decoder.set_limits(limits.clone())?;
+            let (width, height) = decoder.dimensions();
+            limits
+                .clone()
+                .reserve_buffer(width, height, image::ColorType::Rgba8)?;
+            let mut frames = decoder.into_frames();
             frames.next().transpose()?;
             Ok(frames.next().transpose()?.is_some())
         }
@@ -128,30 +132,36 @@ fn is_animated(format: image::ImageFormat, bytes: &[u8]) -> image::ImageResult<b
     }
 }
 
-/// One oversized picture as the same format within `max_side`. EXIF
+/// Original bytes when dimensions fit, otherwise the same format within
+/// `max_side`. EXIF
 /// orientation becomes pixels before resizing, so dropping that metadata
 /// cannot rotate the picture the model receives.
 fn resize_picture(
     picture: &ImageRef,
-    bytes: &[u8],
+    bytes: Vec<u8>,
     max_side: NonZeroU32,
 ) -> Result<Vec<u8>, AxError> {
-    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+    let reader = image::ImageReader::new(std::io::Cursor::new(&bytes))
         .with_guessed_format()
         .map_err(|err| invalid_picture(picture, err, max_side.get()))?;
     let format = reader
         .format()
         .ok_or_else(|| invalid_picture(picture, "its format is not recognised", max_side.get()))?;
-    if is_animated(format, bytes).map_err(|err| invalid_picture(picture, err, max_side.get()))? {
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|err| invalid_picture(picture, err, max_side.get()))?;
+    let (width, height) = decoder.dimensions();
+    if width.max(height) <= max_side.get() {
+        drop(decoder);
+        return Ok(bytes);
+    }
+    if is_animated(format, &bytes).map_err(|err| invalid_picture(picture, err, max_side.get()))? {
         return Err(invalid_picture(
             picture,
             "resizing would discard its later animation frames",
             max_side.get(),
         ));
     }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|err| invalid_picture(picture, err, max_side.get()))?;
     let orientation = decoder
         .orientation()
         .map_err(|err| invalid_picture(picture, err, max_side.get()))?;
@@ -168,4 +178,65 @@ fn resize_picture(
         .write_to(&mut std::io::Cursor::new(&mut encoded), format)
         .map_err(|err| invalid_picture(picture, err, max_side.get()))?;
     Ok(encoded)
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    reason = "generated fixtures must encode and the asserted results must decode"
+)]
+mod tests {
+    use super::*;
+
+    /// A tiny frame cannot make an oversized logical GIF screen safe to allocate.
+    #[test]
+    fn gif_canvas_budget_is_checked_before_frame_iteration() {
+        let mut bytes = Vec::new();
+        image::codecs::gif::GifEncoder::new(&mut bytes)
+            .encode_frames([image::Frame::new(image::RgbaImage::new(1, 1))])
+            .expect("valid generated image fixture");
+        bytes
+            .get_mut(6..10)
+            .expect("GIF logical screen dimensions")
+            .copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+        let picture = ImageRef {
+            locator: Locator::cas(kernel::B3Hash::digest(&bytes)),
+            media_type: kernel::ImageType::Gif,
+            width: 1,
+            height: 1,
+        };
+        let err = ImageBytes::default()
+            .insert(&picture, bytes, NonZeroU32::new(8192))
+            .expect_err("oversized canvas must be refused");
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+        assert!(err.to_string().contains("Memory limit"), "{err}");
+    }
+
+    /// A static GIF past the side ceiling still follows the existing resize path.
+    #[test]
+    fn a_static_gif_within_the_allocation_budget_can_be_resized() {
+        let mut bytes = Vec::new();
+        image::codecs::gif::GifEncoder::new(&mut bytes)
+            .encode_frames([image::Frame::new(image::RgbaImage::new(2, 16))])
+            .expect("valid generated image fixture");
+        let picture = ImageRef {
+            locator: Locator::cas(kernel::B3Hash::digest(&bytes)),
+            media_type: kernel::ImageType::Gif,
+            width: 1,
+            height: 1,
+        };
+        let mut images = ImageBytes::default();
+        images
+            .insert(&picture, bytes, NonZeroU32::new(8))
+            .expect("valid generated image fixture");
+        let sent = base64::engine::general_purpose::STANDARD
+            .decode(
+                images
+                    .encoded(&picture.locator)
+                    .expect("resolved fixture locator"),
+            )
+            .expect("valid generated image fixture");
+        let decoded = image::load_from_memory(&sent).expect("valid generated image fixture");
+        assert_eq!((decoded.width(), decoded.height()), (1, 8));
+    }
 }

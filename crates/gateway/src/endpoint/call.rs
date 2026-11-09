@@ -39,8 +39,20 @@ const MODEL_LIST_PAGES: usize = 16;
 pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     let mut found = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
-    for message in chat.messages.iter() {
-        for block in &message.content {
+    for picture in picture_parts(chat) {
+        if seen.insert(picture.locator.to_string()) {
+            found.push(picture);
+        }
+    }
+    found
+}
+
+/// Every image position the dialect will write, including repeated locators and tool attachments.
+fn picture_parts<'a>(chat: &'a ChatRequest<'_>) -> impl Iterator<Item = &'a ImageRef> {
+    chat.messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .flat_map(|block| {
             let pictures: &[ImageRef] = match block {
                 ContentBlock::Image(picture) => std::slice::from_ref(picture),
                 ContentBlock::ToolResult { attachments, .. } => attachments,
@@ -49,14 +61,8 @@ pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
                 | ContentBlock::RedactedThinking { .. }
                 | ContentBlock::ToolUse { .. } => &[],
             };
-            for picture in pictures {
-                if seen.insert(picture.locator.to_string()) {
-                    found.push(picture);
-                }
-            }
-        }
-    }
-    found
+            pictures.iter()
+        })
 }
 
 /// The id one conversation carries to a host that asks for one.
@@ -289,7 +295,11 @@ impl Endpoint {
     fn pictures_for(&self, chat: &ChatRequest) -> Result<ImageBytes, AxError> {
         let found = pictures_in(chat);
         IMAGES_PER_TURN.admit(found.len())?;
-        let max_side = crate::provider::preset::image_max_side(&self.config.base_url, &chat.model);
+        let max_side = crate::provider::preset::image_max_side(
+            &self.config.base_url,
+            &chat.model,
+            picture_parts(chat).count(),
+        );
         let mut images = ImageBytes::default();
         for picture in found {
             let bytes = (self.redemption.images)(&picture.locator)?;
@@ -494,6 +504,73 @@ mod tests {
         assert_eq!(dimensions, (678, 8192));
     }
 
+    /// CAS dimensions govern every occurrence even when references understate them.
+    #[test]
+    fn understated_picture_dimensions_cannot_bypass_the_ceiling() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(8, 9000)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+        let (endpoint, mut called) = deepseek_picture(bytes, kernel::ImageType::Png, 1, 1);
+        let ContentBlock::Image(mut second) = called.chat.messages[0].content[0].clone() else {
+            panic!("fixture must contain a picture");
+        };
+        second.width = 8;
+        second.height = 9000;
+        called.chat.messages.to_mut()[0]
+            .content
+            .push(ContentBlock::Image(second));
+        let wire = endpoint.wire_request(&called).unwrap();
+        let sent = image::load_from_memory(&wire_picture(&wire)).unwrap();
+        assert_eq!((sent.width(), sent.height()), (7, 8192));
+    }
+
+    /// Repeated wire parts reach the lower tier while sharing one CAS redemption.
+    #[test]
+    fn fifteen_repeated_picture_parts_use_the_lower_ceiling() {
+        let mut bytes = Vec::new();
+        image::DynamicImage::new_rgb8(8, 5000)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+        let (mut endpoint, mut called) =
+            deepseek_picture(bytes.clone(), kernel::ImageType::Png, 8, 5000);
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = reads.clone();
+        endpoint.redemption = Redemption::new(
+            resolver(),
+            std::sync::Arc::new(move |_| {
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(bytes.clone())
+            }),
+        );
+        let content = &mut called.chat.messages.to_mut()[0].content;
+        let picture = content[0].clone();
+        content.resize(14, picture.clone());
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(
+            image::load_from_memory(&wire_picture(&wire))
+                .unwrap()
+                .height(),
+            5000
+        );
+        called.chat.messages.to_mut()[0].content.push(picture);
+        let wire = endpoint.wire_request(&called).unwrap();
+        assert_eq!(wire["messages"][0]["content"].as_array().unwrap().len(), 15);
+        assert_eq!(
+            image::load_from_memory(&wire_picture(&wire))
+                .unwrap()
+                .height(),
+            4096
+        );
+        assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
     /// A picture within the documented ceiling pays no decode or
     /// re-encode: exactly the resolver's bytes reach the wire.
     #[test]
@@ -505,7 +582,8 @@ mod tests {
                 image::ImageFormat::Jpeg,
             )
             .unwrap();
-        let (endpoint, called) = deepseek_picture(bytes.clone(), kernel::ImageType::Jpeg, 8, 8);
+        let (endpoint, called) =
+            deepseek_picture(bytes.clone(), kernel::ImageType::Jpeg, 9000, 9000);
 
         let wire = endpoint.wire_request(&called).unwrap();
         assert_eq!(wire_picture(&wire), bytes);

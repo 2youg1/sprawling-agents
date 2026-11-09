@@ -420,8 +420,18 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
 /// The largest picture side this model's vendor documents. The request
 /// edge reads the same row as modality, window and ceiling.
 #[must_use]
-pub(crate) fn image_max_side(base_url: &str, id: &str) -> Option<std::num::NonZeroU32> {
-    model_for(base_url, id)?.image_max_side
+pub(crate) fn image_max_side(
+    base_url: &str,
+    id: &str,
+    picture_parts: usize,
+) -> Option<std::num::NonZeroU32> {
+    let row = model_for(base_url, id)?;
+    let ceiling = row.image_max_side?;
+    if row.id_prefix.starts_with("deepseek-") && picture_parts >= 15 {
+        std::num::NonZeroU32::new(4096).map(|limit| ceiling.min(limit))
+    } else {
+        Some(ceiling)
+    }
 }
 
 /// The thinking levels this table documents for one model. Read only by
