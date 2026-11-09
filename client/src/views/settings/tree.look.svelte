@@ -13,12 +13,15 @@
   // panel; a group entry draws the letter it is reached by at the row's
   // end (client D40), only once the row is hovered or focused so the
   // tree stays a list of words rather than a wall of initials. What
-  // opens arrives with `drop`; what folds goes at once. Branch children
-  // share one left rail so a nest and a page sit on the same column,
-  // and a closed nest never reads as another branch.
+  // opens arrives with `drop`; what folds goes at once. Every clickable
+  // row starts with one mark box of the same size so the nav-column
+  // geometry gate reads one x (card-S9.PANEL1): indent lives in the
+  // label, never in a margin that moves the row. A closed nest never
+  // reads as another branch.
 
   import Glyph from "../parts/glyph.svelte";
   import { Kbd } from "../parts/kbd.svelte";
+  import type { GlyphName } from "../parts/glyph";
   import type { LeafLook, PageLook, TreeLook } from "./tree";
 
   const { nav, branches }: TreeLook = $props();
@@ -27,24 +30,38 @@
     "group/entry relative flex min-h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-label " +
     "text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive " +
     "active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100";
-  // Every row ends in one slot of the same width - the arrow of a page,
-  // the chevron of a fold, or the letter of a group - so every label is
-  // as wide as the next and the rows' words start on one line.
-  const MARK = "flex w-glyph-sm shrink-0 justify-center text-text-faint";
+  // One box of the same size for every row's first mark - a branch glyph,
+  // or an empty seat that keeps the centre - and the same box at the
+  // end for the arrow, the chevron or the letter (docs/frontend-method.md
+  // §7D geometry; card-S9.PANEL1).
+  const MARK = "flex size-glyph-sm shrink-0 items-center justify-center text-text-faint";
   // The accent bar (`chosen`) says which group is the one drawn
   // (docs/frontend-method.md §7B). The page under the panel is named too,
   // but only in its ink: two bars in one tree would leave the eye to guess
   // which is the selection.
   const HERE = "chosen bg-raised text-text";
-  // One rail for every child of a branch; a nest or "more" draws a
-  // second rail inside so the third level stays readable.
-  const CHILDREN = "drop ml-snug flex flex-col gap-hair border-l border-edge pl-snug pb-base";
-  const NESTED = "drop ml-snug flex flex-col gap-hair border-l border-edge pl-snug";
+  // First-level entries share the branch title's first mark. Indent is
+  // `ps-pane` on the label. Only a nest or "more" list adds a second
+  // step of label padding; the list itself is not shifted.
+  const CHILDREN = "drop flex flex-col gap-hair pb-base";
+  const NESTED = "drop flex flex-col gap-hair";
+  const DEPTH = "min-w-0 flex-1 truncate ps-pane";
+  const DEEPER = "min-w-0 flex-1 truncate ps-[calc(var(--spacing-pane)*2)]";
 </script>
 
-{#snippet page(each: PageLook)}
+{#snippet lead(mark: GlyphName | null)}
+  <span class={MARK} aria-hidden="true">
+    {#if mark !== null}
+      <Glyph name={mark} size="sm" />
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet page(each: PageLook, depth: "depth" | "deeper")}
   <a {...each.wire} class={[ENTRY, each.here && "text-text"]}>
-    <span class="min-w-0 flex-1 truncate">{each.label}</span>
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render lead(null)}
+    <span class={depth === "depth" ? DEPTH : DEEPER}>{each.label}</span>
     {#if each.reading !== null}
       <span class="shrink-0 font-mono text-note text-text-faint">{each.reading}</span>
     {/if}
@@ -58,10 +75,12 @@
   </span>
 {/snippet}
 
-{#snippet leaf(entry: LeafLook)}
+{#snippet leaf(entry: LeafLook, depth: "depth" | "deeper")}
   {#if entry.kind === "group"}
     <button {...entry.wire} class={[ENTRY, entry.here && HERE]}>
-      <span class="min-w-0 flex-1 truncate">{entry.label}</span>
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+      {@render lead(null)}
+      <span class={depth === "depth" ? DEPTH : DEEPER}>{entry.label}</span>
       <span
         class={[
           MARK,
@@ -76,7 +95,7 @@
     </button>
   {:else}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-    {@render page(entry)}
+    {@render page(entry, depth)}
   {/if}
 {/snippet}
 
@@ -93,11 +112,8 @@
           branch.fold.open ? "text-text-quiet" : "text-text-faint",
         ]}
       >
-        {#if branch.mark !== null}
-          <span class={MARK} aria-hidden="true">
-            <Glyph name={branch.mark} size="sm" />
-          </span>
-        {/if}
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+        {@render lead(branch.mark)}
         <span class="min-w-0 flex-1 truncate">{branch.fold.label}</span>
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
         {@render chevron(branch.fold.open)}
@@ -108,7 +124,9 @@
             <li>
               {#if entry.kind === "nest"}
                 <button {...entry.fold.wire} class={[ENTRY, "text-text-quiet"]}>
-                  <span class="min-w-0 flex-1 truncate">{entry.fold.label}</span>
+                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                  {@render lead(null)}
+                  <span class={DEPTH}>{entry.fold.label}</span>
                   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                   {@render chevron(entry.fold.open)}
                 </button>
@@ -116,13 +134,13 @@
                   <ul id={entry.fold.list} class={NESTED}>
                     {#each entry.pages as each (each.key)}
                       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-                      <li>{@render page(each)}</li>
+                      <li>{@render page(each, "deeper")}</li>
                     {/each}
                   </ul>
                 {/if}
               {:else}
                 <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-                {@render leaf(entry)}
+                {@render leaf(entry, "depth")}
               {/if}
             </li>
           {/each}
@@ -132,7 +150,9 @@
                 {...branch.more.fold.wire}
                 class={[ENTRY, "text-note text-text-faint hover:text-text-quiet"]}
               >
-                <span class="min-w-0 flex-1 truncate">{branch.more.fold.label}</span>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render lead(null)}
+                <span class={DEPTH}>{branch.more.fold.label}</span>
                 <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
                 {@render chevron(branch.more.fold.open)}
               </button>
@@ -140,7 +160,7 @@
                 <ul id={branch.more.fold.list} class={NESTED}>
                   {#each branch.more.entries as entry (entry.key)}
                     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-                    <li>{@render leaf(entry)}</li>
+                    <li>{@render leaf(entry, "deeper")}</li>
                   {/each}
                 </ul>
               {/if}

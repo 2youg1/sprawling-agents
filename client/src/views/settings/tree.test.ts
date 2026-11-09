@@ -81,6 +81,24 @@ describe("the settings tree", () => {
     expect(standingOf("privacy", talk)).toEqual({ branch: preferences, more: false });
     expect(standingOf("about", talk)).toEqual({ branch: diagnosis, more: false });
   });
+
+  // The advanced group's door to privacy is a cross-branch jump: the seat
+  // must open preferences, not leave diagnosis (and its more) open.
+  test("a cross-branch jump opens the destination's folds", () => {
+    const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
+    const preferences = TREE.findIndex((branch) => branch.word === "settings_branch_preferences");
+    const diagnosis = TREE.findIndex((branch) => branch.word === "settings_branch_diagnosis");
+    expect(foldsOf("advanced", talk)).toEqual({
+      branch: diagnosis,
+      more: true,
+      nests: { buildings: false, record: false },
+    });
+    expect(foldsOf("privacy", talk)).toEqual({
+      branch: preferences,
+      more: false,
+      nests: { buildings: false, record: false },
+    });
+  });
 });
 
 describe("the settings tree's branch marks", () => {
@@ -103,9 +121,7 @@ describe("the settings tree's branch marks", () => {
         hold: () => undefined,
       },
     );
-    expect(
-      Object.fromEntries(look.branches.map((branch) => [branch.key, branch.mark])),
-    ).toEqual({
+    expect(Object.fromEntries(look.branches.map((branch) => [branch.key, branch.mark]))).toEqual({
       settings_branch_city: "city",
       settings_branch_access: "key",
       settings_branch_running: "pulse",
