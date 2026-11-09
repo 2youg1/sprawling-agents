@@ -3,9 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use kernel::config::{Exposure, ExposureFrom, ExposureTable};
 use kernel::{Address, B3Hash, RunId, Seq};
 
 use super::{PromptTools, ToolRead, tool_rows};
@@ -387,4 +388,77 @@ fn an_external_accept_copies_the_candidate_and_keep_leaves_the_old_pin() {
         .unwrap(),
         "# Outside two\n"
     );
+}
+
+/// A raised building has no frozen tool table yet. The page still lists
+/// the built-in tools its first run will admit, and a tier saved on that
+/// list is what the next read — and therefore that run — sees.
+#[test]
+fn a_building_with_no_run_lists_its_tools_and_keeps_a_saved_tier() {
+    let (dir, lab) = city_with_lab();
+    let answer = catalog(dir.path(), &lab);
+    assert!(answer.run.is_none());
+    let names = names_of(&answer);
+    for name in [
+        "read", "tool", "edit", "search", "status", "exec", "plan", "delegate", "playback",
+        "proposal",
+    ] {
+        assert!(names.contains(name), "lab is missing {name}: {names:?}");
+    }
+    assert!(
+        !names.contains("city"),
+        "a building that builds is not offered city"
+    );
+    let read = tool(&answer, "read");
+    assert_eq!(read.exposure, Exposure::Core);
+    assert_eq!(read.from, ExposureFrom::Fixed);
+    assert!(
+        read.current.is_some(),
+        "a standing row carries its definition"
+    );
+
+    let hall = Address::parse("hall").unwrap();
+    let hall_answer = catalog(dir.path(), &hall);
+    let hall_names = names_of(&hall_answer);
+    assert!(hall_names.contains("city"), "hall plans: {hall_names:?}");
+    assert!(!hall_names.contains("exec"));
+    assert!(!hall_names.contains("delegate"));
+    assert!(!hall_names.contains("workshop"));
+
+    run_settings(
+        dir.path(),
+        wire::BuildingSettings {
+            addr: lab.clone(),
+            sandbox: None,
+            mcp: None,
+            desktop: None,
+            context_second_threshold: None,
+            catalog: Some(ExposureTable {
+                tools: [("search".to_owned(), Exposure::Off)].into(),
+                namespaces: BTreeMap::new(),
+                skills: BTreeMap::new(),
+            }),
+            mcp_references: None,
+            skill_pins: None,
+            reading_room: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, b"turn search off"),
+        },
+    )
+    .unwrap();
+    let saved = catalog(dir.path(), &lab);
+    let search = tool(&saved, "search");
+    assert_eq!(search.exposure, Exposure::Off);
+    assert_eq!(search.from, ExposureFrom::Building);
+}
+
+fn names_of(answer: &wire::CatalogAnswer) -> BTreeSet<&str> {
+    answer.tools.iter().map(|row| row.name.as_str()).collect()
+}
+
+fn tool<'a>(answer: &'a wire::CatalogAnswer, name: &str) -> &'a wire::CatalogTool {
+    answer
+        .tools
+        .iter()
+        .find(|row| row.name == name)
+        .unwrap_or_else(|| panic!("{name} is not in the catalog"))
 }

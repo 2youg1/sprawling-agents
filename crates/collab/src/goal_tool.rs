@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, GoalEntry, GoalId, GoalResource, Payload,
-    RenderIntent, RunId, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    RenderIntent, RunId, Temporal, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -167,9 +167,12 @@ impl GoalTool {
     /// `room` is what the tool declares it writes into; the register
     /// itself is the city's, and the gate that matters is the clash.
     ///
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
     /// # Errors
-    /// Propagates a malformed tool name or parameter schema.
-    pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<GoalTool, AxError> {
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -208,14 +211,25 @@ impl GoalTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("statement".to_owned())]),
         );
+        Ok(ToolDef {
+            name: ToolName::parse("goal")?,
+            description:
+                "Claim the ground you are about to work on, so two residents do not edit the \
+                          same thing; refused if someone holds it already."
+                    .to_owned(),
+            input_schema: Payload::new(params)?,
+        })
+    }
+
+    /// # Errors
+    /// Propagates a malformed tool name or parameter schema.
+    pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<GoalTool, AxError> {
+        let defined = Self::definition()?;
         Ok(GoalTool {
             meta: ToolMeta {
-                name: ToolName::parse("goal")?,
-                disclosure:
-                    "Claim the ground you are about to work on, so two residents do not edit the \
-                     same thing; refused if someone holds it already."
-                        .to_owned(),
-                params: Payload::new(params)?,
+                name: defined.name,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,

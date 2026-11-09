@@ -367,9 +367,13 @@
     "en": "{n} bytes less in every request",
     "zh": "每次请求少 {n} 字节"
   },
+  "catalog_before_run": {
+    "en": "No run yet. These are the tools the next run starts with, and a save applies to that run. A connector's own tools appear after a run connects it.",
+    "zh": "还没有 run。这里是下一个 run 起步时的工具，保存对那个 run 生效。连接器自己的工具要等一次 run 连上之后才列出。"
+  },
   "catalog_no_run": {
-    "en": "No run yet: the tools appear here once this building's first run has started.",
-    "zh": "还没有 run：这栋楼的第一个 run 开始之后，这里列出它的工具。"
+    "en": "No run yet, and this building lists no built-in tools.",
+    "zh": "还没有 run，这栋楼也没有列出内建工具。"
   },
   "catalog_group": {
     "en": "{n} tools · {core} core · {dormant} on demand · {off} off",

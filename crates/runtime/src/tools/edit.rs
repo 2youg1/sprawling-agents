@@ -28,8 +28,8 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
-    ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -72,42 +72,55 @@ impl EditTool {
     const NEW_STRING: &'static str = "new_string";
     const REPLACE_ALL: &'static str = "replace_all";
 
+    /// The name, disclosure and schema `new` registers. The catalog page
+    /// reads the same value before a run has frozen a table.
+    ///
+    /// # Errors
+    /// A schema that does not build, which these literals cannot produce.
+    pub fn definition() -> Result<ToolDef, AxError> {
+        Ok(ToolDef {
+            name: ToolName::parse(Self::NAME)?,
+            description: "Performs exact string replacements in a file you have read in \
+                          this run: `old_string` must match exactly once, or set `replace_all` \
+                          to change every occurrence. A file that changed after your read is \
+                          refused and not overwritten, and the refusal shows the passage as it \
+                          now reads. `old_string: \"\"` creates a file that does not exist."
+                .to_owned(),
+            input_schema: Payload::of(&serde_json::json!({
+                "type": "object",
+                "properties": {
+                    Self::FILE_PATH: { "type": "string",
+                        "description": "the file to modify, relative to the city root" },
+                    Self::OLD_STRING: { "type": "string", "description":
+                        "the exact text to replace; \"\" creates a file that does not exist" },
+                    Self::NEW_STRING: { "type": "string",
+                        "description": "the text to replace it with, or the whole file when creating" },
+                    Self::REPLACE_ALL: { "type": "boolean",
+                        "description": "replace every occurrence of old_string (default false)" },
+                },
+                "required": [Self::FILE_PATH, Self::OLD_STRING, Self::NEW_STRING],
+            }))?,
+        })
+    }
+
     pub fn new(
         city_root: &Path,
         domain: kernel::Address,
         writable: kernel::WriteDomain,
         desk: EditDesk,
     ) -> Result<EditTool, AxError> {
-        let params = Payload::of(&serde_json::json!({
-            "type": "object",
-            "properties": {
-                Self::FILE_PATH: { "type": "string",
-                    "description": "the file to modify, relative to the city root" },
-                Self::OLD_STRING: { "type": "string", "description":
-                    "the exact text to replace; \"\" creates a file that does not exist" },
-                Self::NEW_STRING: { "type": "string",
-                    "description": "the text to replace it with, or the whole file when creating" },
-                Self::REPLACE_ALL: { "type": "boolean",
-                    "description": "replace every occurrence of old_string (default false)" },
-            },
-            "required": [Self::FILE_PATH, Self::OLD_STRING, Self::NEW_STRING],
-        }))?;
+        let defined = Self::definition()?;
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
             writable,
             desk,
             meta: ToolMeta {
-                name: ToolName::parse(Self::NAME)?,
+                name: defined.name,
                 // The write limit is not spelled here: it can change
                 // while the run goes, and these bytes are frozen with the
                 // tool list (§8-62); the note a change appends spells it.
-                disclosure: "Performs exact string replacements in a file you have read in \
-                             this run: `old_string` must match exactly once, or set `replace_all` \
-                             to change every occurrence. A file that changed after your read is \
-                             refused and not overwritten, and the refusal shows the passage as it \
-                             now reads. `old_string: \"\"` creates a file that does not exist."
-                    .to_owned(),
-                params,
+                disclosure: defined.description,
+                params: defined.input_schema,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Light,
                 timeout: None,

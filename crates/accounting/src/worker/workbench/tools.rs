@@ -218,6 +218,8 @@ impl Laying {
         // knows which tools are the city's own.
         let own =
             |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
+        // Same built-ins as `views::catalog::standing`; a tool added here
+        // and not there stays off that page until the first run.
         let mut admitted: Vec<Filed> = vec![
             own(Box::new(archive_tool)),
             own(Box::new(claim_tool)),
@@ -231,31 +233,17 @@ impl Laying {
             own(Box::new(read)),
             own(Box::new(search)),
             own(Box::new(succeed)),
-            // The door to the dormant index (`crates/runtime/Spec.lean` §8-60).
             own(Box::new(runtime::ToolTool::new(Arc::clone(&catalog))?)),
         ];
-        // What this building's residents are for decides the rest of
-        // the bench. City Hall writes Markdown and plans: it gets no
-        // `exec`, no `delegate` and no `workshop`, and it gets the one
-        // door onto the shape of the city instead. Holding that in the
-        // tool table rather than in the wording of `MAYOR.md` is the
-        // whole point - an invariant a prompt is asked to keep is not
-        // an invariant (`crates/city/Spec.lean` §8-22).
-        match city::vocation_of(site.building.addr()) {
-            city::Vocation::Builds => {
-                admitted.push(own(Box::new(self.exec_tool(site, at, policy.reader())?)));
-                admitted.push(own(Box::new(collab::DelegateTool::new(Arc::clone(
-                    &delegates,
-                ))?)));
-                admitted.push(own(Box::new(collab::WorkshopTool::new(
-                    Arc::clone(&desks.workshop),
-                    Arc::clone(&delegates),
-                )?)));
-            }
-            city::Vocation::Plans => {
-                admitted.push(own(Box::new(city::CityTool::new(&self.city_root)?)));
-            }
-        }
+        self.push_vocation_tools(
+            &mut admitted,
+            VocationParts {
+                site,
+                at,
+                desks,
+                policy: policy.reader(),
+            },
+        )?;
         admitted.extend(self.filed_beyond_sprawling(site, addr, &bound)?);
         held(&catalog, "lay out the catalog")?.set_exposure(site.config.catalog.clone());
         register(&catalog, &mut bench, admitted, &keeper)?;
@@ -270,6 +258,39 @@ impl Laying {
             shown,
             rule_candidates: candidates,
         })
+    }
+
+    /// City Hall plans; every other building builds (`crates/city/Spec.lean` §8-22).
+    ///
+    /// # Errors
+    /// Propagates a tool that refuses to be built.
+    fn push_vocation_tools(
+        &self,
+        admitted: &mut Vec<Filed>,
+        parts: VocationParts<'_>,
+    ) -> Result<(), AxError> {
+        let own =
+            |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
+        match city::vocation_of(parts.site.building.addr()) {
+            city::Vocation::Builds => {
+                admitted.push(own(Box::new(self.exec_tool(
+                    parts.site,
+                    parts.at,
+                    parts.policy,
+                )?)));
+                admitted.push(own(Box::new(collab::DelegateTool::new(Arc::clone(
+                    &parts.desks.delegates,
+                ))?)));
+                admitted.push(own(Box::new(collab::WorkshopTool::new(
+                    Arc::clone(&parts.desks.workshop),
+                    Arc::clone(&parts.desks.delegates),
+                )?)));
+            }
+            city::Vocation::Plans => {
+                admitted.push(own(Box::new(city::CityTool::new(&self.city_root)?)));
+            }
+        }
+        Ok(())
     }
 
     /// The run's `edit`: the building's domain is the ceiling and the
@@ -325,6 +346,14 @@ impl Laying {
 
 /// One admitted tool and the namespace the catalog lists it under.
 type Filed = (Namespace, Box<dyn kernel::Tool>);
+
+/// What vocation admission reads from the dispatch.
+struct VocationParts<'a> {
+    site: &'a Site,
+    at: &'a Assignment,
+    desks: &'a BenchDesks,
+    policy: runtime::PolicyReader,
+}
 
 /// Files every built tool in the catalog, at the exposure the run's
 /// `[catalog]` tables give it, and routes on the bench every one the
@@ -514,4 +543,30 @@ impl Laying {
             .clocked(site.clock.clone())
             .cataloging(Box::new(read_catalog)))
     }
+}
+
+/// The built-in tools filed outside `sprawling` that a catalog page can
+/// name before a run connects anything: playback and proposal always,
+/// `web_search` when the frozen `[search]` names a supplier.
+///
+/// # Errors
+/// Propagates a definition whose schema does not build.
+pub(crate) fn catalog_builtins(
+    search: Option<&kernel::config::SearchSupplier>,
+) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {
+    let record = kernel::ReservedNamespace::Record.as_str();
+    let mut tools = vec![
+        (record, playback::PlaybackTool::definition()?),
+        (
+            record,
+            proposal::ProposalTool::<crate::worker::Relay>::definition()?,
+        ),
+    ];
+    if let Some(supplier) = search {
+        tools.push((
+            kernel::ReservedNamespace::Web.as_str(),
+            search::WebSearch::definition(supplier)?,
+        ));
+    }
+    Ok(tools)
 }

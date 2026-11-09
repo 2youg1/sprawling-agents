@@ -29,6 +29,8 @@ mod tools;
 
 pub(super) use standing::{Lending, Placing, lend_tree};
 
+pub(crate) use tools::catalog_builtins;
+
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
 /// laid out in the lane that drives the run (`crates/sprawling/Spec.lean` §8-113).

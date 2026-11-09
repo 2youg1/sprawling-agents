@@ -315,6 +315,9 @@ export interface CatalogLook {
   readonly onPane: (pane: CatalogPane) => void;
   readonly meter: string;
   readonly delta: string | undefined;
+  // Said on the tools pane before this building has frozen a run: the
+  // rows are the tools that run will admit, and a save reaches it.
+  readonly beforeRun: string | undefined;
   readonly empty: string | undefined;
   // Shown on the models and rules panes: what RULES.toml governs here.
   readonly rulesNote: string | undefined;
@@ -494,6 +497,10 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
             n: count(Math.abs(delta)),
           })
         : undefined,
+    beforeRun:
+      seat.pane === "tools" && seat.answer.run == null && groups.length > 0
+        ? say(lang, "catalog_before_run")
+        : undefined,
     empty: emptyOf(seat, groups.length, lang),
     rulesNote:
       seat.pane === "models"
@@ -562,7 +569,12 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
 
 function emptyOf(seat: Seat, groups: number, lang: Lang): string | undefined {
   if (seat.pane === "models" || seat.pane === "rules") return undefined;
-  if (seat.answer.run == null && groups === 0) return say(lang, "catalog_no_run");
+  // Only the tools pane says a run is what fills it. Skills and connectors
+  // have their own empty sentences, and a tools pane that already lists
+  // the standing tools is not empty.
+  if (seat.pane === "tools" && seat.answer.run == null && groups === 0) {
+    return say(lang, "catalog_no_run");
+  }
   if (groups === 0 && seat.unusedOnly) return say(lang, "catalog_no_unused");
   if (groups === 0) {
     return say(lang, seat.pane === "mcp" ? "catalog_mcp_empty" : "catalog_pane_empty");
@@ -789,10 +801,12 @@ function comparisonOf(
   currentSchema: Readonly<Record<string, unknown>> | undefined,
   audit: string | undefined,
 ): RowLook["comparison"] {
-  if (pinnedText === undefined && currentText === undefined) return undefined;
+  // A standing row has only `current`; opening a compare control for it
+  // would show an empty pinned column with no accessible name.
+  if (pinnedText === undefined || currentText === undefined) return undefined;
   return {
-    pinned: `${pinnedText ?? ""}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
-    current: `${currentText ?? ""}\n${JSON.stringify(currentSchema ?? {}, null, 2)}`,
+    pinned: `${pinnedText}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
+    current: `${currentText}\n${JSON.stringify(currentSchema ?? {}, null, 2)}`,
     audit,
   };
 }
