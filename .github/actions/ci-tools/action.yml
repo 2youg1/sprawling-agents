@@ -1,0 +1,40 @@
+# Install the small development tools CI shares, without making every job
+# retry the same anonymous GitHub Release download. The install-action pin
+# selects the tool versions; hashing this directory makes that pin, this
+# staging contract and the requested tool set part of the cache identity.
+name: CI tools
+description: Restore declared CI tool binaries, or install and cache them.
+inputs:
+  tool:
+    description: Comma- or whitespace-separated tool names for install-action.
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      shell: bash
+      env:
+        REQUEST: ${{ inputs.tool }}
+      run: bash "$GITHUB_ACTION_PATH/prepare.sh" "$REQUEST" "${{ hashFiles('.github/actions/ci-tools/**') }}"
+    - id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ env.CI_TOOLS_BIN }}
+        key: ${{ env.CI_TOOLS_KEY }}
+    - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        tool: ${{ inputs.tool }}
+    - name: stage and verify every declared tool
+      shell: bash
+      env:
+        REQUEST: ${{ inputs.tool }}
+      run: bash "$GITHUB_ACTION_PATH/finish.sh" "${{ steps.cache.outputs.cache-hit }}" "$REQUEST"
+    # A concurrent job may save this immutable key first. That lost race only
+    # forgoes an optimization; it must not fail a job whose tools answered.
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      if: steps.cache.outputs.cache-hit != 'true'
+      continue-on-error: true
+      with:
+        path: ${{ env.CI_TOOLS_BIN }}
+        key: ${{ env.CI_TOOLS_KEY }}

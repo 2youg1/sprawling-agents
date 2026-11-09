@@ -61,7 +61,7 @@ runs:
         restore-keys: bun-${{ runner.os }}-
     # The recipe runner, because the command below is a recipe. Jobs that
     # already install it pay nothing: the action is a no-op on a hit.
-    - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
+    - uses: ./.github/actions/ci-tools
       if: steps.bundle.outputs.cache-hit != 'true'
       with:
         tool: just
