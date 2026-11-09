@@ -5,12 +5,12 @@
 <p><a href="../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
 <p>
-  <a href="https://docs.rs/sprawling"><img alt="docs.rs" src="https://docs.rs/sprawling/badge.svg"></a>
-  <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
-  <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
-  <a href="../LICENSE"><img alt="License" src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5"></a>
-  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img alt="Ask DeepWiki" src="https://img.shields.io/badge/Ask-DeepWiki-2B6CB0?labelColor=171717"></a>
-  <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://docs.rs/sprawling"><img src="https://docs.rs/sprawling/badge.svg" alt="docs.rs"></a>
+  <a href="https://crates.io/crates/sprawling"><img src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584" alt="crates.io"></a>
+  <a href="https://www.npmjs.com/package/sprawling"><img src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837" alt="npm"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5" alt="License"></a>
+  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img src="https://img.shields.io/badge/Ask-DeepWiki-2B6CB0?labelColor=171717" alt="Ask DeepWiki"></a>
+  <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 </p>
 
 > **寻找协作者与同路人**：`sprawling` 仍在开发中，欢迎新的协作者，也欢迎各种反馈。<br>
