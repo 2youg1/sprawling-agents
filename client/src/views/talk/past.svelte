@@ -15,8 +15,9 @@
   // client D100): until then the line under the rule says it is
   // opening, and a refusal stays there with `/stop` beside it.
   //
-  // In the panorama tier's band only the way back stands; the session
-  // pane above it shows the session.
+  // In the panorama tier's band only the way back stands; on the desktop
+  // the gauge strip in this column (outside the conversation landmark)
+  // shows the session (workspace.svelte, client D113).
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
   import { say } from "../../core/lang";

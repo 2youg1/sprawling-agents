@@ -24,7 +24,7 @@
   import type { Address, RoundsAnswer } from "../../wire";
   import { openContext } from "../inspect/open.svelte";
   import Look from "./gauge.look.svelte";
-  import { contextOf, remindersOf, ringOf, sessionRunOf } from "./gauge";
+  import { contextOf, lockOfConfig, remindersOf, ringOf, sessionRunOf } from "./gauge";
   import type { Reminders } from "./gauge";
 
   interface Props {
@@ -54,12 +54,15 @@
   });
 
   let reminders = $state<Reminders>(remindersOf(undefined));
+  let lockTokens = $state<number | null>(null);
   $effect(() => {
     const at = room;
     reminders = remindersOf(undefined);
+    lockTokens = null;
     if (at === null) return;
     return u.conn.asking.ask({ config: { addr: at } }).subscribe((held) => {
       reminders = remindersOf(held);
+      lockTokens = lockOfConfig(held);
     });
   });
 
@@ -70,6 +73,7 @@
         rounds?.turns ?? [],
         $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
         reminders,
+        lockTokens,
       ),
     ),
   );

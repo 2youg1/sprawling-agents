@@ -150,10 +150,12 @@ impl Run<Active> {
                 .dispatched_by
                 .handed_down_by(plan.predecessor, plan.parent),
         );
-        let gauge = ContextGauge::new(
-            kernel::Tokens::new(plan.shape.context_tokens),
-            plan.second_threshold,
-        );
+        let model_window = kernel::Tokens::new(plan.shape.context_tokens);
+        let (window, locked) = match plan.context_lock {
+            Some(lock) => (lock.effective(model_window), true),
+            None => (model_window, false),
+        };
+        let gauge = ContextGauge::locked(window, plan.second_threshold, locked);
         let watchdog = crate::Watchdog::new(plan.retries, plan.run);
         Ok(Run {
             plan,
@@ -352,6 +354,19 @@ impl Run<Active> {
             .and_then(|usage| self.state.gauge.observe(usage.input_tokens))
         {
             self.state.conversation.push_reminder(&reminder);
+            // Auto-ask the succeed desk only when the run continues: a
+            // zero-call turn concludes in this same step, before the model
+            // can see LockReached or write Handoff.md. Continuing turns
+            // keep the desk ask so landing can open a successor after the
+            // model has had a chance to hand off (or call `succeed`).
+            if reminder.asks_succession()
+                && report.calls_made() > 0
+                && let Ok(mut desk) = self.plan.succession.lock()
+            {
+                desk.ask(crate::Succession {
+                    reason: "context lock reached".to_owned(),
+                });
+            }
         }
         if report.calls_made() == 0 {
             self.state.lines.barrier(ledger)?;

@@ -309,6 +309,10 @@ pub(crate) fn config_answer(
         min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
         max: kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
     };
+    let building = city::Building::of(addr)?;
+    let context_lock_tokens = city::load(city_root, building.addr())?
+        .context_lock()
+        .map(|lock| lock.tokens().get());
     Ok(wire::ConfigAnswer {
         addr: addr.clone(),
         effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| wire::SettledEffort {
@@ -328,6 +332,7 @@ pub(crate) fn config_answer(
             },
         ),
         first: Some(kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT),
+        context_lock_tokens,
         tuning: wire::TuningDefaults {
             from: wire::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,

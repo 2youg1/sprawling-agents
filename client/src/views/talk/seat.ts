@@ -8,15 +8,16 @@
 // screen"): the address line, which every tier draws in the box's
 // placeholder or at a past session's head (4-10a), and the frozen facts
 // of the session - model, effort, mode, policy, sandbox - which the first
-// message head states unless the workbench's gauge above the column
-// already does (docs/frontend-method.md §7D).
+// message head states unless the panorama gauge strip above the
+// conversation landmark already does (docs/frontend-method.md §7D,
+// client D113).
 //
 // `page` is the conversation on the zen and blend page; `workbench` is the
-// same column under the panorama workbench's chosen session, with the run
-// whose facts that session's gauge states (`world/chosen.svelte.ts`'s
-// answer, or a past session's last run); `specimen` is a `#/gallery`
-// fixture, which draws a thread with no address line, because the
-// fixture is not the page and names no room a palette could leave.
+// same column in the panorama tier with a gauge strip that states the
+// frozen facts of `gauged` (`world/chosen.svelte.ts`'s answer, or a past
+// session's last run); `specimen` is a `#/gallery` fixture, which draws a
+// thread with no address line, because the fixture is not the page and
+// names no room a palette could leave.
 
 import type { RunId } from "../../wire";
 

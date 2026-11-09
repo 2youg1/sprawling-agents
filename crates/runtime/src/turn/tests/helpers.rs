@@ -189,6 +189,8 @@ pub(super) fn run_plan() -> crate::run::RunPlan {
         inherited: Vec::new(),
         shape: shape(),
         second_threshold: None,
+        context_lock: None,
+        succession: std::sync::Arc::new(std::sync::Mutex::new(crate::SuccessionDesk::new())),
         context: crate::ContextReading::default(),
         prefix: prefix(),
         policy: BuildingPolicy::default(),

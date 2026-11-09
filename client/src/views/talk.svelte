@@ -10,10 +10,10 @@
   // - words flowing down it, the box at its foot. Every run in the room
   // is a stretch of the same thread; what waits for the person is a card
   // in it; and the box either steers the run that is going or opens the
-  // next one. On the panorama workbench the column stands under the chosen
-  // session and draws the whole thread (client/Spec.lean §7K); only on one
-  // column, under the world layer's sheet, is it a band: the last thing
-  // said, and the same box (docs/frontend-method.md §7I).
+  // next one. On the panorama tier the gauge strip sits in this column
+  // above the conversation landmark (workspace.svelte, client D113 / §7K);
+  // only on one column, under the world layer's sheet, is it a band: the
+  // last thing said, and the same box (docs/frontend-method.md §7I).
   //
   // A session is a stretch of the room, not the room: runs
   // before it fold behind one line, and how it began is drawn where the

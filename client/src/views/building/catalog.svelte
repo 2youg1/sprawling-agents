@@ -9,11 +9,12 @@
   // The unified building catalog: one answer, one draft and one save.
   // A refusal leaves the draft untouched; only an answer equal to what
   // was sent marks it saved. The tools / skills / MCP panes edit the
-  // catalog table; the models and rules panes edit this building's
-  // RULES.toml through the same PutRules door the settings page uses.
+  // catalog table; the models, context and rules panes edit this
+  // building's RULES.toml through the same PutRules door.
   import { untrack } from "svelte";
   import { readable } from "svelte/store";
 
+  import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
   import {
     configureCatalog,
@@ -23,12 +24,14 @@
   } from "../../core/commands";
   import { readDocument } from "../../core/document";
   import { fill, say } from "../../core/lang";
-  import { QUERIES } from "../../core/asking";
+  import { toFragment } from "../../core/route";
+  import { kilo } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Answer, CatalogAnswer, Effort, Query } from "../../wire";
   import { TIERS, choiceOf, tiersOf } from "./subagent";
   import type { Tier } from "./subagent";
   import Button from "../parts/button.svelte";
+  import Field from "../parts/field.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { rulesAt } from "../settings/files";
   import {
@@ -44,6 +47,7 @@
   import { catalogLook, draftOf, selectionOf, settleSave } from "./catalog";
   import type { CatalogPane, Scope, Selection } from "./catalog";
   import { takeCatalogFocus } from "./catalog_focus.svelte";
+  import { lockOf, lockShare, withLock } from "./context_lock";
   import Look from "./catalog.look.svelte";
   import { textBoxWire } from "./text_box";
   import TextBox from "./text_box.look.svelte";
@@ -93,6 +97,7 @@
       case "skills":
       case "tools":
         pane = focus;
+        return;
     }
   });
 
@@ -212,14 +217,84 @@
     awaitReceipt(mine, rulesSlot);
   }
 
+  // Context lock field, kept beside the RULES draft so PutRules is the
+  // only write door for this pane.
+  let lockBox = $state("");
+  let lockEdited = $state(false);
+  // True only while a saveLock PutRules is in flight: rulesSaving is
+  // shared with saveRules / saveChoice, so a models-pane save must not
+  // clear an unfinished lock edit.
+  let lockSaving = $state(false);
+  $effect(() => {
+    if (onDisk === null || lockEdited) return;
+    const held = lockOf(onDisk);
+    lockBox = held === null ? "" : String(held);
+  });
+  // Empty clears the key; a non-positive or non-integer value is not a
+  // clear — save must refuse rather than delete the lock on disk.
+  const lockField = $derived.by(
+    (): { kind: "clear" } | { kind: "set"; tokens: number } | { kind: "invalid" } => {
+      const trimmed = lockBox.trim();
+      if (trimmed === "") return { kind: "clear" };
+      const tokens = Number(trimmed);
+      return Number.isInteger(tokens) && tokens > 0 ? { kind: "set", tokens } : { kind: "invalid" };
+    },
+  );
+  const lockTokens = $derived(lockField.kind === "set" ? lockField.tokens : null);
+
   // The direct sub-agent model. Easy / medium / hard fill these three
   // selects; saving writes `[workspace_models.choice]` and leaves the
-  // shortcuts in the file.
+  // shortcuts in the file. The same endpoints answer feeds the context
+  // pane's model-window share.
   const endpointAsked = $derived(u.conn.asking.ask(QUERIES.endpoints));
   const endpointRead = $derived(
     readAnswer($endpointAsked, (held) => ("endpoints" in held ? held.endpoints : undefined)),
   );
   const endpointList = $derived(endpointRead.kind === "held" ? endpointRead.value.endpoints : []);
+  const modelWindow = $derived.by(() => {
+    let largest: number | null = null;
+    for (const endpoint of endpointList) {
+      for (const model of endpoint.models) {
+        const window = model.context_tokens;
+        if (window === undefined || window === null || window <= 0) continue;
+        if (largest === null || window > largest) largest = window;
+      }
+    }
+    return largest;
+  });
+  const share = $derived(
+    lockTokens === null || modelWindow === null ? null : lockShare(lockTokens, modelWindow),
+  );
+
+  function saveLock(): void {
+    if (onDisk === null || lockField.kind === "invalid" || rulesSaving.kind === "saving") return;
+    // PutRules writes only the disk base plus the lock key: unfinished
+    // rules-pane prose is not committed by a lock save. The editor draft
+    // still receives the same key rewrite so unsaved prose is not wiped.
+    const tokens = lockField.kind === "set" ? lockField.tokens : null;
+    const next = withLock(onDisk, tokens);
+    if (!u.send(putRules(building, onDisk, next))) return;
+    rulesDraft = withLock(rulesDraft, tokens);
+    // Keep lockEdited until this lock write answers: clearing it here
+    // re-runs the sync effect against the still-old onDisk and wipes
+    // the box. Other PutRules saves share rulesSaving and must not clear.
+    lockSaving = true;
+    const mine = markSent(onDisk);
+    rulesSaving = mine;
+    awaitReceipt(mine, rulesSlot);
+  }
+  $effect(() => {
+    if (!lockSaving) return;
+    if (rulesSaving.kind === "saved") {
+      lockEdited = false;
+      lockSaving = false;
+      return;
+    }
+    if (rulesSaving.kind === "refused" || rulesSaving.kind === "unverified") {
+      lockSaving = false;
+    }
+  });
+
   let provider = $state("");
   let modelId = $state("");
   let level = $state<Effort>("medium");
@@ -470,6 +545,68 @@
   </div>
 {/snippet}
 
+{#snippet context()}
+  <div class="flex min-w-0 flex-col gap-base">
+    <Field
+      label={say($lang, "catalog_context_lock")}
+      kind="number"
+      step={1}
+      suffix={say($lang, "catalog_context_lock_unit")}
+      mono
+      placeholder={say($lang, "catalog_context_lock_hint")}
+      value={lockBox}
+      onInput={(next: string) => {
+        lockBox = next;
+        lockEdited = true;
+      }}
+    />
+    {#if modelWindow === null}
+      <p class="text-note text-text-faint">{say($lang, "catalog_context_window_unknown")}</p>
+    {:else}
+      <p class="text-note text-text-quiet">
+        {fill(say($lang, "catalog_context_window"), { window: kilo(modelWindow) })}
+        {#if share !== null}
+          · {fill(say($lang, "catalog_context_share"), { n: String(share) })}
+        {/if}
+      </p>
+    {/if}
+    <p class="text-note text-text-faint">
+      {say($lang, "catalog_context_warm")}
+      <a
+        class="text-accent underline-offset-2 hover:underline"
+        href={toFragment({ kind: "setup", group: "accounts" })}
+      >
+        {say($lang, "nav_settings")}
+      </a>
+    </p>
+    <span class="flex flex-wrap items-center gap-base">
+      <Button
+        label={say($lang, "catalog_context_save")}
+        tone="primary"
+        loading={rulesSaving.kind === "saving"}
+        {...lockEdited && lockField.kind !== "invalid" && rulesSaving.kind !== "saving"
+          ? {}
+          : {
+              why: say(
+                $lang,
+                lockField.kind === "invalid"
+                  ? "catalog_context_lock_invalid"
+                  : rulesSaving.kind === "saving"
+                    ? "subagent_saving"
+                    : "catalog_unchanged",
+              ),
+            }}
+        onPress={saveLock}
+      />
+      {#if rulesSaving.kind === "saved"}
+        <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+      {:else if rulesSaving.kind === "refused"}
+        <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
+      {/if}
+    </span>
+  </div>
+{/snippet}
+
 <section class="flex max-w-page min-w-0 flex-col gap-wide" aria-label={say($lang, "bld_catalog")}>
   <h2 class="sr-only">{say($lang, "bld_catalog")}</h2>
   {#if read.kind === "unavailable"}
@@ -477,7 +614,14 @@
   {:else if look === undefined}
     <p class="text-text-faint">…</p>
   {:else}
-    <Look {...look} rules={pane === "models" || pane === "rules" ? rules : undefined} />
+    <Look
+      {...look}
+      rules={pane === "models" || pane === "rules"
+        ? rules
+        : pane === "context"
+          ? context
+          : undefined}
+    />
     {#if saved}
       <p class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</p>
     {/if}

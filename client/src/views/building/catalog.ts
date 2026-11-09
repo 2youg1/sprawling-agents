@@ -297,11 +297,18 @@ const CHANGE_WORD: Record<CatalogChange, Key> = {
 };
 
 // Which pane of the catalog is drawn: tools the building owns, skills,
-// MCP connectors, subagent model recommendations (via RULES.toml), and
-// the RULES.toml editor itself.
-export type CatalogPane = "tools" | "skills" | "mcp" | "models" | "rules";
+// MCP connectors, subagent model recommendations (via RULES.toml), the
+// context lock (also RULES.toml), and the RULES.toml editor itself.
+export type CatalogPane = "tools" | "skills" | "mcp" | "models" | "context" | "rules";
 
-export const CATALOG_PANES: readonly CatalogPane[] = ["tools", "skills", "mcp", "models", "rules"];
+export const CATALOG_PANES: readonly CatalogPane[] = [
+  "tools",
+  "skills",
+  "mcp",
+  "models",
+  "context",
+  "rules",
+];
 
 export interface CatalogLook {
   readonly scopeLabel: string;
@@ -464,11 +471,12 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     skills: "catalog_door_skills",
     mcp: "catalog_door_mcp",
     models: "catalog_door_models",
+    context: "catalog_door_context",
     rules: "catalog_door_rules",
   };
   // RULES.toml and model notes are always this building's file; the
   // catalog's city/building scope is for the tool table alone.
-  const scoped = seat.pane !== "models" && seat.pane !== "rules";
+  const scoped = seat.pane !== "models" && seat.pane !== "context" && seat.pane !== "rules";
   return {
     scopeLabel: say(lang, "catalog_scope"),
     scopes: scoped
@@ -505,9 +513,11 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     rulesNote:
       seat.pane === "models"
         ? say(lang, "catalog_models_note")
-        : seat.pane === "rules"
-          ? say(lang, "catalog_rules_note")
-          : undefined,
+        : seat.pane === "context"
+          ? say(lang, "catalog_context_note")
+          : seat.pane === "rules"
+            ? say(lang, "catalog_rules_note")
+            : undefined,
     groups,
     save: {
       label: say(lang, seat.scope === "building" ? "catalog_save_building" : "catalog_save_city"),
@@ -550,6 +560,7 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
             for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
             break;
           case "models":
+          case "context":
           case "rules":
             break;
         }
@@ -568,7 +579,7 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
 }
 
 function emptyOf(seat: Seat, groups: number, lang: Lang): string | undefined {
-  if (seat.pane === "models" || seat.pane === "rules") return undefined;
+  if (seat.pane === "models" || seat.pane === "context" || seat.pane === "rules") return undefined;
   // Only the tools pane says a run is what fills it. Skills and connectors
   // have their own empty sentences, and a tools pane that already lists
   // the standing tools is not empty.

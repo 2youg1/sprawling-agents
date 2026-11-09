@@ -24,7 +24,7 @@
   import type { Address, RoundsAnswer, RunId } from "../../wire";
   import { costReading, runSpend } from "../pricing";
   import Bounds from "../talk/bounds.svelte";
-  import { contextOf, remindersOf, remindersSaid, usedPercent } from "../talk/gauge";
+  import { contextOf, lockOfConfig, remindersOf, remindersSaid, usedPercent } from "../talk/gauge";
   import { frozenSaid } from "../talk/frozen";
   import { speedOf } from "./speed";
 
@@ -48,7 +48,7 @@
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
   );
   const turns = $derived(rounds?.turns ?? []);
-  const context = $derived(contextOf(turns, served, remindersOf($config)));
+  const context = $derived(contextOf(turns, served, remindersOf($config), lockOfConfig($config)));
   // The four values the run was dispatched under, from its opening.
   const policy = $derived(rounds?.opening?.policy ?? null);
 

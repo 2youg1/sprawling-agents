@@ -207,6 +207,9 @@ pub(crate) struct Written {
     /// Exact repository paths whose entropy-only checkpoint hits are exempt.
     #[serde(default)]
     checkpoint_entropy_allow: Vec<String>,
+    /// Absolute context lock in input tokens; absent is reminder-only.
+    #[serde(default)]
+    context_lock_tokens: Option<u64>,
 }
 
 /// What `usersbrowser` may say: off, on with no address declared yet,
@@ -309,6 +312,10 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     if let Some(policy) = &written.workspace_models {
         policy.validate()?;
     }
+    let context_lock = written
+        .context_lock_tokens
+        .map(kernel::ContextLock::parse)
+        .transpose()?;
     Ok(BuildingRules {
         addr: addr.clone(),
         policy: BuildingPolicy::new(confidential),
@@ -327,6 +334,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         harness_minutes: written.harness_minutes,
         workspace_models: written.workspace_models,
         checkpoint_entropy_allow,
+        context_lock,
     })
 }
 

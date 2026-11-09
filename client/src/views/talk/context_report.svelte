@@ -14,7 +14,7 @@
   import type { Address, PrefixAnswer, PromptShapeAnswer, RoundsAnswer, RunId } from "../../wire";
   import Look from "./context_report.look.svelte";
   import { reportOf } from "./context_report";
-  import { contextOf, remindersOf } from "./gauge";
+  import { contextOf, lockOfConfig, remindersOf } from "./gauge";
   import type { Reminders } from "./gauge";
 
   interface Props {
@@ -31,6 +31,7 @@
   let shape = $state<PromptShapeAnswer | null>(null);
   let rounds = $state<RoundsAnswer | undefined>(undefined);
   let reminders = $state<Reminders>(remindersOf(undefined));
+  let lockTokens = $state<number | null>(null);
 
   $effect(() => {
     prefix = null;
@@ -56,9 +57,11 @@
   $effect(() => {
     const at = room;
     reminders = remindersOf(undefined);
+    lockTokens = null;
     if (at === null) return;
     return u.conn.asking.ask({ config: { addr: at } }).subscribe((held) => {
       reminders = remindersOf(held);
+      lockTokens = lockOfConfig(held);
     });
   });
 
@@ -72,6 +75,7 @@
         rounds?.turns ?? [],
         $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
         reminders,
+        lockTokens,
       ),
     ),
   );
