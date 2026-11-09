@@ -46,7 +46,7 @@
       <span class="relative grid size-key shrink-0 place-items-center">
         {#if onOpen !== null}
           <button
-            class="absolute inset-0 rounded-pill"
+            class="absolute inset-0 rounded-pill transition-[background-color,scale] ease-leave hover:bg-raised-hover/40 hover:ease-arrive hover:scale-105 active:scale-(--scale-press) active:ease-arrive still:transition-none still:hover:scale-100 still:active:scale-100"
             {...ring.meter}
             aria-describedby={hint}
             onclick={(event) => {

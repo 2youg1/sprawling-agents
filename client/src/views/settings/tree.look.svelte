@@ -22,7 +22,8 @@
 
   const ENTRY =
     "relative flex min-h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-label " +
-    "text-text-quiet hover:bg-raised hover:text-text";
+    "text-text-quiet transition-[background-color,color,scale] ease-leave hover:bg-raised-hover hover:text-text hover:ease-arrive " +
+    "active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100";
   // Every row ends in one slot of the same width - the arrow of a page,
   // the chevron of a branch, or nothing - so every label is as wide as
   // the next and the rows' words start on one line.
@@ -32,6 +33,8 @@
   // but only in its ink: two bars in one tree would leave the eye to guess
   // which is the selection.
   const HERE = "chosen bg-raised text-text";
+  // First-level entries share the branch title's first mark (the nav-column
+  // geometry gate). Only a nest or "more" draws a second rail inside.
   const NESTED = "drop ml-base flex flex-col gap-hair border-l border-edge pl-tight";
 </script>
 

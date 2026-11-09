@@ -296,14 +296,28 @@ const CHANGE_WORD: Record<CatalogChange, Key> = {
   removed: "catalog_removed",
 };
 
+// Which pane of the catalog is drawn: tools the building owns, skills,
+// MCP connectors, subagent model recommendations (via RULES.toml), and
+// the RULES.toml editor itself.
+export type CatalogPane = "tools" | "skills" | "mcp" | "models" | "rules";
+
+export const CATALOG_PANES: readonly CatalogPane[] = ["tools", "skills", "mcp", "models", "rules"];
+
 export interface CatalogLook {
   readonly scopeLabel: string;
   readonly scopes: readonly Choice<Scope>[];
   readonly scope: Scope;
   readonly onScope: (scope: Scope) => void;
+  // Own name for the pane radiogroup; never the first pane's label.
+  readonly panesLabel: string;
+  readonly panes: readonly Choice<CatalogPane>[];
+  readonly pane: CatalogPane;
+  readonly onPane: (pane: CatalogPane) => void;
   readonly meter: string;
   readonly delta: string | undefined;
   readonly empty: string | undefined;
+  // Shown on the models and rules panes: what RULES.toml governs here.
+  readonly rulesNote: string | undefined;
   readonly groups: readonly GroupLook[];
   readonly save: {
     readonly label: string;
@@ -368,10 +382,12 @@ export interface Seat {
   readonly now: number;
   readonly unusedOnly: boolean;
   readonly buildings: readonly Address[];
+  readonly pane: CatalogPane;
 }
 
 export interface Hands {
   readonly scope: (scope: Scope) => void;
+  readonly pane: (pane: CatalogPane) => void;
   readonly edit: (draft: Selection) => void;
   readonly save: () => void;
   readonly unused: (only: boolean) => void;
@@ -399,20 +415,71 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
       label: say(lang, EXPOSURE_WORD[value]),
       ...(why === undefined ? {} : { why }),
     }));
+  const mcpLabels: ReadonlySet<string> = new Set(
+    seat.draft.references.map((reference) => reference.label),
+  );
   const namespaces = [...new Set(tools.map((row) => row.tool.namespace))];
-  const groups = namespaces.map((namespace) => {
+  const toolNamespaces = namespaces.filter((namespace) => !mcpLabels.has(namespace));
+  const mcpNamespaces = namespaces.filter((namespace) => mcpLabels.has(namespace));
+  const toolGroups = toolNamespaces.map((namespace) => {
     const members = tools.filter((row) => row.tool.namespace === namespace);
     return toolGroup(namespace, members, seat, lang, hands, choices);
   });
-  if (skills.length > 0) groups.push(skillGroup(skills, seat, lang, hands, choices));
+  const mcpGroups = mcpNamespaces.map((namespace) => {
+    const members = tools.filter((row) => row.tool.namespace === namespace);
+    return toolGroup(namespace, members, seat, lang, hands, choices);
+  });
+  // A connector with no tool row yet still names itself so the pane is
+  // not empty while the city has only the reference. Under the unused
+  // filter those placeholders are not unused tools, so they stay out.
+  if (!seat.unusedOnly) {
+    for (const reference of seat.draft.references) {
+      if (mcpGroups.some((group) => group.key === reference.label)) continue;
+      mcpGroups.push({
+        key: reference.label,
+        title: reference.label,
+        summary: say(lang, "catalog_mcp_reference"),
+        open: true,
+        choices: choices(undefined),
+        held: null,
+        onPick: () => undefined,
+        rows: [],
+      });
+    }
+  }
+  const skillGroups = skills.length > 0 ? [skillGroup(skills, seat, lang, hands, choices)] : [];
+  const groups =
+    seat.pane === "tools"
+      ? toolGroups
+      : seat.pane === "skills"
+        ? skillGroups
+        : seat.pane === "mcp"
+          ? mcpGroups
+          : [];
+  const paneWord: Record<CatalogPane, Key> = {
+    tools: "catalog_door_tools",
+    skills: "catalog_door_skills",
+    mcp: "catalog_door_mcp",
+    models: "catalog_door_models",
+    rules: "catalog_door_rules",
+  };
+  // RULES.toml and model notes are always this building's file; the
+  // catalog's city/building scope is for the tool table alone.
+  const scoped = seat.pane !== "models" && seat.pane !== "rules";
   return {
     scopeLabel: say(lang, "catalog_scope"),
-    scopes: [
-      { value: "building", label: say(lang, "catalog_scope_building") },
-      { value: "city", label: say(lang, "catalog_scope_city") },
-    ],
+    scopes: scoped
+      ? [
+          { value: "building", label: say(lang, "catalog_scope_building") },
+          { value: "city", label: say(lang, "catalog_scope_city") },
+        ]
+      : [],
     scope: seat.scope,
     onScope: hands.scope,
+    panesLabel: say(lang, "catalog_panes"),
+    panes: CATALOG_PANES.map((value) => ({ value, label: say(lang, paneWord[value]) })),
+    pane: seat.pane,
+    onPane: hands.pane,
     meter: fill(say(lang, "catalog_meter_unified"), {
       always: String(seat.answer.always),
       dormant: String(seat.answer.dormant),
@@ -427,11 +494,12 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
             n: count(Math.abs(delta)),
           })
         : undefined,
-    empty:
-      seat.answer.run == null && groups.length === 0
-        ? say(lang, "catalog_no_run")
-        : groups.length === 0 && seat.unusedOnly
-          ? say(lang, "catalog_no_unused")
+    empty: emptyOf(seat, groups.length, lang),
+    rulesNote:
+      seat.pane === "models"
+        ? say(lang, "catalog_models_note")
+        : seat.pane === "rules"
+          ? say(lang, "catalog_rules_note")
           : undefined,
     groups,
     save: {
@@ -457,9 +525,27 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
       },
       offLabel: say(lang, "catalog_turn_off_unused"),
       onOff: () => {
+        // Only the pane on screen: turning off unused MCP tools must not
+        // also clear unused skills the person cannot see.
         let next = seat.draft;
-        for (const row of tools) next = { ...next, catalog: pressRow(next.catalog, row, "off") };
-        for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
+        switch (seat.pane) {
+          case "tools":
+            for (const row of tools.filter((each) => !mcpLabels.has(each.tool.namespace))) {
+              next = { ...next, catalog: pressRow(next.catalog, row, "off") };
+            }
+            break;
+          case "mcp":
+            for (const row of tools.filter((each) => mcpLabels.has(each.tool.namespace))) {
+              next = { ...next, catalog: pressRow(next.catalog, row, "off") };
+            }
+            break;
+          case "skills":
+            for (const row of skills) next = pressSkill(next, row, "off", seat.scope);
+            break;
+          case "models":
+          case "rules":
+            break;
+        }
         hands.edit(next);
       },
     },
@@ -472,6 +558,16 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
           }
         : undefined,
   };
+}
+
+function emptyOf(seat: Seat, groups: number, lang: Lang): string | undefined {
+  if (seat.pane === "models" || seat.pane === "rules") return undefined;
+  if (seat.answer.run == null && groups === 0) return say(lang, "catalog_no_run");
+  if (groups === 0 && seat.unusedOnly) return say(lang, "catalog_no_unused");
+  if (groups === 0) {
+    return say(lang, seat.pane === "mcp" ? "catalog_mcp_empty" : "catalog_pane_empty");
+  }
+  return undefined;
 }
 
 function toolGroup(

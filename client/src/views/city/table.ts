@@ -98,6 +98,9 @@ export interface TableRowLook {
   readonly key: string;
   readonly guide: string;
   readonly name: string;
+  // Folder path shown beside the building id: city-relative when no city
+  // folder is set, otherwise absolute under that folder (including `/`).
+  readonly path: string;
   readonly picked: boolean;
   readonly waiting: number;
   readonly working: number;
@@ -122,11 +125,18 @@ export interface TableSeat {
   readonly now: number;
   readonly picked: Address | null;
   readonly lang: Lang;
+  // Absolute folder of the city on this machine, when the person set one
+  // for the editor; empty means only the city-relative path is shown.
+  readonly cityFolder: string;
 }
 
 export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableLook {
   const { lang, now } = seat;
   const unadopted = waiting(seat.city.buildings);
+  // A bare `/` (or `\`) is the filesystem root, not an unset folder: only
+  // strip a trailing separator when something remains after it.
+  const trimmed = seat.cityFolder.replace(/[\\/]+$/u, "");
+  const folder = trimmed === "" && /^[\\/]+$/u.test(seat.cityFolder) ? "/" : trimmed;
   return {
     label: say(lang, "city_table"),
     folds: FOLDS.filter((fold) => fold.minutes > 0).map((fold) => ({
@@ -137,11 +147,18 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
     now: say(lang, "runs_now"),
     rows: tableOf(seat.city.buildings, seat.runs).map((row) => {
       const name = row.addr === "hall" ? say(lang, "city_hall") : row.addr;
+      const path =
+        folder === ""
+          ? `./${row.addr}`
+          : folder === "/"
+            ? `/${row.addr}`
+            : `${folder}/${row.addr}`.replaceAll("\\", "/");
       const from = row.since === null ? null : along(row.since, now);
       return {
         key: row.addr,
         guide: row.guide,
         name,
+        path,
         picked: row.addr === seat.picked,
         waiting: row.waiting,
         working: row.working,
@@ -164,6 +181,7 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
           "aria-pressed": row.addr === seat.picked,
           "aria-label": fill(say(lang, "city_table_row"), {
             name,
+            path,
             waiting: String(row.waiting),
             working: String(row.working),
             done: String(row.done),

@@ -268,10 +268,12 @@
         now: 0,
         unusedOnly: false,
         buildings: [SHOP, Address.make("mill")],
+        pane: "tools",
       },
       $lang,
       {
         scope: still,
+        pane: still,
         edit: still,
         save: still,
         unused: still,
@@ -289,9 +291,10 @@
         now: 0,
         unusedOnly: false,
         buildings: [SHOP],
+        pane: "tools",
       },
       $lang,
-      { scope: still, edit: still, save: still, unused: still, copy: still },
+      { scope: still, pane: still, edit: still, save: still, unused: still, copy: still },
     ),
   );
   const TASK = "fix the checkout total";

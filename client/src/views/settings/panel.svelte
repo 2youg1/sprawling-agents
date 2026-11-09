@@ -59,5 +59,5 @@
 </script>
 
 <Look dialog={dialogOf(`${uid}-title`, onClose, hold)}>
-  <Sheet {group} {beneath} {onPick} {onClose} {onHome} titleId={`${uid}-title`} />
+  <Sheet {group} {beneath} {onPick} {onHome} titleId={`${uid}-title`} />
 </Look>

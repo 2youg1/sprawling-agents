@@ -63,9 +63,9 @@ describe("the settings tree", () => {
       more: false,
     });
     const cost = TREE.findIndex((branch) =>
-      branch.more.some((entry) => entry.kind === "page" && entry.view.kind === "cost"),
+      branch.entries.some((entry) => entry.kind === "page" && entry.view.kind === "cost"),
     );
-    expect(standingOf("you", { kind: "cost" })).toEqual({ branch: cost, more: true });
+    expect(standingOf("you", { kind: "cost" })).toEqual({ branch: cost, more: false });
   });
 
   test("lists a city of one building, the hall", () => {
@@ -126,7 +126,13 @@ describe("the settings tree's wiring", () => {
     expect(open).toHaveLength(1);
     const [branch] = open;
     expect(branch?.fold.wire["aria-controls"]).toBe(branch?.fold.list);
-    expect(branch?.more?.fold.wire["aria-expanded"]).toBe(true);
+    // Automation sits in the branch's first list; the diagnosis branch
+    // is the one that still keeps a "more" fold.
+    expect(branch?.more).toBeNull();
+    const diagnosis = drawn("advanced", talk).look.branches.find(
+      (each) => each.fold.wire["aria-expanded"],
+    );
+    expect(diagnosis?.more?.fold.wire["aria-expanded"]).toBe(true);
   });
 
   test("hands each press to the seat: a group to pick, a fold to toggle", () => {

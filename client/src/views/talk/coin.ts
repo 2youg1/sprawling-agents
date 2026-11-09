@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What the coin key's look is handed: the face that is up, the key's
-// name and, for the faint face, why it does nothing, all in the person's
+// name and the command a press would send, all in the person's
 // language, and the key's wiring as one bag the look spreads on its
 // button. Which face is up and what a press of it sends are
 // `./coin_face.ts`'s decisions; this file only builds the value.
@@ -19,11 +19,13 @@ import { SPELLING } from "./composer";
 import { pressCoin, type Face } from "./coin_face";
 
 export interface CoinLook {
-  // Which face is turned up; `idle` is the send face, faint.
+  // Which face is turned up; `idle` means the key is not drawn.
   readonly face: Face;
-  // Why the faint face does nothing, as the hint the look shows beside
-  // it; nothing on the two faces that act.
-  readonly why: string | undefined;
+  // Whether a send is a fresh dispatch or a steer into a live run.
+  readonly sending: Sending;
+  // The command a press would run, shown as the tip on every acting face
+  // so the coin and the ring band stay distinguishable by what they say.
+  readonly command: string | undefined;
   // Spread on the key's button: its type, name, whether it can be
   // pressed, and what a press does.
   readonly wire: CoinWire;
@@ -37,14 +39,17 @@ export type CoinWire = Pick<
 // The send face submits the form the key stands in, so Enter in the box
 // and a press here are one path: `pressCoin` answers `words` and the
 // click lets the submit through. The stop face is a plain button that
-// cancels; the faint face swallows the press.
+// cancels; the idle face is not drawn.
 export function lookOf(face: Face, sending: Sending, lang: Lang, onStop: () => void): CoinLook {
+  const command =
+    face === "stop" ? STOP : face === "send" ? say(lang, SPELLING[sending]) : undefined;
   return {
     face,
-    why: face === "idle" ? say(lang, "talk_enter_hint") : undefined,
+    sending,
+    command,
     wire: {
       type: face === "stop" ? "button" : "submit",
-      "aria-label": face === "stop" ? STOP : say(lang, SPELLING[sending]),
+      "aria-label": command ?? say(lang, SPELLING[sending]),
       "aria-disabled": face === "idle" ? "true" : undefined,
       onclick: (event) => {
         switch (pressCoin(face)) {

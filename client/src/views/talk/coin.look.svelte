@@ -5,12 +5,11 @@
 
 <script lang="ts">
   // How the coin key is drawn, and nothing else (docs/frontend-method.md
-  // §7I): send and stop are two faces of one key that turns about its
+  // §7I): send and pause are two faces of one key that turns about its
   // vertical axis. With motion off or reduced the faces cross-fade in
-  // place instead, so the answer to "what does this key do now" still
-  // changes and nothing travels. The faint face says why it does nothing
-  // in a hint beside it, which a keyboard reaches by focusing the key
-  // and a screen reader reads with its name.
+  // place instead. The idle face is not drawn — an empty box with no
+  // run leaves the ring alone. The tip always names the command a press
+  // would send, so the key and the context ring stay distinguishable.
   import type { Snippet } from "svelte";
 
   import Glyph from "../parts/glyph.svelte";
@@ -29,6 +28,7 @@
   <button
     class="coin"
     data-up={look.face === "stop" ? "stop" : "send"}
+    data-kind={look.face === "send" ? look.sending : undefined}
     {...look.wire}
     aria-describedby={hint}
   >
@@ -39,14 +39,14 @@
   </button>
 {/snippet}
 
-<!-- The hint stands to the right: above the key is where the context
-ring that surrounds it says its own reading. -->
-{#if look.why === undefined}
-  {@render key(undefined)}
-{:else}
-  <Tip text={look.why} side="right">
-    {#snippet children(hint: string)}{@render key(hint)}{/snippet}
-  </Tip>
+{#if look.face !== "idle"}
+  {#if look.command === undefined}
+    {@render key(undefined)}
+  {:else}
+    <Tip text={look.command} side="right">
+      {#snippet children(hint: string)}{@render key(hint)}{/snippet}
+    </Tip>
+  {/if}
 {/if}
 
 <style>
@@ -60,6 +60,9 @@ ring that surrounds it says its own reading. -->
      * reads as a coin turning, far enough that its edge never fills the
      * key. */
     perspective: calc(var(--spacing-coin) * 7.5);
+    transition:
+      scale var(--transition-duration-short) var(--ease-leave),
+      color var(--transition-duration-short) var(--ease-leave);
   }
   .faces {
     position: relative;
@@ -81,29 +84,45 @@ ring that surrounds it says its own reading. -->
     transition:
       background-color var(--transition-duration-short) var(--ease-leave),
       color var(--transition-duration-short) var(--ease-leave),
-      opacity var(--transition-duration-short) var(--ease-leave);
+      opacity var(--transition-duration-short) var(--ease-leave),
+      scale var(--transition-duration-short) var(--ease-leave);
   }
   .face[data-face="stop"] {
     transform: rotateY(180deg);
   }
-  .coin[aria-disabled="true"] .face[data-face="send"] {
-    color: var(--color-text-disabled);
-  }
-  /* Hover lays 8 % of the ink over the page colour itself, so the face
-   * reads the same over any surface behind the composer; a key that
-   * cannot be pressed keeps its ground. */
+  /* Hover lifts the wash and grows the key a hair; a press yields by the
+   * theme's press scale; release returns on the leave curve. */
   .coin:hover .face {
     background-color: color-mix(in oklch, var(--color-text) 8%, var(--color-page));
     transition-timing-function: var(--ease-arrive);
   }
-  .coin[aria-disabled="true"]:hover .face {
-    background-color: var(--color-page);
+  .coin:hover {
+    scale: 1.06;
+    transition-timing-function: var(--ease-arrive);
   }
   .coin[data-up="stop"] .faces {
     transform: rotateY(180deg);
   }
+  /* Dispatch takes the accent; steer keeps the quieter ink so the two
+   * send kinds stay distinguishable before the tip is read. */
+  .coin[data-kind="dispatch"] .face[data-face="send"] {
+    color: var(--color-accent);
+  }
+  .coin:active {
+    scale: var(--scale-press);
+    transition-timing-function: var(--ease-arrive);
+  }
   .coin:active .faces {
-    scale: 0.94;
+    scale: 1;
+  }
+  :global([data-motion="off"]) .coin,
+  :global([data-motion="off"]) .faces,
+  :global([data-motion="off"]) .face {
+    transition: none;
+  }
+  :global([data-motion="off"]) .coin:hover,
+  :global([data-motion="off"]) .coin:active {
+    scale: 1;
   }
   :global([data-motion="off"]) .faces,
   :global([data-motion="off"]) .face[data-face="stop"] {
@@ -117,6 +136,15 @@ ring that surrounds it says its own reading. -->
     opacity: 1;
   }
   @media (prefers-reduced-motion: reduce) {
+    :global(:root:not([data-motion="on"])) .coin,
+    :global(:root:not([data-motion="on"])) .faces,
+    :global(:root:not([data-motion="on"])) .face {
+      transition: none;
+    }
+    :global(:root:not([data-motion="on"])) .coin:hover,
+    :global(:root:not([data-motion="on"])) .coin:active {
+      scale: 1;
+    }
     :global(:root:not([data-motion="on"])) .faces,
     :global(:root:not([data-motion="on"])) .face[data-face="stop"] {
       transform: none;

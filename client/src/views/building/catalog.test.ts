@@ -361,12 +361,15 @@ describe("the capabilities draft", () => {
     };
     const hands = {
       scope: () => undefined,
+      pane: () => undefined,
       edit: () => undefined,
       save: () => undefined,
       unused: () => undefined,
       copy: () => undefined,
     };
-    const removedLook = catalogLook(
+    // The removed tool sits under an MCP reference label, so the MCP
+    // pane is the one that draws it.
+    const removedTools = catalogLook(
       {
         answer,
         scope: "building",
@@ -375,16 +378,33 @@ describe("the capabilities draft", () => {
         now: 0,
         unusedOnly: false,
         buildings: [],
+        pane: "mcp",
       },
       "en",
       hands,
     );
-    expect(removedLook.groups[0]?.rows[0]?.actions.map((action) => action.key)).toEqual(["accept"]);
-    expect(removedLook.groups[1]?.rows[0]?.actions.map((action) => action.key)).toEqual([
+    expect(removedTools.groups[0]?.rows[0]?.actions.map((action) => action.key)).toEqual([
+      "accept",
+    ]);
+    const removedSkills = catalogLook(
+      {
+        answer,
+        scope: "building",
+        draft: selection,
+        edited: true,
+        now: 0,
+        unusedOnly: false,
+        buildings: [],
+        pane: "skills",
+      },
+      "en",
+      hands,
+    );
+    expect(removedSkills.groups[0]?.rows[0]?.actions.map((action) => action.key)).toEqual([
       "accept",
       "keep",
     ]);
-    const addedLook = catalogLook(
+    const addedSkills = catalogLook(
       {
         answer: { ...answer, skill_rows: [addedSkill], changed: 1 },
         scope: "building",
@@ -393,11 +413,12 @@ describe("the capabilities draft", () => {
         now: 0,
         unusedOnly: false,
         buildings: [],
+        pane: "skills",
       },
       "en",
       hands,
     );
-    expect(addedLook.groups[1]?.rows[0]?.actions.map((action) => action.key)).toEqual(["accept"]);
+    expect(addedSkills.groups[0]?.rows[0]?.actions.map((action) => action.key)).toEqual(["accept"]);
   });
 
   test("Accept counts the new version's bytes, not the old version's twice", () => {

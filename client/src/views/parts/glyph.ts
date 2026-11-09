@@ -54,6 +54,8 @@ export type GlyphName =
   // mark of a run somebody stopped, so the control and its outcome read
   // as one shape.
   | "stop"
+  // Two vertical bars: pause what is streaming, the way a player does.
+  | "pause"
   // A line that runs into a wall: it ran out of what it was allowed.
   | "capped"
   // An arrow rising from the box: send what is written.
