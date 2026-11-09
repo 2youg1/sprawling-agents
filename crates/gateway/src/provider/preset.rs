@@ -187,17 +187,17 @@ pub fn known_hosts() -> Result<Vec<KnownHost>, kernel::AxError> {
         .collect()
 }
 
-/// The three fields of the OpenAI-compatible chat face whose spelling
-/// each vendor's documentation decides for itself.
+/// The four fields of the OpenAI-compatible chat (and responses) faces
+/// whose spelling each vendor's documentation decides for itself.
 ///
-/// One value because the three are read together, at the one place a
-/// chat request is written, and a host that states one states all
-/// three.
+/// One value because the four are read together, at the one place a
+/// request is written, and a host that states one states all four.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChatSpelling {
     pub ceiling: CeilingField,
     pub effort: EffortField,
     pub reasoning: ReasoningReturn,
+    pub tool_pictures: ToolPictureCarry,
 }
 
 impl ChatSpelling {
@@ -209,12 +209,28 @@ impl ChatSpelling {
     /// ceiling silently dropped. `reasoning_effort` because it is the
     /// specification's own field. An earlier turn's reasoning is not
     /// sent back, because the specification's assistant message has no
-    /// field that carries it.
+    /// field that carries it. Tool pictures follow in a user message,
+    /// because the specification's `tool` message is a string.
     pub const DOCUMENTED: ChatSpelling = ChatSpelling {
         ceiling: CeilingField::MaxTokens,
         effort: EffortField::ReasoningEffort,
         reasoning: ReasoningReturn::Dropped,
+        tool_pictures: ToolPictureCarry::FollowingUser,
     };
+}
+
+/// Where a picture a tool produced rides on the OpenAI-compatible faces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolPictureCarry {
+    /// The specification's shape: `tool` / `function_call_output` is a
+    /// string, so the picture lands in the user message that follows.
+    FollowingUser,
+    /// The host's schema takes image parts on the tool result itself
+    /// (DeepSeek and Kimi/Moonshot chat `tool` content arrays; DeepSeek
+    /// responses `function_call_output.output` lists). A following user
+    /// message between tool results and the next assistant turn answers
+    /// 400 under thinking-with-tools, so the picture must ride here.
+    InToolContent,
 }
 
 /// Which field carries the output ceiling.
@@ -532,6 +548,33 @@ mod tests {
         assert_eq!(
             chat_spelling("https://api.deepseek.com").reasoning,
             ReasoningReturn::AsReasoningContent
+        );
+        assert_eq!(
+            chat_spelling("https://api.deepseek.com").tool_pictures,
+            ToolPictureCarry::InToolContent
+        );
+        // Kimi's multimodal tool example puts image/video parts on
+        // `role: tool`; the three Moonshot hosts share that spelling.
+        for base in [
+            "https://api.moonshot.ai/v1",
+            "https://api.moonshot.cn/v1",
+            "https://api.kimi.com/coding/v1",
+        ] {
+            assert_eq!(
+                chat_spelling(base).tool_pictures,
+                ToolPictureCarry::InToolContent,
+                "{base}"
+            );
+        }
+        // OpenAI chat tool content is text-only; xAI only documents
+        // images on user messages — both keep the following-user carry.
+        assert_eq!(
+            chat_spelling("https://api.openai.com/v1").tool_pictures,
+            ToolPictureCarry::FollowingUser
+        );
+        assert_eq!(
+            chat_spelling("https://api.x.ai/v1").tool_pictures,
+            ToolPictureCarry::FollowingUser
         );
         assert_eq!(
             chat_spelling("http://127.0.0.1:11434/v1"),

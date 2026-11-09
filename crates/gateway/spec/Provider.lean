@@ -35,12 +35,14 @@ pub struct ModelPreset { pub id_prefix: &'static str, pub context_tokens: u64,
 pub struct PresetThinking { pub levels: &'static [Effort], pub default: Option<Effort>,
                             pub source: &'static str }             // levels 不含 None；source 是写着档位的那一页
 pub const PRESETS: [HostPreset; 13];
-pub struct ChatSpelling { pub ceiling: CeilingField, pub effort: EffortField, pub reasoning: ReasoningReturn }
-impl ChatSpelling { pub const DOCUMENTED: ChatSpelling; }       // 未登记的主机：max_tokens、reasoning_effort、丢弃思考
+pub struct ChatSpelling { pub ceiling: CeilingField, pub effort: EffortField,
+                          pub reasoning: ReasoningReturn, pub tool_pictures: ToolPictureCarry }
+impl ChatSpelling { pub const DOCUMENTED: ChatSpelling; }       // 未登记的主机：max_tokens、reasoning_effort、丢弃思考、图跟在 user 后
 pub enum CeilingField { MaxTokens, MaxCompletionTokens }
 pub enum EffortField { ReasoningEffort, ReasoningObject, ThinkingToggle, EnableThinking }
                                     // 一档与「开启思考」在 chat 面写成哪几个字段，表在 `crates/gateway/spec/Dialect.lean` §8-1
 pub enum ReasoningReturn { Dropped, AsReasoningContent }
+pub enum ToolPictureCarry { FollowingUser, InToolContent }   // 工具产出的图写在哪；表在 Dialect §8-1 与 D66
 // HostPreset 另有三列：chat: ChatSpelling、session_header: Option<&'static str>、cache_key_field: Option<&'static str>
 pub fn chat_spelling(base_url: &str) -> ChatSpelling;             // 未登记即 DOCUMENTED
 pub fn session_header(base_url: &str) -> Option<&'static str>;    // 要一个会话标识头的主机说出头名
@@ -88,7 +90,7 @@ impl Figures {
 - **预设表的上下文窗口也是一档**：`window_for` 与 `ceiling_for` 读同一行，窗口梯在钉版目录之后读它，所以它在三个兼容格式上一样作答。今天登记模型行的是 `api.anthropic.com`（当前四个家族与更早的四行，读自厂商的 models overview）与 `api.deepseek.com`（`deepseek-flash` 与 `deepseek-v4` 两个家族：1M 窗口，上限 393216——API 参考写作「between 1 and 384K (393216)」）。厂商页上写作 `1M`、`128K` 的数按一千进位读：它恒不高于厂商所指的那个数。
 - **钉版目录与预设表是同一档的两个索引**：目录按精确 id 查，预设表按 host ＋ id 前缀查，一条测试钉住两个索引不为同一个 id 作答。`MarketSnapshot::lookup` 因此保持精确匹配，前缀匹配只发生在预设表内。
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列不在本表：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7）。
-- **chat 面的三处拼法随主机走，住本表的 `chat` 列**：输出上限写进 `max_tokens` 还是 `max_completion_tokens`、一档思考与「开启思考」写在哪几个字段（见下文思考档一条）、上一轮的推理是否作为 `reasoning_content` 放回 assistant 消息。三件事都是「同一个 OpenAI 兼容格式，各家文档各写各的」，dialect 本身不带主机名，所以由 `Endpoint::wire_request` 按 base URL 查一次本表、把拼法作为参数交给纯函数。**未登记的主机取 `ChatSpelling::DOCUMENTED`**：`max_tokens`（OpenAI 规格已标 deprecated，但本地推理服务与多数兼容服务只认它，而 `max_completion_tokens` 落在一个不认它的服务上是被静默忽略的上限）、`reasoning_effort`（OpenAI 规格的拼法）、丢弃思考块（OpenAI 规格的 assistant 消息没有这个字段）。`api.openai.com` 必须是 `max_completion_tokens`：规格写明 `max_tokens`「is not compatible with o-series models」，推理模型对它答 400。落选的是「一律 `max_completion_tokens`」：DeepSeek、通义与智谱的文档只写 `max_tokens`，对它们换名就是把人定的上限丢掉。**重开参数**：当本地推理服务普遍改收 `max_completion_tokens` 时，`DOCUMENTED` 的上限列随之改。
+- **chat／responses 面的四处拼法随主机走，住本表的 `chat` 列**：输出上限写进 `max_tokens` 还是 `max_completion_tokens`、一档思考与「开启思考」写在哪几个字段（见下文思考档一条）、上一轮的推理是否作为 `reasoning_content` 放回 assistant 消息、工具产出的图写在 tool 结果上还是跟在其后的 user 消息里（`ToolPictureCarry`，Dialect D66）。四件事都是「同一个 OpenAI 兼容格式，各家文档各写各的」，dialect 本身不带主机名，所以由 `Endpoint::wire_request` 按 base URL 查一次本表、把拼法作为参数交给纯函数（chat 与 responses 两面都读 `tool_pictures`）。**未登记的主机取 `ChatSpelling::DOCUMENTED`**：`max_tokens`（OpenAI 规格已标 deprecated，但本地推理服务与多数兼容服务只认它，而 `max_completion_tokens` 落在一个不认它的服务上是被静默忽略的上限）、`reasoning_effort`（OpenAI 规格的拼法）、丢弃思考块（OpenAI 规格的 assistant 消息没有这个字段）、图跟在 user 后（OpenAI 规格的 tool 消息是字符串）。`api.openai.com` 必须是 `max_completion_tokens`：规格写明 `max_tokens`「is not compatible with o-series models」，推理模型对它答 400。`api.deepseek.com` 与 Moonshot／Kimi 三台主机是 `InToolContent`：前者 chat／responses 文档都在工具结果上收图，跟在 user 后会在思考＋工具下答 400；后者的 K2.6 多模态工具示例把图／视频部件写在 `role:"tool"` 上（Dialect D66）。落选的是「一律 `max_completion_tokens`」：DeepSeek、通义与智谱的文档只写 `max_tokens`，对它们换名就是把人定的上限丢掉。**重开参数**：当本地推理服务普遍改收 `max_completion_tokens` 时，`DOCUMENTED` 的上限列随之改。
 - **会话标识头**：`opencode.ai`（OpenCode Zen 与 Go 共用这个 host）的文档要求每个会话带一个稳定的 `x-opencode-session`，用于路由与前缀缓存。值由 `endpoint` 从请求本身推出：冻结前缀的四段 hash 加第一条消息的字节，经 `kernel::B3Hash::digest` 取十六进制。同一会话的每一轮前缀与首条消息都不变，所以值不变；不同会话首条不同，值就不同；推出来的值不含任何原文，也不需要本城另存一份状态。人在 `extra_headers` 里自己写了同名头时让位于人。本城不冒充 OpenCode 客户端：只收 OpenCode 客户端的免费模型不在本城要走的路上。所有经 `client_for` 出去的请求都带 `sprawling/<版本>` 的 User-Agent——OpenCode Go 的文档要求客户端以自己的名字自报，而不是 HTTP 库的名字。
 - **前缀缓存键**（D25）：`api.openai.com` 的两面（chat completions 与 responses）在正文里收一个 `prompt_cache_key`，厂商用它把共享长前缀的请求路由到同一处缓存。本表的 `cache_key_field` 列说出这个字段名；`Endpoint::wire_request` 在 OpenAI 兼容两面上、这一列有值时把会话标识写进去，值与会话标识头是同一个 `conversation_id`（冻结前缀的四段加第一条消息的 B3 摘要，64 个十六进制字符），所以一条 run 冻结的前缀在每一轮带同一个键。写在 `overrides` 之前，人在覆盖里给了这个路径时人的值胜。messages 面不写：Anthropic 的缓存由 `cache_control` 断点决定（dialect 保断点位），没有这个字段。
 - **一个 host 说几面，各挂在哪，是本表的一列（`faces`）**。它取代原来的 `base_path` 与 `dialect` 两列：一列只能说一条路径与一个默认面，而厂商文档常把两种兼容格式挂在同一 host 的两条路径下（DeepSeek 的 OpenAI 兼容面在 `/`、Anthropic 兼容面在 `/anthropic`；Kimi Code 的 OpenAI 兼容面在 `/coding/v1`、Anthropic 兼容面在 `/coding/`）。**默认面只在恰一面时存在**：两面以上时替人挑一面就是替人猜，归一化照旧让人选。人粘了裸 host 时，路径取他所选那一面的路径；他还没选时取第一面的路径，第一面因此按厂商文档的主推面排。

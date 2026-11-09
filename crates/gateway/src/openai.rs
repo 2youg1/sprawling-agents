@@ -24,11 +24,13 @@
 //! drop on this path; the specification's assistant message has no
 //! field for a thinking block, so one is not sent rather than sent as
 //! prose, except to a host whose documentation reads it back as
-//! `reasoning_content`; and its `tool` message accepts only
-//! a string, so pictures a tool produced ride in the user message that
-//! immediately follows it — the pictures arrive, and what is lost is
-//! the statement that they came out of that tool call. All three are
-//! asserted in tests.
+//! `reasoning_content`; and where the host's `tool` message accepts
+//! only a string (`ToolPictureCarry::FollowingUser`), pictures a tool
+//! produced ride in the user message that immediately follows it — the
+//! pictures arrive, and what is lost is the statement that they came
+//! out of that tool call. A host whose schema takes image parts on the
+//! tool message (`InToolContent`) keeps that attribution. All three
+//! are asserted in tests.
 
 use kernel::{
     AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
@@ -40,7 +42,7 @@ use crate::dialect::ImageBytes;
 use crate::mismatch::{
     as_str, cache_count, mismatch, mismatch_found, payload_from, require, tokens_or_zero,
 };
-use crate::provider::preset::{CeilingField, ChatSpelling, ReasoningReturn};
+use crate::provider::preset::{CeilingField, ChatSpelling, ReasoningReturn, ToolPictureCarry};
 
 mod stream;
 
@@ -117,26 +119,52 @@ fn image_part(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, 
     }))
 }
 
-/// Every picture one user message refers to, in the order the blocks
-/// name them: the message's own `Image` blocks first, then whatever its
-/// tool results attached.
-fn pictures_of(content: &[ContentBlock], images: &ImageBytes) -> Result<Vec<Value>, AxError> {
+/// Every picture that should ride a following user message for
+/// `carry`: the message's own `Image` blocks always, and tool
+/// attachments only when they cannot ride the tool message itself.
+fn pictures_following(
+    content: &[ContentBlock],
+    images: &ImageBytes,
+    carry: ToolPictureCarry,
+) -> Result<Vec<Value>, AxError> {
     let mut parts = Vec::new();
     for block in content {
         match block {
             ContentBlock::Image(picture) => parts.push(image_part(picture, images)?),
-            ContentBlock::ToolResult { attachments, .. } => {
+            ContentBlock::ToolResult { attachments, .. }
+                if carry == ToolPictureCarry::FollowingUser =>
+            {
                 for picture in attachments {
                     parts.push(image_part(picture, images)?);
                 }
             }
-            ContentBlock::Text { .. }
+            ContentBlock::ToolResult { .. }
+            | ContentBlock::Text { .. }
             | ContentBlock::Thinking { .. }
             | ContentBlock::RedactedThinking { .. }
             | ContentBlock::ToolUse { .. } => {}
         }
     }
     Ok(parts)
+}
+
+/// One tool result as this host spells its content: a string when there
+/// are no pictures or the host cannot take them here; otherwise a part
+/// array that keeps the pictures with the call they came from.
+fn tool_content(
+    content: &str,
+    attachments: &[kernel::ImageRef],
+    images: &ImageBytes,
+    carry: ToolPictureCarry,
+) -> Result<Value, AxError> {
+    if attachments.is_empty() || carry == ToolPictureCarry::FollowingUser {
+        return Ok(Value::String(content.to_owned()));
+    }
+    let mut parts = vec![json!({ "type": "text", "text": content })];
+    for picture in attachments {
+        parts.push(image_part(picture, images)?);
+    }
+    Ok(Value::Array(parts))
 }
 
 pub(crate) fn request(
@@ -159,21 +187,29 @@ pub(crate) fn request(
                         tool_use_id,
                         content,
                         is_error: _,
-                        attachments: _,
+                        attachments,
                     } = block
                     {
                         messages.push(json!({
-                            "role": "tool", "tool_call_id": tool_use_id, "content": content,
+                            "role": "tool",
+                            "tool_call_id": tool_use_id,
+                            "content": tool_content(
+                                content,
+                                attachments,
+                                images,
+                                spelling.tool_pictures,
+                            )?,
                         }));
                     }
                 }
-                // Pictures cannot ride a `tool` message on this wire, so
-                // they land in the user message that follows it. The
-                // loss is which tool call produced them, and it is
-                // recorded at the top of this file rather than taken
-                // silently.
+                // Under `FollowingUser`, pictures a tool produced cannot
+                // ride the tool message, so they land in the user
+                // message that follows it. Under `InToolContent` they
+                // already rode the tool message above; only `Image`
+                // blocks the person attached still need this slot.
                 let text = joined_text(&message.content);
-                let pictures = pictures_of(&message.content, images)?;
+                let pictures =
+                    pictures_following(&message.content, images, spelling.tool_pictures)?;
                 if pictures.is_empty() {
                     if !text.is_empty() {
                         messages.push(json!({ "role": "user", "content": text }));
