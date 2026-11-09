@@ -19,7 +19,7 @@ use kernel::Effort;
 
 use super::{
     CeilingField, ChatSpelling, EffortField, Face, GenerationPreset, HostPreset, ModelPreset,
-    PresetThinking, ReasoningReturn,
+    PresetThinking, ReasoningReturn, ToolPictureCarry,
 };
 
 /// `low` to `max`, the set every current OpenAI reasoning model page
@@ -71,6 +71,10 @@ pub const PRESETS: [HostPreset; 13] = [
         models: OPENAI_MODELS,
         // `max_tokens` "is not compatible with o-series models"
         // (`CreateChatCompletionRequest` in `openai/openai-openapi`).
+        // Tool pictures follow in a user message: chat tool content is
+        // text-only (`ChatCompletionToolMessageParam`), and the same
+        // host spelling must also serve the chat face, so responses'
+        // `function_call_output` image parts are not used here (D66).
         chat: ChatSpelling {
             ceiling: CeilingField::MaxCompletionTokens,
             ..ChatSpelling::DOCUMENTED
@@ -112,11 +116,17 @@ pub const PRESETS: [HostPreset; 13] = [
         ],
         models: DEEPSEEK_MODELS,
         // Thinking is on by default, and a request with tools whose
-        // history lacks the earlier `reasoning_content` answers 400.
-        // and the switch is `thinking.type`, with the level beside it.
+        // history lacks the earlier `reasoning_content` answers 400;
+        // the switch is `thinking.type`, with the level beside it.
+        // Tool-produced pictures ride the tool result: the chat schema
+        // takes `image_url` parts on `role: tool`, and the responses
+        // face takes `input_image` in `function_call_output.output`
+        // (<https://api-docs.deepseek.com/api/create-chat-completion>,
+        // <https://api-docs.deepseek.com/guides/responses_api>).
         chat: ChatSpelling {
             effort: EffortField::ThinkingToggle,
             reasoning: ReasoningReturn::AsReasoningContent,
+            tool_pictures: ToolPictureCarry::InToolContent,
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
@@ -140,7 +150,10 @@ pub const PRESETS: [HostPreset; 13] = [
         ],
         models: &[],
         // `max_tokens` is deprecated in favour of
-        // `max_completion_tokens`.
+        // `max_completion_tokens`. Tool pictures stay on the following
+        // user message: the image pages only show them on `role: user`
+        // (<https://docs.x.ai/developers/model-capabilities/images/understanding>,
+        // <https://docs.x.ai/developers/model-capabilities/legacy/chat-completions>).
         chat: ChatSpelling {
             ceiling: CeilingField::MaxCompletionTokens,
             ..ChatSpelling::DOCUMENTED
@@ -170,6 +183,7 @@ pub const PRESETS: [HostPreset; 13] = [
             ceiling: CeilingField::MaxTokens,
             effort: EffortField::ReasoningObject,
             reasoning: ReasoningReturn::AsReasoningContent,
+            tool_pictures: ToolPictureCarry::FollowingUser,
         },
         session_header: None,
         cache_key_field: None,
@@ -341,11 +355,15 @@ pub const PRESETS: [HostPreset; 13] = [
 /// every earlier `reasoning_content` whatever the request says.
 ///
 /// K2 models switch thinking by `thinking.type` and K3 takes a level in
-/// `reasoning_effort`, so both are written.
+/// `reasoning_effort`, so both are written. Tool pictures ride the tool
+/// message: Kimi's multimodal tool example returns `image_url` /
+/// `video_url` parts as `role: tool` content
+/// (<https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart>).
 const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxCompletionTokens,
     effort: EffortField::ThinkingToggle,
     reasoning: ReasoningReturn::AsReasoningContent,
+    tool_pictures: ToolPictureCarry::InToolContent,
 };
 
 /// Zhipu's chat face, read at
@@ -357,6 +375,7 @@ const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxTokens,
     effort: EffortField::ThinkingToggle,
     reasoning: ReasoningReturn::AsReasoningContent,
+    tool_pictures: ToolPictureCarry::FollowingUser,
 };
 
 /// Anthropic's documented ceilings. The Messages API requires
