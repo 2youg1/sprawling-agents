@@ -205,14 +205,24 @@ impl WorkspaceModelPolicy {
 /// equal the choice, so the section the city already requires is present.
 /// An existing recommendation table is left as the shortcut it is.
 ///
+/// An empty base (no `RULES.toml` yet) opens with the ordinary
+/// `confidential` / `write` pair the template uses, then the choice
+/// section; a non-empty file that still fails evaluation is refused by
+/// `write_rules_against`, not rewritten here.
+///
 /// The result is text for `write_rules_against` to evaluate. This function
 /// does not decide that the choice is registered or offered.
 pub fn inscribe_choice(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
+    let text = if text.trim().is_empty() {
+        "confidential = false\nwrite = \"everything\"\n"
+    } else {
+        text
+    };
     let choice = choice_section(endpoint, model, effort);
     if let Some(rewritten) = replace_section(text, "[workspace_models.choice]", &choice) {
         return ensure_allowed(&rewritten, endpoint, model, effort);
     }
-    if has_exact_header(text, "[workspace_models]") {
+    if has_header(text, "[workspace_models]") {
         let with_choice = insert_before_next_header(text, "[workspace_models]", &choice);
         return ensure_allowed(&with_choice, endpoint, model, effort);
     }
@@ -224,28 +234,47 @@ pub fn inscribe_choice(text: &str, endpoint: &str, model: &str, effort: Effort) 
     out
 }
 
+fn toml_string(value: &str) -> String {
+    toml::Value::String(value.to_owned()).to_string()
+}
+
 fn choice_section(endpoint: &str, model: &str, effort: Effort) -> String {
     format!(
-        "[workspace_models.choice]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{}\"\n",
+        "[workspace_models.choice]\nendpoint = {}\nmodel = {}\neffort = \"{}\"\n",
+        toml_string(endpoint),
+        toml_string(model),
         effort.as_str()
     )
 }
 
 fn fresh_section(endpoint: &str, model: &str, effort: Effort) -> String {
     let word = effort.as_str();
+    let endpoint = toml_string(endpoint);
+    let model = toml_string(model);
     format!(
-        "\n[workspace_models]\nallowed = [{{ endpoint = \"{endpoint}\", model = \"{model}\" }}]\nmax_effort = \"{word}\"\n\n[workspace_models.choice]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.easy]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.medium]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.hard]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n"
+        "\n[workspace_models]\nallowed = [{{ endpoint = {endpoint}, model = {model} }}]\nmax_effort = \"{word}\"\n\n[workspace_models.choice]\nendpoint = {endpoint}\nmodel = {model}\neffort = \"{word}\"\n\n[workspace_models.recommendations.easy]\nendpoint = {endpoint}\nmodel = {model}\neffort = \"{word}\"\n\n[workspace_models.recommendations.medium]\nendpoint = {endpoint}\nmodel = {model}\neffort = \"{word}\"\n\n[workspace_models.recommendations.hard]\nendpoint = {endpoint}\nmodel = {model}\neffort = \"{word}\"\n"
     )
 }
 
-fn has_exact_header(text: &str, header: &str) -> bool {
-    text.lines().any(|line| line.trim() == header)
+fn has_header(text: &str, header: &str) -> bool {
+    text.lines().any(|line| is_header(line, header))
+}
+
+/// A `[table]` line, optionally followed by a TOML line comment.
+fn is_header(line: &str, header: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed == header {
+        return true;
+    }
+    trimmed
+        .strip_prefix(header)
+        .is_some_and(|rest| rest.trim_start().starts_with('#'))
 }
 
 /// Replaces the body of `header` through the line before the next header.
 fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
     let lines: Vec<&str> = text.lines().collect();
-    let start = lines.iter().position(|line| line.trim() == header)?;
+    let start = lines.iter().position(|line| is_header(line, header))?;
     let end = next_header_index(&lines, start, |_| true);
     let mut out = String::new();
     for line in lines.iter().take(start) {
@@ -265,10 +294,10 @@ fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
 
 fn insert_before_next_header(text: &str, header: &str, section: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
-    let Some(start) = lines.iter().position(|line| line.trim() == header) else {
+    let Some(start) = lines.iter().position(|line| is_header(line, header)) else {
         return text.to_owned();
     };
-    let end = next_header_index(&lines, start, |trimmed| trimmed != header);
+    let end = next_header_index(&lines, start, |trimmed| !is_header(trimmed, header));
     let mut out = String::new();
     for line in lines.iter().take(end) {
         out.push_str(line);
@@ -300,11 +329,15 @@ fn next_header_index(lines: &[&str], start: usize, keep: impl Fn(&str) -> bool) 
 }
 
 fn ensure_allowed(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
-    let pair = format!("endpoint = \"{endpoint}\", model = \"{model}\"");
+    let pair = format!(
+        "endpoint = {}, model = {}",
+        toml_string(endpoint),
+        toml_string(model)
+    );
     let lines: Vec<&str> = text.lines().collect();
     let Some(start) = lines
         .iter()
-        .position(|line| line.trim() == "[workspace_models]")
+        .position(|line| is_header(line, "[workspace_models]"))
     else {
         return text.to_owned();
     };
@@ -398,7 +431,7 @@ fn insert_after_header(text: &str, header: &str, line: &str) -> String {
     for existing in text.lines() {
         out.push_str(existing);
         out.push('\n');
-        if existing.trim() == header {
+        if is_header(existing, header) {
             out.push_str(line);
             if !line.ends_with('\n') {
                 out.push('\n');

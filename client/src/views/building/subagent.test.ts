@@ -34,3 +34,17 @@ test("a direct choice and the three shortcuts are read from the rules", () => {
   expect(tiersOf(RULES).hard).toEqual({ endpoint: "house", model: "strong", effort: "high" });
   expect(choiceOf("confidential = false\n")).toBeUndefined();
 });
+
+test("a single-quoted choice and a commented header still read", () => {
+  const text = `confidential = false
+[workspace_models.choice] # selected
+endpoint = 'house'
+model = 'vendor"model'
+effort = 'high'
+`;
+  expect(choiceOf(text)).toEqual({
+    endpoint: "house",
+    model: 'vendor"model',
+    effort: "high",
+  });
+});

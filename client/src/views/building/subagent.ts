@@ -36,7 +36,7 @@ export function tiersOf(text: string): Partial<Record<Tier, Picked>> {
 
 function tableOf(text: string, header: string): Picked | undefined {
   const lines = text.split("\n");
-  const start = lines.findIndex((line) => line.trim() === header);
+  const start = lines.findIndex((line) => isHeader(line, header));
   if (start < 0) return undefined;
   const body: string[] = [];
   for (const line of lines.slice(start + 1)) {
@@ -50,13 +50,69 @@ function tableOf(text: string, header: string): Picked | undefined {
   return { endpoint, model, effort };
 }
 
+function isHeader(line: string, header: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed === header) return true;
+  if (!trimmed.startsWith(header)) return false;
+  const rest = trimmed.slice(header.length).trimStart();
+  return rest === "" || rest.startsWith("#");
+}
+
 function quoted(lines: readonly string[], key: string): string | undefined {
   const line = lines.find(
     (each) => each.trim().startsWith(`${key} `) || each.trim().startsWith(`${key}=`),
   );
   if (line === undefined) return undefined;
-  const match = /"([^"]*)"/.exec(line);
-  return match?.[1];
+  const eq = line.indexOf("=");
+  if (eq < 0) return undefined;
+  const raw = line.slice(eq + 1).trim();
+  if (raw.startsWith('"')) return decodeBasic(raw);
+  if (raw.startsWith("'")) {
+    const end = raw.indexOf("'", 1);
+    return end < 0 ? undefined : raw.slice(1, end);
+  }
+  return undefined;
+}
+
+function decodeBasic(raw: string): string | undefined {
+  if (!raw.startsWith('"')) return undefined;
+  let out = "";
+  for (let i = 1; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (ch === undefined) return undefined;
+    if (ch === '"') return out;
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === undefined) return undefined;
+    i += 1;
+    switch (next) {
+      case "b":
+        out += "\b";
+        break;
+      case "t":
+        out += "\t";
+        break;
+      case "n":
+        out += "\n";
+        break;
+      case "f":
+        out += "\f";
+        break;
+      case "r":
+        out += "\r";
+        break;
+      case '"':
+      case "\\":
+        out += next;
+        break;
+      default:
+        return undefined;
+    }
+  }
+  return undefined;
 }
 
 function isEffort(value: string | undefined): value is Effort {

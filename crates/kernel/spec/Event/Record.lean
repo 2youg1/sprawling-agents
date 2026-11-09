@@ -34,7 +34,7 @@ pub struct ModelRef { pub endpoint: String, pub model: String }
 pub struct ModelRouting { pub difficulty: Option<Difficulty>, pub model: ModelRef,
                           pub policy: Option<B3Hash>, pub source: ModelSelectionSource }
 #[serde(rename_all = "snake_case")]
-pub enum ModelSelectionSource { Manual, Difficulty, MediumDefault, Main }
+pub enum ModelSelectionSource { Manual, Difficulty, MediumDefault, Choice, Main }
 pub struct AgentRunIdentity { pub id: String, pub version: Option<String>, pub launch_digest: B3Hash }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64,
@@ -454,7 +454,7 @@ pub struct RunStarted {
 /-!
 ### 8-89 `run_started` 记下工作区模型路由（`kernel::event::record::run`，形状 2 值类型）
 
-`routing` 只出现在本城驱动的模型 run：实际 `(endpoint, model)` 是 `ModelRef`，`difficulty` 是父调用这次带来的词，`policy` 是实际命中的工作区策略摘要，`source` 穷尽为 `manual`／`difficulty`／`medium_default`／`main`。实际 effort 读同一行的 `effort`，不在 `ModelRouting` 里复制；没有命中策略或已有 Session 继续冻结形状时 `policy` 缺席。旧行与 harness run 的整个 `routing` 缺席。
+`routing` 只出现在本城驱动的模型 run：实际 `(endpoint, model)` 是 `ModelRef`，`difficulty` 是父调用这次带来的词，`policy` 是实际命中的工作区策略摘要，`source` 穷尽为 `manual`／`difficulty`／`medium_default`／`choice`／`main`。实际 effort 读同一行的 `effort`，不在 `ModelRouting` 里复制；没有命中策略或已有 Session 继续冻结形状时 `policy` 缺席。旧行与 harness run 的整个 `routing` 缺席。`choice` 是子派发读到 `[workspace_models.choice]` 时的来源。
 
 这条记录是重放的事实来源：重放不要求父 Session 再评一次难度，也不调用分类模型。选择失败发生在子 `run_started` 之前，经既有 unstarted handback 回到父房间。
 -/

@@ -157,14 +157,22 @@
   // RULES.toml for the models and rules panes: the same PutRules door
   // the settings page uses, so a change here is a change there.
   const rulesHeld = $derived(u.conn.asking.ask({ document: { at: rulesAt(building) } }));
+  const rulesRead = $derived(readDocument($rulesHeld));
+  // Missing file is an empty base the writer may initialise. Any other
+  // unanswered document read stays unanswered; it is not an empty file.
   const onDisk = $derived.by(() => {
-    const readRules = readDocument($rulesHeld);
-    return readRules.kind === "held"
-      ? readRules.value.text
-      : readRules.kind === "unavailable"
-        ? ""
-        : null;
+    switch (rulesRead.kind) {
+      case "held":
+        return rulesRead.value.text;
+      case "unavailable":
+        return rulesRead.reason === null ? "" : null;
+      case "asking":
+        return null;
+    }
   });
+  const rulesFailed = $derived(
+    rulesRead.kind === "unavailable" && rulesRead.reason !== null ? rulesRead : null,
+  );
   let rulesDraft = $state("");
   let rulesSaving = $state.raw<Saving>(HELD);
   const rulesSlot: Slot = { now: () => rulesSaving, mark: (next) => (rulesSaving = next) };
@@ -208,30 +216,57 @@
   // selects; saving writes `[workspace_models.choice]` and leaves the
   // shortcuts in the file.
   const endpointAsked = $derived(u.conn.asking.ask(QUERIES.endpoints));
-  const endpointList = $derived.by(() => {
-    const stated = $endpointAsked;
-    return stated !== undefined && "endpoints" in stated ? stated.endpoints.endpoints : [];
-  });
+  const endpointRead = $derived(
+    readAnswer($endpointAsked, (held) => ("endpoints" in held ? held.endpoints : undefined)),
+  );
+  const endpointList = $derived(endpointRead.kind === "held" ? endpointRead.value.endpoints : []);
   let provider = $state("");
   let modelId = $state("");
   let level = $state<Effort>("medium");
-  $effect(() => {
-    const text = onDisk;
-    if (text === null) return;
+  let choiceDirty = $state(false);
+  let choiceAt: Address | null = null;
+  function applyChoice(text: string): void {
     const picked = choiceOf(text) ?? tiersOf(text).medium;
-    if (picked === undefined) return;
+    if (picked === undefined) {
+      provider = "";
+      modelId = "";
+      level = "medium";
+      return;
+    }
     provider = picked.endpoint;
     modelId = picked.model;
     level = picked.effort;
+  }
+  $effect(() => {
+    const at = building;
+    const text = onDisk;
+    if (text === null) return;
+    const moved = choiceAt !== at;
+    choiceAt = at;
+    if (moved) {
+      applyChoice(text);
+      choiceDirty = false;
+      return;
+    }
+    if (choiceDirty) return;
+    applyChoice(text);
+  });
+  $effect(() => {
+    if (rulesSaving.kind === "saved") choiceDirty = false;
   });
   const providerModels = $derived(
     endpointList.find((each) => each.name === provider)?.models ?? [],
   );
   const levels = $derived.by((): readonly Effort[] => {
-    const offered = providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
-    return offered.length > 0 ? offered : ["minimal", "low", "medium", "high", "xhigh", "max"];
+    return providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
   });
   const shortcuts = $derived(onDisk === null ? {} : tiersOf(onDisk));
+  const choiceBlocked = $derived.by((): string | undefined => {
+    if (rulesSaving.kind === "saving") return say($lang, "subagent_saving");
+    if (provider === "" || modelId === "") return say($lang, "subagent_no_endpoint");
+    if (levels.length === 0 || !levels.includes(level)) return say($lang, "subagent_no_effort");
+    return undefined;
+  });
 
   function useTier(tier: Tier): void {
     const picked = shortcuts[tier];
@@ -239,10 +274,11 @@
     provider = picked.endpoint;
     modelId = picked.model;
     level = picked.effort;
+    choiceDirty = true;
   }
 
   function saveChoice(): void {
-    if (onDisk === null || provider === "" || modelId === "") return;
+    if (onDisk === null || choiceBlocked !== undefined || rulesSaving.kind === "saving") return;
     if (!u.send(setWorkspaceChoice(building, onDisk, provider, modelId, level))) return;
     const mine = markSent(onDisk);
     rulesSaving = mine;
@@ -294,11 +330,25 @@
 
 {#snippet rules()}
   <div class="flex min-w-0 flex-col gap-base">
-    {#if onDisk === null}
+    {#if rulesFailed !== null}
+      <Unanswered
+        query={rulesFailed.query}
+        reason={rulesFailed.reason}
+        asked={{ document: { at: rulesAt(building) } }}
+      />
+    {:else if onDisk === null}
       <p class="text-text-faint">…</p>
     {:else}
       {#if pane === "models"}
-        {#if endpointList.length === 0}
+        {#if endpointRead.kind === "unavailable"}
+          <Unanswered
+            query={endpointRead.query}
+            reason={endpointRead.reason}
+            asked={QUERIES.endpoints}
+          />
+        {:else if endpointRead.kind === "asking"}
+          <p class="text-text-faint">…</p>
+        {:else if endpointList.length === 0}
           <p class="text-note text-text-faint">{say($lang, "subagent_no_endpoint")}</p>
         {:else}
           <div class="flex min-w-0 flex-wrap items-end gap-base">
@@ -313,7 +363,8 @@
                   modelId = next?.models[0]?.id ?? "";
                   const offered = next?.models[0]?.thinking.levels ?? [];
                   const first = offered[0];
-                  if (first !== undefined) level = first;
+                  level = first ?? "medium";
+                  choiceDirty = true;
                 }}
               >
                 <option value=""></option>
@@ -332,7 +383,9 @@
                   const offered =
                     providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
                   const first = offered[0];
-                  if (first !== undefined && !offered.includes(level)) level = first;
+                  if (first === undefined) level = "medium";
+                  else if (!offered.includes(level)) level = first;
+                  choiceDirty = true;
                 }}
               >
                 {#each providerModels as facts (facts.id)}
@@ -347,7 +400,10 @@
                 value={level}
                 onchange={(event) => {
                   const next = levels.find((each) => each === event.currentTarget.value);
-                  if (next !== undefined) level = next;
+                  if (next !== undefined) {
+                    level = next;
+                    choiceDirty = true;
+                  }
                 }}
               >
                 {#each levels as effort (effort)}
@@ -356,6 +412,9 @@
               </select>
             </label>
           </div>
+          {#if modelId !== "" && levels.length === 0}
+            <p class="text-note text-text-faint">{say($lang, "subagent_no_effort")}</p>
+          {/if}
           <span class="flex flex-wrap items-center gap-base">
             {#each TIERS as tier (tier)}
               {#if shortcuts[tier] !== undefined}
@@ -371,11 +430,15 @@
             <Button
               label={say($lang, "subagent_save")}
               tone="primary"
-              {...provider === "" || modelId === ""
-                ? { why: say($lang, "subagent_no_endpoint") }
-                : {}}
+              loading={rulesSaving.kind === "saving"}
+              {...choiceBlocked === undefined ? {} : { why: choiceBlocked }}
               onPress={saveChoice}
             />
+            {#if rulesSaving.kind === "saved"}
+              <span class="text-note text-text-quiet" role="status">{say($lang, "catalog_saved")}</span>
+            {:else if rulesSaving.kind === "refused"}
+              <span class="text-note text-text-quiet" role="status">{rulesSaving.error.recovery}</span>
+            {/if}
           </span>
         {/if}
       {/if}

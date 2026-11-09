@@ -294,6 +294,64 @@ effort = "high"
             .model,
         "ordinary"
     );
+    let from_missing = crate::inscribe_choice("", "house", "ordinary", kernel::Effort::Medium);
+    let missing = evaluate(&addr("shop"), &from_missing).unwrap();
+    assert_eq!(
+        missing
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "ordinary",
+        "an empty RULES.toml opens with ordinary confidential/write before the choice"
+    );
+    let quoted = crate::inscribe_choice(
+        &ordinary(""),
+        "house",
+        "vendor\"model",
+        kernel::Effort::Low,
+    );
+    assert!(
+        quoted.contains('\'') || quoted.contains("\\\""),
+        "model ids with quotes are TOML-escaped: {quoted}"
+    );
+    let quoted_policy = evaluate(&addr("shop"), &quoted).unwrap();
+    assert_eq!(
+        quoted_policy
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "vendor\"model"
+    );
+    let commented = format!(
+        "{}\n[workspace_models.choice] # selected\nendpoint = \"house\"\nmodel = \"ordinary\"\neffort = \"low\"\n",
+        workspace_rules()
+    );
+    let replaced =
+        crate::inscribe_choice(&commented, "house", "strong", kernel::Effort::High);
+    assert_eq!(
+        replaced
+            .matches("[workspace_models.choice]")
+            .count(),
+        1,
+        "a choice header with a trailing comment is replaced, not duplicated"
+    );
+    let replaced_policy = evaluate(&addr("shop"), &replaced).unwrap();
+    assert_eq!(
+        replaced_policy
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "strong"
+    );
 }
 
 #[test]
