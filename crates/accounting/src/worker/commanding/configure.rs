@@ -271,6 +271,35 @@ impl RunWorker {
         )
     }
 
+    /// Sets the direct sub-agent model and leaves the rest of `RULES.toml`.
+    ///
+    /// # Errors
+    /// Propagates a choice the rules reader or the endpoint book refuses,
+    /// a file that is no longer `base`, and a history that will not take
+    /// the line.
+    pub(in crate::worker) fn set_workspace_choice(
+        &mut self,
+        building: &kernel::Address,
+        base: &str,
+        endpoint: &str,
+        model: &str,
+        effort: kernel::Effort,
+    ) -> Result<(), AxError> {
+        let building = city::Building::of(building)?;
+        let body = city::inscribe_choice(base, endpoint, model, effort);
+        city::write_rules_against_with(
+            &self.city_root,
+            building.addr(),
+            city::RulesEdit { base, text: &body },
+            |rules| self.validate_workspace_models(rules),
+        )?;
+        self.book_document(
+            Scope::Building(building.addr().clone()),
+            GoverningDocument::Rules,
+            &city::rules_path(&self.city_root, building.addr()),
+        )
+    }
+
     /// Writes the city's own layer from the settings page, one fact at a
     /// time, and books the change once (`crates/wire/spec/Command/Step.lean`
     /// §8-61). A frame that states nothing writes nothing and books

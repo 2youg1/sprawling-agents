@@ -15,11 +15,14 @@
   import { readable } from "svelte/store";
 
   import { readAnswer } from "../../core/answered";
-  import { configureCatalog, configureCityCatalog, putRules } from "../../core/commands";
+  import { configureCatalog, configureCityCatalog, putRules, setWorkspaceChoice } from "../../core/commands";
   import { readDocument } from "../../core/document";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
+  import { QUERIES } from "../../core/asking";
   import { ui } from "../../ui";
-  import type { Address, Answer, CatalogAnswer, Query } from "../../wire";
+  import type { Address, Answer, CatalogAnswer, Effort, Query } from "../../wire";
+  import { TIERS, choiceOf, tiersOf } from "./subagent";
+  import type { Tier } from "./subagent";
   import Button from "../parts/button.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { rulesAt } from "../settings/files";
@@ -186,6 +189,48 @@
     awaitReceipt(mine, rulesSlot);
   }
 
+  // The direct sub-agent model. Easy / medium / hard fill these three
+  // selects; saving writes `[workspace_models.choice]` and leaves the
+  // shortcuts in the file.
+  const endpointAsked = $derived(u.conn.asking.ask(QUERIES.endpoints));
+  const endpointList = $derived.by(() => {
+    const stated = $endpointAsked;
+    return stated !== undefined && "endpoints" in stated ? stated.endpoints.endpoints : [];
+  });
+  let provider = $state("");
+  let modelId = $state("");
+  let level = $state<Effort>("medium");
+  $effect(() => {
+    const text = onDisk;
+    if (text === null) return;
+    const picked = choiceOf(text) ?? tiersOf(text).medium;
+    if (picked === undefined) return;
+    provider = picked.endpoint;
+    modelId = picked.model;
+    level = picked.effort;
+  });
+  const providerModels = $derived(
+    endpointList.find((each) => each.name === provider)?.models ?? [],
+  );
+  const levels = $derived.by((): readonly Effort[] => {
+    const offered = providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
+    return offered.length > 0 ? offered : ["minimal", "low", "medium", "high", "xhigh", "max"];
+  });
+  const shortcuts = $derived(onDisk === null ? {} : tiersOf(onDisk));
+
+  function useTier(tier: Tier): void {
+    const picked = shortcuts[tier];
+    if (picked === undefined) return;
+    provider = picked.endpoint;
+    modelId = picked.model;
+    level = picked.effort;
+  }
+
+  function saveChoice(): void {
+    if (onDisk === null || provider === "" || modelId === "") return;
+    u.send(setWorkspaceChoice(building, onDisk, provider, modelId, level));
+  }
+
   const look = $derived(
     answer === undefined
       ? undefined
@@ -234,6 +279,88 @@
     {#if onDisk === null}
       <p class="text-text-faint">…</p>
     {:else}
+      {#if pane === "models"}
+        {#if endpointList.length === 0}
+          <p class="text-note text-text-faint">{say($lang, "subagent_no_endpoint")}</p>
+        {:else}
+          <div class="flex min-w-0 flex-wrap items-end gap-base">
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_provider")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={provider}
+                onchange={(event) => {
+                  provider = event.currentTarget.value;
+                  const next = endpointList.find((each) => each.name === provider);
+                  modelId = next?.models[0]?.id ?? "";
+                  const offered = next?.models[0]?.thinking.levels ?? [];
+                  const first = offered[0];
+                  if (first !== undefined) level = first;
+                }}
+              >
+                <option value=""></option>
+                {#each endpointList as endpoint (endpoint.name)}
+                  <option value={endpoint.name}>{endpoint.label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_model")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={modelId}
+                onchange={(event) => {
+                  modelId = event.currentTarget.value;
+                  const offered =
+                    providerModels.find((each) => each.id === modelId)?.thinking.levels ?? [];
+                  const first = offered[0];
+                  if (first !== undefined && !offered.includes(level)) level = first;
+                }}
+              >
+                {#each providerModels as facts (facts.id)}
+                  <option value={facts.id}>{facts.id}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="flex min-w-0 flex-col gap-tight text-note">
+              <span class="text-text-quiet">{say($lang, "subagent_effort")}</span>
+              <select
+                class="h-control max-w-full rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+                value={level}
+                onchange={(event) => {
+                  const next = levels.find((each) => each === event.currentTarget.value);
+                  if (next !== undefined) level = next;
+                }}
+              >
+                {#each levels as effort (effort)}
+                  <option value={effort}>{effort}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+          <span class="flex flex-wrap items-center gap-base">
+            {#each TIERS as tier (tier)}
+              {#if shortcuts[tier] !== undefined}
+                <Button
+                  label={fill(say($lang, "subagent_shortcut"), { tier })}
+                  tone="quiet"
+                  onPress={() => {
+                    useTier(tier);
+                  }}
+                />
+              {/if}
+            {/each}
+            <Button
+              label={say($lang, "subagent_save")}
+              tone="primary"
+              {...provider === "" || modelId === ""
+                ? { why: say($lang, "subagent_no_endpoint") }
+                : {}}
+              onPress={saveChoice}
+            />
+          </span>
+        {/if}
+      {/if}
       <TextBox
         size="document"
         wire={textBoxWire(rulesDraft, say($lang, "rules_title"), false, (next) => {

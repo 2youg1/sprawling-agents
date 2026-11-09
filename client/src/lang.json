@@ -348,8 +348,32 @@
     "zh": "这一栏还没有内容。"
   },
   "catalog_models_note": {
-    "en": "Delegated tasks read [workspace_models] in this building's RULES.toml. Edit the file below; a change takes effect on the next run.",
-    "zh": "委派任务读这栋楼 RULES.toml 里的 [workspace_models]。在下方编辑；改动在下一个 run 生效。"
+    "en": "A new child session uses the provider, model and effort chosen here. Easy, medium and hard stay as shortcuts. The change is saved in this building's RULES.toml and takes effect on the next run.",
+    "zh": "新的子会话使用这里选定的供应方、模型与强度。容易、中等、困难三档仍是快捷方式。改动写进这栋楼的 RULES.toml，在下一个 run 生效。"
+  },
+  "subagent_provider": {
+    "en": "provider",
+    "zh": "供应方"
+  },
+  "subagent_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "subagent_effort": {
+    "en": "effort",
+    "zh": "强度"
+  },
+  "subagent_save": {
+    "en": "save subagent model",
+    "zh": "保存子代理模型"
+  },
+  "subagent_shortcut": {
+    "en": "use {tier}",
+    "zh": "用{tier}"
+  },
+  "subagent_no_endpoint": {
+    "en": "No provider is attached yet. Attach one in settings, then choose it here.",
+    "zh": "还没有接上供应方。先在设置里接上，再在这里选择。"
   },
   "catalog_rules_note": {
     "en": "This building's RULES.toml: exposure, skills, sandbox and workspace models. The city refuses text it cannot read.",

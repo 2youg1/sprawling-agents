@@ -299,6 +299,7 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
         | Command::PutDocument { .. }
         | Command::PutIdentity { .. }
         | Command::PutRules(_)
+        | Command::SetWorkspaceChoice { .. }
         | Command::ConfigureCity(_)
         | Command::RestoreFile { .. }
         | Command::PutGuide { .. }

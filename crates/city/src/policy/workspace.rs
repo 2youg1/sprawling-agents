@@ -79,6 +79,10 @@ pub struct WorkspaceModelPolicy {
     allowed: Vec<ModelRef>,
     max_effort: Effort,
     recommendations: WorkspaceRecommendations,
+    /// The person's direct provider, model and effort. When set, a new
+    /// child session uses it instead of the difficulty recommendations.
+    #[serde(default)]
+    choice: Option<ModelRecommendation>,
 }
 
 impl WorkspaceModelPolicy {
@@ -112,6 +116,14 @@ impl WorkspaceModelPolicy {
             Difficulty::Medium => &self.recommendations.medium,
             Difficulty::Hard => &self.recommendations.hard,
         }
+    }
+
+    /// The provider, model and effort the person chose directly, when
+    /// they did. Absent, a new child session still follows the difficulty
+    /// recommendations.
+    #[must_use]
+    pub fn choice(&self) -> Option<&ModelRecommendation> {
+        self.choice.as_ref()
     }
 
     /// A stable identity for the policy a child run actually used.
@@ -162,8 +174,208 @@ impl WorkspaceModelPolicy {
                 )));
             }
         }
+        if let Some(choice) = &self.choice {
+            if !self.allowed.contains(choice.model()) {
+                return Err(invalid(format!(
+                    "chosen model {} is not in workspace_models.allowed",
+                    choice.model()
+                )));
+            }
+            if choice.effort == Effort::None {
+                return Err(invalid(format!(
+                    "chosen model {} uses `none`, which is not a thinking level",
+                    choice.model()
+                )));
+            }
+            if choice.effort > self.max_effort {
+                return Err(invalid(format!(
+                    "chosen model {} uses {}, above max_effort {}",
+                    choice.model(),
+                    choice.effort.as_str(),
+                    self.max_effort.as_str()
+                )));
+            }
+        }
         Ok(())
     }
+}
+
+/// Writes `choice` into `text` and leaves every other key. A file with
+/// no `[workspace_models]` table gains one whose three recommendations
+/// equal the choice, so the section the city already requires is present.
+/// An existing recommendation table is left as the shortcut it is.
+///
+/// The result is text for `write_rules_against` to evaluate. This function
+/// does not decide that the choice is registered or offered.
+pub fn inscribe_choice(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
+    let choice = choice_section(endpoint, model, effort);
+    if let Some(rewritten) = replace_section(text, "[workspace_models.choice]", &choice) {
+        return ensure_allowed(&rewritten, endpoint, model, effort);
+    }
+    if has_exact_header(text, "[workspace_models]") {
+        let with_choice = insert_before_next_header(text, "[workspace_models]", &choice);
+        return ensure_allowed(&with_choice, endpoint, model, effort);
+    }
+    let mut out = text.to_owned();
+    if !out.is_empty() && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str(&fresh_section(endpoint, model, effort));
+    out
+}
+
+fn choice_section(endpoint: &str, model: &str, effort: Effort) -> String {
+    format!(
+        "[workspace_models.choice]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{}\"\n",
+        effort.as_str()
+    )
+}
+
+fn fresh_section(endpoint: &str, model: &str, effort: Effort) -> String {
+    let word = effort.as_str();
+    format!(
+        "\n[workspace_models]\nallowed = [{{ endpoint = \"{endpoint}\", model = \"{model}\" }}]\nmax_effort = \"{word}\"\n\n[workspace_models.choice]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.easy]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.medium]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n\n[workspace_models.recommendations.hard]\nendpoint = \"{endpoint}\"\nmodel = \"{model}\"\neffort = \"{word}\"\n"
+    )
+}
+
+fn has_exact_header(text: &str, header: &str) -> bool {
+    text.lines().any(|line| line.trim() == header)
+}
+
+/// Replaces the body of `header` through the line before the next header.
+fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.iter().position(|line| line.trim() == header)?;
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(start + 1)
+        .find(|(_, line)| line.trim().starts_with('['))
+        .map_or(lines.len(), |(index, _)| index);
+    let mut out = String::new();
+    for line in &lines[..start] {
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str(section);
+    if !section.ends_with('\n') {
+        out.push('\n');
+    }
+    for line in &lines[end..] {
+        out.push_str(line);
+        out.push('\n');
+    }
+    Some(out)
+}
+
+fn insert_before_next_header(text: &str, header: &str, section: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let Some(start) = lines.iter().position(|line| line.trim() == header) else {
+        return text.to_owned();
+    };
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(start + 1)
+        .find(|(_, line)| {
+            let trimmed = line.trim();
+            trimmed.starts_with('[') && trimmed != header
+        })
+        .map_or(lines.len(), |(index, _)| index);
+    let mut out = String::new();
+    for line in &lines[..end] {
+        out.push_str(line);
+        out.push('\n');
+    }
+    if !out.ends_with("\n\n") {
+        out.push('\n');
+    }
+    out.push_str(section);
+    for line in &lines[end..] {
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+fn ensure_allowed(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
+    let pair = format!("endpoint = \"{endpoint}\", model = \"{model}\"");
+    let lines: Vec<&str> = text.lines().collect();
+    let Some(start) = lines
+        .iter()
+        .position(|line| line.trim() == "[workspace_models]")
+    else {
+        return text.to_owned();
+    };
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(start + 1)
+        .find(|(_, line)| line.trim().starts_with('['))
+        .map_or(lines.len(), |(index, _)| index);
+    let mut out = String::new();
+    let mut allowed = false;
+    for (index, line) in lines.iter().enumerate() {
+        if (start..end).contains(&index) && line.trim().starts_with("allowed") {
+            allowed = true;
+            if line.contains(&pair) {
+                out.push_str(line);
+            } else if let Some(bracket) = line.rfind(']') {
+                let (head, tail) = line.split_at(bracket);
+                let joiner = if head.trim_end().ends_with('[') {
+                    ""
+                } else {
+                    ", "
+                };
+                out.push_str(head);
+                out.push_str(joiner);
+                out.push_str(&format!("{{ {pair} }}"));
+                out.push_str(tail);
+            } else {
+                out.push_str(line);
+            }
+        } else if (start..end).contains(&index) && line.trim().starts_with("max_effort") {
+            out.push_str(&raised_max(line, effort));
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    if !allowed {
+        // The table named no pool. Put one on the line after its header.
+        return insert_after_header(
+            &out,
+            "[workspace_models]",
+            &format!("allowed = [{{ {pair} }}]\n"),
+        );
+    }
+    out
+}
+
+fn raised_max(line: &str, effort: Effort) -> String {
+    let Some(quoted) = line.split('"').nth(1) else {
+        return line.to_owned();
+    };
+    let current = Effort::ALL.into_iter().find(|each| each.as_str() == quoted);
+    if current.is_some_and(|current| current >= effort) {
+        return line.to_owned();
+    }
+    format!("max_effort = \"{}\"", effort.as_str())
+}
+
+fn insert_after_header(text: &str, header: &str, line: &str) -> String {
+    let mut out = String::new();
+    for existing in text.lines() {
+        out.push_str(existing);
+        out.push('\n');
+        if existing.trim() == header {
+            out.push_str(line);
+            if !line.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+    }
+    out
 }
 
 /// A structurally invalid policy, rejected before any rule bytes land.

@@ -284,6 +284,14 @@ impl RunWorker {
                 ref card, ref base, ..
             } => self.put_identity(card, base),
             wire::Command::PutRules(ref write) => self.put_rules(write),
+            wire::Command::SetWorkspaceChoice {
+                ref building,
+                ref base,
+                ref endpoint,
+                ref model,
+                effort,
+                ..
+            } => self.set_workspace_choice(building, base, endpoint, model, effort),
             wire::Command::PutPrompt(ref write) => self.put_prompt(write),
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
             wire::Command::PutGuide { progress, .. } => guide::put(&self.city_root, &progress),

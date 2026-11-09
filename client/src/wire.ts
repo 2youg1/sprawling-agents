@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 77 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "93f13fb04e54f24f4954be894c0e66111a22ba8eb685f68a5cee478db63a4956" as const;
+export const WIRE_HASH = "d7948f0e355c39958caf06056253c0352b5ac857591f855e9b464b36480fb240" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -6287,6 +6287,16 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     put_rules: RulesWrite,
+  }),
+  Schema.Struct({
+    set_workspace_choice: Schema.Struct({
+      base: Schema.String,
+      building: Address,
+      effort: Effort,
+      endpoint: Schema.String,
+      idem: IdemKey,
+      model: Schema.String,
+    }),
   }),
   Schema.Struct({
     restore_file: Schema.Struct({

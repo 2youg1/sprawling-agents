@@ -193,10 +193,10 @@ effort = "high"
 - **一个 ModelRef 同时携 `(endpoint, model)`**，同名模型跨 provider 不合并。`allowed` 非空；三档推荐都必须在其中；`max_effort` 与三档 `effort` 都是真实档位，旧账本兼容词 `none` 在这里拒绝；每档都不高于 `max_effort`。这些结构不变量在 `evaluate` 一次性判完，失败不落任何字节。
 - **页面保存还要过端点簿**：`PutRules` 与携自定义规则的 `CreateBuilding` 在现有写门之前，用同一本 `EndpointBook` 拒掉未接入、未登记或不存在的引用，以及已知不提供推荐 effort 的模型。文件已有并发改动仍由 `base` 拒；任一拒绝都不留下半份策略。
 - **策略只管城市原生模型居民**：harness 自己选模型，`agree_to_work` 的 harness 臂不读这张表。confidential 的本地边界仍由 `EndpointBook::select` 在选型时判，策略不能放宽它。
-- **只在新 Session 的委派路径上推荐**：已有房间记录时忽略本次难度，继续走冻结形状；新子 Session 有难度取对应推荐，没难度取 `medium`。人显式给出的 `Dispatch.model`／`effort` 优先，但仍受 allowed／max effort 与 provider offer 约束。推荐端点被摘除、模型不再登记、effort offer 改变或 confidential 不允许时拒绝，不降档、不另换模型。
+- **只在新 Session 的委派路径上推荐**：已有房间记录时忽略本次难度与直接选择，继续走冻结形状；新子 Session 在 `Dispatch.model` 缺席时，有 `[workspace_models.choice]` 就用它（provider、model、effort 三栏），否则有难度取对应推荐，没难度取 `medium`。人显式给出的 `Dispatch.model`／`effort` 仍优先，并受 allowed／max effort 与 provider offer 约束。推荐或直接选择的端点被摘除、模型不再登记、effort offer 改变或 confidential 不允许时拒绝，不降档、不另换模型。
 - **版本随子 run 入账**：策略的规范 JSON 字节摘要进入 `run_started.routing.policy`；实际 `ModelRef`、请求难度与选择来源同在这条记录，实际 effort 沿用已有的 `run_started.effort`，不写第二份。重放只读这些行，不重新评估任务。
 - **新楼的模板带一段注释占位**：`crates/city/templates/RULES.toml` 末尾把 `allowed`、`max_effort` 与三档推荐写成注释，每档给 `endpoint`（provider 名）、`model`、`effort` 三栏。注释即不启用，人揭开并改掉示例值就生效；占位符本身由 `the_template_hands_a_building_a_working_routing_placeholder` 钉住——模板照读是 `None`，揭开后是本读者接受的策略。
-- **本版不加结构化表单**：另立一帧与一棵 TOML 写者，会让同一个键有两种写法，而现有规则页已经带着基线、求值与端点簿校验三道守卫；占位符解决“不知道写什么”，结构化编辑器留给真有批量改法需求的那天（D90 的重开参数）。
+- **直接选择是一帧，仍走楼规这一扇门**：`SetWorkspaceChoice` 只改 `[workspace_models.choice]`（没有这一节时补上一节，三档与选择相同，以便读者接受），经 `write_rules_against` 求值并守 `base`。三档推荐留在文件里，页面可以把某一档填进选择器，但它们不是唯一的写法。页面不另拼一份 TOML。
 
 验收：city 的解析与结构拒绝测试、Lean 的 `route_existing_session`／`route_without_policy`／`route_recommendation_allowed`／`route_recommendation_within_max`；accounting 经真实 `delegate` 覆盖三档、无难度缺省、已有 Session 不换模型、无策略旧行为与开始前拒绝。
 -/
@@ -214,13 +214,13 @@ effort = "high"
 
 /-! D90 工作区策略追加进 RULES.toml，而不是另建模型默认值
 
-**决定**：`[workspace_models]` 是楼规的可选末节，复用整份楼规的求值、基线写门与治理摘要；不把推荐写进 `[model] name`，也不改全城 `main`。
+**决定**：`[workspace_models]` 是楼规的可选末节，复用整份楼规的求值、基线写门与治理摘要；不把推荐写进 `[model] name`，也不改全城 `main`。人直接选定的 provider、model 与 effort 写在同一节的 `choice`，由 `SetWorkspaceChoice` 经 `write_rules_against` 落盘；三档推荐仍在，没有 `choice` 时路由照旧。
 
-**理由**：工作区允许什么与三档推荐是一张必须原子校验、原子保存的策略；楼规已有这条写路径。另建文件会让楼规与策略各自留下版本和失败路径，改全城 `main` 则会把一次子任务的选择泄漏给无关 Session。
+**理由**：工作区允许什么、三档推荐与直接选择是一张必须原子校验、原子保存的策略；楼规已有这条写路径。另建文件会让楼规与策略各自留下版本和失败路径，改全城 `main` 则会把一次子任务的选择泄漏给无关 Session。直接选择与三档写在同一张表里，页面不必为了换一个模型去改整份楼规，也不会另长出第二棵 TOML 写者。
 
-**被否**：给 `delegate` 再加 model／effort 参数——父 Session 就会同时回答难度、模型与价格，和城市策略形成三套可能矛盾的答案；房间级策略——第一版没有房间级场景，Session 冻结与人工 `Dispatch` 已覆盖单次指定；为这张表另立结构化帧与第二棵 TOML 写者——同一个键有了两种写法，而模板里的注释占位已经回答了“不知道写什么”。
+**被否**：给 `delegate` 再加 model／effort 参数——父 Session 就会同时回答难度、模型与价格，和城市策略形成三套可能矛盾的答案；房间级策略——没有房间级场景，Session 冻结与人工 `Dispatch` 已覆盖单次指定；只保留三档、不设 `choice`——页面只能在 easy／medium／hard 三行模板里打转。
 
-**重开参数**：人要求在页面上一次改三档而不碰其余楼规文本，且规则页的基于求值的拒词已不足以给出下一步时，再议结构化帧，且它只能经 `write_rules_against` 这一扇门落盘。
+**重开参数**：人要求按房间而不是按楼记住直接选择时，再给房间一层，并且仍经同一扇 `write_rules_against`。
 -/
 
 /-! D2 定规：读界在调用时按目标所在楼现读规则
@@ -465,13 +465,15 @@ structure Recommendation where
   effort : Nat
   deriving Repr
 
-/-- 三档齐全的一张工作区策略。 -/
+/-- 三档齐全的一张工作区策略，外加可缺的直接选择。 -/
 structure Policy where
   allowed : List ModelRef
   maxEffort : Nat
   easy : Recommendation
   medium : Recommendation
   hard : Recommendation
+  /-- 人直接选定的 provider、model 与 effort。`none` 时仍走三档。 -/
+  choice : Option Recommendation
   deriving Repr
 
 /-- 父 Session 给出的难度命中哪一档；未给难度是 `medium`，不是另一次判断。 -/
@@ -481,18 +483,26 @@ def recommendation (policy : Policy) (difficulty : Difficulty) : Recommendation 
   | .Medium => policy.medium
   | .Hard => policy.hard
 
+/-- 新子 Session 实际采用的推荐：直接选择优先，否则按难度，未给难度是 `medium`。 -/
+def selected (policy : Policy) (requested : Option Difficulty) : Recommendation :=
+  match policy.choice with
+  | some chosen => chosen
+  | none => recommendation policy (requested.getD .Medium)
+
 /-- `evaluate` 与端点簿校验共同建立、路由依赖的结构前提。 -/
 def Valid (policy : Policy) : Prop :=
-  policy.allowed ≠ [] ∧ ∀ difficulty,
+  policy.allowed ≠ [] ∧ (∀ difficulty,
     (recommendation policy difficulty).model ∈ policy.allowed ∧
-      (recommendation policy difficulty).effort ≤ policy.maxEffort
+      (recommendation policy difficulty).effort ≤ policy.maxEffort) ∧
+    (∀ chosen, policy.choice = some chosen →
+      chosen.model ∈ policy.allowed ∧ chosen.effort ≤ policy.maxEffort)
 
 /-- `none` 是继续走旧冻结／`main` 路径；`some` 才是城市替一次新子 Session 作出的推荐。 -/
 def route (existingSession : Bool) (policy : Option Policy) (requested : Option Difficulty) :
     Option Recommendation :=
   match existingSession, policy with
   | true, _ | _, none => none
-  | false, some policy => some (recommendation policy (requested.getD .Medium))
+  | false, some policy => some (selected policy requested)
 
 /-- 已有 Session 不受这次难度影响。 -/
 theorem route_existing_session (policy : Option Policy) (requested : Option Difficulty) :
@@ -507,22 +517,40 @@ theorem route_without_policy (requested : Option Difficulty) :
 /-- 有效策略选出的模型一定在 allowed 中。 -/
 theorem route_recommendation_allowed (policy : Policy) (requested : Option Difficulty)
     (valid : Valid policy) :
-    ∃ selected, route false (some policy) requested = some selected ∧
-      selected.model ∈ policy.allowed := by
-  refine ⟨recommendation policy (requested.getD .Medium), rfl, ?_⟩
-  exact (valid.2 (requested.getD .Medium)).1
+    ∃ picked, route false (some policy) requested = some picked ∧
+      picked.model ∈ policy.allowed := by
+  refine ⟨selected policy requested, rfl, ?_⟩
+  cases h : policy.choice with
+  | some chosen =>
+    have : selected policy requested = chosen := by simp [selected, h]
+    rw [this]
+    exact (valid.2.2 chosen h).1
+  | none =>
+    have : selected policy requested = recommendation policy (requested.getD .Medium) := by
+      simp [selected, h]
+    rw [this]
+    exact (valid.2.1 (requested.getD .Medium)).1
 
 /-- 有效策略选出的 effort 一定不高于 max_effort。 -/
 theorem route_recommendation_within_max (policy : Policy) (requested : Option Difficulty)
     (valid : Valid policy) :
-    ∃ selected, route false (some policy) requested = some selected ∧
-      selected.effort ≤ policy.maxEffort := by
-  refine ⟨recommendation policy (requested.getD .Medium), rfl, ?_⟩
-  exact (valid.2 (requested.getD .Medium)).2
+    ∃ picked, route false (some policy) requested = some picked ∧
+      picked.effort ≤ policy.maxEffort := by
+  refine ⟨selected policy requested, rfl, ?_⟩
+  cases h : policy.choice with
+  | some chosen =>
+    have : selected policy requested = chosen := by simp [selected, h]
+    rw [this]
+    exact (valid.2.2 chosen h).2
+  | none =>
+    have : selected policy requested = recommendation policy (requested.getD .Medium) := by
+      simp [selected, h]
+    rw [this]
+    exact (valid.2.1 (requested.getD .Medium)).2
 
-/-- 不写难度不是空路由：配置了策略的新子 Session 落到 medium 推荐。 -/
-theorem route_defaults_to_medium (policy : Policy) :
-    route false (some policy) none = some policy.medium :=
-  rfl
+/-- 不写难度、也没有直接选择时，新子 Session 落到 medium 推荐。 -/
+theorem route_defaults_to_medium (policy : Policy) (noChoice : policy.choice = none) :
+    route false (some policy) none = some policy.medium := by
+  simp [route, selected, recommendation, noChoice]
 
 end City.Policy.Workspace

@@ -215,6 +215,52 @@ fn a_workspace_model_policy_is_read_from_the_rules() {
         }
     );
     assert_eq!(policy.digest().unwrap(), policy.digest().unwrap());
+    assert!(policy.choice().is_none());
+}
+
+#[test]
+fn a_direct_choice_is_read_and_a_missing_section_gains_one() {
+    let chosen = format!(
+        "{}\n[workspace_models.choice]\nendpoint = \"house\"\nmodel = \"strong\"\neffort = \"high\"\n",
+        workspace_rules()
+    );
+    let policy = evaluate(&addr("shop"), &chosen)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        policy.choice().map(crate::ModelRecommendation::model),
+        Some(&kernel::ModelRef {
+            endpoint: "house".to_owned(),
+            model: "strong".to_owned(),
+        })
+    );
+    let inscribed =
+        crate::inscribe_choice(&workspace_rules(), "house", "ordinary", kernel::Effort::Low);
+    let again = evaluate(&addr("shop"), &inscribed)
+        .unwrap()
+        .workspace_models()
+        .unwrap()
+        .clone();
+    assert_eq!(again.choice().unwrap().effort(), kernel::Effort::Low);
+    assert_eq!(
+        again.recommendation(kernel::Difficulty::Hard).model().model,
+        "strong",
+        "inscribing a choice leaves the difficulty shortcuts"
+    );
+    let fresh = crate::inscribe_choice(&ordinary(""), "house", "ordinary", kernel::Effort::High);
+    let opened = evaluate(&addr("shop"), &fresh).unwrap();
+    assert_eq!(
+        opened
+            .workspace_models()
+            .unwrap()
+            .choice()
+            .unwrap()
+            .model()
+            .model,
+        "ordinary"
+    );
 }
 
 #[test]

@@ -62,6 +62,7 @@ impl<Secret> Command<Secret> {
             | Self::PutDocument { ref idem, .. }
             | Self::PutIdentity { ref idem, .. }
             | Self::PutRules(RulesWrite { ref idem, .. })
+            | Self::SetWorkspaceChoice { ref idem, .. }
             | Self::ConfigureCity(CitySettings { ref idem, .. })
             | Self::RestoreFile { ref idem, .. }
             | Self::PutGuide { ref idem, .. }
@@ -240,6 +241,21 @@ impl From<WireCommand> for Command {
             },
             Command::PutIdentity { card, base, idem } => Self::PutIdentity { card, base, idem },
             Command::PutRules(write) => Self::PutRules(write),
+            Command::SetWorkspaceChoice {
+                building,
+                base,
+                endpoint,
+                model,
+                effort,
+                idem,
+            } => Self::SetWorkspaceChoice {
+                building,
+                base,
+                endpoint,
+                model,
+                effort,
+                idem,
+            },
             Command::RestoreFile { at, point, idem } => Self::RestoreFile { at, point, idem },
             Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),
