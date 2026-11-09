@@ -37,6 +37,13 @@ describe("context_lock", () => {
     expect(set.slice(choiceAt)).not.toContain("context_lock_tokens");
   });
 
+  test("reads TOML integers that use underscores", () => {
+    const text = 'confidential = false\ncontext_lock_tokens = 262_144\n';
+    expect(lockOf(text)).toBe(262_144);
+    expect(withLock(text, 1000)).toContain("context_lock_tokens = 1000");
+    expect(withLock(text, 1000).match(/context_lock_tokens/g)).toHaveLength(1);
+  });
+
   test("reports the lock as a share of the model window", () => {
     expect(lockShare(262_144, 1_050_000)).toBe(24);
     expect(lockShare(0, 1_000)).toBeNull();

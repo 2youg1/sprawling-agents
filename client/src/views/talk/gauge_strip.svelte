@@ -43,7 +43,7 @@
 </script>
 
 {#if run !== null}
-  <div class="shrink-0" aria-label={say($lang, "world_session")}>
+  <div class="shrink-0" role="group" aria-label={say($lang, "world_session")}>
     <div class="mb-snug flex items-baseline justify-between gap-pane">
       <p class="flex min-w-0 items-baseline gap-snug text-note text-text-quiet">
         {#if worktree !== null}

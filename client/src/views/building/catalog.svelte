@@ -271,11 +271,15 @@
     const next = withLock(base, tokens);
     if (!u.send(putRules(building, onDisk, next))) return;
     rulesDraft = next;
-    lockEdited = false;
+    // Keep lockEdited until the write answers: clearing it here re-runs
+    // the sync effect against the still-old onDisk and wipes the box.
     const mine = markSent(onDisk);
     rulesSaving = mine;
     awaitReceipt(mine, rulesSlot);
   }
+  $effect(() => {
+    if (rulesSaving.kind === "saved") lockEdited = false;
+  });
 
   let provider = $state("");
   let modelId = $state("");

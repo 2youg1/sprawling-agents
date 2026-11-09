@@ -14,7 +14,11 @@
 // the save.
 
 const KEY = "context_lock_tokens";
-const LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[ \\t]*(\\d+)[ \\t]*(?:#.*)?$`, "m");
+// TOML allows underscores in integers (`262_144`); strip them before Number.
+const LINE = new RegExp(
+  `^[ \\t]*${KEY}[ \\t]*=[ \\t]*(\\d(?:_?\\d)*)[ \\t]*(?:#.*)?$`,
+  "m",
+);
 const ANY_LINE = new RegExp(`^[ \\t]*${KEY}[ \\t]*=[^\\n]*\\n?`, "gm");
 const TABLE = /^[ \t]*\[[^\]\n]+\]/m;
 
@@ -24,7 +28,7 @@ export function lockOf(text: string): number | null {
   if (match === null) return null;
   const raw = match[1];
   if (raw === undefined) return null;
-  const tokens = Number(raw);
+  const tokens = Number(raw.replaceAll("_", ""));
   return Number.isInteger(tokens) ? tokens : null;
 }
 
