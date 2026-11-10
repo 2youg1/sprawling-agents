@@ -293,6 +293,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D32 | 人从页面立楼时，目录在不在由城看：在就收编，不在就新建 | `crates/city/spec/Building.lean` |
 | D33 | 页面能写的提示文档是 city 的一张名单，整份动作也在 city | `crates/city/spec/SpineFiles.lean` |
 | D34 | `[catalog]` 只写在城与楼两级，两级的表各自冻结 | `crates/city/spec/ConfigLayers.lean` |
+| D35 | 主机导入跳过名为 `.git` 的真实目录，同名的文件与链接不跳过 | `crates/city/spec/Building.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

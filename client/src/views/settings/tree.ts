@@ -134,10 +134,7 @@ export interface Standing {
 // The branch the panel opens on: the one holding the page beneath when
 // the tree offers that page, else the one holding the group drawn.
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
-  return (
-    placeOf((leaf) => offers(leaf, beneath)) ??
-    standingForGroup(drawn)
-  );
+  return placeOf((leaf) => offers(leaf, beneath)) ?? standingForGroup(drawn);
 }
 
 // The branch that holds the drawn group alone. Used when the person
