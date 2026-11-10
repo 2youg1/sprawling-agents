@@ -19,6 +19,7 @@ use crate::turn::{
     Generating, HeldLines, Interrupt, PhaseOutcome, RunLine, RunPrompt, Turn, TurnReport,
 };
 
+use super::charter::Verdict;
 use super::checkpoint::{CheckpointPolicy, Wave, WaveCheckpoint};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
@@ -163,6 +164,7 @@ impl Run<Active> {
                 conversation,
                 turns: 0,
                 last_turn_t: None,
+                failure: None,
                 gauge,
                 prior_shape: None,
                 prompt: crate::turn::PromptRecord::default(),
@@ -400,7 +402,15 @@ impl Run<Active> {
             (Completion::Cancelled, Some(turn_t)) => turn_t,
             _ => (hooks.now)()?,
         };
-        self.plan.charter().close(ledger, handoff, &completion, t)?;
+        self.plan.charter().close(
+            ledger,
+            handoff,
+            Verdict {
+                completion: &completion,
+                failure: self.state.failure.as_ref(),
+            },
+            t,
+        )?;
         let turns = self.state.turns;
         Ok(Run {
             plan: self.plan,

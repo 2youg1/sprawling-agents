@@ -24,6 +24,17 @@ use crate::handoff::Handoff;
 
 use super::RunPlan;
 
+/// How a run ended, with the error that ended it when an error did.
+///
+/// One value because the two are written into one `run_frozen` line, and
+/// because only a cancelled ending carries a failure: a `done` verdict
+/// with an error beside it is not a line a run can write.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Verdict<'a> {
+    pub(crate) completion: &'a Completion,
+    pub(crate) failure: Option<&'a AxError>,
+}
+
 /// What `run_started` records about a run, and whom every line of the
 /// run is written as.
 #[derive(Debug, Clone, Copy)]
@@ -140,7 +151,9 @@ impl Charter<'_> {
     }
 
     /// The closing pair: the handoff at `t`, and `run_frozen` one
-    /// millisecond later, because the two lines record one event.
+    /// millisecond later, because the two lines record one event. The
+    /// verdict says how the run ended and what stopped it, when an error
+    /// did.
     ///
     /// # Errors
     /// Propagates the ledger, and refuses a `t` at the end of `u64`.
@@ -148,7 +161,7 @@ impl Charter<'_> {
         &self,
         ledger: &mut dyn Ledger,
         handoff: &Handoff,
-        completion: &Completion,
+        verdict: Verdict<'_>,
         t: TimeMs,
     ) -> Result<(), AxError> {
         ledger.append(EventDraft {
@@ -170,7 +183,7 @@ impl Charter<'_> {
             who: self.who.to_owned(),
             addr: None,
             kind: EventKind::RunFrozen,
-            data: Payload::of(&RunFrozen::of(completion))?,
+            data: Payload::of(&RunFrozen::of_failure(verdict.completion, verdict.failure))?,
             ig: false,
         })?;
         Ok(())

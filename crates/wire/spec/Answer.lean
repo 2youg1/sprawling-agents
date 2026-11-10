@@ -30,7 +30,12 @@ pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs,
                      pub dispatched_by: Option<Who>,    // §8-48；policy §8-76，effort 与 names §8-79
                      pub generation: Option<FrozenGeneration>, // 这次 run 冻下的有效生成配置；旧行缺席
                      pub parent: Option<RunId> }        // 派它的那个 run，`Answer/Sessions.lean` D40
-pub struct Closing { pub completion: String, pub at: TimeMs }
+pub struct Closing {
+    pub completion: String,
+    pub at: TimeMs,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<kernel::AxError>,   // run_frozen.failure；旧行仅在 cancelled 收尾读近旁 carrier
+}
 
 // Query 第 21、22 条（声明序，QUERY_NAMES 同序追加）
 Listing  { at: Option<Address> },   // → Answer::Listing(ListingAnswer)；None 是城根

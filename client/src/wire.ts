@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 78 as const;
+export const WIRE_V = 79 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "026e6fa252a7583ae1f4f4d2645cd49ca5f386e12dcc06c605afb09458a9ff8e" as const;
+export const WIRE_HASH = "edccfc623a2c07088052f273da697dfebc14c671240d737ed9992d6060c19902" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -4333,6 +4333,7 @@ export type ReleaseAnswer = typeof ReleaseAnswer.Type;
 export const Closing = Schema.Struct({
   at: TimeMs,
   completion: Schema.String,
+  failure: Schema.optional(Schema.NullOr(AxError)),
 }).annotate({ identifier: "Closing" });
 export type Closing = typeof Closing.Type;
 

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::completion::Completion;
 use crate::delegation::Difficulty;
+use crate::error::AxError;
 use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
 use crate::event::who::Who;
@@ -197,7 +198,9 @@ pub enum Opening {
 /// the authority for the words: this struct carries whichever word that
 /// method printed rather than an enum that would have to agree with it.
 /// A run that ended any other way cites nothing, and the key is absent
-/// rather than empty, exactly as the hand-written writer left it.
+/// rather than empty, exactly as the hand-written writer left it. A
+/// run that stopped against an error cites it whole, so a reader can say
+/// why instead of guessing whether a carrier event belonged to some call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunFrozen {
@@ -209,6 +212,11 @@ pub struct RunFrozen {
     /// for itself, so those lines keep the bytes they always had.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<FreezeCause>,
+    /// The error a stopped run cites as the reason it did not finish,
+    /// when one did. A halt or cancel leaves it absent rather than inventing
+    /// a cause; a record written before this key carried it reads as none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<AxError>,
 }
 
 /// Why a run was frozen by something other than its own driver.
@@ -227,6 +235,15 @@ impl RunFrozen {
     /// holds [`EventRef`](crate::EventRef)s, and minting those from a
     /// line would forge the evidence the type exists to guarantee.
     pub fn of(completion: &Completion) -> RunFrozen {
+        Self::of_failure(completion, None)
+    }
+
+    /// The projection from a verdict and the failure that ended it.
+    /// The failure belongs on the line because a run that stopped against
+    /// something has no other common reader: carrier events reach a
+    /// tool-call row only when a call exists to pair with, and a loadtime
+    /// code has no carrier at all.
+    pub fn of_failure(completion: &Completion, failure: Option<&AxError>) -> RunFrozen {
         let evidence = match completion {
             Completion::Done(evidence) => Some(
                 evidence
@@ -244,6 +261,7 @@ impl RunFrozen {
             completion: completion.name().to_owned(),
             evidence,
             cause: None,
+            failure: failure.cloned(),
         }
     }
 
@@ -259,6 +277,7 @@ impl RunFrozen {
             completion: Completion::Cancelled.name().to_owned(),
             evidence: None,
             cause: Some(FreezeCause::ProcessDied),
+            failure: None,
         }
     }
 }

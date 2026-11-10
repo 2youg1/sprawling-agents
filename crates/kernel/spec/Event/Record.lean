@@ -390,16 +390,21 @@ pub struct RunFrozen {
     pub evidence: Option<Vec<EvidenceCite>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<FreezeCause>,  // 不是 run 自己的驱动写下这一行时，为什么写
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<AxError>,    // 使 run 因错误停下的那个错；主动停不发明原因
 }
 impl RunFrozen {
-    pub fn of(completion: &Completion) -> RunFrozen;   // cause 恒 None，字节与加键之前相同
-    pub fn lost() -> RunFrozen;                        // completion "cancelled"、无 evidence、cause ProcessDied
+    pub fn of(completion: &Completion) -> RunFrozen;              // cause 恒 None、failure 恒 None
+    pub fn of_failure(completion: &Completion, Option<&AxError>); // 上述 + failure
+    pub fn lost() -> RunFrozen;                                   // completion "cancelled"、无 evidence、cause ProcessDied
 }
 ```
 
 - **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（`crates/accounting/Spec.lean` §8-18），不由 run 自己写，所以载荷多一个键说明原因。
 - **结局仍是三种之一。** `Completion` 的三种结局不变（§8-20），死掉的 run 冻成 `cancelled`：它没做完，`Done` 需要城自己记下的证据而它没有；也没有被上限截断，`Limit` 说的是那件事。`cancelled` 说的是「停下了，不是做完」，`cause: process_died` 把「人或 halt 叫停的」与「进程死了」分开（D14）。
 - **一处构造。** `RunFrozen::lost` 是写这一行的唯一入口，「死掉的 run 冻成哪一种结局」只在这里回答。
+- **因错误停下的 `cancelled` 还引用错误本身。** 只要这次冻结属于一次失败，负载带可选的 `failure: AxError`：一条带 carrier 的事件不一定有可配对的调用（`tool_result` 在 round 折里按 `tool_use_id` 找调用），loadtime 码更没有任何 carrier，而一次停下的 run 不该靠页面猜。主动取消与正常完成不发明原因；旧行没有这个键，读它的 `completion` 的人不受影响。
+- 被否：给每个 carrier 事件另立一条「找不到调用也画」的读法——每种 carrier 各有各的形状，读者得逐个认，而 `run_frozen` 是每条终止路径都经过的共同出口；在 `Closing` 里另存一份错误——一个事实两个家。
 - **缺席即 run 自己的冻结。** `RunFrozen::of` 写的行没有这个键，字节与加键之前相同；旧行照读。读结局的读者（`views` 的 `completion`、`city::resident` 的计数）照旧只读 `completion`。
 - 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（`crates/sprawling/Spec.lean` §8-127）钉住死 run 的最后一行是这一行。
 
