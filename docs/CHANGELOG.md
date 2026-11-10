@@ -20,6 +20,40 @@ release notes and their commits.
 
 ---
 
+## v0.0.16-Alpha-261110
+
+**sprawling 0.0.16 wonderer**
+
+Alpha, cut on 2026-11-10 (UTC+8) as `v0.0.16-Alpha-261110`. The workspace manifest carries 0.0.16; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.15-Alpha-261102`. The wire moves from WIRE_V 74 to 79, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 75 when model generation settings began to freeze with the session (#251), 76 when Paper Mono opened the page with a fallback chain and six switches (#255), 77 when a workspace could be imported from this computer and a skill library mounted whole (#271), 78 when the talk box was pinned across tiers and a building kept a context lock in `RULES.toml` (#290), and 79 when a stopped run began to name its error (#295). `EVENT_LOG_V` stays 2 and the configuration formats stay at format 1, so a city written by 0.0.15 opens without a new migration. Keep the backup the [update guide](getting-started.md#updating) asks for before updating.
+
+### Behaviour changes
+
+- **Paper Mono replaces Maple Mono, with a fallback chain and six switches.** The settings page picks any installed face in its own shape, with one live preview (#255, #289).
+- **The settings tree is reorganised around a home.** Provider setup is stepped, the catalog has its own panes, and the cost meter reads as a coin (#272, #278, #288).
+- **A sub-agent is a chosen provider, model and effort.** The workspace names the models a run may use, and the parent names only the difficulty (#253, #287).
+- **A building's tools can be set before its first run**, and a building keeps a context lock in `RULES.toml` (#286, #290).
+- **A `read` answer carries a picture inside one size ceiling**, and a picture bound for a provider is fitted to that model's limits (#269, #285).
+- **The sent conversation joins the frozen prefix**, and generation settings freeze with the session (#251, #266). A tool's picture rides the host's tool message (#277).
+- **A stopped run names the error that stopped it**, and a nested repository's work enters the checkpoint (#295).
+- **A workspace is imported from this computer, a skill library mounts whole, and a room name is explained** (#271). A session switch lands in the box rather than the title (#274), and the composition ring opens a report from the Ledger's bytes (#273).
+- **A curated release takes the nightlies it contains** (#281).
+
+### Fixes
+
+- Keyboard setup, quiet thinking and visibly fresh sessions (#239); press feedback, a wear bar, the mic icon and uncrowded menus (#276); a growing reasoning paints once per frame (#280).
+- Entropy findings no longer block runs (#268), and settings picks keep their branch while import skips `.git` (#292).
+
+### Known and unfixed
+
+- Some refusals are too broad: a tool call needs a structured refusal that explains the cause and names the recovery. The logs carry too little, where input and state changes should be recorded, and several translated names read poorly. The author resolves them one at a time in the next versions.
+- In some workspaces a git conflict stops replies from being recorded; the cause is still to be found.
+
+### Toolchain, CI and repository gates
+
+- **CI runs narrower.** Path filters and parallel gates decide what a change runs, macOS `core` leaves the pull request, the release cache is warmed on main, and the Miri gate is retired (#275, #279).
+- **The standing documents move under `docs/`**, while `AGENTS.md` keeps the judgment (#238); every crate README states what its crate does (#250).
+- **The Python guest carries its standard library** (#259), and one engine family serves every sandbox with no advisory exemptions.
+- **Dependencies.** `zip` moves to 9.2.1 (#237), `wat` to 1.263.0 (#233), `toml` (#249) and `taiki-e/install-action` (#231, #283) move with them.
 ## v0.0.15-Alpha-261102
 
 **sprawling 0.0.15 henceforth**

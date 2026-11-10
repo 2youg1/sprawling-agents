@@ -178,7 +178,7 @@ The standalone release binary needs no JavaScript runtime and no database. The n
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.15<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may still change between versions; keep a restorable backup before updating. Each command below installs the version its channel offers now, which may differ from the source version described here.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.16<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may still change between versions; keep a restorable backup before updating. Each command below installs the version its channel offers now, which may differ from the source version described here.
 
 Choose one channel:
 
