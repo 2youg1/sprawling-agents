@@ -136,9 +136,16 @@ export interface Standing {
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
   return (
     placeOf((leaf) => offers(leaf, beneath)) ??
-    placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ??
-    FIRST
+    standingForGroup(drawn)
   );
+}
+
+// The branch that holds the drawn group alone. Used when the person
+// picks a group while the panel stays over the same page: the page
+// beneath must not win again, or every pick under a city / building /
+// cost page would reopen the city branch (CS17.SETUX regression).
+export function standingForGroup(drawn: SetupGroup): Standing {
+  return placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ?? FIRST;
 }
 
 const FIRST: Standing = { branch: 0, more: false };

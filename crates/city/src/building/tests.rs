@@ -231,6 +231,46 @@ fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
     );
 }
 
+/// A host `.git` store is skipped on import: it is not the workspace's
+/// files, and copying it would block the city on an ordinary project.
+#[test]
+fn importing_skips_a_git_directory() {
+    let city = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    std::fs::write(source.path().join("KEEP.md"), "keep\n").unwrap();
+    let git = source.path().join(".git");
+    std::fs::create_dir_all(git.join("objects")).unwrap();
+    std::fs::write(git.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    std::fs::write(git.join("objects/pack"), "heavy\n").unwrap();
+
+    raise(
+        city.path(),
+        Raising {
+            addr: &addr("lab"),
+            template: BuildingTemplate::Minimal,
+            rules: RulesText::Template,
+            source: Some(source.path()),
+        },
+    )
+    .unwrap();
+
+    let root = city.path().join("lab");
+    assert_eq!(
+        std::fs::read_to_string(root.join("KEEP.md")).unwrap(),
+        "keep\n"
+    );
+    assert!(
+        !root.join(".git").exists(),
+        "the host .git store must not land in the building"
+    );
+    assert!(
+        std::fs::read_to_string(source.path().join(".git/HEAD"))
+            .unwrap()
+            .contains("refs/heads"),
+        "the source .git stays on the host"
+    );
+}
+
 /// A folder that is already a building keeps its rules. Importing it
 /// would have to overwrite them, so the copy never starts and the empty
 /// target is not what the refusal names.

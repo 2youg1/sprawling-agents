@@ -288,7 +288,10 @@ fn refuse_governed_source(source: &Path) -> Result<(), AxError> {
 }
 
 /// One directory copy, bounded against cycles and refusing links rather
-/// than following them into content the person did not name.
+/// than following them into content the person did not name. A `.git`
+/// directory is skipped: it is the host's version-control store, not the
+/// workspace's files, and copying it blocks the city for a long time on
+/// ordinary projects (city Building.lean §8-3).
 fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxError> {
     const DEPTH_MAX: u32 = 64;
     if depth > DEPTH_MAX {
@@ -301,8 +304,12 @@ fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxErro
     let entries = std::fs::read_dir(source).map_err(|err| import_io(source, &err))?;
     for entry in entries {
         let entry = entry.map_err(|err| import_io(source, &err))?;
+        let name = entry.file_name();
+        if name == ".git" {
+            continue;
+        }
         let from = entry.path();
-        let into = target.join(entry.file_name());
+        let into = target.join(&name);
         let metadata = std::fs::symlink_metadata(&from).map_err(|err| import_io(&from, &err))?;
         if metadata.file_type().is_symlink() {
             return Err(invalid_import(

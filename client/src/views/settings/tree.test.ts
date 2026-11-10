@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { SETUP_GROUPS, type SetupGroup, type View } from "../../core/route";
 import { Address } from "../../wire";
-import { foldsOf, toggled, type Fold, type Folds } from "./folds";
+import { foldsForGroup, foldsOf, toggled, type Fold, type Folds } from "./folds";
 import {
   TREE,
   buildingPages,
@@ -95,6 +95,26 @@ describe("the settings tree", () => {
     });
     expect(foldsOf("privacy", talk)).toEqual({
       branch: preferences,
+      more: false,
+      nests: { buildings: false, record: false },
+    });
+  });
+
+  // Settings opened from the city page keep that page beneath the panel.
+  // Picking a group in another branch must open that branch, not snap
+  // back onto city because foldsOf prefers the page beneath.
+  test("a group pick over the city page opens the group's branch", () => {
+    const city = { kind: "city" } as const;
+    const access = TREE.findIndex((branch) => branch.word === "settings_branch_access");
+    const running = TREE.findIndex((branch) => branch.word === "settings_branch_running");
+    expect(foldsOf("you", city).branch).toBe(0);
+    expect(foldsForGroup("accounts", city)).toEqual({
+      branch: access,
+      more: false,
+      nests: { buildings: false, record: false },
+    });
+    expect(foldsForGroup("rules", city)).toEqual({
+      branch: running,
       more: false,
       nests: { buildings: false, record: false },
     });

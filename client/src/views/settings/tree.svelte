@@ -36,7 +36,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import { useBuildings } from "../shared/buildings";
-  import { foldsOf, toggled } from "./folds";
+  import { foldsForGroup, foldsOf, toggled } from "./folds";
   import type { Folds } from "./folds";
   import { buildingPages, byInitial, lookOf, stepped } from "./tree";
   import type { Nest, Page } from "./tree";
@@ -93,14 +93,18 @@
   // holds it and takes the focus with it while the focus is in the tree,
   // so a cross-branch door (advanced → privacy) does not leave the old
   // fold open, and the ring never stays on an entry the body no longer
-  // shows.
+  // shows. A group pick opens that group's branch: the page beneath is
+  // frozen while the panel is open, so re-applying foldsOf would keep
+  // snapping back onto the city branch whenever settings opened from it.
   let drawn: SetupGroup | null = null;
   let stood: View | null = null;
   $effect(() => {
     if (group === drawn && beneath === stood) return;
+    const first = drawn === null;
+    const groupMoved = !first && group !== drawn;
     drawn = group;
     stood = beneath;
-    folds = foldsOf(group, beneath);
+    folds = groupMoved ? foldsForGroup(group, beneath) : foldsOf(group, beneath);
     if (!nav?.contains(document.activeElement)) return;
     void tick().then(() => {
       nav?.querySelector<HTMLElement>("[aria-current=true]")?.focus();

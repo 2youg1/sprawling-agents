@@ -131,6 +131,10 @@
     const before = $belief.refusal;
     if (u.send(createBuilding(target, template, edited ? rules : null, importOf))) {
       sent = { addr: target, before };
+      // Ask again once the frame is out: a short create can finish before
+      // the next city_view invalidation paints, and the page would stay
+      // on the raise form with the submit key spinning.
+      u.conn.asking.refresh(QUERIES.city);
     }
   }
 
@@ -255,13 +259,17 @@
               ? "raise_adopt"
               : "raise_build",
         )}
-        {...target === null
-          ? { why: say($lang, "raise_needs_address") }
-          : sourceWhy !== null
-            ? { why: say($lang, sourceWhy) }
-            : ready
-              ? {}
-              : { why: say($lang, "raise_rules_waiting") }}
+        {...sent !== null
+          ? {
+              why: say($lang, importOf !== null ? "raise_importing" : "raise_raising"),
+            }
+          : target === null
+            ? { why: say($lang, "raise_needs_address") }
+            : sourceWhy !== null
+              ? { why: say($lang, sourceWhy) }
+              : ready
+                ? {}
+                : { why: say($lang, "raise_rules_waiting") }}
       />
     </div>
   </form>
