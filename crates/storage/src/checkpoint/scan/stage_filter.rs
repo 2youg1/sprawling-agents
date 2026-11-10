@@ -43,6 +43,7 @@ fn is_half_a_write(relative: &std::path::Path) -> bool {
 pub(super) struct StageFilter {
     root: std::path::PathBuf,
     aliases: Vec<(String, crate::alias::AliasKind)>,
+    nested: Vec<std::path::PathBuf>,
     fault: Option<StorageError>,
 }
 
@@ -51,11 +52,36 @@ impl StageFilter {
         StageFilter {
             root: root.to_path_buf(),
             aliases: Vec::new(),
+            nested: Vec::new(),
             fault: None,
         }
     }
 
     pub(super) fn admit(&mut self, relative: &std::path::Path) -> i32 {
+        let verdict = self.admit_entry(relative);
+        if verdict != 0 {
+            return verdict;
+        }
+        match self.nested_repository(relative) {
+            Ok(true) => 1,
+            Ok(false) => 0,
+            Err(err) => {
+                self.fault = Some(err);
+                1
+            }
+        }
+    }
+
+    /// Judges a directory whose contents are already being walked without
+    /// libgit2. Another repository below it is ordinary recursion here, not
+    /// a root to hand back to the caller a second time.
+    pub(super) fn admit_directory(&mut self, relative: &std::path::Path) -> i32 {
+        self.admit_entry(relative)
+    }
+
+    /// The admission every path shares before libgit2's repository-boundary
+    /// rule is applied.
+    fn admit_entry(&mut self, relative: &std::path::Path) -> i32 {
         if crate::sessions::is_session_projection(relative)
             || !crate::reserved::outside_reserved(relative)
             || is_half_a_write(relative)
@@ -75,19 +101,52 @@ impl StageFilter {
         }
     }
 
+    /// Whether this path is the root of work a nested repository keeps.
+    /// The marker itself is never followed: a linked marker is protected
+    /// metadata, and the walk below will skip it like any other `.git`.
+    fn nested_repository(&mut self, relative: &std::path::Path) -> Result<bool, StorageError> {
+        match std::fs::symlink_metadata(self.root.join(relative).join(".git")) {
+            Ok(_) => {
+                self.nested.push(relative.to_path_buf());
+                Ok(true)
+            }
+            // Every path in the wave is asked this, files included, and a
+            // file has nothing below it: Linux says `NotADirectory` where
+            // Windows says `NotFound`, and both mean no repository here.
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                Ok(false)
+            }
+            Err(err) => Err(StorageError::Checkpoint {
+                op: "inspect a nested repository",
+                detail: format!("{}: {err}", relative.display()),
+            }),
+        }
+    }
+
+    /// The nested roots the libgit2 walk skipped. Their files still owe the
+    /// checkpoint the same staging and admission rules as every other file.
+    pub(super) fn nested(&self) -> &[std::path::PathBuf] {
+        &self.nested
+    }
+
     /// The wave's verdict. The refusal names the first alias in path
     /// order, so the same scope refuses with the same sentence on every
     /// machine.
-    pub(super) fn refused(mut self) -> Result<(), StorageError> {
-        if let Some(err) = self.fault {
+    pub(super) fn refused(&mut self) -> Result<(), StorageError> {
+        if let Some(err) = self.fault.take() {
             return Err(err);
         }
         self.aliases.sort_by(|left, right| left.0.cmp(&right.0));
-        match self.aliases.into_iter().next() {
+        match self.aliases.first() {
             Some((path, kind)) => Err(crate::alias::refused(
                 "stage a wave",
-                std::path::Path::new(&path),
-                kind,
+                std::path::Path::new(path),
+                *kind,
             )),
             None => Ok(()),
         }

@@ -133,6 +133,7 @@ impl Checkpoint {
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何检查点——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在检查点侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
+- **嵌套 Git 仓库在写域里是普通工作内容，不是外层仓库的一个 gitlink。** `StageFilter` 认出工作区里带有自己的 `.git` 的目录，不让 libgit2 把这个目录本身暂存；其中的普通文件逐一经同一个 `stage_file` 与 `StageFilter` 进入外层检查点，`.git` 及其内容仍由 `outside_reserved` 排除。这样一座在收楼之前已经含有嵌套仓库的城也能立起检查点，其中文件的删除仍有恢复地址；导入时跳过 `.git` 只防止新副本带来嵌套仓库，不能替代这条已有数据的读取规则。被否：整棵跳过嵌套仓库——普通文件会离开检查点与恢复语义；保留 gitlink——空嵌套仓库会在暂存时拒绝整波，而且 gitlink 不携带工作区里普通文件的恢复内容。
 -/
 
 /-! D27 城的第一个提交（`ensure_base`）与收楼的基线（`base_checkpoint`）是同一种写法：对象全进 mempack，一次写成一个 pack，之后才写 index、才以比较后交换建 HEAD 指的分支。

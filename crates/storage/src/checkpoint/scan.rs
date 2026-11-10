@@ -364,6 +364,19 @@ impl Checkpoint {
                 .map_err(git_err("stage scope"))?;
         }
         filter.refused()?;
+        let mut nested = filter.nested().to_vec();
+        nested.sort();
+        nested.dedup();
+        for root in nested {
+            // A checkpoint written by an older build may hold a gitlink at
+            // this root. Its files replace that pointer; the two shapes
+            // cannot occupy the same tree path.
+            if index.get_path(&root, 0).is_some() {
+                index.remove_path(&root).map_err(git_err("stage scope"))?;
+            }
+            self.stage_nested(&mut index, &mut filter, &root)?;
+        }
+        filter.refused()?;
         let mut changed: BTreeSet<Vec<u8>> = BTreeSet::new();
         let mut present = 0usize;
         for entry in index.iter() {
@@ -412,6 +425,37 @@ impl Checkpoint {
             index.remove_path(file)
         }
         .map_err(git_err("stage scope"))
+    }
+
+    /// Stages the ordinary files below a nested repository root. The outer
+    /// `add_all` skips that root; this walk supplies its contents without
+    /// following a directory link or admitting protected metadata.
+    fn stage_nested(
+        &self,
+        index: &mut git2::Index,
+        filter: &mut StageFilter,
+        relative: &std::path::Path,
+    ) -> Result<(), StorageError> {
+        let directory = workdir(&self.repo)?.join(relative);
+        let refused = |err: std::io::Error| StorageError::Checkpoint {
+            op: "stage a nested repository",
+            detail: format!("{}: {err}", relative.display()),
+        };
+        let mut entries = std::fs::read_dir(directory)
+            .and_then(|entries| entries.collect::<Result<Vec<_>, _>>())
+            .map_err(refused)?;
+        entries.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in entries {
+            let path = relative.join(entry.file_name());
+            if entry.file_type().map_err(refused)?.is_dir() {
+                if filter.admit_directory(&path) == 0 {
+                    self.stage_nested(index, filter, &path)?;
+                }
+            } else {
+                self.stage_file(index, filter, &path)?;
+            }
+        }
+        Ok(())
     }
 
     /// Commits the index at the injected time. An unchanged tree still
