@@ -126,7 +126,9 @@
   });
 
   function raise(): void {
-    if (target === null || !ready || sent !== null) return;
+    // The submit key already disables on `sourceWhy`, but Enter in a field
+    // still submits the form: refuse a relative import path here too.
+    if (target === null || !ready || sent !== null || sourceWhy !== null) return;
     refusal = null;
     const before = $belief.refusal;
     if (u.send(createBuilding(target, template, edited ? rules : null, importOf))) {
