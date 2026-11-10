@@ -8,7 +8,7 @@
 // `client/spec/Views/Fold.lean`; `tree.test.ts` holds this file to them.
 
 import type { SetupGroup, View } from "../../core/route";
-import { nestOf, standingOf, type Nest } from "./tree";
+import { nestOf, standingOf, standingForGroup, type Nest } from "./tree";
 // Which folds of the tree are open: the one branch, that branch's
 // "more", and each nest. One branch at a time (client D53,
 // `client/spec/Views/Fold.lean`).
@@ -24,16 +24,35 @@ export type Fold =
   | { readonly kind: "more" }
   | { readonly kind: "nest"; readonly nest: Nest };
 
+function nestsOf(beneath: View): Folds["nests"] {
+  const nest = nestOf(beneath);
+  return { buildings: nest === "buildings", record: nest === "record" };
+}
+
 // The folds the tree opens with: the branch the panel stands in, its
 // "more" when the standing entry is inside it, and the nest of the page
-// beneath.
+// beneath. Prefers the page beneath when the tree offers it, so opening
+// settings from the city or a building starts on that branch.
 export function foldsOf(drawn: SetupGroup, beneath: View): Folds {
   const standing = standingOf(drawn, beneath);
-  const nest = nestOf(beneath);
   return {
     branch: standing.branch,
     more: standing.more,
-    nests: { buildings: nest === "buildings", record: nest === "record" },
+    nests: nestsOf(beneath),
+  };
+}
+
+// The folds after the drawn group moves (a pick in the tree, a body
+// door, the address bar). Opens the group's own branch: the page
+// beneath stays put while the panel is open, so preferring it again
+// would snap every pick back onto city / buildings / cost whenever
+// settings were opened from those pages.
+export function foldsForGroup(drawn: SetupGroup, beneath: View): Folds {
+  const standing = standingForGroup(drawn);
+  return {
+    branch: standing.branch,
+    more: standing.more,
+    nests: nestsOf(beneath),
   };
 }
 

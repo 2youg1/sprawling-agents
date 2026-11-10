@@ -231,6 +231,139 @@ fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
     );
 }
 
+/// Places `target` at `link` as a link, on a machine that has no symlink
+/// privilege: Windows gets a junction, which `symlink_metadata` reports
+/// through the same name-surrogate predicate a symlink is reported by.
+#[cfg(windows)]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
+fn make_link(link: &Path, target: &Path) {
+    let made = std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .status()
+        .unwrap();
+    assert!(made.success(), "the fixture could not make a link");
+}
+
+#[cfg(unix)]
+fn make_link(link: &Path, target: &Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
+}
+
+/// A host `.git` store is skipped on import: it is not the workspace's
+/// files, and copying it would block the city on an ordinary project.
+/// The skip applies at every depth, because a vendored or nested
+/// repository keeps its store the same way.
+#[test]
+fn importing_skips_a_git_directory() {
+    let city = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    std::fs::write(source.path().join("KEEP.md"), "keep\n").unwrap();
+    let git = source.path().join(".git");
+    std::fs::create_dir_all(git.join("objects")).unwrap();
+    std::fs::write(git.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    std::fs::write(git.join("objects/pack"), "heavy\n").unwrap();
+    let nested = source.path().join("vendor/pkg/.git");
+    std::fs::create_dir_all(&nested).unwrap();
+    std::fs::write(nested.join("config"), "nested\n").unwrap();
+    std::fs::write(source.path().join("vendor/pkg/keep.txt"), "here\n").unwrap();
+
+    raise(
+        city.path(),
+        Raising {
+            addr: &addr("lab"),
+            template: BuildingTemplate::Minimal,
+            rules: RulesText::Template,
+            source: Some(source.path()),
+        },
+    )
+    .unwrap();
+
+    let root = city.path().join("lab");
+    assert_eq!(
+        std::fs::read_to_string(root.join("KEEP.md")).unwrap(),
+        "keep\n"
+    );
+    assert!(
+        !root.join(".git").exists(),
+        "the host .git store must not land in the building"
+    );
+    assert!(
+        !root.join("vendor/pkg/.git").exists(),
+        "a nested .git store is skipped at its own depth"
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join("vendor/pkg/keep.txt")).unwrap(),
+        "here\n"
+    );
+    assert!(
+        std::fs::read_to_string(source.path().join(".git/HEAD"))
+            .unwrap()
+            .contains("refs/heads"),
+        "the source .git stays on the host"
+    );
+}
+
+/// A file named `.git` is the pointer a linked worktree or a submodule
+/// keeps, not the version-control store: it comes in with the rest of
+/// the folder.
+#[test]
+fn importing_copies_a_file_named_git() {
+    let city = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    std::fs::write(
+        source.path().join(".git"),
+        "gitdir: /elsewhere/.git/worktrees/lab\n",
+    )
+    .unwrap();
+
+    raise(
+        city.path(),
+        Raising {
+            addr: &addr("lab"),
+            template: BuildingTemplate::Minimal,
+            rules: RulesText::Template,
+            source: Some(source.path()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(city.path().join("lab").join(".git")).unwrap(),
+        "gitdir: /elsewhere/.git/worktrees/lab\n"
+    );
+}
+
+/// A link named `.git` is a link, not the store's directory: the skip
+/// does not take it past the rule that refuses every link.
+#[test]
+fn importing_refuses_a_link_named_git() {
+    let city = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    std::fs::write(elsewhere.path().join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    make_link(&source.path().join(".git"), elsewhere.path());
+
+    let err = raise(
+        city.path(),
+        Raising {
+            addr: &addr("lab"),
+            template: BuildingTemplate::Minimal,
+            rules: RulesText::Template,
+            source: Some(source.path()),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.recovery().contains("links are not copied"), "{err}");
+    assert!(
+        !city.path().join("lab").exists(),
+        "a refused import lays nothing at the target"
+    );
+}
+
 /// A folder that is already a building keeps its rules. Importing it
 /// would have to overwrite them, so the copy never starts and the empty
 /// target is not what the refusal names.

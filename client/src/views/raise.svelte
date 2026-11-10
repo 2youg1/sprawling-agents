@@ -66,9 +66,15 @@
   // edited ordinary rules sent under the confidential template would
   // raise the ordinary building the person had just turned away from.
   let edited = $state(false);
-  // The raise in flight, and the refusal the city held when it left, so
-  // only a newer one is read as this raise's answer.
-  let sent = $state.raw<{ readonly addr: Address; readonly before: AxError | null } | null>(null);
+  // The raise in flight, the refusal the city held when it left, and
+  // whether that frame copies a folder in, so only a newer refusal is
+  // read as this raise's answer and the wait copy describes the frame
+  // that went out rather than a box edited after it.
+  let sent = $state.raw<{
+    readonly addr: Address;
+    readonly before: AxError | null;
+    readonly importing: boolean;
+  } | null>(null);
   let refusal = $state.raw<AxError | null>(null);
 
   const buildings = $derived($city !== undefined && "city" in $city ? $city.city.buildings : []);
@@ -102,6 +108,9 @@
   // template's once the city has said what those are.
   const ready = $derived(target !== null && (edited || answered));
   const importOf = $derived(sourceOf(from));
+  // Whether the frame in flight copies a folder in; while none is in
+  // flight, whether the next one would.
+  const importing = $derived(sent?.importing ?? importOf !== null);
   const sourceWhy = $derived(sourceRefusal(from));
   $effect(() => {
     const text = offered;
@@ -126,11 +135,17 @@
   });
 
   function raise(): void {
-    if (target === null || !ready || sent !== null) return;
+    // The submit key already disables on `sourceWhy`, but Enter in a field
+    // still submits the form: refuse a relative import path here too.
+    if (target === null || !ready || sent !== null || sourceWhy !== null) return;
     refusal = null;
     const before = $belief.refusal;
     if (u.send(createBuilding(target, template, edited ? rules : null, importOf))) {
-      sent = { addr: target, before };
+      sent = { addr: target, before, importing: importOf !== null };
+      // Ask again once the frame is out: a short create can finish before
+      // the next city_view invalidation paints, and the page would stay
+      // on the raise form with the submit key spinning.
+      u.conn.asking.refresh(QUERIES.city);
     }
   }
 
@@ -242,27 +257,33 @@
         })}
       </p>
     {/if}
-    <div>
+    <div class="flex flex-col items-start gap-snug">
       <Button
         type="submit"
         tone="primary"
         loading={sent !== null}
         label={say(
           $lang,
-          importOf !== null
-            ? "raise_import"
-            : raising.kind === "adopt"
-              ? "raise_adopt"
-              : "raise_build",
+          importing ? "raise_import" : raising.kind === "adopt" ? "raise_adopt" : "raise_build",
         )}
-        {...target === null
-          ? { why: say($lang, "raise_needs_address") }
-          : sourceWhy !== null
-            ? { why: say($lang, sourceWhy) }
-            : ready
-              ? {}
-              : { why: say($lang, "raise_rules_waiting") }}
+        {...sent !== null
+          ? {}
+          : target === null
+            ? { why: say($lang, "raise_needs_address") }
+            : sourceWhy !== null
+              ? { why: say($lang, sourceWhy) }
+              : ready
+                ? {}
+                : { why: say($lang, "raise_rules_waiting") }}
       />
+      {#if sent !== null}
+        <!-- A wait is not a refusal: the key keeps its loading posture
+             (spinner and `aria-busy`), and the sentence beside it says
+             what the frame is doing while the city answers. -->
+        <p class="text-note text-text-quiet" role="status">
+          {say($lang, importing ? "raise_importing" : "raise_raising")}
+        </p>
+      {/if}
     </div>
   </form>
 </Page>

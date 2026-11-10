@@ -8248,8 +8248,16 @@
     "zh": "留空就新建一栋楼或接管城里已有的文件夹；填了就把这个文件夹复制进城，原处的文件夹保持原样"
   },
   "raise_will_import": {
-    "en": "a copy of that folder, adopted as it is: its files come in unchanged",
-    "zh": "那个文件夹的一份副本，照原样接管：文件原封不动地进来"
+    "en": "a copy of that folder, adopted as it is: its files come in unchanged; .git is skipped, and a large folder takes a moment",
+    "zh": "那个文件夹的一份副本，照原样接管：文件原封不动地进来；跳过 .git，大文件夹需要一点时间"
+  },
+  "raise_raising": {
+    "en": "raising the building; its page opens when it is ready",
+    "zh": "正在建楼；就绪后会打开这栋楼的楼页"
+  },
+  "raise_importing": {
+    "en": "copying the folder into the city (.git skipped); the building page opens when it is ready",
+    "zh": "正在把文件夹复制进城（跳过 .git）；就绪后会打开这栋楼的楼页"
   },
   "raise_source_relative": {
     "en": "give an absolute path; a relative one has no meaning on the city's machine",

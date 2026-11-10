@@ -288,7 +288,12 @@ fn refuse_governed_source(source: &Path) -> Result<(), AxError> {
 }
 
 /// One directory copy, bounded against cycles and refusing links rather
-/// than following them into content the person did not name.
+/// than following them into content the person did not name. A real
+/// `.git` directory is skipped: it is the host's version-control store,
+/// not the workspace's files, and copying it blocks the city for a long
+/// time on ordinary projects (city Building.lean §8-3, city D35). A file
+/// or link by that name is not a store, so the file comes in and the
+/// link meets the same refusal as every other link.
 fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxError> {
     const DEPTH_MAX: u32 = 64;
     if depth > DEPTH_MAX {
@@ -301,8 +306,9 @@ fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxErro
     let entries = std::fs::read_dir(source).map_err(|err| import_io(source, &err))?;
     for entry in entries {
         let entry = entry.map_err(|err| import_io(source, &err))?;
+        let name = entry.file_name();
         let from = entry.path();
-        let into = target.join(entry.file_name());
+        let into = target.join(&name);
         let metadata = std::fs::symlink_metadata(&from).map_err(|err| import_io(&from, &err))?;
         if metadata.file_type().is_symlink() {
             return Err(invalid_import(
@@ -311,6 +317,9 @@ fn copy_directory(source: &Path, target: &Path, depth: u32) -> Result<(), AxErro
             ));
         }
         if metadata.is_dir() {
+            if name == ".git" {
+                continue;
+            }
             let deeper = depth.checked_add(1).ok_or_else(|| {
                 invalid_import(&from, "the directory depth cannot be represented")
             })?;
