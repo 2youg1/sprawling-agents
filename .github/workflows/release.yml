@@ -548,14 +548,26 @@ jobs:
           printf '\n📋 What changed / 本版改动：[CHANGELOG.md](%s/%s/blob/main/docs/CHANGELOG.md#%s)\n' \
             "${GITHUB_SERVER_URL}" "${GITHUB_REPOSITORY}" "${anchor}" >>"${notes}"
           # Who this version came from, in GitHub's own words: the pull requests
-          # merged since the previous tag, and the contributors who were new
-          # among them. The changelog says what changed and is written by hand;
-          # this says who, and cannot be. `gh release create --generate-notes`
-          # would replace the authored notice rather than follow it, so the
-          # generated half is fetched and appended.
+          # merged since the previous release, and the contributors who were
+          # new among them. The changelog says what changed and is written by
+          # hand; this says who, and cannot be. `gh release create
+          # --generate-notes` would replace the authored notice rather than
+          # follow it, so the generated half is fetched and appended.
+          #
+          # The base is the newest curated tag, not whatever release GitHub
+          # picked last: every nightly is a release too, so 0.0.16's generated
+          # half otherwise listed only the two pull requests since the last
+          # snapshot and stopped there. A shallow checkout carries the tag it
+          # was cut from and no other, so the tags are fetched first.
+          git fetch --tags --force --quiet
+          previous=$(git tag --list 'v*' --sort=-v:refname | grep -vx "${GITHUB_REF_NAME}" | head -n 1 || true)
           printf '\n' >>"${notes}"
+          generated=(-f tag_name="${GITHUB_REF_NAME}")
+          if [ -n "${previous}" ]; then
+            generated+=(-f previous_tag_name="${previous}")
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-            -f tag_name="${GITHUB_REF_NAME}" -q .body >>"${notes}"
+            "${generated[@]}" -q .body >>"${notes}"
           gh release create "${GITHUB_REF_NAME}" assets/*.zip \
             --title "sprawling ${GITHUB_REF_NAME}" \
             --prerelease \
