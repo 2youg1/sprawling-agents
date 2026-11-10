@@ -22,7 +22,7 @@ use kernel::{AxError, Completion, EventKind, EventRef, Evidence, Ledger, Payload
 
 use crate::handoff::Handoff;
 
-use super::charter::Charter;
+use super::charter::{Charter, Verdict};
 
 /// Why the city cut a harness's turn short.
 ///
@@ -151,7 +151,15 @@ impl<'a> HarnessRun<'a> {
             t,
         ))?;
         let completion = ending(&answered, self.cut, cited)?;
-        self.charter.close(ledger, handoff, &completion, t)?;
+        self.charter.close(
+            ledger,
+            handoff,
+            Verdict {
+                completion: &completion,
+                failure: None,
+            },
+            t,
+        )?;
         Ok(completion)
     }
 
@@ -164,10 +172,18 @@ impl<'a> HarnessRun<'a> {
         self,
         ledger: &mut dyn Ledger,
         handoff: &Handoff,
+        failure: Option<&AxError>,
         t: TimeMs,
     ) -> Result<Completion, AxError> {
-        self.charter
-            .close(ledger, handoff, &Completion::Cancelled, t)?;
+        self.charter.close(
+            ledger,
+            handoff,
+            Verdict {
+                completion: &Completion::Cancelled,
+                failure,
+            },
+            t,
+        )?;
         Ok(Completion::Cancelled)
     }
 }

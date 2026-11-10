@@ -872,6 +872,56 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
         !kinds.iter().any(|kind| kind == "provider_degraded"),
         "a loadtime code invents no carrier: {kinds:?}"
     );
+    let frozen = ledger
+        .lines
+        .iter()
+        .rev()
+        .find_map(|line| {
+            let value: serde_json::Value = serde_json::from_slice(line).unwrap();
+            (value["kind"] == "run_frozen").then_some(value)
+        })
+        .expect("the verdict is on the ledger");
+    assert_eq!(
+        frozen["data"]["failure"]["code"],
+        serde_json::json!("E_WIRE_MISMATCH")
+    );
+}
+
+/// A carrier failure that freezes the run names its own error on the
+/// verdict, so the page can show why instead of inventing a carrier row.
+#[test]
+fn a_carrier_failure_writes_its_reason_on_the_verdict() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = FailingModel {
+        code: kernel::AxCode::Provider,
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    assert!(matches!(frozen.completion(), Completion::Cancelled));
+    let last: serde_json::Value =
+        serde_json::from_slice(ledger.lines.last().expect("the verdict is the last line")).unwrap();
+    assert_eq!(
+        last["data"]["failure"]["code"],
+        serde_json::json!("E_PROVIDER")
+    );
 }
 
 /// The other half of the carrier table, held here so the two arms are
@@ -1881,6 +1931,11 @@ fn every_account_failing_records_one_exhausted_refusal() {
         )]
     );
     assert!(matches!(completion, Completion::Cancelled));
+    assert_eq!(
+        data_of(&ledger, "run_frozen")[0]["failure"]["code"],
+        serde_json::json!("E_PROVIDER_ACCOUNTS_EXHAUSTED"),
+        "the verdict names the reason the run stopped, not the last refusal"
+    );
 }
 
 /// A roster with no account whose key can be redeemed sends nothing: the

@@ -421,6 +421,56 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     assert_eq!((refused(on_first), refused(on_later)), (true, true));
 }
 
+/// A nested repository's work belongs to the outer checkpoint; only its
+/// metadata belongs to the nested repository. A city adopted before imports
+/// skipped `.git` must not fail every later wave at this directory.
+#[test]
+fn a_nested_repository_contributes_its_work_but_not_its_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/nested/README.md", "ordinary work");
+    git2::Repository::init(tmp.path().join("work/nested")).unwrap();
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+
+    let outcome = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .map(|payload| payload.as_map().clone());
+
+    assert!(
+        outcome.is_ok(),
+        "a nested repository must not refuse the wave: {outcome:?}"
+    );
+    assert_eq!(
+        outcome.unwrap()["files"],
+        serde_json::json!(["work/nested/README.md"])
+    );
+}
+
+/// A file the nested repository lost leaves the outer checkpoint with it,
+/// which is what the SPEC promises when it says that repository's work keeps
+/// a restoration address: `add_all` still reaches the index entries under the
+/// root it skipped, and the walk below only ever adds.
+#[test]
+fn a_file_deleted_inside_a_nested_repository_leaves_the_checkpoint() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/nested/README.md", "ordinary work");
+    write(tmp.path(), "work/nested/old.rs", "fn old() {}\n");
+    git2::Repository::init(tmp.path().join("work/nested")).unwrap();
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+
+    std::fs::remove_file(tmp.path().join("work/nested/old.rs")).unwrap();
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    assert_eq!(
+        payload.as_map()["files"],
+        serde_json::json!(["work/nested/old.rs"])
+    );
+}
+
 /// A staging file is half of somebody's write, and the writer renames it
 /// away whenever it likes: the walk must not open it, whether a prefix
 /// scope walks past it or a wave names it as the file it touched

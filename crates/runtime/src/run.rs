@@ -269,6 +269,9 @@ pub struct Active {
     conversation: Conversation,
     turns: u32,
     last_turn_t: Option<TimeMs>,
+    /// Why a stopped run did not finish, when an error ended it. One
+    /// field because every failure path leaves by the same freeze.
+    failure: Option<kernel::AxError>,
     /// How full the window is, read off each call's reported usage.
     gauge: ContextGauge,
     /// The cache shape of the request this run sent last, which is what
@@ -367,6 +370,7 @@ pub fn drive(
                     run.state.lines.barrier(ledger)?;
                     let t = (hooks.now)()?;
                     run.record_refusal(ledger, t, &exhausted)?;
+                    run.state.failure = Some(exhausted);
                     break Completion::Cancelled;
                 }
             }
@@ -396,6 +400,7 @@ pub fn drive(
                 // (runtime D36).
                 run.state.lines.barrier(ledger)?;
                 let Carrier::Event(kind) = err.code().carrier() else {
+                    run.state.failure = Some(err.clone());
                     run.freeze(ledger, handoff, Completion::Cancelled, hooks)?;
                     return Err(err);
                 };
@@ -432,6 +437,7 @@ pub fn drive(
                     } => {
                         let exhausted = run.state.watchdog.exhausted();
                         run.record_refusal(ledger, t, &exhausted)?;
+                        run.state.failure = Some(exhausted);
                     }
                     crate::Disposal::Proceed
                     | crate::Disposal::CorrectiveSteer { .. }
@@ -444,6 +450,10 @@ pub fn drive(
                         ledger.append(run.line(t, kind, Payload::of(&err)?))?;
                     }
                 }
+                // The error that stopped the run, unless the watchdog
+                // already named a more specific one above: every account
+                // refusing is the reason, and the last refusal is not.
+                run.state.failure.get_or_insert(err);
                 break Completion::Cancelled;
             }
         }

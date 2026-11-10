@@ -322,11 +322,27 @@ fn a_finished_run_writes_the_bytes_completion_extend_payload_wrote() {
 }
 
 #[test]
+fn a_failed_cancel_carries_the_error_that_stopped_it() {
+    let failed =
+        crate::AxError::failure(crate::AxCode::WorktreeBusy, "stage a wave", "work/nested/")
+            .with_recovery("resolve the repository state, then retry the wave");
+    let frozen = Payload::of(&RunFrozen::of_failure(
+        &Completion::Cancelled,
+        Some(&failed),
+    ))
+    .unwrap();
+    let back: RunFrozen = frozen.read().unwrap();
+    assert_eq!(back.completion, "cancelled");
+    assert_eq!(back.failure, Some(failed));
+}
+
+#[test]
 fn the_two_endings_that_cite_nothing_leave_the_key_absent() {
     for completion in [Completion::Limit, Completion::Cancelled] {
         let new = Payload::of(&RunFrozen::of(&completion)).unwrap();
         assert_eq!(bytes(&new), bytes(&hand_written_frozen(&completion)));
         assert!(!bytes(&new).contains("evidence"), "{}", bytes(&new));
+        assert!(!bytes(&new).contains("failure"), "{}", bytes(&new));
     }
 }
 

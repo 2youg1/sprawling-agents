@@ -250,7 +250,7 @@ fn a_lost_session_freezes_cancelled_with_no_answer() {
     };
     let run = HarnessRun::open(charter(&owned), &mut ledger, &mut now).unwrap();
     let completion = run
-        .abandon(&mut ledger, &handoff(&owned), TimeMs::new(9))
+        .abandon(&mut ledger, &handoff(&owned), None, TimeMs::new(9))
         .unwrap();
 
     assert_eq!(completion, Completion::Cancelled);
@@ -290,7 +290,7 @@ fn a_refused_tree_is_booked_before_the_run_freezes() {
         }],
     );
     run.refusal(&mut ledger, &report, TimeMs::new(5)).unwrap();
-    run.abandon(&mut ledger, &handoff(&owned), TimeMs::new(6))
+    run.abandon(&mut ledger, &handoff(&owned), None, TimeMs::new(6))
         .unwrap();
 
     assert_eq!(

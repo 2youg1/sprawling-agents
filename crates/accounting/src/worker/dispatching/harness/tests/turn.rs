@@ -276,7 +276,12 @@ fn a_harness_that_writes_a_known_key_shape_is_refused_and_reported_before_the_fr
         .expect("the refused run still freezes");
     assert_eq!(
         frozen.data(),
-        &Payload::of(&RunFrozen::of(&Completion::Cancelled)).unwrap()
+        &Payload::of(&RunFrozen::of_failure(
+            &Completion::Cancelled,
+            Some(&refused)
+        ))
+        .unwrap(),
+        "the freeze names the refusal that stopped the run"
     );
     assert!(
         blocked.seq() < frozen.seq(),

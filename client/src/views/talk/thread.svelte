@@ -116,9 +116,13 @@
   });
   const frozen = $derived(run.doing.kind === "frozen");
   const phase = $derived<Phase>(frozen ? "frozen" : "live");
+  // The word the run froze with: the record once it holds one, and what
+  // the page believes until then. One reading, because the ending the
+  // thread draws and the way out of an empty one are the same word.
+  const word = $derived(
+    answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null),
+  );
   const completion = $derived.by((): string => {
-    const word =
-      answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null);
     switch (word) {
       case "done":
         return say($lang, "outcome_done");
@@ -141,6 +145,19 @@
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
   const emptyRun = $derived(read.kind === "held" && silentRun(turns, phase));
+  // The error that ended this run, from the closing line: the card at the
+  // end of a wordless run is where the page says why it stopped.
+  const failure = $derived(answer?.closing?.failure ?? null);
+  // Whether the run was stopped rather than concluded, which is the same
+  // word for a person's cancel and for a failure.
+  const stopped = $derived(word === "cancelled");
+  // Where the way out of a wordless run leads: a failure decides for itself
+  // (a provider that turned the call down is settled on the settings page),
+  // a run the person stopped has nothing there to settle, and a model that
+  // said nothing is asked again elsewhere.
+  const wayOut = $derived<"offered" | "absent" | undefined>(
+    failure !== null ? undefined : stopped ? "absent" : "offered",
+  );
   const why = $derived(cutOff(turns.at(-1)?.stopped));
   const whole = $derived(drawsCalls($held.showing));
   // A call still running is already a line of its own, with its timer and
@@ -352,16 +369,14 @@
          been, and one way out, the verb spelled as the command it sends
          (client/Spec.lean §4-10). A run the person stopped says so rather
          than blaming the model. -->
-    {@const stopped =
-      (answer?.closing?.completion ??
-        (run.doing.kind === "frozen" ? run.doing.completion : null)) === "cancelled"}
     <Failed
       what={stopped
         ? say($lang, "talk_failed_cancelled")
         : ceiling === null
           ? say($lang, "talk_said_nothing")
           : fill(say($lang, "talk_said_nothing_capped"), { n: count(ceiling) })}
-      settings={stopped ? "absent" : "offered"}
+      error={failure ?? undefined}
+      settings={wayOut}
       onRetry={onRetry === undefined
         ? undefined
         : () => {

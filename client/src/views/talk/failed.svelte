@@ -20,7 +20,7 @@
     readonly error?: AxError | undefined;
     // Whether the way out goes through the model settings; absent, the
     // refusal decides.
-    readonly settings?: "offered" | "absent";
+    readonly settings?: "offered" | "absent" | undefined;
     readonly onRetry?: (() => void) | undefined;
   }
 

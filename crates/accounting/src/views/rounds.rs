@@ -31,6 +31,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
+use kernel::Completion;
 use wire::{EventKind, EventRecord, RunId, UsdMicros};
 
 use super::prepared::LedgerAsk;
@@ -144,15 +145,50 @@ fn closing(records: &[EventRecord]) -> Result<Option<wire::Closing>, kernel::AxE
         .iter()
         .find(|record| record.kind() == EventKind::RunFrozen)
         .map(|record| {
+            let frozen = record.data().read::<kernel::event::record::RunFrozen>()?;
+            // Only a cancelled close was stopped by something; a run that
+            // finished or was cut by the ceiling met its carrier on the way
+            // and did not stop there.
+            let failure = match frozen.failure {
+                Some(failed) => Some(failed),
+                None if frozen.completion == Completion::Cancelled.name() => {
+                    old_carrier_failure(records)
+                }
+                None => None,
+            };
             Ok(wire::Closing {
-                completion: record
-                    .data()
-                    .read::<kernel::event::record::RunFrozen>()?
-                    .completion,
+                completion: frozen.completion,
                 at: record.t(),
+                failure,
             })
         })
         .transpose()
+}
+
+/// The failure an older ledger carried beside `run_frozen`, when the
+/// freeze predates the `failure` key. Its carrier event wrote the same
+/// error flat into history, and the rounds fold dropped carrier rows it
+/// could not pair with a call; recovery reads the close's own evidence
+/// so an adopted city still shows why it stopped.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "three kinds write a carrier; every other record is not one"
+)]
+fn old_carrier_failure(records: &[EventRecord]) -> Option<kernel::AxError> {
+    records.iter().rev().find_map(|record| match record.kind() {
+        EventKind::ProviderDegraded => record
+            .data()
+            .read::<kernel::event::record::ProviderDegraded>()
+            .ok()
+            .and_then(|degraded| match degraded {
+                kernel::event::record::ProviderDegraded::Refused(error) => Some(error),
+                kernel::event::record::ProviderDegraded::VaultFellBack(_) => None,
+            }),
+        EventKind::BudgetLimit | EventKind::GateDenied => {
+            record.data().read::<kernel::AxError>().ok()
+        }
+        _ => None,
+    })
 }
 
 /// Folds a session's events into turns, oldest first.

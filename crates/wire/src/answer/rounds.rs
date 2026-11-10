@@ -13,7 +13,7 @@
 //! They live on the wire because a second client must be able to draw a
 //! session without folding the ledger itself.
 
-use kernel::{GitOid, Locator, RunId, Seq, TimeMs, Tokens, UsdMicros};
+use kernel::{AxError, GitOid, Locator, RunId, Seq, TimeMs, Tokens, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 use super::Note;
@@ -317,6 +317,11 @@ pub struct FrozenNames {
 pub struct Closing {
     pub completion: String,
     pub at: TimeMs,
+    /// Why the run stopped instead of finishing, when an error ended it.
+    /// Absent on a person or halt cancel, and on a line written before the
+    /// key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<AxError>,
 }
 
 /// One session's rounds, oldest first.

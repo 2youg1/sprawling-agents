@@ -329,7 +329,7 @@ fn drive_turn<L: Ledger>(
         (Ok(_) | Err(_), Some(booking)) => booking,
         (Err(session), None) => session,
     };
-    run.abandon(&mut *ledger, &half.handoff, clock.now()?)?;
+    run.abandon(&mut *ledger, &half.handoff, Some(&failure), clock.now()?)?;
     Err(failure)
 }
 
