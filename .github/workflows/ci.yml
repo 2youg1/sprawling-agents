@@ -134,7 +134,15 @@ jobs:
   # runs only when a path it judges moved: the kernel it proves over, this
   # workflow, the xtask that owns the harness roster, and the kani pin.
   changes:
-    if: ${{ !inputs.release-validation }}
+    # A release call runs this job and skips only its filter step below.
+    # A job that runs under `always()` beneath a skipped `needs` does not
+    # publish its outputs: a minimal workflow proved that the consumer's
+    # `fromJSON(needs.<job>.outputs.…)` then reads an empty string, and
+    # the job is skipped under its unexpanded matrix name. `test-build`
+    # runs that way here, and `test-slice` reads its matrix from
+    # `test-build.outputs.slices`, so `changes` stays a successful
+    # dependency on every path (`crates/xtask/Spec.lean` D27).
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -147,6 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: ${{ !inputs.release-validation }}
         id: filter
         with:
           filters: |
