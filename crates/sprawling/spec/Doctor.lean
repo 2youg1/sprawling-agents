@@ -283,7 +283,7 @@ pub(crate) const GECKO_ROW / CHROMIUM_ROW / WEBKIT_ROW: Requirement;
 pub(crate) fn member_at(family: Family, at: &Path) -> Option<&'static Member>;
 pub(super) fn look(family, platform, search_path) -> Presence;   // 版本读自文件，故无 patience（§8-80）
 
-// bin::doctor（表因此能说出「任一即可」与「点进它自己的站」）
+// bin::doctor（表因此能说出「任一即可」与「点进它的发布/安装页」）
 pub(crate) enum Need { Required, OneOf(Group), Optional }
 pub(crate) enum Group { BrowserEngine }
 pub(crate) enum Detection { …, Family(Family) }
@@ -300,7 +300,7 @@ pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf>;
 - **`SPRAWLING_BROWSER` 只拼一次，且是引擎读的同一处**：变量压过一切探测。路径按文件名主干认族；**认不出的归 Gecko**，因为无驱动的那条起法是任何分支都接受的那一条，而 xtask render 正是这样设它。被否决的备选是「认不出就当没有」：那会对着一个人正看着的文件报「不在 PATH 上」。
 - **Windows 的两把钥匙经 `reg.exe` 读，不引新依赖**：per-user 安装落在带账户名的目录里，表里的字面路径找不到它；`App Paths\<程序>.exe` 与 `StartMenuInternet\<牌子>\shell\open\command` 两个键说得出。只 `reg query`，不写；找不到就换下一个成员。被否决的备选是加一个 registry crate——一个平台、一个问题，换一份人要下载的二进制里的第三方代码。
 - **`enables` 不再说 WebUI 要某个浏览器**：WebUI 任何浏览器都打得开，要 Gecko／Chromium／WebKit 的只有 browser tool。
-- **`Tried` 之外的成员排在最后并带一句说明**：Tor Browser 的启动器与代理会挡在会话前面（`, confirm it by hand once`），Safari 的 BiDi 支持是局部的（`, experimental`）。`member_at` 把找到的路径认回牌子，于是报告说 `zen` 而不只是 `gecko`，`DoctorItem.homepage` 给的也是**那个牌子自己的站**。
+- **`Tried` 之外的成员排在最后并带一句说明**：Tor Browser 的启动器与代理会挡在会话前面（`, confirm it by hand once`），Safari 的 BiDi 支持是局部的（`, experimental`）。`member_at` 把找到的路径认回牌子，于是报告说 `zen` 而不只是 `gecko`，`DoctorItem.homepage` 给的是**那个牌子的下载或安装页**，让人点进去就能自行安装。
 
 **本章测试**：`every_family_is_a_row_and_every_member_says_where_it_is_installed`；`a_found_browser_is_reported_by_the_brand_it_is`（Developer Edition 的程序文件也叫 `firefox`，只有目录分得开）；`a_member_that_needs_confirming_is_never_the_first_answer`；`a_verdict_counts_the_required_items_of_its_own_tier_only` 的三段——只有 Zen、只有 Edge 加驱动、四条路全关。
 
@@ -976,34 +976,37 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 **测试**：`doctor::pin::tests` 读出的两个钉子与两份文件相等，空文件读成不钉；`doctor::upstream::tests` 从固定的答案文本里读出版本（crates.io、通道清单、python.org、GitHub 各一份），以及每一行的 `Upstream` 与表对得上；`doctor::tests::the_rust_tools_pack_is_every_cargo_tool_this_repository_calls`。
 -/
 
-/-! ## 8-174 Maple Mono NF CN 是可选的字体依赖（`bin::doctor::table`、`bin::doctor::probe`）
+/-! ## 8-174 Sarasa Mono SC 与 Maple Mono NF CN 是可选的字体依赖（`bin::doctor::table`、`bin::doctor::probe`）
 
-客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`crates/wire/spec/Preference.lean` D123）；Maple Mono NF CN 不进客户端包。doctor 的 Use 层有 `maple-mono-nf-cn` 可选行，为外观组的回退格与要中文和 Nerd Font 图标的终端提供系统字体：
+客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`crates/wire/spec/Preference.lean` D123）；中文字体都不进客户端包。doctor 的 Use 层有两行可选字体行：
+
+- `sarasa-gothic`：推荐与 Paper Mono 搭配，把 `Sarasa Mono SC` 填进外观组的回退格。
+- `maple-mono-nf-cn`：推荐作为单一字体栈：把界面与等宽字体都选为 `maple`，并在第一回退填入 `Maple Mono NF CN`——随包的 Maple Mono 家族本身没有中文字形与 Nerd Font 图标，名字不同的 NF CN 家族经回退格进入同一条栈（wire D124），Latin、中文与 Nerd Font 图标由一条路覆盖。
 
 ```rust
 // bin::doctor（Detection 与 Absence 各多一臂）
-Detection::Font { file: &'static str }
+Detection::Font { files: &'static [&'static str] }
 Absence::NotInstalled
 
 // bin::doctor::probe
 pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
-                      local_app_data: Option<OsString>, file: &str) -> Presence;
+                      local_app_data: Option<OsString>, files: &[&str]) -> Presence;
 ```
 
-- **探测的是字体文件，不是 PATH 上的程序**：`file` 是 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。找到即 `Present { version: Silent }`，Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；候选的元数据或遍历目录不可读时答 `Broken(Unreadable)`。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取，取不到时在用户目录都查完之后答 `Broken(Unreadable)`，`at` 是那条注册表值的地址，由 `bin::privacy::windows` 自己给出，免得报告里写着一个它不再读的键。不存在版本号猜测，最新版仍由 `Upstream::GitHub("subframe7536/maple-font")` 读取。
-- **安装方式照上游安装文档**：Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`；macOS 经 Homebrew 安装 `font-maple-mono-nf-cn`，Linux 手动下载并安装到 `~/.local/share/fonts`。每条命令配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装。Linux 的 Homebrew cask 可写到该平台探测范围外，故改为手动安装。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
-- **它不是 Use 层必需项**：缺它不影响城市或客户端运行，页面只是没有那一格可填的中文字体，终端也只是少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_maple_mono_nf_cn`（「为页面的回退字体与使用它的工具补齐中文字形和 Nerd Font 图标」），终端的 enables 与它同义。外观组的回退格填的就是这个家族名（`Maple Mono NF CN`，wire D124）。
+- **探测的是字体文件，不是 PATH 上的程序**：`files` 是一组候选文件名，任一命中即 `Present { version: Silent }`。`sarasa-gothic` 列 `SarasaMonoSC-Regular.ttf`（手动 TTF 安装）与 `Sarasa-SuperTTC.ttc`（Homebrew 的 `font-sarasa-gothic` cask 安装）；`maple-mono-nf-cn` 列 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；某个候选的元数据或遍历目录不可读时记下第一个错误、继续看其余候选与其余目录，全部未命中才以它答 `Broken(Unreadable)`——一个读不了的目录不能把一个已安装的第二候选说成坏。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取，取不到时在用户目录都查完之后答 `Broken(Unreadable)`，`at` 是那条注册表值的地址，由 `bin::privacy::windows` 自己给出，免得报告里写着一个它不再读的键。不存在版本号猜测，最新版仍由各自的 `Upstream::GitHub` 读取。
+- **安装方式照上游安装文档**：`sarasa-gothic` 在 macOS 经 Homebrew 安装 `font-sarasa-gothic`，在 Windows 与 Linux 手动下载 `SarasaMonoSC-TTF-*.7z` 并安装到用户字体目录；`maple-mono-nf-cn` 在 Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`，macOS 经 Homebrew 安装 `font-maple-mono-nf-cn`，Linux 手动下载并安装到 `~/.local/share/fonts`。每条命令配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装。Linux 的 Homebrew cask 可写到该平台探测范围外，故改为手动安装。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
+- **它们不是 Use 层必需项**：缺它们不影响城市或客户端运行，页面只是没有那一格可填的中文字体，终端也只是少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_sarasa_gothic` 与 `machine_enables_maple_mono_nf_cn`，终端的 enables 与它们同义。外观组的回退格填的是 `Sarasa Mono SC` 或 `Maple Mono NF CN`（wire D124）。
 
-**本章测试**：需求表包含此行且三个平台都有配方；`font_at` 在临时目录上认出 Regular 文件、缺文件答 `NotInstalled`；表格完整性测试覆盖 `Detection::Font`。
+**本章测试**：需求表包含这两行且三个平台都有配方；`font_at` 在临时目录上认出任一候选文件、缺文件答 `NotInstalled`；首候选读取失败、次候选在场仍答 `Present`（第一个错误只在全部未命中时回答）；表格完整性测试覆盖 `Detection::Font`。
 -/
 
-/-! D82 Maple Mono NF CN 只作可选系统字体，不随客户端内嵌（§8-174）
+/-! D82 Sarasa Mono SC 与 Maple Mono NF CN 只作可选系统字体，不随客户端内嵌（§8-174）
 
-**决定**：doctor 新增可选的 Maple Mono NF CN 字体行，以 Regular 字体文件探测，Windows 用 Scoop、macOS 用 Homebrew 安装，Linux 手动安装到用户字体目录。
+**决定**：doctor 新增可选的 `sarasa-gothic` 字体行，并把 `maple-mono-nf-cn` 保留为另一行；`sarasa-gothic` 以 `SarasaMonoSC-Regular.ttf` 或 `Sarasa-SuperTTC.ttc` 探测，macOS 用 Homebrew，Windows 与 Linux 手动安装；`maple-mono-nf-cn` 以 `MapleMono-NF-CN-Regular.ttf` 探测，Windows 用 Scoop、macOS 用 Homebrew、Linux 手动安装。
 
-**理由**：人的决定是内置西文面用 Paper Mono、随包保留 Maple Mono，并在 doctor 的依赖安装里为中文与图标补上 Maple Mono NF CN。两种字体职责不同：界面资源要保持小，系统字体的中文与图标覆盖则按需要安装，不能为了省一次探测让安装后复查永远报缺。
+**理由**：人的决定是内置西文面用 Paper Mono、随包保留 Maple Mono，并在 doctor 的依赖安装里为中文补齐 Sarasa Mono SC（与 Paper Mono 视觉更统一），同时保留 Maple Mono NF CN 作为单一字体栈的备选。两种字体职责不同：界面资源要保持小，系统字体的中文覆盖则按需要安装，不能为了省一次探测让安装后复查永远报缺。
 
-**被否**：①复用 `Detection::Component` 指到 `~/.sprawling/components`——Scoop 与 Homebrew 不写到那里，装完必报缺；②把 NF CN 也嵌入客户端——完整 CJK 字体远超当前客户端资源预算，而回退格能让装了它的人得到同一结果；③Windows 用 winget——上游 v7.9 安装文档给出的 Windows 包管理器是 Scoop。
+**被否**：①复用 `Detection::Component` 指到 `~/.sprawling/components`——Scoop 与 Homebrew 不写到那里，装完必报缺；②把 CJK 字体也嵌入客户端——完整 CJK 字体远超当前客户端资源预算，而回退格能让装了它的人得到同一结果；③Windows 用 winget 安装 Sarasa-Gothic——没有可靠的官方 winget 源；④只保留 Maple Mono NF CN 一种推荐——Sarasa Mono SC 与 Paper Mono 的视觉统一性更好，应作为首荐。
 -/
 
 /-! D6 doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id（`crates/wire/Spec.lean` §8-25）

@@ -34,7 +34,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "edge",
         program: "msedge",
-        homepage: "https://www.microsoft.com/edge",
+        homepage: "https://www.microsoft.com/edge/download",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[
@@ -49,7 +49,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "brave",
         program: "brave-browser",
-        homepage: "https://brave.com/",
+        homepage: "https://brave.com/download/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"],
@@ -61,7 +61,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "chromium",
         program: "chromium",
-        homepage: "https://www.chromium.org/",
+        homepage: "https://www.chromium.org/getting-involved/download-chromium/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Chromium\Application\chrome.exe"],
@@ -77,7 +77,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "vivaldi",
         program: "vivaldi",
-        homepage: "https://vivaldi.com/",
+        homepage: "https://vivaldi.com/download/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Vivaldi\Application\vivaldi.exe"],

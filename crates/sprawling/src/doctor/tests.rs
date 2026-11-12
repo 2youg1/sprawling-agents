@@ -141,8 +141,11 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
                 }
             }
             Detection::Built { .. } => {}
-            Detection::Font { file } => {
-                assert!(!file.is_empty(), "{name} names no font file");
+            Detection::Font { files } => {
+                assert!(!files.is_empty(), "{name} names no font file");
+                for file in *files {
+                    assert!(!file.is_empty(), "{name} names an empty font file");
+                }
             }
             Detection::Family(family) => {
                 assert!(
@@ -198,6 +201,7 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "sandbox-engine",
         "shell",
         "ffmpeg",
+        "sarasa-gothic",
         "maple-mono-nf-cn",
     ] {
         assert!(named.contains(needed), "the table does not carry {needed}");

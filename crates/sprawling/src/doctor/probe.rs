@@ -144,12 +144,12 @@ impl Machine for ThisMachine {
             }
             Detection::Built { carried } => super::host::built(*carried),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
-            Detection::Font { file } => match self.platform {
+            Detection::Font { files } => match self.platform {
                 Some(platform) => {
                     let home = accounting::home::Home::detect()
                         .ok()
                         .map(|home| home.path().to_path_buf());
-                    font_at(platform, home, std::env::var_os("LOCALAPPDATA"), file)
+                    font_at(platform, home, std::env::var_os("LOCALAPPDATA"), files)
                 }
                 None => Presence::Absent(Absence::NotInstalled),
             },
@@ -204,7 +204,7 @@ pub(super) fn font_at(
     platform: Platform,
     home: Option<PathBuf>,
     local_app_data: Option<OsString>,
-    file: &str,
+    files: &[&str],
 ) -> Presence {
     let system = match platform {
         Platform::Windows => windows_font_root(),
@@ -221,7 +221,7 @@ pub(super) fn font_at(
             local_app_data,
             system,
         },
-        file,
+        files,
     )
 }
 
@@ -258,7 +258,7 @@ fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
 }
 
 /// Searches user locations first, then system locations in platform order.
-fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence {
+fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Presence {
     let mut roots = Vec::new();
     if let Platform::Windows = platform
         && let Some(local) = locations.local_app_data
@@ -290,25 +290,46 @@ fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence
     } else {
         0
     };
+    // A read error ends that one candidate's search, not the probe's:
+    // any listed file satisfies the detection, so a directory that
+    // cannot be read must not turn an installed second candidate into
+    // `Broken`. The first error is kept and answered only when no
+    // candidate answered anywhere (Doctor §8-174).
+    let mut trouble: Option<Presence> = None;
     for root in roots {
-        if let Some(answer) = font_under(&root, file, depth) {
-            return answer;
+        for file in files {
+            match font_under(&root, file, depth) {
+                Some(answer @ Presence::Present { .. }) => return answer,
+                Some(answer @ Presence::Broken { .. }) => {
+                    trouble.get_or_insert(answer);
+                }
+                _ => {}
+            }
         }
     }
     match locations.system {
         Ok(roots) => {
             for root in roots {
-                if let Some(answer) = font_under(&root, file, depth) {
-                    return answer;
+                for file in files {
+                    match font_under(&root, file, depth) {
+                        Some(answer @ Presence::Present { .. }) => return answer,
+                        Some(answer @ Presence::Broken { .. }) => {
+                            trouble.get_or_insert(answer);
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
         Err(UnreadableRoot { at, said }) => {
-            return Presence::Broken {
+            trouble.get_or_insert(Presence::Broken {
                 at,
                 fault: Fault::Unreadable(said),
-            };
+            });
         }
+    }
+    if let Some(answer) = trouble {
+        return answer;
     }
     if locations.home.is_none() {
         Presence::Absent(Absence::NoHome)
@@ -615,7 +636,7 @@ mod tests {
                 Platform::Linux,
                 Some(linux_home.path().to_path_buf()),
                 None,
-                FILE
+                &[FILE]
             ),
             Presence::Present {
                 at: linux,
@@ -638,7 +659,7 @@ mod tests {
                 Platform::Windows,
                 Some(windows_home.path().to_path_buf()),
                 None,
-                FILE
+                &[FILE]
             ),
             Presence::Present {
                 at: windows,
@@ -654,7 +675,7 @@ mod tests {
                     local_app_data: None,
                     system: Ok(vec![mac_system.path().to_path_buf()]),
                 },
-                FILE,
+                &[FILE],
             ),
             Presence::Absent(Absence::NotInstalled)
         );
@@ -680,7 +701,7 @@ mod tests {
         };
         for path in [&user, &scoop, &system] {
             assert_eq!(
-                font_in(Platform::Windows, locations(), "font.ttf"),
+                font_in(Platform::Windows, locations(), &["font.ttf"]),
                 Presence::Present {
                     at: path.to_path_buf(),
                     version: Version::Silent
@@ -703,7 +724,7 @@ mod tests {
             system: Ok(vec![]),
         };
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Present {
                 at: nested.clone(),
                 version: Version::Silent
@@ -712,7 +733,7 @@ mod tests {
         let top = root.join("font.ttf");
         std::fs::write(&top, b"font").unwrap();
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Present {
                 at: top.clone(),
                 version: Version::Silent
@@ -724,9 +745,42 @@ mod tests {
         std::fs::create_dir_all(too_deep.parent().unwrap()).unwrap();
         std::fs::write(too_deep, b"font").unwrap();
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Absent(Absence::NotInstalled)
         );
+    }
+
+    #[test]
+    fn a_broken_first_candidate_does_not_hide_a_present_second_one() {
+        // The first name carries an interior NUL, which every platform's
+        // stat refuses with an error other than NotFound, so one test
+        // covers the branch everywhere; the realistic unreadable-file
+        // shape of the same branch is `unreadable_font_metadata_is_broken`,
+        // which only unix can build.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join(".local/share/fonts");
+        std::fs::create_dir_all(&root).unwrap();
+        let broken = root.join("font.ttf\0");
+        let second = root.join("font.ttc");
+        std::fs::write(&second, b"font").unwrap();
+        let locations = || FontLocations {
+            home: Some(dir.path().to_path_buf()),
+            local_app_data: None,
+            system: Ok(vec![]),
+        };
+        let files = ["font.ttf\0", "font.ttc"];
+        assert_eq!(
+            font_in(Platform::Linux, locations(), &files),
+            Presence::Present {
+                at: second.clone(),
+                version: Version::Silent
+            }
+        );
+        std::fs::remove_file(&second).unwrap();
+        assert!(matches!(
+            font_in(Platform::Linux, locations(), &files),
+            Presence::Broken { at, fault: Fault::Unreadable(_) } if at == broken
+        ));
     }
 
     #[cfg(unix)]
@@ -751,7 +805,7 @@ mod tests {
             }),
         };
         assert!(matches!(
-            font_in(Platform::Windows, locations, "font.ttf"),
+            font_in(Platform::Windows, locations, &["font.ttf"]),
             Presence::Broken {
                 fault: Fault::Unreadable(_),
                 ..

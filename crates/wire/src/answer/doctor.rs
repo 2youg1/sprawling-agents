@@ -88,9 +88,9 @@ pub struct DoctorItem {
     pub name: String,
     pub tier: DoctorTier,
     pub need: DoctorNeed,
-    /// The item's own site, so a page can link a name to the people who
-    /// publish it. `None` where there is no one site: a platform's
-    /// shell, and this project's own connector.
+    /// The item's release, distribution or installation page, so a page
+    /// can link a name to where a person gets it. `None` where there is
+    /// no one site: a platform's shell, and this project's own connector.
     pub homepage: Option<String>,
     pub state: DoctorState,
     pub install: DoctorInstall,

@@ -104,7 +104,7 @@ pub(super) const GIT: Requirement = row(
             linux: &[],
         },
     },
-    "https://git-scm.com/",
+    "https://git-scm.com/downloads",
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
@@ -133,7 +133,7 @@ pub(super) const BASH: Requirement = row(
         args: &["--version"],
         line: "GNU bash",
     },
-    "https://www.gnu.org/software/bash/",
+    "https://www.gnu.org/software/bash/manual/html_node/Installing-Bash.html",
     PerPlatform {
         windows: Recipe::Manual(concat!(
             "run `just` from Git Bash, which the git row installs: its own bash comes first ",
@@ -173,7 +173,7 @@ pub(super) const RUST: Requirement = row(
     Need::Required,
     "the compiler, at the version rust-toolchain.toml pins, which rustup fetches on first use",
     program("rustc"),
-    "https://www.rust-lang.org/",
+    "https://www.rust-lang.org/tools/install",
     same_command("rustup", &["default", "stable"]),
 )
 .from(Upstream::RustChannel)
@@ -184,7 +184,7 @@ pub(super) const RUSTFMT: Requirement = row(
     Need::Required,
     "`cargo fmt --check`, the first step of `just check`",
     program("rustfmt"),
-    "https://github.com/rust-lang/rustfmt",
+    "https://github.com/rust-lang/rustfmt/releases/latest",
     same_command("rustup", &["component", "add", "rustfmt"]),
 )
 .from(Upstream::Unread(DoctorUnread::WithToolchain));
@@ -227,7 +227,7 @@ pub(super) const CARGO_NEXTEST: Requirement = row(
     Need::Required,
     "`just test`, the test runner every check here calls",
     program("cargo-nextest"),
-    "https://nexte.st/",
+    "https://nexte.st/book/installation.html",
     same_command("cargo", &["install", "cargo-nextest", "--locked"]),
 )
 .packed("cargo-nextest");
@@ -237,7 +237,7 @@ pub(super) const CARGO_DENY: Requirement = row(
     Need::Optional,
     "`just deny`, the supply-chain read `just gates` ends with; CI runs it on every push",
     program("cargo-deny"),
-    "https://embarkstudios.github.io/cargo-deny/",
+    "https://embarkstudios.github.io/cargo-deny/#quickstart",
     same_command("cargo", &["install", "cargo-deny", "--locked"]),
 )
 .packed("cargo-deny");
@@ -247,7 +247,7 @@ pub(super) const BUN: Requirement = row(
     Need::Required,
     "`just build-web` and the client's checks, which the artifact gates judge",
     program("bun"),
-    "https://bun.sh/",
+    "https://bun.sh/docs/installation",
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
@@ -286,7 +286,7 @@ pub(super) const ELAN: Requirement = row(
     Need::Required,
     "the Lean toolchain manager `just models` and `just adversary` run through",
     program("elan"),
-    "https://github.com/leanprover/elan",
+    "https://github.com/leanprover/elan/releases/latest",
     PerPlatform {
         windows: Recipe::Command {
             program: "powershell",
@@ -330,7 +330,7 @@ pub(super) const LEAN: Requirement = row(
         args: &["toolchain", "list"],
         line: LEAN_PIN,
     },
-    "https://lean-lang.org/",
+    "https://lean-lang.org/download/",
     same_command("elan", &["toolchain", "install", LEAN_INSTALL]),
 )
 .from(Upstream::GitHub("leanprover/lean4"))
@@ -379,7 +379,7 @@ pub(super) const ZIG: Requirement = row(
         args: &["version"],
         line: ZIG_PIN,
     },
-    "https://ziglang.org/",
+    "https://ziglang.org/download/",
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
@@ -400,7 +400,7 @@ pub(super) const UV: Requirement = row(
     Need::Optional,
     "the Python this repository's probes and maintenance scripts run on",
     program("uv"),
-    "https://docs.astral.sh/uv/",
+    "https://docs.astral.sh/uv/getting-started/installation/",
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
@@ -425,7 +425,7 @@ pub(super) const PYTHON: Requirement = row(
         args: &["python", "find"],
         line: "",
     },
-    "https://www.python.org/",
+    "https://www.python.org/downloads/",
     same_command("uv", &["python", "install"]),
 )
 .from(Upstream::PythonOrg);
@@ -435,7 +435,7 @@ pub(super) const CARGO_MUTANTS: Requirement = row(
     Need::Optional,
     "`just mutants`, which asks whether the tests notice a change in a module held to a mutation score",
     program("cargo-mutants"),
-    "https://mutants.rs/",
+    "https://mutants.rs/installation.html",
     same_command("cargo", &["install", "cargo-mutants", "--locked"]),
 )
 .packed("cargo-mutants");
@@ -445,7 +445,7 @@ pub(super) const CARGO_FUZZ: Requirement = row(
     Need::Optional,
     "`just fuzz <target>`, which needs a nightly toolchain as well",
     program("cargo-fuzz"),
-    "https://rust-fuzz.github.io/book/cargo-fuzz.html",
+    "https://rust-fuzz.github.io/book/cargo-fuzz/setup.html",
     same_command("cargo", &["install", "cargo-fuzz", "--locked"]),
 )
 .packed("cargo-fuzz");
@@ -455,7 +455,7 @@ pub(super) const KANI: Requirement = row(
     Need::Optional,
     "`just proof`, proving a property against real MIR, on Linux and nowhere else today",
     program("cargo-kani"),
-    "https://model-checking.github.io/kani/",
+    "https://model-checking.github.io/kani/install-guide.html",
     PerPlatform {
         windows: Recipe::Manual("kani runs on Linux; a WSL installation is where it goes here"),
         macos: Recipe::Manual("kani runs on Linux; this platform has no build today"),
