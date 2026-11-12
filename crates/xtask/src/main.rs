@@ -23,6 +23,7 @@ mod boundary;
 mod budget;
 mod bundle;
 mod channel;
+mod ci;
 mod color;
 mod commits;
 mod depmap;
@@ -92,6 +93,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("gates") => gates::run(&root, &gate_names(&args)),
+        Some("ci") => ci::run(&root, args.get(1..).unwrap_or(&[])),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -298,10 +300,14 @@ struct Tool {
 /// Everything `cargo xtask` answers that is not a gate, plus the flags
 /// that change what a gate does. The dispatcher above and this array are
 /// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 17] = [
+const TOOLS: [Tool; 18] = [
     Tool {
         call: "acp-catalog",
         gives: "the ACP registry index, written as the catalog snapshot the build ships",
+    },
+    Tool {
+        call: "ci <plan|run> [--full | --base <rev>] [--store <dir>]",
+        gives: "the content-addressed source-verification graph, planned or executed",
     },
     Tool {
         call: "gates [<gate>...]",

@@ -24,7 +24,7 @@ default: check
 #
 # `ci.yml` runs the same recipes, one job per slice of this line, so a
 # green pull request implies exactly this and no less.
-check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
+check: prereqs verify-sources models build-web clippy features test gates-artifacts deny check-client
 
 # The merge's whole check: the phases of `check`, but every phase runs
 # even after another has failed, so one run names every red rather than
@@ -50,14 +50,12 @@ check-all *phases:
         printf '%s\t%s\t%s\n' "$name" "$rc" "$((SECONDS - start))" >> "$out/phases.tsv"
     }
     just prereqs || exit 2
-    phase fmt just fmt-check
+    phase sources just verify-sources
     phase build-web just build-web
     { phase clippy just clippy; phase features just features
-      phase test just test --no-fail-fast; phase gates just gates; } &
+      phase test just test --no-fail-fast; phase artifacts just gates-artifacts; phase deny just deny; } &
     { phase models just models; } &
     { phase client just client-checks; } &
-    { phase desktop just check-desktop; } &
-    { phase console just check-console; } &
     wait
     touch "$out/phases.tsv"
     column -t -s $'\t' "$out/phases.tsv"
@@ -89,20 +87,14 @@ check-branch base="main":
     packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
-    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm') || exit 2
-    step guard cargo xtask gates guard --range "$mb..HEAD"
-    step fmt just fmt-check
+    step sources just verify-sources --base "$mb"
     touched client && step build-web just build-web
     if [ -n "$packages" ]; then
         step clippy just clippy
         step tests just test --no-fail-fast --no-tests=warn -E "$(just branch-tests "$mb" $packages)"
     fi
-    # shellcheck disable=SC2086
-    step gates cargo xtask gates $gates --range "$mb..HEAD"
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
-    touched crates/desktop/ffi && step desktop just check-desktop
-    touched crates/console_ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (crates/xtask/Spec.lean §8-43).
@@ -503,8 +495,14 @@ artifact_gates := "render npm budget"
 gates: gates-sources gates-artifacts
     just deny
 
-# The gates that read sources alone, which answer in seconds, so `check`
-# runs them before clippy's minutes and a red arrives first.
+# The content-addressed source verification phase: formatting, source gates,
+# workflow self-tests and the Zig leaves. Extra arguments select the affected
+# graph, for example `just verify-sources --base main`.
+verify-sources *args:
+    cargo xtask ci run "$@"
+
+# The raw source gates without result reuse, for a focused gate run and for
+# `just gates`. The production phase above owns their input graph.
 gates-sources:
     #!/usr/bin/env bash
     set -euo pipefail

@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import crates.xtask.spec.Ci
 import crates.xtask.spec.Guard.Wall
 import crates.xtask.spec.Packaged
 import crates.xtask.spec.Report
@@ -131,7 +132,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
-**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
+**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。扫描结果只在 D43 的完整内容身份下复用；任何输入未声明完整、环境未固定或结果为失败的检查都重新执行。
 
 **secret 门细则**：扫描面是仓内全部文件（含 fixtures 与语料），排除隔离区 `local/` 与 `walk` 跳过的目录（§10 第 1 条）；判定器是 `kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件、偏移与长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：产品包（§8-39）`src/**` 内 `.expose(` 的调用点只许出现在 `EXPOSE_WHITELIST` 列出的文件里——定义处与每一个出线前的最后一格，理由逐条写在表旁；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
@@ -676,11 +677,11 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：`changes` 照常起、只跳过它的路径过滤，Linux `core` 与条件 `proof` 不跑，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。`changes` 不整条跳过，因为一个在某条 `needs` 为 skipped 时靠 `always()` 起跑的 job 不会把 outputs 交给下游：一份最小 workflow 证明过，consumer 的 `fromJSON(needs.<job>.outputs.…)` 读到空串，job 以未展开的矩阵名 skipped；`test-build` 正是这样起跑的，而 `test-slice` 的矩阵取自 `test-build.outputs.slices`，所以 `changes` 在每条路径上都是一个成功的依赖。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`changes` 输出 `rust`（`crates/**`／`tools/**`／工作区清单与会改变 Rust 检查的根文件、以及 `.github/workflows|actions`）、`client`（`client/**` 与 `bunfig.toml`）、`lean`（`**/*.lean` 与 Lean 钉／lake 清单），并以 `code` 为二者之或，供仍要把「任一产品面」当作一票的读者。未触达 `rust` 的变更跳过 `clippy`、测试 archive／分片与 Linux `core`；未触达 `client` 的变更跳过 `swap` 与 `client`；未触达 `lean` 的变更跳过 `models`；仅文档与根散文仍只跑 `gates` 与 `supply`。`workflow_dispatch` 与 `release-validation` 跑满必需集。macOS 上的 `just check-core` 不在每条 PR 上跑：它与 macOS 源码门同住 `platforms.yml`，因为托管 macOS 是最长的单 job（约 7–10 min）、不是分支保护必过项，却占满并发并拖长整次 workflow；ubuntu 上的 `core` 仍随 `rust` 在 ci 里跑。`gates` 拆成 `gates-sources`（fmt、源码门、提交信息、Zig leaf 自测）与 `gates-artifacts`（bundle 上的 render／npm／budget），二者并行，再由同名汇总 job `gates` 对分支保护与 `validation` 交一张票——与 `test` 汇总同构；Zig 全局缓存只在 `gates-sources` 开关。standalone fuzz 的 `cargo check` 离开 `clippy` 岗位，改由 `nightly.yml` 的 fuzz 岗位在跑 sanitizer 之前做稳定编译，以免每条 PR 在 clippy 缓存上再付约 78 s。`plain`／`client` 测试分片不装完整 Rust 工具链：nextest 对 archive 的执行不需要 rustc，分片只装 `cargo-nextest` 与 `just`，`just test-slice` 优先走已安装的 `cargo-nextest nextest`（镜像预装的 `cargo` 仍在 PATH 上时也如此），以免 runner 经 `cargo nextest` 拉钉；若 PATH 上仍有 `cargo`，在 fan-out 前串行跑一次 `cargo -vV` 装好钉住的工具链，避免 archive 内并行的 `cargo metadata` 在 Windows 上竞态安装。`validation` 经 `needs` 汇合 `changes` 与各重作业：`gates` 与 `supply` 必须 success；其余汇合项允许因路径过滤而为 skipped；`changes` 自身 failure／cancelled，以及因依赖失败而被跳过的分片，仍拒绝。分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。filterset 由两层组成：part 是互不相交的测试集合——trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底 part；accounting 的 unit 场景按执行、协作及补集三个模块域分开，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。分片是一个 runner 承担的若干 part，按实测 nextest 时间凑成四片：Windows 托管 runner 上一个分片在第一个测试之前要付约 60 s 的准备，而多数 part 只跑 10–80 s，一 part 一 runner 时一轮 CI 起 31 个 job、其中 23 个 Windows，与账户约 20 个并发 job 的上限相撞，两轮并发即互相排队，而墙钟并不比四片短。accounting 的执行与协作两个域同在 `worker` 片且该片不带别的重 part，因为它们的文件写入与 worker 场景是一个 runner 最重的负载；`citysim` 与 accounting 补集、runtime、gateway 同在较轻的 `accounting` 片——两轮绿 CI 上 `worker` 约 424 s、`accounting` 约 178 s，把 `citysim` 留在 `worker` 会违反「不带别的重 part」并拉大片间差。新测试必须仍恰好落入一个 part，每个 part 恰好属于一个分片，recipe 对后者自查。
+D27 **整体验证的 job 映射住 `.github/workflows/ci.yml`，源码节点的输入与复用政策住 `xtask::ci`；release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：`changes` 照常起、只跳过它的路径过滤，Linux `core` 与条件 `proof` 不跑，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。`changes` 不整条跳过，因为一个在某条 `needs` 为 skipped 时靠 `always()` 起跑的 job 不会把 outputs 交给下游：一份最小 workflow 证明过，consumer 的 `fromJSON(needs.<job>.outputs.…)` 读到空串，job 以未展开的矩阵名 skipped；`test-build` 正是这样起跑的，而 `test-slice` 的矩阵取自 `test-build.outputs.slices`，所以 `changes` 在每条路径上都是一个成功的依赖。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`changes` 输出 `rust`（`crates/**`／`tools/**`／工作区清单与会改变 Rust 检查的根文件、以及 `.github/workflows|actions`）、`client`（`client/**` 与 `bunfig.toml`）、`lean`（`**/*.lean` 与 Lean 钉／lake 清单），并以 `code` 为二者之或，供仍要把「任一产品面」当作一票的读者。未触达 `rust` 的变更跳过 `clippy`、测试 archive／分片与 Linux `core`；未触达 `client` 的变更跳过 `swap` 与 `client`；未触达 `lean` 的变更跳过 `models`；仅文档与根散文仍只跑 `gates` 与 `supply`。`workflow_dispatch` 与 `release-validation` 跑满必需集。macOS 上的 `just check-core` 不在每条 PR 上跑：它与 macOS 源码门同住 `platforms.yml`，因为托管 macOS 是最长的单 job（约 7–10 min）、不是分支保护必过项，却占满并发并拖长整次 workflow；ubuntu 上的 `core` 仍随 `rust` 在 ci 里跑。`gates` 拆成 `gates-sources`（fmt、源码门、提交信息、Zig leaf 自测）与 `gates-artifacts`（bundle 上的 render／npm／budget），二者并行，再由同名汇总 job `gates` 对分支保护与 `validation` 交一张票——与 `test` 汇总同构；Zig 全局缓存只在 `gates-sources` 开关。standalone fuzz 的 `cargo check` 离开 `clippy` 岗位，改由 `nightly.yml` 的 fuzz 岗位在跑 sanitizer 之前做稳定编译，以免每条 PR 在 clippy 缓存上再付约 78 s。`plain`／`client` 测试分片不装完整 Rust 工具链：nextest 对 archive 的执行不需要 rustc，分片只装 `cargo-nextest` 与 `just`，`just test-slice` 优先走已安装的 `cargo-nextest nextest`（镜像预装的 `cargo` 仍在 PATH 上时也如此），以免 runner 经 `cargo nextest` 拉钉；若 PATH 上仍有 `cargo`，在 fan-out 前串行跑一次 `cargo -vV` 装好钉住的工具链，避免 archive 内并行的 `cargo metadata` 在 Windows 上竞态安装。`validation` 经 `needs` 汇合 `changes` 与各重作业：`gates` 与 `supply` 必须 success；其余汇合项允许因路径过滤而为 skipped；`changes` 自身 failure／cancelled，以及因依赖失败而被跳过的分片，仍拒绝。分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。filterset 由两层组成：part 是互不相交的测试集合——trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底 part；accounting 的 unit 场景按执行、协作及补集三个模块域分开，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。分片是一个 runner 承担的若干 part，按实测 nextest 时间凑成四片：Windows 托管 runner 上一个分片在第一个测试之前要付约 60 s 的准备，而多数 part 只跑 10–80 s，一 part 一 runner 时一轮 CI 起 31 个 job、其中 23 个 Windows，与账户约 20 个并发 job 的上限相撞，两轮并发即互相排队，而墙钟并不比四片短。accounting 的执行与协作两个域同在 `worker` 片且该片不带别的重 part，因为它们的文件写入与 worker 场景是一个 runner 最重的负载；`citysim` 与 accounting 补集、runtime、gateway 同在较轻的 `accounting` 片——两轮绿 CI 上 `worker` 约 424 s、`accounting` 约 178 s，把 `citysim` 留在 `worker` 会违反「不带别的重 part」并拉大片间差。新测试必须仍恰好落入一个 part，每个 part 恰好属于一个分片，recipe 对后者自查。
 
 每个分片带一个 `environment`，同样只在 `test-slice-plan` 定义：`compile`（trybuild 自行编译，需要 Zig、registry、完整工具链与 trybuild 草稿缓存；`test-slice` 只在这一种下 `cargo fetch`），`client`（xtask 的测试读 `client/node_modules` 与 bundle；不编 Rust），`plain`（两者都不需要）。ci.yml 按它决定装什么，所以不编译的分片不为客户端树、Zig 与 rustup 付准备时间。trybuild 的所有套件共用一个 target 目录 `target/tests/trybuild`，因此草稿缓存在 Windows 上是 `compile` 分片的一条，在 ubuntu `core` 与 `platforms.yml` 的 macOS 岗位上各一条；冷的 trybuild 是 core 测试运行的大头（macOS 上单个套件 219 s）。
 
-只需几秒工作的判定并入已经装好其工具的 job：fmt、读源码的门、提交信息与 Zig leaf 自测并入 `gates-sources`；bundle 门并入 `gates-artifacts`；各判定步骤以 `!cancelled()` 运行，一处红不遮住其余。`supply` 在 ubuntu 上跑，因为 `deny.toml` 不指定 target，cargo-deny 读的是所有平台的依赖图，判定与宿主无关，且它什么都不编译。被否：保留一 part 一 runner——墙钟没有缩短，排队变长；按 count 均分——把冷 trybuild 与 unit 混在一起，最慢一片由 trybuild 决定；把 macOS `check-core` 留在每条 PR 上——它不是必过项，却常是最长单 job，并与 Windows 测试链争并发。重开参数：并发 job 上限、单个分片的准备开销、某个 part 的实测时间显著变化，或分支保护把 macOS core 列为必过。
+fmt、读源码的门、工作流自测与 Zig leaf 自测进入 `xtask::ci` 的内容寻址图，由 `gates-sources` 经 `just verify-sources` 一次调用；commit messages 每次运行，bundle 门仍并入 `gates-artifacts`。图内独立节点并行，一处红不遮住其余可执行节点，前置非绿的后继不得执行。`supply` 在 ubuntu 上跑，因为 `deny.toml` 不指定 target，cargo-deny 读的是所有平台的依赖图，判定与宿主无关，且它什么都不编译。被否：保留一 part 一 runner——墙钟没有缩短，排队变长；按 count 均分——把冷 trybuild 与 unit 混在一起，最慢一片由 trybuild 决定；把 macOS `check-core` 留在每条 PR 上——它不是必过项，却常是最长单 job，并与 Windows 测试链争并发。重开参数：并发 job 上限、单个分片的准备开销、某个 part 的实测时间显著变化，或分支保护把 macOS core 列为必过。
 
 编译的 job 经 `.github/actions/toolchain` 装工具链：rustup home 放在 runner 的临时目录，里面只有 `rust-toolchain.toml` 钉住的那一个工具链，并设为默认（测试会在不受 `rust-toolchain.toml` 管辖的临时目录里运行 `cargo`）。原因是 Rust cache 把 rustup 装着的每个工具链都算进缓存键，镜像预装的 `stable` 因而也在键里：某次 ubuntu 镜像把 `stable` 从 1.98.1 换成 1.99.0 后，`core` 的键不再是 main 一小时前写下的那条，冷编译 474 s。在 Windows 上 Cargo home 移到工作盘（D:，checkout 所在）：托管 Windows runner 的系统盘 C: 写小文件慢得多，而 Cargo 在编译前要把构建读的每个 crate 解包进 `registry/src`，Rust cache 不保留这个目录。从 `Updating crates.io index` 到第一个 crate 开始编译，C: 上 test build 25 s、clippy 35 s，D: 上两者都是 9–10 s；trybuild 分片的 `cargo fetch`（含下载）从 49 s 降到 14–22 s。同理 bun 在 Windows 上下载到工作盘且不恢复缓存：88 MB 的缓存条目解包进 C: 的用户目录要 30 s，解包到 D: 是 6–7 s，而完全不用缓存的 `bun install` 是 7 s，条目在那里买不到时间。`proof` 不换：kani 缓存是对镜像自带的两个 home 写的。被否：`compile` 分片按 `Cargo.lock` 缓存 registry 的 index 与 crate 文件——Cargo home 在 D: 后，命中时恢复 3 s 加 `cargo fetch` 14 s，不缓存时两次读数 14 s 与 22 s，差别在 runner 波动之内，却多占一条 88 MB 的缓存；Dev Drive（ReFS）——test build 与分片要求同一 checkout 路径，换盘符要连带改 rust-cache 与全部分片，而 D: 已经拿到了这里量到的收益；直接卸载镜像的 `stable`——在 C: 上删文件同样慢，下一个预装工具链还会进键。重开参数：托管 runner 的磁盘布局，或 Rust cache 改变键的组成。
 
@@ -704,7 +705,7 @@ D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call
 
 release 的墙钟由 Windows archive 决定：冷构建时 `cargo build --release` 约 18 分钟，其中依赖编译约 9 分钟，最后约 9 分钟是 `sprawling` 的 fat LTO 单 codegen unit，只用一个核。发行 profile 不为提速改动（opt-level、LTO、codegen-units、strip 与压缩级别作用于发布的字节，是一条裁决），所以能省的是依赖编译与它周围的串行步骤。archive 的 Rust cache 只在 main 写入，tag 运行能读默认分支写下的缓存，而 tag 从不在 main 上运行：`release-warm.yml` 在 main 上的 `ci` 以 push 事件成功结束后，对照该提交相对其父提交的路径，若触达 `release_cache` 输入（锁文件、各 `Cargo.toml`、`rust-toolchain.toml`、`.cargo/**`），则以 `workflow_call`（`channel: source`，`sign: false`）调用 `release.yml`，写下三条 `release` 缓存供随后的 tag 运行读取；未触达那些输入的提交不重写缓存，因为依赖字节未变。`workflow_run` 对默认分支缓存默认只读，故该工作流显式 `cache-mode: write`，且 `decide` 仍只承认 push 且成功的 CI；调用方权限上限与 nightly 相同（`contents`／`id-token`／`attestations: write`），archive 自身仍为 `contents: read`。concurrency 组 `release-warm-main` 取 `cancel-in-progress: false` 与 `queue: max`，以免后到的不保温提交取消在飞或挤掉已排队的保温。保温与必需的 CI 检查分开，以免冷的 C 依赖或 archive 抖动把分支保护打红。人手仍可在即将打 tag 的 SHA 上 `workflow_dispatch` 一次只构建的 release.yml 作补强；符合条件的 main nightly archive 也会经同一条 `release` 键写入缓存。缓存键由 shared-key、runner 的 OS 与架构、已装工具链与 CARGO/CC/CFLAGS/CXX/CMAKE/RUST 前缀环境变量的散列、以及 manifest、Cargo.lock、`.cargo/config.toml`、`rust-toolchain.toml` 的散列组成，不含事件、ref 或矩阵 target，所以同一提交上的 dispatch 与 tag 算出同一个键。镜像自带的 stable 工具链也进键，而 GitHub 换镜像要几天、新旧 runner 混跑，所以 archive 用 runner 临时目录下自己的 `RUSTUP_HOME`，里面只有 `rust-toolchain.toml` 钉的那一个，键因此只随树变。`cache_hit` 只报精确键；manifest 在两次运行之间变了时，经不含 lockfile 散列的前缀仍能恢复，读数为 false。workspace crate 在保存前被清掉，fat LTO 链接每次都在本运行里做，复用的只是 cargo 以同样输入会编出同样字节的依赖。xtask 在 dev profile 下与发行构建并行编译：cargo 按 profile 目录各自加锁，两者互不等待，构建之后的 `cargo xtask sbom` 不再在关键路径上编译它。`just dist` 带 `--timings`，`cargo-timing.html` 随发行证据上传，供下一次判断分钟花在哪里。archive 与 CI 共用 `.github/actions/toolchain`，Windows 的 Cargo home 因而也位于前述测量更快的工作盘。客户端由 `.github/actions/client-artifacts` 以 `want=bundle` 准备：main 的 test-build 按全部 client 输入的散列写入 bundle，release 与 nightly 在相同输入上恢复，再以 `just --no-deps dist` 跳过且只跳过已经完成的 build-web 依赖；Cargo 构建与 SBOM 不变。advisories 与 `supply` 同理在 ubuntu 上跑，让出一个 Windows runner。被否：tag 运行也写缓存——tag 的缓存只有同一 tag 能读，写了没有读者，还占 10 GB 预算；分支上的 dispatch 写缓存——分支作用域的缓存 tag 读不到；把 npm 包的组装移到 publish 之前的 job——最多省约 40 s，而只在 tag 上运行的发布链无法由只构建运行验证，缺陷会留到真发版时才暴露。重开参数：GitHub 的缓存作用域规则、Windows 托管 runner 的核数、发行 profile，或 `--timings` 显示依赖之外的某一段成为大头。
 
-被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
+被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口。源码图不直接接受一个历史 CI 绿状态：它只接受 D43 规定的完整内容键、同键绿色 verdict 与受控存储作用域，失败与非 hermetic 节点不复用。重开参数：发行要求 core/proof 阻塞，或远程执行改变存储与执行信任边界。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
 -/
@@ -1341,6 +1342,28 @@ D42 **nightly 保留最新一份，加上稳定版尚未包含的那一份。** 
 **重开参数**：curated release 的频率高到「最多滞后一次 nightly 发布」不可接受，或 nightly 通道需要保留可回退的上一份——那时改的是保留几份，不是这条判据。
 -/
 
+/-! ### 8-54 内容寻址验证图：源码门的生产切片
+
+`crates/xtask/src/ci.rs` 与其分部持有验证节点、输入散列、依赖闭包、结果存储与并行执行；形式模型住
+`crates/xtask/spec/Ci.lean`。`ci.yml` 的 `gates-sources` 调用 `cargo xtask ci run`，不再把一组互相独立的
+步骤写成固定的串行列表。已迁移节点没有第二份旧编排；commit-message 的历史／标题输入仍在
+`.github/actions/commit-messages` 中，每次运行，不进内容缓存。
+
+**接口**：`cargo xtask ci plan [--base <rev>]` 输出节点与内容键；`cargo xtask ci run [--base <rev>]`
+缺省执行完整源码验证，给出 base 时选择受影响节点、其反向依赖与必要前置。`--store <dir>` 明确选择
+本地结果目录；GitHub 适配器由 `SPRAWLING_CI_CACHE_ADAPTER` 指向 `.github/ci-cache/cache.ts`。
+所有键使用工作区唯一的 BLAKE3，内容记录包含路径、字节摘要、节点定义、平台与依赖键。
+
+**复用边界**：只读 `green` 且键完全相等的结果；`refused`、`broken`、损坏记录、缺失文件与不可达存储
+都回到真实执行。缓存写失败不改变已经得到的绿色结论，缓存读失败也不会把未执行读成绿色。非 hermetic
+节点必须声明 `never`。图拒绝重名节点、未知依赖与环；独立失败不遮住其他可执行节点，后继在前置非绿时
+不得执行。
+
+**验收**：`lake build crates.xtask.spec.Ci` 证明复用、闭包与完整性的性质；Rust 测试覆盖相同输入、不同
+内容、不同路径、删除输入、损坏缓存、失败重跑、受影响及前置闭包、并发执行和原子发布。生产验收是
+`cargo xtask ci run` 在本检出全绿，并在两个不同输入树上展示正确的 miss／hit 与节点选择。
+-/
+
 /-! ## 9 工作流程
 
 `cargo xtask <gate>` → 定位仓库根（`root::judged`，见 D3）→ 读数据面（`architecture.toml`／ARCHITECTURE.md／`lexicon.toml`／`budgets.toml`）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）；汇合取哪个退出码，见 `spec/Report.lean`。
@@ -1452,6 +1475,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 | `spec/Report.lean` | `a_broken_gate_outranks_a_violation`、`a_broken_gate_drops_no_later_finding`、`green_means_every_gate_judged_and_found_nothing`、`the_outcome_ignores_gate_order`、`every_outcome_is_reachable` | `report::finish_all`、`RunOutcome::of`；`report::tests::a_broken_gate_outranks_a_violation` |
 | `spec/Guard/Wall.lean` | `a_key_agrees_exactly_when_the_record_matches_the_difference` | `guard::wall::judge`；`guard::wall::tests` 的五例与自清理断言 |
 | `spec/Packaged.lean` | `an_excluded_item_never_builds`、`the_reading_is_not_vacuous` | `packaged::excludes_production`；`packaged::tests` |
+| `spec/Ci.lean` | `never_reuses`、`no_failure_is_reused`、`reuse_iff_success_and_same_content`、`changed_input_selects_its_reader`、`changed_dependency_selects_dependent`、`affected_execution_includes_prerequisites`、`full_execution_is_realizable` | `ci` 的图、内容键、存储与执行器；`ci` 分部的回归与生产运行 |
 
 模型的证明是参照定义的证明，不是 Rust 实现的证明：两侧逐分支对应，对应由右列的单测守着，门的
 `just check` 运行再对本仓判一次。
@@ -1473,6 +1497,8 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 - `docs/glossary.md`：退役词的 replacement 指向它的粗体词（§10 第 5 条）。
 - `skills/sdd/SKILL.md`：`spec` 骨架的十七节（§8-41）与本规格的十七节。
 - `crates/adversary/Spec.lean`：检验器的规格，`spec` 门按位置认出它（§8-47、D13）。
+- `crates/xtask/spec/Ci.lean`：内容寻址验证图的形式模型；`crates/xtask/src/ci.rs` 及分部是它规定的实现，
+  `.github/workflows/ci.yml` 的 `gates-sources` 与 `.github/ci-cache/` 是生产调用与存储适配器。
 - `crates/desktop/Spec.lean` D14：叶子那张 lint 表为什么存在（§8-46、D14）。
 -/
 
