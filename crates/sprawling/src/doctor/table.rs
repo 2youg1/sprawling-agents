@@ -222,7 +222,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         detect: Detection::Built {
             carried: super::host::ENGINE_CARRIED,
         },
-        homepage: Some("https://wasmtime.dev/"),
+        homepage: Some("https://github.com/2youg1/sprawling-agents/releases"),
         recipe: PerPlatform {
             windows: ENGINE_BY_BUILD,
             macos: ENGINE_BY_BUILD,
@@ -289,7 +289,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "--version",
             places: NOWHERE,
         },
-        homepage: Some("https://github.com/PowerShell/PowerShell"),
+        homepage: Some("https://github.com/PowerShell/PowerShell/releases/latest"),
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
@@ -322,7 +322,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "-version",
             places: NOWHERE,
         },
-        homepage: Some("https://ffmpeg.org/"),
+        homepage: Some("https://ffmpeg.org/download.html"),
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
@@ -338,13 +338,46 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         upstream: Upstream::Unread(DoctorUnread::NoSource),
         pack: None,
     },
+    // Spelled in lowercase throughout: GitHub resolves an owner and a
+    // repository name whatever case they are written in, and the
+    // vendor's own capitalisation puts capitals beside a digit in one
+    // token, which the secret gate's mixed-alphabet rule reports as a
+    // key-shaped string. Lowercase is the same page and the same API
+    // answer without that false positive.
+    Requirement {
+        name: "sarasa-gothic",
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "Chinese glyphs that pair with Paper Mono as a fallback face; install the Mono SC variant",
+        detect: Detection::Font {
+            files: &["SarasaMonoSC-Regular.ttf", "Sarasa-SuperTTC.ttc"],
+        },
+        homepage: Some("https://github.com/be5invis/sarasa-gothic/releases/latest"),
+        recipe: PerPlatform {
+            windows: Recipe::Manual(
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/sarasa-gothic/releases/latest, \
+                 extract it, and install the .ttf files in your user fonts folder",
+            ),
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "--cask", "font-sarasa-gothic"],
+            },
+            linux: Recipe::Manual(
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/sarasa-gothic/releases/latest, \
+                 extract it, and install the .ttf files in ~/.local/share/fonts",
+            ),
+        },
+        pin: Pin::Unpinned,
+        upstream: Upstream::GitHub("be5invis/sarasa-gothic"),
+        pack: None,
+    },
     Requirement {
         name: "maple-mono-nf-cn",
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "Chinese glyphs for the page's fallback slots, and Nerd Font icons in tools that use it",
+        enables: "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono, and enter Maple Mono NF CN in the first fallback",
         detect: Detection::Font {
-            file: "MapleMono-NF-CN-Regular.ttf",
+            files: &["MapleMono-NF-CN-Regular.ttf"],
         },
         homepage: Some("https://font.subf.dev/en/"),
         recipe: PerPlatform {

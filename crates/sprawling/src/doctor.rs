@@ -232,8 +232,10 @@ pub(crate) enum Detection {
     /// `SPRAWLING_BROWSER` overrides it (`doctor::family`).
     Family(Family),
     /// A font installed in one of the platform's user or system font
-    /// directories, named by its regular face's file (`doctor::probe::font_at`).
-    Font { file: &'static str },
+    /// directories, named by one of its regular face's files
+    /// (`doctor::probe::font_at`). Any listed file satisfies the probe, so a
+    /// row can cover both a manual TTF install and a package manager's TTC.
+    Font { files: &'static [&'static str] },
 }
 
 /// One thing this city needs, and everything that can be said about it
@@ -248,9 +250,9 @@ pub(crate) struct Requirement {
     /// the name spelled `_`.
     pub(crate) enables: &'static str,
     pub(crate) detect: Detection,
-    /// The item's own site, for a reader who wants to know what it is
-    /// before installing it. `None` where there is no one site: a
-    /// platform's shell, and this repository's own connector.
+    /// The item's release, distribution or installation page, for a
+    /// reader who wants to get it themselves. `None` where there is no
+    /// one site: a platform's shell, and this repository's own connector.
     pub(crate) homepage: Option<&'static str>,
     pub(crate) recipe: PerPlatform<Recipe>,
     /// The file in this repository that pins the item's version, if any.

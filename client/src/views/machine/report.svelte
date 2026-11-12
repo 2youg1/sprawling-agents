@@ -94,9 +94,9 @@
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
-  import Tip from "../parts/tip.svelte";
   import Copy from "../parts/copy.svelte";
   import Pack from "./pack.svelte";
+  import DoctorLink from "./doctor_link.svelte";
   import Scanning from "./scanning.svelte";
   import Versions from "./versions.svelte";
 
@@ -154,26 +154,7 @@
   {@const enables = enablesKey(item.name)}
   <li class="flex min-w-0 flex-col gap-tight border-t border-edge pt-snug pb-base">
     <div class="flex min-w-0 items-center gap-snug">
-      {#if item.homepage === undefined || item.homepage === null}
-        <span class="shrink-0 whitespace-nowrap font-mono text-label text-text">{item.name}</span>
-      {:else}
-        {@const site = item.homepage}
-        <span class="shrink-0 whitespace-nowrap"
-          ><Tip text={site}>
-            {#snippet children(hint)}
-              <a
-                class="font-mono text-label text-text underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
-                href={site}
-                target="_blank"
-                rel="noreferrer"
-                aria-describedby={hint}
-              >
-                {item.name}
-              </a>
-            {/snippet}
-          </Tip></span
-        >
-      {/if}
+      <DoctorLink {item} />
       <Badge text={say($lang, line.state)} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
         <span class="shrink-0 text-note text-text-faint">{say($lang, "machine_optional")}</span>

@@ -18,7 +18,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "firefox",
         program: "firefox",
-        homepage: "https://www.mozilla.org/firefox/",
+        homepage: "https://www.mozilla.org/firefox/new/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[
@@ -37,7 +37,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "zen",
         program: "zen",
-        homepage: "https://zen-browser.app/",
+        homepage: "https://zen-browser.app/download/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Zen Browser\zen.exe"],
@@ -49,7 +49,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "librewolf",
         program: "librewolf",
-        homepage: "https://librewolf.net/",
+        homepage: "https://librewolf.net/installation/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\LibreWolf\librewolf.exe"],
@@ -61,7 +61,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "waterfox",
         program: "waterfox",
-        homepage: "https://www.waterfox.net/",
+        homepage: "https://www.waterfox.net/download/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Waterfox\waterfox.exe"],
@@ -73,7 +73,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "floorp",
         program: "floorp",
-        homepage: "https://floorp.app/",
+        homepage: "https://floorp.app/en/download/",
         confidence: Confidence::Tried,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Ablaze Floorp\floorp.exe"],
@@ -115,7 +115,7 @@ pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "tor-browser",
         program: "tor-browser",
-        homepage: "https://www.torproject.org/",
+        homepage: "https://www.torproject.org/download/",
         confidence: Confidence::NeedsConfirmation,
         places: PerPlatform {
             windows: &[r"C:\Program Files\Tor Browser\Browser\firefox.exe"],

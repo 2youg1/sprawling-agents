@@ -5120,8 +5120,12 @@
     "zh": "just proof，对真实的 MIR 证明性质，只在 Linux 上可用"
   },
   "machine_enables_maple_mono_nf_cn": {
-    "en": "Chinese glyphs for the page's fallback faces, and Nerd Font icons in tools that use it",
-    "zh": "为页面的回退字体与使用它的工具补齐中文字形和 Nerd Font 图标"
+    "en": "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono, and enter Maple Mono NF CN in the first fallback",
+    "zh": "作为单一字体栈补齐中文与 Nerd Font 图标；需把界面与等宽字体都选为 Maple Mono，并在第一回退填入 Maple Mono NF CN"
+  },
+  "machine_enables_sarasa_gothic": {
+    "en": "Chinese glyphs that pair with Paper Mono as a fallback face; install the Mono SC variant",
+    "zh": "为 Paper Mono 补齐中文字形，作为回退字体；请安装 Mono SC 变体"
   },
   "machine_enables_msedgedriver": {
     "en": "the browser tool against Edge, which every Windows machine already has",
@@ -12032,8 +12036,8 @@
     "zh": "所选字体没有的字形按这里依次往后找，通常是中文"
   },
   "appearance_fallbacks_help": {
-    "en": "one family name per box, in the order they are tried; an empty box leaves the choice to this machine. The doctor recommends Maple Mono NF CN for Chinese and symbols.",
-    "zh": "每格一个字体名，按顺序往后找；留空就由系统决定。doctor 推荐用 Maple Mono NF CN 补中文与符号。"
+    "en": "one family name per box, in the order they are tried; an empty box leaves the choice to this machine. The doctor recommends Sarasa Mono SC to pair with Paper Mono, and Maple Mono NF CN for a single font stack.",
+    "zh": "每格一个字体名，按顺序往后找；留空就由系统决定。doctor 推荐 Paper Mono 搭配 Sarasa Mono SC 补中文，单一字体栈则推荐 Maple Mono NF CN。"
   },
   "appearance_fallback_first": {
     "en": "first fallback",
