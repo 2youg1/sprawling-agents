@@ -237,7 +237,7 @@ pub(super) const CARGO_DENY: Requirement = row(
     Need::Optional,
     "`just deny`, the supply-chain read `just gates` ends with; CI runs it on every push",
     program("cargo-deny"),
-    "https://embarkstudios.github.io/cargo-deny/install.html",
+    "https://embarkstudios.github.io/cargo-deny/#quickstart",
     same_command("cargo", &["install", "cargo-deny", "--locked"]),
 )
 .packed("cargo-deny");
@@ -435,7 +435,7 @@ pub(super) const CARGO_MUTANTS: Requirement = row(
     Need::Optional,
     "`just mutants`, which asks whether the tests notice a change in a module held to a mutation score",
     program("cargo-mutants"),
-    "https://mutants.rs/install.html",
+    "https://mutants.rs/installation.html",
     same_command("cargo", &["install", "cargo-mutants", "--locked"]),
 )
 .packed("cargo-mutants");
@@ -445,7 +445,7 @@ pub(super) const CARGO_FUZZ: Requirement = row(
     Need::Optional,
     "`just fuzz <target>`, which needs a nightly toolchain as well",
     program("cargo-fuzz"),
-    "https://rust-fuzz.github.io/book/cargo-fuzz/installation.html",
+    "https://rust-fuzz.github.io/book/cargo-fuzz/setup.html",
     same_command("cargo", &["install", "cargo-fuzz", "--locked"]),
 )
 .packed("cargo-fuzz");

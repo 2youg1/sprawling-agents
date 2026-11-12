@@ -981,7 +981,7 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`crates/wire/spec/Preference.lean` D123）；中文字体都不进客户端包。doctor 的 Use 层有两行可选字体行：
 
 - `sarasa-gothic`：推荐与 Paper Mono 搭配，把 `Sarasa Mono SC` 填进外观组的回退格。
-- `maple-mono-nf-cn`：推荐作为单一字体栈，把界面与等宽字体都选为 `maple`，让 Maple Mono NF CN 同时覆盖 Latin、中文与 Nerd Font 图标。
+- `maple-mono-nf-cn`：推荐作为单一字体栈：把界面与等宽字体都选为 `maple`，并在第一回退填入 `Maple Mono NF CN`——随包的 Maple Mono 家族本身没有中文字形与 Nerd Font 图标，名字不同的 NF CN 家族经回退格进入同一条栈（wire D124），Latin、中文与 Nerd Font 图标由一条路覆盖。
 
 ```rust
 // bin::doctor（Detection 与 Absence 各多一臂）
@@ -993,11 +993,11 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
                       local_app_data: Option<OsString>, files: &[&str]) -> Presence;
 ```
 
-- **探测的是字体文件，不是 PATH 上的程序**：`files` 是一组候选文件名，任一命中即 `Present { version: Silent }`。`sarasa-gothic` 列 `SarasaMonoSC-Regular.ttf`（手动 TTF 安装）与 `Sarasa-SuperTTC.ttc`（Homebrew 的 `font-sarasa-gothic` cask 安装）；`maple-mono-nf-cn` 列 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；候选的元数据或遍历目录不可读时答 `Broken(Unreadable)`。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取，取不到时在用户目录都查完之后答 `Broken(Unreadable)`，`at` 是那条注册表值的地址，由 `bin::privacy::windows` 自己给出，免得报告里写着一个它不再读的键。不存在版本号猜测，最新版仍由各自的 `Upstream::GitHub` 读取。
+- **探测的是字体文件，不是 PATH 上的程序**：`files` 是一组候选文件名，任一命中即 `Present { version: Silent }`。`sarasa-gothic` 列 `SarasaMonoSC-Regular.ttf`（手动 TTF 安装）与 `Sarasa-SuperTTC.ttc`（Homebrew 的 `font-sarasa-gothic` cask 安装）；`maple-mono-nf-cn` 列 `MapleMono-NF-CN-Regular.ttf`。Windows 依次看 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`、用户 Scoop 的 `scoop/apps/maple-mono-nf-cn/current` 与系统字体目录；macOS 看用户与系统的 `Library/Fonts`；Linux 看用户的 `.local/share/fonts`、`.fonts` 与系统字体目录。Linux 在每个字体目录下最多向下查四层，不跟随子目录符号链接；某个候选的元数据或遍历目录不可读时记下第一个错误、继续看其余候选与其余目录，全部未命中才以它答 `Broken(Unreadable)`——一个读不了的目录不能把一个已安装的第二候选说成坏。没有家目录且都没找到答 `NoHome`，有家目录且都没找到答 `NotInstalled`；Windows 系统字体目录从 HKLM 的 SystemRoot 取，取不到时在用户目录都查完之后答 `Broken(Unreadable)`，`at` 是那条注册表值的地址，由 `bin::privacy::windows` 自己给出，免得报告里写着一个它不再读的键。不存在版本号猜测，最新版仍由各自的 `Upstream::GitHub` 读取。
 - **安装方式照上游安装文档**：`sarasa-gothic` 在 macOS 经 Homebrew 安装 `font-sarasa-gothic`，在 Windows 与 Linux 手动下载 `SarasaMonoSC-TTF-*.7z` 并安装到用户字体目录；`maple-mono-nf-cn` 在 Windows 经 Scoop 的 `nerd-fonts` bucket 安装 `Maple-Mono-NF-CN`，macOS 经 Homebrew 安装 `font-maple-mono-nf-cn`，Linux 手动下载并安装到 `~/.local/share/fonts`。每条命令配方仍逐项征得同意、不提权，Windows 用一条 PowerShell 先登记 bucket 再安装。Linux 的 Homebrew cask 可写到该平台探测范围外，故改为手动安装。安装后复查走同一文件探测，因此配方与 Presence 能闭环。
 - **它们不是 Use 层必需项**：缺它们不影响城市或客户端运行，页面只是没有那一格可填的中文字体，终端也只是少中文与 Nerd Font 图标的完整覆盖。页面词句为 `machine_enables_sarasa_gothic` 与 `machine_enables_maple_mono_nf_cn`，终端的 enables 与它们同义。外观组的回退格填的是 `Sarasa Mono SC` 或 `Maple Mono NF CN`（wire D124）。
 
-**本章测试**：需求表包含这两行且三个平台都有配方；`font_at` 在临时目录上认出任一候选文件、缺文件答 `NotInstalled`；表格完整性测试覆盖 `Detection::Font`。
+**本章测试**：需求表包含这两行且三个平台都有配方；`font_at` 在临时目录上认出任一候选文件、缺文件答 `NotInstalled`；首候选读取失败、次候选在场仍答 `Present`（第一个错误只在全部未命中时回答）；表格完整性测试覆盖 `Detection::Font`。
 -/
 
 /-! D82 Sarasa Mono SC 与 Maple Mono NF CN 只作可选系统字体，不随客户端内嵌（§8-174）

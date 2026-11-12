@@ -290,10 +290,20 @@ fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Pres
     } else {
         0
     };
+    // A read error ends that one candidate's search, not the probe's:
+    // any listed file satisfies the detection, so a directory that
+    // cannot be read must not turn an installed second candidate into
+    // `Broken`. The first error is kept and answered only when no
+    // candidate answered anywhere (Doctor §8-174).
+    let mut trouble: Option<Presence> = None;
     for root in roots {
         for file in files {
-            if let Some(answer) = font_under(&root, file, depth) {
-                return answer;
+            match font_under(&root, file, depth) {
+                Some(answer @ Presence::Present { .. }) => return answer,
+                Some(answer @ Presence::Broken { .. }) => {
+                    trouble.get_or_insert(answer);
+                }
+                _ => {}
             }
         }
     }
@@ -301,18 +311,25 @@ fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Pres
         Ok(roots) => {
             for root in roots {
                 for file in files {
-                    if let Some(answer) = font_under(&root, file, depth) {
-                        return answer;
+                    match font_under(&root, file, depth) {
+                        Some(answer @ Presence::Present { .. }) => return answer,
+                        Some(answer @ Presence::Broken { .. }) => {
+                            trouble.get_or_insert(answer);
+                        }
+                        _ => {}
                     }
                 }
             }
         }
         Err(UnreadableRoot { at, said }) => {
-            return Presence::Broken {
+            trouble.get_or_insert(Presence::Broken {
                 at,
                 fault: Fault::Unreadable(said),
-            };
+            });
         }
+    }
+    if let Some(answer) = trouble {
+        return answer;
     }
     if locations.home.is_none() {
         Presence::Absent(Absence::NoHome)
@@ -731,6 +748,39 @@ mod tests {
             font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Absent(Absence::NotInstalled)
         );
+    }
+
+    #[test]
+    fn a_broken_first_candidate_does_not_hide_a_present_second_one() {
+        // The first name carries an interior NUL, which every platform's
+        // stat refuses with an error other than NotFound, so one test
+        // covers the branch everywhere; the realistic unreadable-file
+        // shape of the same branch is `unreadable_font_metadata_is_broken`,
+        // which only unix can build.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join(".local/share/fonts");
+        std::fs::create_dir_all(&root).unwrap();
+        let broken = root.join("font.ttf\0");
+        let second = root.join("font.ttc");
+        std::fs::write(&second, b"font").unwrap();
+        let locations = || FontLocations {
+            home: Some(dir.path().to_path_buf()),
+            local_app_data: None,
+            system: Ok(vec![]),
+        };
+        let files = ["font.ttf\0", "font.ttc"];
+        assert_eq!(
+            font_in(Platform::Linux, locations(), &files),
+            Presence::Present {
+                at: second.clone(),
+                version: Version::Silent
+            }
+        );
+        std::fs::remove_file(&second).unwrap();
+        assert!(matches!(
+            font_in(Platform::Linux, locations(), &files),
+            Presence::Broken { at, fault: Fault::Unreadable(_) } if at == broken
+        ));
     }
 
     #[cfg(unix)]

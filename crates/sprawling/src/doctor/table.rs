@@ -222,7 +222,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         detect: Detection::Built {
             carried: super::host::ENGINE_CARRIED,
         },
-        homepage: Some("https://github.com/bytecodealliance/wasmtime/releases/latest"),
+        homepage: Some("https://github.com/2youg1/sprawling-agents/releases"),
         recipe: PerPlatform {
             windows: ENGINE_BY_BUILD,
             macos: ENGINE_BY_BUILD,
@@ -375,7 +375,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: "maple-mono-nf-cn",
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono",
+        enables: "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono, and enter Maple Mono NF CN in the first fallback",
         detect: Detection::Font {
             files: &["MapleMono-NF-CN-Regular.ttf"],
         },

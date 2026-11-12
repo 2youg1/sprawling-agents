@@ -5120,8 +5120,8 @@
     "zh": "just proof，对真实的 MIR 证明性质，只在 Linux 上可用"
   },
   "machine_enables_maple_mono_nf_cn": {
-    "en": "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono",
-    "zh": "作为单一字体栈补齐中文与 Nerd Font 图标；需把界面与等宽字体都选为 Maple Mono"
+    "en": "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono, and enter Maple Mono NF CN in the first fallback",
+    "zh": "作为单一字体栈补齐中文与 Nerd Font 图标；需把界面与等宽字体都选为 Maple Mono，并在第一回退填入 Maple Mono NF CN"
   },
   "machine_enables_sarasa_gothic": {
     "en": "Chinese glyphs that pair with Paper Mono as a fallback face; install the Mono SC variant",
