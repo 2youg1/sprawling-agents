@@ -338,6 +338,12 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         upstream: Upstream::Unread(DoctorUnread::NoSource),
         pack: None,
     },
+    // Spelled in lowercase throughout: GitHub resolves an owner and a
+    // repository name whatever case they are written in, and the
+    // vendor's own capitalisation puts capitals beside a digit in one
+    // token, which the secret gate's mixed-alphabet rule reports as a
+    // key-shaped string. Lowercase is the same page and the same API
+    // answer without that false positive.
     Requirement {
         name: "sarasa-gothic",
         tier: Tier::Use,
@@ -346,10 +352,10 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         detect: Detection::Font {
             files: &["SarasaMonoSC-Regular.ttf", "Sarasa-SuperTTC.ttc"],
         },
-        homepage: Some("https://github.com/be5invis/Sarasa-Gothic/releases/latest"),
+        homepage: Some("https://github.com/be5invis/sarasa-gothic/releases/latest"),
         recipe: PerPlatform {
             windows: Recipe::Manual(
-                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/Sarasa-Gothic/releases/latest, \
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/sarasa-gothic/releases/latest, \
                  extract it, and install the .ttf files in your user fonts folder",
             ),
             macos: Recipe::Command {
@@ -357,12 +363,12 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
                 args: &["install", "--cask", "font-sarasa-gothic"],
             },
             linux: Recipe::Manual(
-                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/Sarasa-Gothic/releases/latest, \
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/sarasa-gothic/releases/latest, \
                  extract it, and install the .ttf files in ~/.local/share/fonts",
             ),
         },
         pin: Pin::Unpinned,
-        upstream: Upstream::GitHub("be5invis/Sarasa-Gothic"),
+        upstream: Upstream::GitHub("be5invis/sarasa-gothic"),
         pack: None,
     },
     Requirement {

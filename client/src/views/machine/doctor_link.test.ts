@@ -16,11 +16,11 @@ const ITEM: DoctorItem = {
   name: "sarasa-gothic",
   tier: "use",
   need: "optional",
-  homepage: "https://github.com/be5invis/Sarasa-Gothic/releases/latest",
+  homepage: "https://github.com/be5invis/sarasa-gothic/releases/latest",
   state: { absent: { absence: { no_component: { dir: "the platform's font directories" } } } },
   install: {
     manual: {
-      how: "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/Sarasa-Gothic/releases/latest",
+      how: "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/sarasa-gothic/releases/latest",
     },
   },
   pinned: null,
