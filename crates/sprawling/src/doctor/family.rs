@@ -119,7 +119,7 @@ pub(crate) const GECKO_ROW: Requirement = Requirement {
               Waterfox, Floorp and Firefox Developer all answer here, and Tor Browser \
               answers too but wants confirming by hand",
     detect: Detection::Family(Family::Gecko),
-    homepage: Some("https://www.mozilla.org/firefox/"),
+    homepage: Some("https://www.mozilla.org/firefox/new/"),
     recipe: PerPlatform {
         windows: Recipe::Command {
             program: "winget",
@@ -146,7 +146,7 @@ pub(crate) const CHROMIUM_ROW: Requirement = Requirement {
     enables: "the browser tool through chromedriver or msedgedriver, whose major \
               version must match the browser found here",
     detect: Detection::Family(Family::Chromium),
-    homepage: Some("https://www.chromium.org/"),
+    homepage: Some("https://www.chromium.org/getting-involved/download-chromium/"),
     recipe: CHROMIUM_RECIPE,
     pin: super::Pin::Unpinned,
     upstream: super::Upstream::Unread(wire::DoctorUnread::ManyBrands),

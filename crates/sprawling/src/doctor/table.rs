@@ -222,7 +222,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         detect: Detection::Built {
             carried: super::host::ENGINE_CARRIED,
         },
-        homepage: Some("https://wasmtime.dev/"),
+        homepage: Some("https://github.com/bytecodealliance/wasmtime/releases/latest"),
         recipe: PerPlatform {
             windows: ENGINE_BY_BUILD,
             macos: ENGINE_BY_BUILD,
@@ -289,7 +289,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "--version",
             places: NOWHERE,
         },
-        homepage: Some("https://github.com/PowerShell/PowerShell"),
+        homepage: Some("https://github.com/PowerShell/PowerShell/releases/latest"),
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
@@ -322,7 +322,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "-version",
             places: NOWHERE,
         },
-        homepage: Some("https://ffmpeg.org/"),
+        homepage: Some("https://ffmpeg.org/download.html"),
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
@@ -339,12 +339,39 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         pack: None,
     },
     Requirement {
+        name: "sarasa-gothic",
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "Chinese glyphs that pair with Paper Mono as a fallback face; install the Mono SC variant",
+        detect: Detection::Font {
+            files: &["SarasaMonoSC-Regular.ttf", "Sarasa-SuperTTC.ttc"],
+        },
+        homepage: Some("https://github.com/be5invis/Sarasa-Gothic/releases/latest"),
+        recipe: PerPlatform {
+            windows: Recipe::Manual(
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/Sarasa-Gothic/releases/latest, \
+                 extract it, and install the .ttf files in your user fonts folder",
+            ),
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "--cask", "font-sarasa-gothic"],
+            },
+            linux: Recipe::Manual(
+                "download SarasaMonoSC-TTF-*.7z from https://github.com/be5invis/Sarasa-Gothic/releases/latest, \
+                 extract it, and install the .ttf files in ~/.local/share/fonts",
+            ),
+        },
+        pin: Pin::Unpinned,
+        upstream: Upstream::GitHub("be5invis/Sarasa-Gothic"),
+        pack: None,
+    },
+    Requirement {
         name: "maple-mono-nf-cn",
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "Chinese glyphs for the page's fallback slots, and Nerd Font icons in tools that use it",
+        enables: "Chinese glyphs and Nerd Font icons as a single font stack; choose Maple Mono for sans and mono",
         detect: Detection::Font {
-            file: "MapleMono-NF-CN-Regular.ttf",
+            files: &["MapleMono-NF-CN-Regular.ttf"],
         },
         homepage: Some("https://font.subf.dev/en/"),
         recipe: PerPlatform {

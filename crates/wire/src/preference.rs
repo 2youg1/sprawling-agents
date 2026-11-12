@@ -74,7 +74,7 @@ pub enum Face {
     /// (`client/src/fonts/PaperMono[wght].woff2`, wire D123).
     Paper,
     /// Maple Mono, also shipped, and the family the doctor's NF CN build
-    /// extends with Han glyphs and Nerd Font icons.
+    /// extends with Han glyphs and Nerd Font icons for a single font stack.
     Maple,
     /// Whatever this machine calls its interface font.
     System,

@@ -144,12 +144,12 @@ impl Machine for ThisMachine {
             }
             Detection::Built { carried } => super::host::built(*carried),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
-            Detection::Font { file } => match self.platform {
+            Detection::Font { files } => match self.platform {
                 Some(platform) => {
                     let home = accounting::home::Home::detect()
                         .ok()
                         .map(|home| home.path().to_path_buf());
-                    font_at(platform, home, std::env::var_os("LOCALAPPDATA"), file)
+                    font_at(platform, home, std::env::var_os("LOCALAPPDATA"), files)
                 }
                 None => Presence::Absent(Absence::NotInstalled),
             },
@@ -204,7 +204,7 @@ pub(super) fn font_at(
     platform: Platform,
     home: Option<PathBuf>,
     local_app_data: Option<OsString>,
-    file: &str,
+    files: &[&str],
 ) -> Presence {
     let system = match platform {
         Platform::Windows => windows_font_root(),
@@ -221,7 +221,7 @@ pub(super) fn font_at(
             local_app_data,
             system,
         },
-        file,
+        files,
     )
 }
 
@@ -258,7 +258,7 @@ fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
 }
 
 /// Searches user locations first, then system locations in platform order.
-fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence {
+fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Presence {
     let mut roots = Vec::new();
     if let Platform::Windows = platform
         && let Some(local) = locations.local_app_data
@@ -291,15 +291,19 @@ fn font_in(platform: Platform, locations: FontLocations, file: &str) -> Presence
         0
     };
     for root in roots {
-        if let Some(answer) = font_under(&root, file, depth) {
-            return answer;
+        for file in files {
+            if let Some(answer) = font_under(&root, file, depth) {
+                return answer;
+            }
         }
     }
     match locations.system {
         Ok(roots) => {
             for root in roots {
-                if let Some(answer) = font_under(&root, file, depth) {
-                    return answer;
+                for file in files {
+                    if let Some(answer) = font_under(&root, file, depth) {
+                        return answer;
+                    }
                 }
             }
         }
@@ -615,7 +619,7 @@ mod tests {
                 Platform::Linux,
                 Some(linux_home.path().to_path_buf()),
                 None,
-                FILE
+                &[FILE]
             ),
             Presence::Present {
                 at: linux,
@@ -638,7 +642,7 @@ mod tests {
                 Platform::Windows,
                 Some(windows_home.path().to_path_buf()),
                 None,
-                FILE
+                &[FILE]
             ),
             Presence::Present {
                 at: windows,
@@ -654,7 +658,7 @@ mod tests {
                     local_app_data: None,
                     system: Ok(vec![mac_system.path().to_path_buf()]),
                 },
-                FILE,
+                &[FILE],
             ),
             Presence::Absent(Absence::NotInstalled)
         );
@@ -680,7 +684,7 @@ mod tests {
         };
         for path in [&user, &scoop, &system] {
             assert_eq!(
-                font_in(Platform::Windows, locations(), "font.ttf"),
+                font_in(Platform::Windows, locations(), &["font.ttf"]),
                 Presence::Present {
                     at: path.to_path_buf(),
                     version: Version::Silent
@@ -703,7 +707,7 @@ mod tests {
             system: Ok(vec![]),
         };
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Present {
                 at: nested.clone(),
                 version: Version::Silent
@@ -712,7 +716,7 @@ mod tests {
         let top = root.join("font.ttf");
         std::fs::write(&top, b"font").unwrap();
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Present {
                 at: top.clone(),
                 version: Version::Silent
@@ -724,7 +728,7 @@ mod tests {
         std::fs::create_dir_all(too_deep.parent().unwrap()).unwrap();
         std::fs::write(too_deep, b"font").unwrap();
         assert_eq!(
-            font_in(Platform::Linux, locations(), "font.ttf"),
+            font_in(Platform::Linux, locations(), &["font.ttf"]),
             Presence::Absent(Absence::NotInstalled)
         );
     }
@@ -751,7 +755,7 @@ mod tests {
             }),
         };
         assert!(matches!(
-            font_in(Platform::Windows, locations, "font.ttf"),
+            font_in(Platform::Windows, locations, &["font.ttf"]),
             Presence::Broken {
                 fault: Fault::Unreadable(_),
                 ..
