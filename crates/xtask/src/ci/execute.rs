@@ -7,7 +7,7 @@
 //! failures never prevent unrelated nodes from reporting (xtask D43).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::mpsc;
 
@@ -219,7 +219,7 @@ fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, Xta
             command
         }
         Operation::Process { program, args } => {
-            let mut command = Command::new(program);
+            let mut command = Command::new(executable(program)?);
             command.args(args);
             command
         }
@@ -239,6 +239,24 @@ fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, Xta
         Some(1) => Outcome::Refused,
         Some(_) | None => Outcome::Broken,
     })
+}
+
+/// Resolve the shell that runs repository scripts. On Windows, a bare
+/// `bash` can select WSL; these scripts use the Git Bash shipped with the
+/// development and Actions images.
+fn executable(program: &str) -> Result<PathBuf, XtaskError> {
+    #[cfg(windows)]
+    if program == "bash" {
+        let path = PathBuf::from("C:/Program Files/Git/bin/bash.exe");
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(XtaskError::Cmd {
+            cmd: "locate Git Bash for a repository script".to_owned(),
+            msg: "C:/Program Files/Git/bin/bash.exe is absent (git-bash-missing); install Git for Windows or make the workflow use its explicit shell path".to_owned(),
+        });
+    }
+    Ok(PathBuf::from(program))
 }
 
 fn report(outcomes: &BTreeMap<String, Outcome>) -> ExitCode {
@@ -327,5 +345,14 @@ mod tests {
     fn an_empty_affected_scope_is_green_without_work() {
         let outcomes = schedule(&[], &BTreeSet::new(), |_| Outcome::Broken);
         assert_eq!(report(&outcomes), ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn workflow_bash_never_resolves_to_the_wsl_name_on_windows() {
+        let resolved = executable("bash").unwrap();
+        #[cfg(windows)]
+        assert_eq!(resolved, PathBuf::from("C:/Program Files/Git/bin/bash.exe"));
+        #[cfg(not(windows))]
+        assert_eq!(resolved, PathBuf::from("bash"));
     }
 }
