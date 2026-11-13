@@ -11,7 +11,7 @@ Agent skills that ship with sprawling. Each directory holds one skill, and its `
 | [`playback`](playback/SKILL.md) | A stretch of a city's history made into one self-contained HTML page the User reviews offline, the reference page to start from, and the five checks it passes |
 | [`sdd`](sdd/SKILL.md) | Specification-first development with Lean contracts |
 | [`translation`](translation/SKILL.md) | Translating texts whose form carries the thought into Chinese |
-| [`tutor`](tutor/SKILL.md) | Teaching one person a subject through dialogue until they can diagnose it |
+| [`ub-mode`](ub-mode/SKILL.md) | A code-change loop that chooses surgical or structural scope from evidence, then verifies the complete diff |
 | [`why`](why/SKILL.md) | Why something is the way it is, answered from every source of evidence that can be reached |
 
 [`LICENSES.md`](LICENSES.md) gives each skill's licence and attribution. The release archive carries this directory exactly as it stands, this file included, because the archive walks it rather than listing skills (the `Skills` part in `crates/xtask/src/package/contents.rs`); a change here reaches people with the next release.

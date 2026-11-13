@@ -256,8 +256,9 @@ Agent 的能力和规模越强，人的注意力就越昂贵。我拒绝让 spra
   - 界面控件由本仓库自行实现，键盘无障碍行为参照 W3C ARIA Authoring Practices、Kobalte 和 Ark UI 的文档。
   - 上游来源版本与完整许可见 [third-party](third-party.md)。
 - **随附 Skills**
-  - `sdd`、`tutor` 和 `translation` 是作者中文 Skills 的英文改编版。
+  - `sdd` 和 `translation` 是作者中文 Skills 的英文改编版。备选的 `tutor` 归档在 [docs/ArchiveSKILL](ArchiveSKILL/)，不再内置。
   - `why`、`how` 和 `blast-radius` 改编自 Lauren Tan（poteto）的 [pstack](https://github.com/cursor/plugins/tree/main/pstack)，`authority-review` 改编自同一仓库的 Thermos。这四项均保留 MIT 许可。
+  - `ub-mode` 改编自 Robert C. Martin 的 [ub-mode](https://github.com/unclebob/ub-mode) 和 pstack，保留 MIT 许可；交付方式由各仓库自己的规则决定。
   - 每个 Skill 的署名和许可见 [skills/LICENSES.md](../crates/city/skills/LICENSES.md)。
 - **贡献与许可**
   - 报告缺陷或提出功能建议，请使用 [Issue 表单](https://github.com/2youg1/sprawling-agents/issues/new/choose)。

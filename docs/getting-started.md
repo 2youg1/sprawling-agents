@@ -128,7 +128,7 @@ A name on that list that no shelf holds is reported rather than promised. This k
 shelves = ["~/.claude/skills"]
 ```
 
-The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. Its **folders from this computer** box takes an absolute path — `~/.claude/skills`, or a Windows drive — and mounts the whole folder read-only: every folder inside it holding a `SKILL.md` becomes a skill, nothing is copied, and the list above shows it once the city answers. This repository ships nine skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
+The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. Its **folders from this computer** box takes an absolute path — `~/.claude/skills`, or a Windows drive — and mounts the whole folder read-only: every folder inside it holding a `SKILL.md` becomes a skill, nothing is copied, and the list above shows it once the city answers. This repository ships the skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
 
 **MCP** (Model Context Protocol) is how a building reaches outside applications — mail, GitHub, Figma, a document converter — through a tool server. A server is one entry in the building's `CONFIG.toml`: a `command` for a program on this computer, or a `url` for a hosted one; the **MCP** page writes the same entries for you. A confidential building starts none.
 

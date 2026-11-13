@@ -252,8 +252,9 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
   - The interface controls are implemented here, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation.
   - Source versions and full licences are in [third-party](docs/third-party.md).
 - **Bundled skills**
-  - `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills.
+  - `sdd` and `translation` are English adaptations of the author's Chinese skills. The archived `tutor` alternative lives in [docs/ArchiveSKILL](docs/ArchiveSKILL/) and is not built in.
   - `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository. All four keep the MIT licence.
+  - `ub-mode` is adapted from Robert C. Martin's [ub-mode](https://github.com/unclebob/ub-mode) and pstack under the MIT licence, with delivery left to each repository's rules.
   - Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
 - **Contributing and licences**
   - To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose).

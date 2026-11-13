@@ -44,11 +44,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## `sdd`, `tutor`, `translation` — MPL-2.0
+## `sdd`, `translation` — MPL-2.0
 
 English translations and adaptations by 2youg1, 2026, of the author's own
 Chinese-language open-source skills, published under AGPL-3.0-or-later. The
-author licenses these three files under MPL-2.0, the license in `LICENSE` at
+author licenses these two files under MPL-2.0, the license in `LICENSE` at
 the root of this tree; the originals remain AGPL-3.0-or-later. The translation
 skill keeps the byline its original wore — KL9 ＆ Claude Fable 5.
 
@@ -77,3 +77,36 @@ recut as one lens over the whole diff - a fact with more than one authoritative 
 ranked by how close the copies are to disagreeing, with the six shapes that carry most findings
 and a requirement to name the definition that survives. Copyright (c) 2026 the Thermos plugin's
 authors, MIT Licence.
+
+## `ub-mode` — MIT
+
+Modified adaptation of [unclebob/ub-mode](https://github.com/unclebob/ub-mode)
+and pstack's principles and refactoring playbook in
+[cursor/plugins](https://github.com/cursor/plugins). Modifications by 2youg1,
+2026: the repository-adapted change loop, evidence-based choice between surgical
+and structural scope, development-tool reuse, and project-owned verification and
+delivery. The companion tools, action log, and push-to-main instruction are not
+adopted.
+
+Copyright (c) 2026 Robert C. Martin
+Copyright (c) 2026 Lauren Tan
+
+### MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

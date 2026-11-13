@@ -128,7 +128,7 @@ reading_room = ["tutor", "blast-radius"]
 shelves = ["~/.claude/skills"]
 ```
 
-**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库在 [`../crates/city/skills/`](../crates/city/skills/) 下附带九件 skill；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
+**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库附带 [`../crates/city/skills/`](../crates/city/skills/) 下的技能；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
 
 **MCP**（Model Context Protocol）是一栋楼通往外部应用——邮件、GitHub、Figma、文档转换器——的路，经由一个工具服务。一个 server 是楼的 `CONFIG.toml` 里的一条：电脑上的程序写 `command`，托管服务写 `url`；**MCP** 页替你写同样的条目。保密楼一个也不起。
 
