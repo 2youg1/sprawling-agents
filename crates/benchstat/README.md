@@ -50,7 +50,7 @@ A round author runs the three commands on a round directory, and a reviewer runs
 
 ## Specification
 
-The SPEC is [`Spec.lean`](Spec.lean), with its part under [`spec/Estimators.lean`](spec/Estimators.lean); [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 11, *Specifications in Lean*, describes that layout. Section 1 lists the modules, section 3 fixes the manifest facts the analyzer assumes, section 8 the command line, its exit codes and the fields a manifest must carry, and section 16 names the tests that hold what the proofs leave open. The Lean part proves that a nearest-rank index stays inside a non-empty sample, that a selected block length stays within `1..n`, and that a degenerate pilot's next target grows. The SPEC is written in Chinese with concept names in English, as the *Language* section of [`AGENTS.md`](../../AGENTS.md) requires.
+The SPEC is [`Spec.lean`](Spec.lean), with its part under [`spec/Estimators.lean`](spec/Estimators.lean); [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 11, *Specifications in Lean*, describes that layout. Section 1 lists the modules, section 3 fixes the manifest facts the analyzer assumes, section 8 the command line, its exit codes and the fields a manifest must carry, and section 16 names the tests that hold what the proofs leave open. The Lean part proves that a nearest-rank index stays inside a non-empty sample, that a selected block length stays within `1..n`, and that a degenerate pilot's next target grows. The SPEC is written in Chinese with concept names in English, as [CONTRIBUTING §5](../../docs/CONTRIBUTING.md#5-comments-and-documentation) requires.
 
 ## Checking it
 
