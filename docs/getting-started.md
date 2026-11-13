@@ -118,7 +118,7 @@ A **skill** is a folder holding a `SKILL.md`: a set of instructions, sometimes w
 The city keeps skills on **shelves**: the building's own shelf at `<building>/.sprawling/skills/`, the city's library, and any outside folder the city mounts read-only (a skills folder another harness already keeps, for instance). An agent sees only the skills its building admits by name in `RULES.toml`:
 
 ```toml
-reading_room = ["tutor", "blast-radius"]
+reading_room = ["how", "blast-radius"]
 ```
 
 A name on that list that no shelf holds is reported rather than promised. This keeps a building's context from growing as the disk fills with skills. An outside folder is mounted in the city's own `<city>/.sprawling/CONFIG.toml`:
@@ -495,7 +495,7 @@ Open `<building>/.sprawling/RULES.toml` in your editor to change that. Every key
 does = "The importer for the lab's instrument logs."   # one paragraph for an agent arriving here
 conventions = "Rust 2024; every change passes cargo test."
 review = true                  # work is offered for review before it lands
-reading_room = ["tutor"]       # skills admitted into this building
+reading_room = ["blast-radius"]  # skills admitted into this building
 egress = ["api.github.com"]    # domains work here may reach
 browser = true                 # the browser tool
 ```
