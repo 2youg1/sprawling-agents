@@ -105,3 +105,32 @@ fn staging_failed(action: &str, path: &Path, err: &std::io::Error) -> AxError {
         "free space on this disk and make the city directory writable, then form the city again",
     )
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+
+    /// The notice an adapted skill owes has to reach the copy a city
+    /// shelves, and three of the four install channels carry the binary
+    /// and nothing else (`crates/city/spec/Library/Install.lean` D37).
+    #[test]
+    fn every_staged_skill_carries_the_licence_list() {
+        let staged = tempfile::tempdir().unwrap();
+        let names = stage(staged.path()).unwrap();
+        let shared = SHIPPED.iter().find(|(path, _)| !path.contains('/'));
+        assert!(shared.is_some(), "the table carries the licence list");
+        let (_, licence) = shared.unwrap();
+        assert!(!names.is_empty(), "the table carries a skill");
+        for name in &names {
+            let written = std::fs::read(staged.path().join(name).join("LICENSES.md")).unwrap();
+            assert_eq!(written, *licence, "{name} carries the licence list it owes");
+        }
+    }
+}
