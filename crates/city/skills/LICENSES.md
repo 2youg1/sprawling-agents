@@ -5,8 +5,9 @@ and in `docs/third-party.md` §5. The repository owner's own skills carry
 MPL-2.0, the license of the rest of this tree; a skill adapted from someone
 else's work keeps that work's license, and is here only because that license
 permits redistribution. This file travels with
-the directory — in the tree and in the release archive — so the obligations
-reach every copy.
+the directory — in the tree, in the release archive, and inside every
+shipped skill directory, since only the archive carries `skills/` beside
+the binary — so the obligations reach every copy.
 
 ## `why`, `how`, `blast-radius` — MIT
 
@@ -85,8 +86,9 @@ and pstack's principles and refactoring playbook in
 [cursor/plugins](https://github.com/cursor/plugins). Modifications by 2youg1,
 2026: the repository-adapted change loop, evidence-based choice between surgical
 and structural scope, development-tool reuse, and project-owned verification and
-delivery. The companion tools, action log, and push-to-main instruction are not
-adopted.
+delivery. The action log and push-to-main instruction are not adopted; the
+companion tools (crapper, dryer, mutator) are named as optional aids, not
+vendored.
 
 Copyright (c) 2026 Robert C. Martin
 Copyright (c) 2026 Lauren Tan
