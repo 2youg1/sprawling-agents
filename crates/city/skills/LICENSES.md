@@ -86,8 +86,9 @@ and pstack's principles and refactoring playbook in
 [cursor/plugins](https://github.com/cursor/plugins). Modifications by 2youg1,
 2026: the repository-adapted change loop, evidence-based choice between surgical
 and structural scope, development-tool reuse, and project-owned verification and
-delivery. The companion tools, action log, and push-to-main instruction are not
-adopted.
+delivery. The action log and push-to-main instruction are not adopted; the
+companion tools (crapper, dryer, mutator) are named as optional aids, not
+vendored.
 
 Copyright (c) 2026 Robert C. Martin
 Copyright (c) 2026 Lauren Tan
