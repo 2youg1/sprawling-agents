@@ -4,11 +4,13 @@ This guide explains contribution preparation, feature admission and submission. 
 
 ## 0 Development tools
 
-Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. The [verification tiers](verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
+Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. For JavaScript or TypeScript, use `bun` rather than `node`. The [verification tiers](verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
 
 Start a fresh checkout by reading [AGENTS.md](../AGENTS.md). Its required instructions and skills are tracked here; no global agent configuration or skill installation is needed. Contributors may separately choose [actionbook/rust-skills](https://github.com/actionbook/rust-skills) as auxiliary Rust reading. Its suggestions are not project rules and do not replace the built-in workflow.
 
 ## 1 Read before you write
+
+Before acting on an issue or opening one, search related open and closed issues and pull requests, and read every comment, review, and inline review comment to the end; search snippets do not replace the discussion. Use `gh issue list --state all --search <terms>` and `gh pr list --state all --search <terms>`, then `gh issue view <n> --comments` and `gh pr view <n> --comments`. `gh pr view` carries no inline review comments: read those through `gh api repos/{owner}/{repo}/pulls/<n>/comments --paginate`, and the review bodies through `gh api repos/{owner}/{repo}/pulls/<n>/reviews --paginate`, because a settled decision is often recorded in one of them. Read the recent history of the code with `git log -p -n <count> -- <path>`, so a duplicate, a settled decision, or a fix in flight does not get rebuilt. An issue links what this search found.
 
 Before editing, read [AGENTS.md](../AGENTS.md#read-before-you-write) completely and follow its task routing table. Read the affected crate's specification and relevant Lean parts, and the implementing source, callers, neighbouring modules and tests. Trace callers, data flow, invariants and failure paths before changing a shared interface, and identify the Lean properties the implementation must preserve. State the problem, the required result and the constraints before implementation, choose the smallest coherent change that meets the result, and include only the source and documents it needs; consider how the next maintainer will understand and extend the design.
 
@@ -99,8 +101,6 @@ Use [The loop](verification.md#the-loop) for build-lock and slow-build handling.
 [The loop](verification.md#the-loop) lists the repository commands and their purposes; `just --list` prints every recipe available in the checkout.
 
 ## 10 Issue labels and triage
-
-Before acting on or opening an issue, search related open and closed issues and pull requests. Read every comment, review, and inline review comment to the end; search snippets do not replace the discussion. Use `gh issue list --state all --search <terms>`, `gh pr list --state all --search <terms>`, then `gh issue view <n> --comments` or `gh pr view <n> --comments`. Read recent history with `git log -p -n <count> -- <path>` so a duplicate, settled decision, or fix in flight does not get rebuilt. An issue links what this search found.
 
 Every label — its name, colour and description — has one authority, [`.github/labels.yml`](../.github/labels.yml), and the live set is synchronized from that file; the command is at the end of this section. The labels divide along four axes:
 

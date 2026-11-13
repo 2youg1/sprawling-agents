@@ -24,6 +24,8 @@ Let the mechanism decide how much to change:
 
 Minimal means the smallest complete change that removes the cause, not the fewest lines or files. Finish a migration by moving every reader and writer, exercising the production path, and deleting the old authority and its adapters.
 
+Explicit wording beats inference. When a premise is wrong and the goal is still reachable, correct the premise and continue; record the corrected premise and every inferred choice for the report.
+
 ## 2. Design the change
 
 Give each rule, value, state transition, and decision one authority. Encode invariants in types where possible, make invalid states unrepresentable, and parse outside input at the boundary. Keep domain decisions independent of I/O and UI.
@@ -62,4 +64,4 @@ Use the repository's verification guide to run every check affected by the final
 
 Before opening a pull request, follow the repository's contribution guide and submission template. Complete its required local checks and, when required, a green fork CI run rather than treating the pull request as the first test run. Commit, push, or publish only within the user's request and project rules; no workflow here pushes directly to the mainline by default.
 
-Report the commands and evidence first, then the outcome they establish, followed by blockers and remaining uncertainty. Report decisions and results, not a log of every action.
+Stop only for a blocker — a missing credential or permission, an irreversible step outside the task, or requirements that contradict — and a single `continue` is never a reason to stop. Report the commands and evidence first, then the outcome they establish, then the blockers, corrected premises and inferred choices that qualify it, and at most two matters needing attention. Report decisions and results, not a log of every action.
