@@ -9,8 +9,15 @@
 //! (`crates/runtime/Spec.lean` §8-29-6; `docs/getting-started.md`, "Tools, skills
 //! and MCP").
 //!
+//! A shipped skill's pinned bytes are the staged ones, the licence list
+//! riding inside (`city` D37): the library shelf is nearer than the
+//! mounted one (`Library.lean` §8-8), so for a shipped name the city's
+//! staged copy is the holding the pin names.
+//!
 //! The shelf is the `skills/` directory itself, named in the city's own
 //! configuration the way the guide tells a person to name one.
+
+use std::path::Path;
 
 use kernel::B3Hash;
 use serde_json::json;
@@ -81,7 +88,7 @@ fn every_shipped_skill_on_a_shelf_outside_the_city_is_read_by_name_and_pinned() 
                 .collect(),
         },
         Seen {
-            pinned: shipped.iter().map(on_disk).collect(),
+            pinned: shipped.iter().map(as_shelved).collect(),
             read: shipped.iter().map(|skill| skill.name.clone()).collect(),
         },
         "the dispatch answered {dispatched:?}"
@@ -103,10 +110,35 @@ fn mount(city_root: &std::path::Path) {
     std::fs::write(&config, text).unwrap();
 }
 
-/// The canonical manifest digest a run pins for a skill on the shelf.
-fn on_disk(skill: &Shipped) -> (String, B3Hash) {
+/// The canonical manifest digest a run pins for a shipped skill: the
+/// staged bytes, the licence list riding inside (`city` D37). The
+/// library is the nearer shelf (`Library.lean` §8-8), so its staged
+/// copy of a shipped name is the holding a run pins, not the raw
+/// directory the mounted shelf holds.
+fn as_shelved(skill: &Shipped) -> (String, B3Hash) {
+    let staged = tempfile::tempdir().unwrap();
+    copy_dir(&skill.dir, staged.path());
+    std::fs::copy(
+        skills_dir().join("LICENSES.md"),
+        staged.path().join("LICENSES.md"),
+    )
+    .unwrap();
     (
         skill.name.clone(),
-        ::city::skill_digest(&skill.dir).unwrap(),
+        ::city::skill_digest(staged.path()).unwrap(),
     )
+}
+
+/// Copies one directory tree without changing a byte.
+fn copy_dir(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).unwrap();
+        }
+    }
 }
