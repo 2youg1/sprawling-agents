@@ -74,6 +74,19 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 **三个平台**：内嵌与安装渠道无关，三个平台上自带 skill 都在二进制里；城库在三个平台上都是 `<city>/.sprawling/library/shipped/`；git 在 Windows 上找 `git.exe`，在 macOS 与 Linux 上找 `git`，都按 PATH。
 -/
 
+/-! D37 许可通知随每件自带 skill 落位：`skills/LICENSES.md` 进内嵌表，写出时进入每个 skill 目录
+
+**决定**：city 的构建脚本把 `skills/LICENSES.md` 作为表里一行没有 `/` 的条目（`LICENSES.md`）写进 `OUT_DIR` 的表，`library::shipped::stage` 把它写进每一件 skill 的暂存目录；同一目录的 `README.md` 仍只随发行归档走。
+
+**理由**：MIT 要求通知随副本走。四条安装渠道里只有发行归档在二进制旁边带 `skills/`，安装脚本、npm、`cargo binstall` 与 `cargo install` 都只交付二进制或包目录；落上书架的那一份正是 MIT 意义上的副本，而在此之前它只有 `SKILL.md`，没有版权行与许可全文。`LICENSES.md` 已经是全部通知的唯一权威，把它放进每个 skill 目录，比在六份 `SKILL.md` 里各复制一遍更少维护，也不再依赖「归档在二进制旁边」这个只在一条渠道成立的假设。
+
+**被否**：①每件 skill 各带一份许可文件：六份副本，改一处要改六处；②把 `LICENSES.md` 单独落在城库里：城库只保留 CAS 与索引行、不保留文件目录，且 `install` 只收一个包目录；③只靠发行归档：另外三条渠道的读者看不到它。
+
+**重开参数**：上游许可改变通知要求，或自带 skill 换到不要求随副本携带通知的许可时，重议这一行。
+
+**本节测试**：`library::shipped::tests::every_staged_skill_carries_the_licence_list`——表里恰有一行没有 `/`，暂存之后每一件 skill 目录里的 `LICENSES.md` 与那一行的字节相等。
+-/
+
 /-!
 ### 8-28c 自带 skill 上架（`library::shipped`，形状 2 值＋一个落盘动作）
 
@@ -84,7 +97,7 @@ pub fn shelve_shipped(city_root: &Path,
     register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>) -> Result<Vec<Installed>, AxError>;
 ```
 
-- **字节从哪来**：city 的构建脚本（`crates/city/build.rs`）走包目录里的 `skills/`，为其中每一个含 `SKILL.md` 的子目录的每个文件生成一行 `(相对路径, include_bytes!(…))`，写进 `OUT_DIR` 下的一张表，`library::shipped` 经 `include!` 读它。`skills/` 根上的文件（`README.md`、`LICENSES.md`）不是 skill，不进表；它们随发行归档走（D20）。表按相对路径排序，同一棵树在三个平台上生成同一张表；路径段在表里以 `/` 分隔，落盘时逐段 `join`，于是 Windows 上不出现 `/` 与 `\` 混写。
+- **字节从哪来**：city 的构建脚本（`crates/city/build.rs`）走包目录里的 `skills/`，为其中每一个含 `SKILL.md` 的子目录的每个文件生成一行 `(相对路径, include_bytes!(…))`，写进 `OUT_DIR` 下的一张表，`library::shipped` 经 `include!` 读它。`skills/` 根上的 `README.md` 不是 skill，不进表，只随发行归档走（D20）；同目录的 `LICENSES.md` 也不是 skill，但作为一行没有 `/` 的条目进表，落位时写进每一件 skill 的目录（D37）。表按相对路径排序，同一棵树在三个平台上生成同一张表；路径段在表里以 `/` 分隔，落盘时逐段 `join`，于是 Windows 上不出现 `/` 与 `\` 混写。
 - **只经 §8-28 一扇门**：`shelve_shipped` 在 `<library>/.shipped/` 这个点开头的暂存目录里按表写出每件 skill 的目录（扫描跳过点开头的项，读者看不见它），再对每件调用 `install(city_root, Slot::library(SHIPPED_SECTION), <暂存>/<name>, register)`；预检、原子落位与 CAS 登记都不在这里另写。暂存目录先删再写，成败之后都删：它从未被换入。
 - **playback 页面组装**：`skills/playback/src/skeleton.html` 按内联标记的顺序声明 CSS 与脚本片段，`skills/playback/assemble.js` 将它们逐字节组装成带生成标记的 `template.html`；脚本片段共用同一个内联脚本作用域，不增加浏览器模块加载或网络依赖。生成页仍由上述表原样内嵌，发行归档也携带同一份页；CI 用生成器的 `--check` 比对整份字节，既有 playback 验收经生产工具导出后检查 structure、source 与 offline。渲染片段持有时间线绘制，将来的 Three.js 或 WebGPU 实现也在此处维护并内联组装。
 - **字节照原样**：表里是源树里的字节，写出与登记都不改行尾——仓库的 `.gitattributes` 让它们在三个平台的检出里都是 LF，书架上的那一份就是二进制里的那一份。

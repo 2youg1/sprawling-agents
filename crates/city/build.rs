@@ -10,16 +10,18 @@
 //! §8-28c).
 //!
 //! The directory is inside this package because a crates.io archive
-//! carries this package's directory and nothing else (city D20). A file
-//! directly under `skills/` is not a skill - the README and the licence
-//! list ride in the release archive - so only directories holding a
-//! `SKILL.md` are walked. Paths are written with `/` between segments
-//! and sorted, so the table is the same on every platform.
+//! carries this package's directory and nothing else (city D20). Only
+//! directories holding a `SKILL.md` are skills; the licence list beside
+//! them is not one, and it is added as a row of its own because the
+//! notice an adapted skill owes has to reach the copy a city shelves
+//! (city D37). Paths are written with `/` between segments and sorted,
+//! so the table is the same on every platform.
 
 use std::path::{Path, PathBuf};
 
 const SKILLS_DIR: &str = "skills";
 const SKILL_FILE: &str = "SKILL.md";
+const LICENCE_FILE: &str = "LICENSES.md";
 const TABLE: &str = "shipped_skills.rs";
 
 fn main() {
@@ -39,6 +41,14 @@ fn embed() -> Result<(), String> {
             collect(&skills, &skill, &mut files)?;
         }
     }
+    let licence = skills.join(LICENCE_FILE);
+    if !licence.is_file() {
+        return Err(format!(
+            "{} is missing, and the shipped skills cannot carry the notices they owe",
+            licence.display()
+        ));
+    }
+    files.push((LICENCE_FILE.to_owned(), licence));
     files.sort_by(|a, b| a.0.cmp(&b.0));
     let mut table = String::from("&[\n");
     for (path, file) in &files {

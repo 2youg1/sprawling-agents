@@ -5,8 +5,9 @@ and in `docs/third-party.md` §5. The repository owner's own skills carry
 MPL-2.0, the license of the rest of this tree; a skill adapted from someone
 else's work keeps that work's license, and is here only because that license
 permits redistribution. This file travels with
-the directory — in the tree and in the release archive — so the obligations
-reach every copy.
+the directory — in the tree, in the release archive, and inside every
+shipped skill directory, since only the archive carries `skills/` beside
+the binary — so the obligations reach every copy.
 
 ## `why`, `how`, `blast-radius` — MIT
 
