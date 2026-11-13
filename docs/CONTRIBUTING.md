@@ -42,9 +42,13 @@ Before submission, apply [tier 1](verification.md#tier-1--while-iterating) to th
 
 Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state specifications and decision placement, and [Language](../AGENTS.md#language) for comments, rustdoc and document languages.
 
+A comment is an MPL notice, interface documentation, a consequence warning, or intent the code cannot carry. Document every interface at every visibility with what its signature cannot say, because the repository defaults to `pub(crate)` and no reader sees the call sites. Write a reason once beside its enforcement and link to it elsewhere: two copies are two authorities, and the one nobody edits keeps asserting what the code no longer does. A function still owns its own contract — its `# Errors` section and its guarantee to a caller are not a copy.
+
+A pull request description and the text around a review comment come in matching English and Chinese versions, with the same scope, uncertainty and verification. Identifiers, commands, paths and diagnostics stay unchanged, and shared evidence appears once. Have an agent compare the versions before publishing.
+
 ### Languages
 
-For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply. For pull requests and review comments, follow [Language](../AGENTS.md#language).
+For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply. For pull requests and review comments, follow [Language](../AGENTS.md#language) and the two-language description rule above.
 
 Before committing or submitting text or attachments, apply [Public content and privacy](#public-content-and-privacy) to establish what readers need and inspect what they will receive. Use [the private security channel](SECURITY.md) for vulnerabilities.
 
