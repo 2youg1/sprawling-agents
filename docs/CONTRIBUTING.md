@@ -4,9 +4,13 @@ This guide explains contribution preparation, feature admission and submission. 
 
 ## 0 Development tools
 
-Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. The [verification tiers](verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
+Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. For JavaScript or TypeScript, use `bun` rather than `node`. The [verification tiers](verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
+
+Start a fresh checkout by reading [AGENTS.md](../AGENTS.md). Its required instructions and skills are tracked here; no global agent configuration or skill installation is needed. Contributors may separately choose [actionbook/rust-skills](https://github.com/actionbook/rust-skills) as auxiliary Rust reading. Its suggestions are not project rules and do not replace the built-in workflow.
 
 ## 1 Read before you write
+
+Before acting on an issue or opening one, search related open and closed issues and pull requests, and read every comment, review, and inline review comment to the end; search snippets do not replace the discussion. Use `gh issue list --state all --search <terms>` and `gh pr list --state all --search <terms>`, then `gh issue view <n> --comments` and `gh pr view <n> --comments`. `gh pr view` carries no inline review comments: read those through `gh api repos/{owner}/{repo}/pulls/<n>/comments --paginate`, and the review bodies through `gh api repos/{owner}/{repo}/pulls/<n>/reviews --paginate`, because a settled decision is often recorded in one of them. Read the recent history of the code with `git log -p -n <count> -- <path>`, so a duplicate, a settled decision, or a fix in flight does not get rebuilt. An issue links what this search found.
 
 Before editing, read [AGENTS.md](../AGENTS.md#read-before-you-write) completely and follow its task routing table. Read the affected crate's specification and relevant Lean parts, and the implementing source, callers, neighbouring modules and tests. Trace callers, data flow, invariants and failure paths before changing a shared interface, and identify the Lean properties the implementation must preserve. State the problem, the required result and the constraints before implementation, choose the smallest coherent change that meets the result, and include only the source and documents it needs; consider how the next maintainer will understand and extend the design.
 
@@ -14,9 +18,11 @@ Read the official documentation of the tools you use and load the vendor's agent
 
 A new core feature must clear all five tests before any implementation: the need exceeds what a skill can meet; no hook plugin should own the behaviour; MCP, CLI or ACP integration cannot reasonably meet the requirement and its guarantees; it serves most users; it is neither a theme nor a workflow for one deployment. Otherwise keep it out of core; if it is still worth building, prefer an extension or a separate repository and bring the result back in an issue. If the seams are too narrow, an issue may propose the smallest interface needed before any implementation. The commit body carries one prose paragraph — the need, the alternatives, why the core should own it, with concrete scenarios and evidence for "most users". Bug fixes are exempt, except a new feature bundled with one. Use the applicable submission template when opening an issue or pull request.
 
-## 2 The five steps of one change
+## 2 One change
 
-Follow [One change, five steps](../AGENTS.md#one-change-five-steps) for specification, regression evidence, implementation and closure. The same section defines the change-surface guidance and the client exemptions; [SPECs and Markdown](../AGENTS.md#specs-and-markdown) defines where an unfinished interface is recorded so the next contributor can continue it.
+Before designing or changing code, load [ub-mode](../crates/city/skills/ub-mode/SKILL.md) and follow its loop for scope, specification, regression evidence, implementation and closure. [The view layer](../AGENTS.md#the-view-layer) defines the client exemptions; [SPECs and Markdown](../AGENTS.md#specs-and-markdown) defines where an unfinished interface is recorded.
+
+Keep a pull request's change surface as small as the coherent result permits, ideally within 99 files. Do not split a deletion that removes more than it adds merely for its size. A larger migration lands in stages that each hold on their own, split along actual call sites rather than file counts.
 
 ## 3 Three tiers of verification
 
@@ -30,17 +36,43 @@ Fix the reported cause, and follow that section's requirements for separate mach
 
 ## 4.1 Continuous integration
 
-The [verification policy](verification.md) defines how branch and batch checks run, how scheduled and on-demand workflows are used, and how contributors without push access obtain a green fork run before opening a pull request. Follow that procedure and link the exact run in the submission; identify any checks left to the maintainer because the fork lacks their required resources.
+Before submission, apply [tier 1](verification.md#tier-1--while-iterating) to the complete final diff and record each command and result in the pull request. Then follow [tier 2](verification.md#tier-2--the-branchs-ci) for branch CI. A contributor without push access opens the pull request only after the fork run is green; link that exact run and identify any check left to the maintainer because the fork lacks its required resources.
 
 ## 5 Comments and documentation
 
-Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state specifications and decision placement, and [Language](../AGENTS.md#language) for comments, rustdoc and document languages.
+Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state specifications and decision placement.
+
+A comment is an MPL notice, interface documentation, a consequence warning, or intent the code cannot carry. Document every interface at every visibility with what its signature cannot say, because the repository defaults to `pub(crate)` and no reader sees the call sites. Write a reason once beside its enforcement and link to it elsewhere: two copies are two authorities, and the one nobody edits keeps asserting what the code no longer does. A function still owns its own contract — its `# Errors` section and its guarantee to a caller are not a copy.
+
+A pull request description and the text around a review comment carry the same scope, uncertainty and verification as the change. Identifiers, commands, paths and diagnostics stay unchanged across versions, and shared evidence appears once.
 
 ### Languages
 
-For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply. For pull requests and review comments, follow [Language](../AGENTS.md#language).
+| Where | Language |
+|---|---|
+| Identifiers, events, error codes, rustdoc, commit subjects | English |
+| `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `docs/` | English; the two `*.zh-CN.md` counterparts change with their English pair |
+| Crate SPECs and design discussion | Chinese with English concept names; Lean declarations use glossary English |
+| An issue or a pull request | Whatever language the author writes best; one not written in Chinese also carries a Chinese version, because the reviewer reads Chinese and a translation shortens the wait |
 
-Before committing or submitting text or attachments, apply [Privacy](../AGENTS.md#privacy) to establish their public necessity and inspect what readers will receive. Use [the private security channel](SECURITY.md) for vulnerabilities.
+For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply.
+
+Before committing or submitting text or attachments, apply [Public content and privacy](#public-content-and-privacy) to establish what readers need and inspect what they will receive. Use [the private security channel](SECURITY.md) for vulnerabilities.
+
+### Public content and privacy
+
+`xtask secret` and `xtask release` scan tracked files for shapes such as credential prefixes and home-directory spellings. Prose about a working environment has no such shape, and no gate scans a pull request description, commit body, issue, review comment, or attachment. The author owns that inspection.
+
+- Keep information unpublished until a public reader needs it to use, understand, reproduce, review, or maintain the project. Publish only the checked minimum. Required source, specifications, and tests stay tracked; working notes and incidental context stay outside public artifacts.
+- Ship the decision, its reason, and the parameter that would reopen it. Leave out the occasion, the participant, and the machine on which it arose.
+- Cite only material a reader can open. Replace a citation to a private plan with its reason or the SPEC section that holds the decision.
+- Describe what was found; the diff shows what changed. Omit conversations, reasoning traces, tool-call logs, personal names, addresses, machine names, and account or organisation identifiers.
+- Keep credentials, tokens, cookies, and signed URLs out of every artifact. Nothing redacts them after publication; an exposed credential needs rotation outside the repository.
+- Use repository-relative paths. Quote only terminal lines that carry the finding, and crop screenshots to the application without desktop or browser chrome.
+- When a finding needs private data, describe its shape rather than its value.
+- Report a measurement with its machine class. The manifest or doctor's output carries the toolchain version.
+
+*The person* as a domain role remains correct in an interface, payload, or rustdoc line. This section governs working context, not that vocabulary.
 
 ### Other projects
 

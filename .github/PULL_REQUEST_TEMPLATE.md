@@ -13,14 +13,13 @@
 
 ## Checklist
 
-- [ ] **`just check` green** — the closing condition (CONTRIBUTING §0). Paste the last lines of your run:
-  `1208 tests passed / all gates green`（照实填，不复制粘贴示例）
-- [ ] **`ci` green in your fork** — the run on your fork's branch, linked here (CONTRIBUTING §4.1):
-- [ ] **Does this touch a protected path?** — `crates/xtask/`, root `Cargo.toml`, `deny.toml`, `clippy.toml`, `lakefile.toml`, `lean-toolchain`, `justfile`, `.github/`, or a module-table row in `docs/ARCHITECTURE.md`. If yes, the **merge commit** carries a `Verdict:` trailer quoting the person's ruling (CONTRIBUTING §3, `xtask guard`). State that ruling here:
+- [ ] **Affected local checks green on the final diff** — select them by impact under [verification.md](docs/verification.md#tier-1--while-iterating), starting with the affected tests and gates and adding the behaviour checks they do not cover; list each command and its result. `just check` is required only when that policy selects it:
+- [ ] **Branch `ci` green before opening this PR** — link the exact run on the same branch. A contributor without push access runs it in a fork first (CONTRIBUTING §4.1):
+- [ ] **Gate machinery is separate** — a path classified by [gates.md](docs/gates.md) sits in a commit apart from the source it judges. If the change loosens a gate in the change that gate rejects, the commit carries `Verdict: user-approved`; state the ruling here:
 - [ ] **SPEC in step with the code** — the crate's SPEC (`Spec.lean` and its parts, or `<crate>-SPEC.md` until it migrates) updated in the same change-set as any interface change it describes.
 - [ ] **Module map in step** — a new production module registered in `architecture.toml` before or with it (`xtask modmap`); a test module needs no entry.
-- [ ] **Red-to-green visible** — for a defect fix, the failing test sits in the history before the fix (CONTRIBUTING §2 steps 3–4).
-- [ ] **Nothing private in this description or in the commit bodies** — no credential, no absolute home path, no pasted terminal dump, no conversation or tool-call log, no personal or machine name, no uncropped screenshot. Reread once before opening: **no gate scans these** (AGENTS.md *Privacy*), and a later force-push does not remove what was already fetched.
+- [ ] **Red-to-green visible** — for a defect fix, the failing test sits in the history before the fix (ub-mode §3).
+- [ ] **Nothing private in this description or in the commit bodies** — no credential, no absolute home path, no pasted terminal dump, no conversation or tool-call log, no personal or machine name, no uncropped screenshot. Reread once before opening: **no gate scans these** (CONTRIBUTING *Public content and privacy*), and a later force-push does not remove what was already fetched.
 
 ## Notes
 

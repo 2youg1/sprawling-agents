@@ -118,7 +118,7 @@
 城市把 skill 放在**书架**上：楼自己的书架 `<building>/.sprawling/skills/`、城市的藏书，以及城市只读挂载的外部文件夹（比如另一个 harness 已经在用的 skills 目录）。但 agent 只看得见它所在的楼在 `RULES.toml` 里按名字准入的那几件：
 
 ```toml
-reading_room = ["tutor", "blast-radius"]
+reading_room = ["how", "blast-radius"]
 ```
 
 清单上有、书架上没有的名字不会被许诺，而是报出来。这样一栋楼的上下文不会随着磁盘上的 skill 越来越多而膨胀。外部文件夹在城市自己的 `<city>/.sprawling/CONFIG.toml` 里挂载：
@@ -128,7 +128,7 @@ reading_room = ["tutor", "blast-radius"]
 shelves = ["~/.claude/skills"]
 ```
 
-**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库在 [`../crates/city/skills/`](../crates/city/skills/) 下附带九件 skill；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
+**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库附带 [`../crates/city/skills/`](../crates/city/skills/) 下的技能；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
 
 **MCP**（Model Context Protocol）是一栋楼通往外部应用——邮件、GitHub、Figma、文档转换器——的路，经由一个工具服务。一个 server 是楼的 `CONFIG.toml` 里的一条：电脑上的程序写 `command`，托管服务写 `url`；**MCP** 页替你写同样的条目。保密楼一个也不起。
 
@@ -495,7 +495,7 @@ Ctrl+/（Mac 上 ⌘/）打开命令面板，给出全部命令，旁边是每�
 does = "实验室仪器日志的导入器。"          # 写给初到这里的 agent 的一段话
 conventions = "Rust 2024；每次改动都要通过 cargo test。"
 review = true                  # 活在落地之前要经过审查
-reading_room = ["tutor"]       # 这栋楼准入的 skill
+reading_room = ["blast-radius"]  # 这栋楼准入的 skill
 egress = ["api.github.com"]    # 这里的活可以访问的域名
 browser = true                 # 浏览器工具
 ```
