@@ -13,9 +13,9 @@
 
 ## Checklist
 
-- [ ] **Affected local checks green on the final diff** — select them by impact under [verification.md](../docs/verification.md#tier-1--while-iterating), starting with the affected tests and gates and adding the behaviour checks they do not cover; list each command and its result. `just check` is required only when that policy selects it:
+- [ ] **Affected local checks green on the final diff** — select them by impact under [verification.md](docs/verification.md#tier-1--while-iterating), starting with the affected tests and gates and adding the behaviour checks they do not cover; list each command and its result. `just check` is required only when that policy selects it:
 - [ ] **Branch `ci` green before opening this PR** — link the exact run on the same branch. A contributor without push access runs it in a fork first (CONTRIBUTING §4.1):
-- [ ] **Gate machinery is separate** — a path classified by [gates.md](../docs/gates.md) sits in a commit apart from the source it judges. If the change loosens a gate in the change that gate rejects, the commit carries `Verdict: user-approved`; state the ruling here:
+- [ ] **Gate machinery is separate** — a path classified by [gates.md](docs/gates.md) sits in a commit apart from the source it judges. If the change loosens a gate in the change that gate rejects, the commit carries `Verdict: user-approved`; state the ruling here:
 - [ ] **SPEC in step with the code** — the crate's SPEC (`Spec.lean` and its parts, or `<crate>-SPEC.md` until it migrates) updated in the same change-set as any interface change it describes.
 - [ ] **Module map in step** — a new production module registered in `architecture.toml` before or with it (`xtask modmap`); a test module needs no entry.
 - [ ] **Red-to-green visible** — for a defect fix, the failing test sits in the history before the fix (ub-mode §3).
