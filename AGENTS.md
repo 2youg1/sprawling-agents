@@ -73,6 +73,7 @@ The workspace lint table owns the mechanical rules: warnings are errors, arithme
 
 Write the current state as if the document had no earlier draft: a first-time reader meets no sentence that only a previous reader could use. Git keeps history; a SPEC keeps the contract and the reason for its present shape.
 
+- Personal ruling: keep discussion drafts, unfinished documents or plans, and material not intended for the repository in the gitignored `local/`. Reserve `docs/` and its index for finished documents the person has asked to publish as part of the repository.
 - Before an interface changes, record its shape, signatures, failures, fixed values, and decision in the touched crate's SPEC. A decision carries its reason and the alternative it beat: `D<n>` above the governed Lean declaration, or §12 of an unmigrated Markdown SPEC.
 - A move that leaves every interface unchanged needs no SPEC section; its module-map row is the record.
 - When no shape fits the interface, stop and ask the person rather than write.

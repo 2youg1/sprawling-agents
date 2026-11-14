@@ -435,17 +435,21 @@ mod tests {
 
     #[test]
     fn a_background_writer_during_snapshot_cannot_overwrite_or_extend_it() {
-        let mut python = Py::spawn().unwrap();
+        // Hold the writer until boot.py has sampled the file size, then make
+        // it finish a large append before the independent read starts. The
+        // exact snapshot boundary no longer depends on thread scheduling.
+        let boot = BOOT.replace(
+            "    name = f.name\n",
+            "    g['sampled'].set()\n    assert g['appended'].wait(5)\n    name = f.name\n",
+        );
+        assert_ne!(boot, BOOT, "the test hook follows the fstat boundary");
+        let mut python = Py::with_boot(&boot).unwrap();
         let first = python
             .run(
-                "import os, threading\nprint('head', flush=True)\nthreading.Thread(target=lambda: [os.write(1, b'x') for _ in range(50000)]).start()",
+                "import os, threading\nsampled = threading.Event()\nappended = threading.Event()\ndef background():\n    assert sampled.wait(5)\n    os.write(1, b'x' * 100000)\n    appended.set()\nthreading.Thread(target=background).start()\nprint('head', flush=True)",
             )
             .unwrap();
-        // The snapshot is read through an independent handle, bounded to the
-        // size captured before the read: the head survives and late background
-        // appends cannot prolong it (they land past the bound).
-        assert!(first.starts_with("head\n"), "{first}");
-        assert!(first.len() < 64, "the snapshot stays bounded: {first}");
-        python.kill_and_wait().unwrap();
+        assert_eq!(first, "head\n");
+        python.close().unwrap();
     }
 }

@@ -141,20 +141,16 @@ pub fn run(
 }
 
 fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<()> {
-    // Sampled before the mutable borrow the closure cannot take.
-    let seen = found(request.get("messages"));
-    let messages = request
-        .get_mut("messages")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(|| {
-            protocol(
-                "append a message",
-                "request.messages is missing or is not an array",
-                "construct one Messages request with messages as an array before calling agent::run",
-            )
-            .with_path("request.messages")
-            .with_value(seen)
-        })?;
+    let Some(messages) = request.get_mut("messages").and_then(Value::as_array_mut) else {
+        return Err(protocol(
+            "append a message",
+            "request.messages is missing or is not an array",
+            "construct one Messages request with messages as an array before calling agent::run",
+        )
+        .with_path("request.messages")
+        .with_value(found(request.get("messages")))
+        .into());
+    };
     messages.push(message.clone());
     serde_json::to_writer(&mut *trace, &message).map_err(|err| {
         protocol(

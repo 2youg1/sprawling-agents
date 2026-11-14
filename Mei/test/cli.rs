@@ -23,6 +23,24 @@ use std::process::Output;
 use serde_json::Value;
 
 #[cfg(unix)]
+fn read_request_body(reader: &mut BufReader<std::net::TcpStream>) -> Vec<u8> {
+    let mut length = 0;
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        if line == "\r\n" {
+            break;
+        }
+        if let Some(value) = line.strip_prefix("Content-Length: ") {
+            length = value.trim().parse::<usize>().unwrap();
+        }
+    }
+    let mut body = vec![0; length];
+    reader.read_exact(&mut body).unwrap();
+    body
+}
+
+#[cfg(unix)]
 fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>>) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
@@ -31,19 +49,7 @@ fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>>) {
         for answer in answers {
             let (stream, _) = listener.accept().unwrap();
             let mut reader = BufReader::new(stream);
-            let mut length = 0;
-            loop {
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                if line == "\r\n" {
-                    break;
-                }
-                if let Some(value) = line.strip_prefix("Content-Length: ") {
-                    length = value.trim().parse::<usize>().unwrap();
-                }
-            }
-            let mut body = vec![0; length];
-            reader.read_exact(&mut body).unwrap();
+            let body = read_request_body(&mut reader);
             requests.push(serde_json::from_slice(&body).unwrap());
             let body = serde_json::to_vec(&answer).unwrap();
             let mut stream = reader.into_inner();
@@ -207,9 +213,10 @@ fn a_non_200_body_reaches_stderr_unchanged() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let handle = std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        let mut buffer = [0; 4096];
-        assert!(stream.read(&mut buffer).unwrap() > 0);
+        let (stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream);
+        drop(read_request_body(&mut reader));
+        let mut stream = reader.into_inner();
         stream
             .write_all(b"HTTP/1.0 400 Bad Request\r\n\r\nprovider says no")
             .unwrap();
