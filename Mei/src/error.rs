@@ -111,20 +111,45 @@ pub enum Error {
     Body(String),
 }
 
+/// Encodes one TOML basic string without adding a TOML dependency to the
+/// minimal harness. JSON and Rust debug escapes are not interchangeable
+/// with TOML for every control character.
+fn toml_string(text: &str) -> String {
+    let mut encoded = String::with_capacity(text.len().saturating_add(2));
+    encoded.push('"');
+    for ch in text.chars() {
+        match ch {
+            '"' => encoded.push_str("\\\""),
+            '\\' => encoded.push_str("\\\\"),
+            '\u{08}' => encoded.push_str("\\b"),
+            '\t' => encoded.push_str("\\t"),
+            '\n' => encoded.push_str("\\n"),
+            '\u{0c}' => encoded.push_str("\\f"),
+            '\r' => encoded.push_str("\\r"),
+            '\u{00}'..='\u{1f}' | '\u{7f}' => {
+                encoded.push_str(&format!("\\u{:04X}", u32::from(ch)));
+            }
+            _ => encoded.push(ch),
+        }
+    }
+    encoded.push('"');
+    encoded
+}
+
 impl Display for Diagnostic {
     fn fmt(&self, out: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(out, "```toml")?;
-        writeln!(out, "code = {:?}", self.code.as_str())?;
-        writeln!(out, "action = {:?}", self.action)?;
-        writeln!(out, "subject = {:?}", self.subject)?;
+        writeln!(out, "code = {}", toml_string(self.code.as_str()))?;
+        writeln!(out, "action = {}", toml_string(&self.action))?;
+        writeln!(out, "subject = {}", toml_string(&self.subject))?;
         if let Some(path) = &self.path {
-            writeln!(out, "path = {:?}", path)?;
+            writeln!(out, "path = {}", toml_string(path))?;
         }
         if let Some(value) = &self.value {
-            writeln!(out, "value = {:?}", value)?;
+            writeln!(out, "value = {}", toml_string(value))?;
         }
-        writeln!(out, "rule = {:?}", self.rule())?;
-        writeln!(out, "recovery = {:?}", self.recovery)?;
+        writeln!(out, "rule = {}", toml_string(self.rule()))?;
+        writeln!(out, "recovery = {}", toml_string(&self.recovery))?;
         write!(out, "```")
     }
 }
@@ -174,5 +199,20 @@ mod tests {
             assert!(shown.contains(field), "{shown}");
         }
         assert!(shown.ends_with("```"));
+    }
+
+    #[test]
+    fn diagnostic_values_use_toml_string_escapes() {
+        let error = protocol(
+            "read response.content",
+            "content is invalid",
+            "return valid content",
+        )
+        .with_value("quote \" \\ \t \u{1b} \0 \u{7f}");
+        let shown = error.to_string();
+        assert!(
+            shown.contains(r#"value = "quote \" \\ \t \u001B \u0000 \u007F""#),
+            "{shown}"
+        );
     }
 }

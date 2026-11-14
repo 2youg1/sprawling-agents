@@ -265,13 +265,25 @@ pub(crate) struct AdapterFailure {
     pub(crate) value: String,
 }
 
+/// Encodes text as a TOML string rather than Rust debug syntax, whose
+/// control-character escapes are not valid TOML.
+fn toml_string(text: &str) -> String {
+    toml::Value::from(text).to_string()
+}
+
 impl AdapterFailure {
     /// The structured diagnostic the repository rule asks for: a `toml`
     /// fenced block carrying every field, ready for the terminal boundary.
     pub(crate) fn render(&self) -> String {
         format!(
-            "```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\npath = {:?}\nvalue = {:?}\nrule = {:?}\nrecovery = {:?}\n```",
-            self.code, self.action, self.subject, self.path, self.value, self.rule, self.recovery
+            "```toml\ncode = {}\naction = {}\nsubject = {}\npath = {}\nvalue = {}\nrule = {}\nrecovery = {}\n```",
+            toml_string(self.code),
+            toml_string(self.action),
+            toml_string(&self.subject),
+            toml_string(&self.path),
+            toml_string(&self.value),
+            toml_string(self.rule),
+            toml_string(self.recovery),
         )
     }
 }
@@ -640,6 +652,29 @@ mod tests {
         assert!(error.contains("E_MEI_CONFIG"), "{error}");
         assert!(error.contains("mei-definitely-not-on-path-xyz"), "{error}");
         assert!(error.contains("MEI_BIN"), "{error}");
+    }
+
+    #[test]
+    fn adapter_diagnostics_with_control_characters_are_parseable_toml() {
+        let rendered = AdapterFailure {
+            code: "E_MEI_CONFIG",
+            action: "start Mei",
+            rule: "MEI_BIN must name an executable Mei binary",
+            recovery: "set MEI_BIN to a working executable",
+            subject: "invalid program".to_owned(),
+            path: "MEI_BIN".to_owned(),
+            value: "bad\u{1b}\0\u{7f}".to_owned(),
+        }
+        .render();
+        let document = rendered
+            .strip_prefix("```toml\n")
+            .and_then(|body| body.strip_suffix("\n```"))
+            .unwrap();
+        let parsed: toml::Table = toml::from_str(document).unwrap();
+        assert_eq!(
+            parsed.get("value").and_then(toml::Value::as_str),
+            Some("bad\u{1b}\0\u{7f}")
+        );
     }
 
     #[cfg(unix)]
