@@ -27,7 +27,9 @@ fn read_request_body(reader: &mut BufReader<std::net::TcpStream>) -> Vec<u8> {
     let mut length = 0;
     loop {
         let mut line = String::new();
-        reader.read_line(&mut line).unwrap();
+        if reader.read_line(&mut line).unwrap() == 0 {
+            panic!("client closed before sending complete request headers");
+        }
         if line == "\r\n" {
             break;
         }
@@ -117,9 +119,17 @@ fn direct_answer_has_only_the_final_text_on_stdout() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"answer");
+    let trace: Vec<Value> = String::from_utf8(output.stderr)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
     assert_eq!(
-        serde_json::from_str::<Value>(&String::from_utf8(output.stderr).unwrap()).unwrap(),
-        serde_json::json!({"role": "assistant", "content": [{"type": "text", "text": "answer"}]})
+        trace,
+        vec![
+            serde_json::json!({"role": "user", "content": "hello"}),
+            serde_json::json!({"role": "assistant", "content": [{"type": "text", "text": "answer"}], "stop_reason": "end_turn"})
+        ]
     );
     let requests = handle.join().unwrap();
     assert_eq!(requests.len(), 1);
@@ -299,4 +309,188 @@ fn pause_turn_preserves_transparent_server_tools_without_local_results() {
             .skip(1)
             .any(|message| message["role"] == "user")
     }));
+}
+
+#[cfg(unix)]
+#[test]
+#[expect(clippy::disallowed_methods, reason = "end-to-end fixture process")]
+fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
+    let playground = tempfile::tempdir().unwrap();
+    let run = |directory: &std::path::Path, base: &str, prompt: &str| {
+        let trace = std::fs::File::create(directory.join("run.jsonl")).unwrap();
+        Command::new(env!("CARGO_BIN_EXE_mei"))
+            .args(["-p", prompt])
+            .current_dir(directory)
+            .env("HARNESS_MODEL", "test/model")
+            .env("ANTHROPIC_BASE_URL", base)
+            .env("ANTHROPIC_API_KEY", "magpie")
+            .env_remove("HARNESS")
+            .env_remove("HARNESS_EXTRA")
+            .env_remove("MEI_TOOLS")
+            .stderr(trace)
+            .output()
+            .unwrap()
+    };
+
+    let first = playground.path().join("first");
+    std::fs::create_dir(&first).unwrap();
+    let (base, first_gateway) = serve(vec![
+        serde_json::json!({"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "name": "python", "id": "assign", "input": {"code": "answer = 40"}}
+        ]}),
+        serde_json::json!({"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "name": "python", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
+        ]}),
+        serde_json::json!({"stop_reason": "end_turn", "content": "42"}),
+    ]);
+    let output = run(&first, &base, "Use Python to calculate 40 + 2");
+    let trace = std::fs::read_to_string(first.join("run.jsonl")).unwrap();
+    assert!(output.status.success(), "{trace}");
+    assert_eq!(output.stdout, b"42");
+    assert_eq!(trace.lines().count(), 6);
+    let requests = first_gateway.join().unwrap();
+    assert_eq!(requests.len(), 3);
+    assert_eq!(requests[0]["model"], "test/model");
+    assert_eq!(requests[2]["messages"].as_array().unwrap().len(), 5);
+
+    let project = playground.path().join("project");
+    std::fs::create_dir(&project).unwrap();
+    std::fs::write(
+        project.join("greeting.py"),
+        "def greeting():\n    return \"hello\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("test_greeting.py"),
+        "import unittest\nfrom greeting import greeting\n\nclass GreetingTest(unittest.TestCase):\n    def test_greeting(self):\n        self.assertEqual(greeting(), \"hello Mei\")\n\nif __name__ == \"__main__\":\n    unittest.main()\n",
+    )
+    .unwrap();
+    let (base, project_gateway) = serve(vec![
+        serde_json::json!({"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "name": "python", "id": "repair", "input": {"code": r#"from pathlib import Path
+import subprocess
+path = Path("greeting.py")
+path.write_text(path.read_text(encoding="utf-8").replace('return "hello"', 'return "hello Mei"'), encoding="utf-8")
+result = subprocess.run(["python3", "-m", "unittest", "discover", "-v"], capture_output=True, text=True)
+print(result.stdout, end="")
+print(result.stderr, end="")
+assert result.returncode == 0
+"#}}
+        ]}),
+        serde_json::json!({"stop_reason": "end_turn", "content": "Updated the greeting and ran the tests."}),
+    ]);
+    let output = run(
+        &project,
+        &base,
+        "Make greeting return hello Mei, then run the project tests",
+    );
+    let trace = std::fs::read_to_string(project.join("run.jsonl")).unwrap();
+    assert!(output.status.success(), "{trace}");
+    assert_eq!(output.stdout, b"Updated the greeting and ran the tests.");
+    assert!(trace.contains("OK"), "{trace}");
+    assert_eq!(
+        std::fs::read_to_string(project.join("greeting.py")).unwrap(),
+        "def greeting():\n    return \"hello Mei\"\n"
+    );
+    let requests = project_gateway.join().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(
+        requests[0]["messages"],
+        serde_json::json!([{"role": "user", "content": "Make greeting return hello Mei, then run the project tests"}])
+    );
+}
+
+#[cfg(unix)]
+#[test]
+#[expect(clippy::disallowed_methods, reason = "resume fixture process")]
+fn cli_resume_imports_only_complete_message_history() {
+    let dir = tempfile::tempdir().unwrap();
+    let session = dir.path().join("session.jsonl");
+    std::fs::write(
+        &session,
+        concat!(
+            "{\"role\":\"user\",\"content\":\"first\"}\n",
+            "{\"role\":\"assistant\",\"content\":\"answer\",\"stop_reason\":\"end_turn\"}\n"
+        ),
+    )
+    .unwrap();
+    let (base, gateway) = serve(vec![
+        serde_json::json!({"stop_reason": "end_turn", "content": "continued"}),
+    ]);
+    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
+        .args(["--resume"])
+        .arg(&session)
+        .args(["-p", "second"])
+        .env("HARNESS_MODEL", "test/model")
+        .env("ANTHROPIC_BASE_URL", &base)
+        .env("ANTHROPIC_API_KEY", "magpie")
+        .env_remove("HARNESS")
+        .env_remove("HARNESS_EXTRA")
+        .env_remove("MEI_TOOLS")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"continued");
+    let requests = gateway.join().unwrap();
+    assert_eq!(
+        requests[0]["messages"],
+        serde_json::json!([
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "answer"},
+            {"role": "user", "content": "second"}
+        ])
+    );
+    let trace: Vec<Value> = String::from_utf8(output.stderr)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(
+        trace,
+        vec![
+            serde_json::json!({"role": "user", "content": "second"}),
+            serde_json::json!({"role": "assistant", "content": "continued", "stop_reason": "end_turn"})
+        ]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+#[expect(clippy::disallowed_methods, reason = "invalid resume fixture process")]
+fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
+    let dir = tempfile::tempdir().unwrap();
+    let session = dir.path().join("incomplete.jsonl");
+    std::fs::write(&session, "{\"role\":\"user\",\"content\":\"first\"}\n").unwrap();
+    let marker = dir.path().join("python-started");
+    let bin = dir.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let python = bin.join("python3");
+    std::fs::write(
+        &python,
+        format!("#!/bin/sh\nprintf started > \"{}\"\n", marker.display()),
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&python).unwrap().permissions();
+    use std::os::unix::fs::PermissionsExt as _;
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&python, permissions).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
+        .args(["--resume"])
+        .arg(&session)
+        .args(["-p", "second"])
+        .current_dir(dir.path())
+        .env("HARNESS_MODEL", "test/model")
+        .env("ANTHROPIC_BASE_URL", "http://127.0.0.1:1")
+        .env("ANTHROPIC_API_KEY", "magpie")
+        .env("PATH", &bin)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("E_MEI_SESSION"), "{error}");
+    assert!(!marker.exists(), "an invalid log reached Python");
 }

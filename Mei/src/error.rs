@@ -21,6 +21,7 @@ pub enum Code {
     Transport,
     Protocol,
     Python,
+    Session,
     Unsupported,
 }
 
@@ -33,6 +34,7 @@ impl Code {
             Code::Transport => "E_MEI_TRANSPORT",
             Code::Protocol => "E_MEI_PROTOCOL",
             Code::Python => "E_MEI_PYTHON",
+            Code::Session => "E_MEI_SESSION",
             Code::Unsupported => "E_MEI_UNSUPPORTED",
         }
     }
@@ -40,7 +42,9 @@ impl Code {
     /// The rule this code enforces; one arm per variant, no default.
     fn rule(self) -> &'static str {
         match self {
-            Code::Usage => "Only `mei -p PROMPT` or a non-terminal stdin prompt is accepted",
+            Code::Usage => {
+                "Only `mei [-p PROMPT] [--resume JSONL]` or a non-terminal stdin prompt is accepted"
+            }
             Code::Config => {
                 "Configuration must preserve the closed Messages and transport contract"
             }
@@ -52,6 +56,9 @@ impl Code {
             }
             Code::Python => {
                 "The private Python channel must carry one valid JSON string frame per call and the interpreter must stay alive"
+            }
+            Code::Session => {
+                "A resume log must contain complete Mei messages from the initial user prompt through an assistant end_turn"
             }
             Code::Unsupported => "Mei requires POSIX process and signal semantics",
         }

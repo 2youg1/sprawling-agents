@@ -17,7 +17,7 @@ use kernel::TimeMs;
 
 use super::super::editor::Editor;
 use super::super::local_time;
-use super::super::mei::{Mei, MeiEvent, MeiProcess};
+use super::super::mei::{Mei, MeiEvent, MeiProcess, MeiSession};
 use super::super::program_status::{self, Held, Reporting};
 use super::super::screen::{Screen, Written};
 use super::{Show, UI_DEPTH};
@@ -65,6 +65,9 @@ struct Ui {
     screen: Screen,
     seen: Mei,
     process: Option<MeiProcess>,
+    session: Option<MeiSession>,
+    session_dir: std::path::PathBuf,
+    pending: Vec<String>,
     replay: Option<BufReader<std::fs::File>>,
     replay_done: bool,
     reporting: Reporting,
@@ -83,6 +86,9 @@ impl Ui {
             screen: Screen::default(),
             seen: Mei::new(model),
             process: None,
+            session: None,
+            session_dir: std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+            pending: Vec::new(),
             replay_done: replay.is_none(),
             replay,
             reporting: Reporting::from_environment(),
@@ -231,9 +237,17 @@ impl Ui {
             self.print(vec![console_live::note("replay is read-only")]);
             return;
         }
+        if self.command(&typed) {
+            return;
+        }
+        if self.session.is_none() && !self.create_session() {
+            return;
+        }
+        self.pending.clear();
         self.seen.begin(at);
         self.status(program_status::Event::Counted(self.seen.counts()));
-        match MeiProcess::spawn(&typed, self.to.clone()) {
+        let resume = self.session.as_ref().and_then(MeiSession::resume_path);
+        match MeiProcess::spawn(&typed, resume, self.to.clone()) {
             Ok(process) => self.process = Some(process),
             Err(error) => {
                 let at = self.now();
@@ -244,9 +258,98 @@ impl Ui {
         }
     }
 
+    fn reset_seen(&mut self) {
+        let model = self.seen.model().to_owned();
+        self.seen = Mei::new(model);
+    }
+
+    fn create_session(&mut self) -> bool {
+        let at = self.now();
+        match MeiSession::create_in(&self.session_dir, at) {
+            Ok(session) => {
+                let path = session.path().display().to_string();
+                self.pending.clear();
+                self.session = Some(session);
+                self.reset_seen();
+                self.print(vec![console_live::note(&format!(
+                    "new Mei session: {path}"
+                ))]);
+                true
+            }
+            Err(error) => {
+                self.print(vec![console_live::note(&error)]);
+                false
+            }
+        }
+    }
+
+    fn resume_session(&mut self, path: &str) {
+        let path = std::path::Path::new(path);
+        let path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.session_dir.join(path)
+        };
+        match MeiSession::import(&path) {
+            Ok(session) => {
+                let at = self.now();
+                self.pending.clear();
+                self.reset_seen();
+                let mut entries = Vec::new();
+                for line in session.history() {
+                    entries.extend(self.seen.line(line, at));
+                }
+                entries.push(console_live::note(&format!(
+                    "resumed Mei session: {}",
+                    session.path().display()
+                )));
+                self.session = Some(session);
+                self.print(entries);
+            }
+            Err(error) => self.print(vec![console_live::note(&error)]),
+        }
+    }
+
+    fn command(&mut self, typed: &str) -> bool {
+        if typed == "/new" {
+            self.create_session();
+            return true;
+        }
+        if typed == "/resume" {
+            self.print(vec![console_live::note("usage: /resume <jsonl>")]);
+            return true;
+        }
+        if let Some(path) = typed.strip_prefix("/resume ") {
+            let path = path.trim();
+            if path.is_empty() {
+                self.print(vec![console_live::note("usage: /resume <jsonl>")]);
+            } else {
+                self.resume_session(path);
+            }
+            return true;
+        }
+        if typed.starts_with('/') {
+            self.print(vec![console_live::note(
+                "unknown Mei command; available: /new, /resume <jsonl>",
+            )]);
+            return true;
+        }
+        false
+    }
+
     fn mei(&mut self, event: MeiEvent) {
         match event {
             MeiEvent::Line(line) => {
+                let is_message =
+                    serde_json::from_str::<serde_json::Value>(&line).is_ok_and(|value| {
+                        matches!(
+                            value.get("role").and_then(serde_json::Value::as_str),
+                            Some("user" | "assistant")
+                        ) && value.get("content").is_some()
+                    });
+                if is_message {
+                    self.pending.push(line.clone());
+                }
                 let at = self.now();
                 let entries = self.seen.line(&line, at);
                 self.print(entries);
@@ -258,6 +361,20 @@ impl Ui {
                     self.print(vec![console_live::note(&error)]);
                 }
                 self.process = None;
+                let successful = !cancelled && result.is_ok();
+                if successful {
+                    let pending = std::mem::take(&mut self.pending);
+                    let saved = self
+                        .session
+                        .as_mut()
+                        .map(|session| session.append(&pending));
+                    if let Some(Err(error)) = saved {
+                        self.session = None;
+                        self.print(vec![console_live::note(&error)]);
+                    }
+                } else {
+                    self.pending.clear();
+                }
                 let at = self.now();
                 let entries = if cancelled {
                     self.seen.cancelled(at)
@@ -443,5 +560,80 @@ mod tests {
         ui.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT));
         assert_eq!(ui.editor.text(), "x\n");
         assert!(ui.process.is_none());
+    }
+
+    fn submit(ui: &mut Ui, text: &str) {
+        for character in text.chars() {
+            ui.key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+        }
+        ui.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    }
+
+    #[test]
+    fn new_and_resume_select_explicit_jsonl_files_without_rewriting_old_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let (to, _from) = std::sync::mpsc::sync_channel(UI_DEPTH);
+        let mut ui = Ui::new(to, None);
+        ui.screen.cut();
+        ui.session_dir = dir.path().to_path_buf();
+        submit(&mut ui, "/new");
+        let first = ui.session.as_ref().unwrap().path().to_path_buf();
+        ui.session
+            .as_mut()
+            .unwrap()
+            .append(&[
+                "{\"role\":\"user\",\"content\":\"first\"}".to_owned(),
+                "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}"
+                    .to_owned(),
+            ])
+            .unwrap();
+        let before = std::fs::read(&first).unwrap();
+        submit(&mut ui, "/new");
+        let second = ui.session.as_ref().unwrap().path().to_path_buf();
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read(&first).unwrap(), before);
+
+        submit(&mut ui, &format!("/resume {}", first.display()));
+        assert_eq!(ui.session.as_ref().unwrap().path(), first.as_path());
+        assert_eq!(ui.session.as_ref().unwrap().history().len(), 2);
+        assert_eq!(std::fs::read(&second).unwrap(), b"");
+    }
+
+    #[test]
+    fn only_a_successful_segment_is_appended_to_the_current_jsonl() {
+        let dir = tempfile::tempdir().unwrap();
+        let (to, _from) = std::sync::mpsc::sync_channel(UI_DEPTH);
+        let mut ui = Ui::new(to, None);
+        ui.screen.cut();
+        ui.session_dir = dir.path().to_path_buf();
+        submit(&mut ui, "/new");
+        ui.mei(MeiEvent::Line("ordinary diagnostic".to_owned()));
+        assert!(ui.pending.is_empty());
+        let path = ui.session.as_ref().unwrap().path().to_path_buf();
+        let segment = vec![
+            "{\"role\":\"user\",\"content\":\"first\"}".to_owned(),
+            "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}".to_owned(),
+        ];
+        ui.pending = segment.clone();
+        ui.mei(MeiEvent::Finished {
+            result: Ok("done".to_owned()),
+            cancelled: false,
+        });
+        assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 2);
+
+        ui.pending = vec!["{\"role\":\"user\",\"content\":\"failed\"}".to_owned()];
+        ui.mei(MeiEvent::Finished {
+            result: Err("failed".to_owned()),
+            cancelled: false,
+        });
+        assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 2);
+
+        ui.pending = vec!["{\"role\":\"user\",\"content\":\"cancelled\"}".to_owned()];
+        ui.mei(MeiEvent::Finished {
+            result: Err("cancelled".to_owned()),
+            cancelled: true,
+        });
+        assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 2);
+        assert_eq!(ui.session.as_ref().unwrap().history(), segment);
     }
 }

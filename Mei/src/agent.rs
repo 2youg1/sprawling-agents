@@ -50,6 +50,7 @@ pub fn run(
     mut exec: impl FnMut(&str) -> Result<String>,
     trace: &mut dyn Write,
 ) -> Result<String> {
+    let mut first_response = true;
     loop {
         let response = post(request)?;
         let stop = response
@@ -84,9 +85,14 @@ pub fn run(
             .with_value(found(Some(&content)))
             .into());
         }
+        if first_response {
+            trace_prompt(request, trace)?;
+            first_response = false;
+        }
         append(
             request,
             json!({"role": "assistant", "content": content.clone()}),
+            Some(stop.as_str()),
             trace,
         )?;
         let base = message_path(request);
@@ -114,7 +120,12 @@ pub fn run(
                         "content": output,
                     }));
                 }
-                append(request, json!({"role": "user", "content": results}), trace)?;
+                append(
+                    request,
+                    json!({"role": "user", "content": results}),
+                    None,
+                    trace,
+                )?;
             }
             "max_tokens" => {
                 return Err(protocol(
@@ -140,7 +151,12 @@ pub fn run(
     }
 }
 
-fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<()> {
+fn append(
+    request: &mut Value,
+    message: Value,
+    stop: Option<&str>,
+    trace: &mut dyn Write,
+) -> Result<()> {
     let Some(messages) = request.get_mut("messages").and_then(Value::as_array_mut) else {
         return Err(protocol(
             "append a message",
@@ -152,25 +168,38 @@ fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<
         .into());
     };
     messages.push(message.clone());
-    serde_json::to_writer(&mut *trace, &message).map_err(|err| {
-        protocol(
-            "trace an appended message",
-            err.to_string(),
-            "keep stderr writable; the message was appended but no tool effect was started by this trace call",
-        )
-        .with_path("trace")
+    let logged = stop.map_or(message.clone(), |stop| {
+        let mut logged = message;
+        if let Some(object) = logged.as_object_mut() {
+            object.insert("stop_reason".to_owned(), Value::from(stop));
+        }
+        logged
+    });
+    write_message(trace, &logged, "trace an appended message")
+}
+
+fn trace_prompt(request: &Value, trace: &mut dyn Write) -> Result<()> {
+    let Some(prompt) = request
+        .get("messages")
+        .and_then(Value::as_array)
+        .and_then(|messages| messages.last())
+        .filter(|message| message["role"] == "user")
+    else {
+        return Ok(());
+    };
+    write_message(trace, prompt, "trace the initial user prompt")
+}
+
+fn write_message(trace: &mut dyn Write, message: &Value, action: &str) -> Result<()> {
+    serde_json::to_writer(&mut *trace, message).map_err(|err| {
+        protocol(action, err.to_string(), "keep stderr writable").with_path("trace")
     })?;
     trace
         .write_all(b"\n")
         .and_then(|()| trace.flush())
         .map_err(|err| {
             Error::from(
-                protocol(
-                    "flush an appended trace message",
-                    err.to_string(),
-                    "keep stderr writable so the next request cannot outrun its observation",
-                )
-                .with_path("trace"),
+                protocol(action, err.to_string(), "keep stderr writable").with_path("trace"),
             )
         })
 }
@@ -326,9 +355,16 @@ mod tests {
         assert!(executed.is_empty());
         assert_eq!(request["messages"].as_array().unwrap().len(), 2);
         assert_eq!(request["messages"][1]["content"], json!("answer"));
+        let trace: Vec<Value> = trace
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
         assert_eq!(
-            serde_json::from_str::<Value>(&trace).unwrap(),
-            json!({"role": "assistant", "content": "answer"})
+            trace,
+            vec![
+                json!({"role": "user", "content": "go"}),
+                json!({"role": "assistant", "content": "answer", "stop_reason": "end_turn"})
+            ]
         );
     }
 
@@ -354,7 +390,7 @@ mod tests {
         assert_eq!(results[0]["content"], "out:x = 40");
         assert_eq!(results[1]["tool_use_id"], "b");
         assert_eq!(results[1]["content"], "out:x += 2; print(x)");
-        assert_eq!(trace.lines().count(), 3);
+        assert_eq!(trace.lines().count(), 4);
     }
 
     #[test]
@@ -435,7 +471,7 @@ mod tests {
         );
         assert!(result.is_err());
         assert_eq!(request["messages"].as_array().unwrap().len(), 2);
-        assert_eq!(String::from_utf8(trace).unwrap().lines().count(), 1);
+        assert_eq!(String::from_utf8(trace).unwrap().lines().count(), 2);
     }
 
     #[test]

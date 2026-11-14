@@ -7,6 +7,7 @@
 //! and the child process group (`crates/sprawling/spec/Console.lean` §8-174).
 
 use std::io::{BufRead, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -22,6 +23,130 @@ use super::program_status::{Counts, Rest};
 use super::ui::Show;
 
 static NEXT_RUN: AtomicU64 = AtomicU64::new(1);
+static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
+
+fn session_failure(
+    action: &'static str,
+    subject: impl Into<String>,
+    path: impl Into<String>,
+) -> String {
+    let path = path.into();
+    AdapterFailure {
+        code: "E_MEI_SESSION",
+        action,
+        rule: "a Mei session is one explicitly named, complete JSONL message log",
+        recovery: "use /resume <jsonl> with a complete log, or /new to create a different file",
+        subject: subject.into(),
+        path: path.clone(),
+        value: path,
+    }
+    .render()
+}
+
+/// The current explicitly visible JSONL. New files start empty; imported
+/// files are validated by Mei before the next model or Python side effect.
+pub(crate) struct MeiSession {
+    path: PathBuf,
+    history: Vec<String>,
+    resume: bool,
+}
+
+impl MeiSession {
+    pub(crate) fn create_in(directory: &Path, at: TimeMs) -> Result<MeiSession, String> {
+        let counter = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
+        let path = directory.join(format!(
+            "mei-{}-{}-{counter}.jsonl",
+            at.value(),
+            std::process::id()
+        ));
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            options.mode(0o600);
+        }
+        options.open(&path).map_err(|err| {
+            session_failure(
+                "create a new Mei session",
+                err.to_string(),
+                path.display().to_string(),
+            )
+        })?;
+        Ok(MeiSession {
+            path,
+            history: Vec::new(),
+            resume: false,
+        })
+    }
+
+    pub(crate) fn import(path: &Path) -> Result<MeiSession, String> {
+        let path = path.to_path_buf();
+        let text = std::fs::read_to_string(&path).map_err(|err| {
+            session_failure(
+                "read the Mei resume log",
+                err.to_string(),
+                path.display().to_string(),
+            )
+        })?;
+        Ok(MeiSession {
+            path,
+            history: text.lines().map(str::to_owned).collect(),
+            resume: true,
+        })
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub(crate) fn history(&self) -> &[String] {
+        &self.history
+    }
+
+    pub(crate) fn resume_path(&self) -> Option<&Path> {
+        self.resume.then_some(self.path.as_path())
+    }
+
+    /// Publishes only a successfully finished segment. A write failure is
+    /// reported and never represented as a saved turn.
+    pub(crate) fn append(&mut self, lines: &[String]) -> Result<(), String> {
+        if lines.is_empty() {
+            return Ok(());
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&self.path)
+            .map_err(|err| {
+                session_failure(
+                    "open the current Mei session for append",
+                    err.to_string(),
+                    self.path.display().to_string(),
+                )
+            })?;
+        for line in lines {
+            file.write_all(line.as_bytes())
+                .and_then(|()| file.write_all(b"\n"))
+                .map_err(|err| {
+                    session_failure(
+                        "append a successful Mei segment",
+                        err.to_string(),
+                        self.path.display().to_string(),
+                    )
+                })?;
+        }
+        file.flush().map_err(|err| {
+            session_failure(
+                "flush a successful Mei segment",
+                err.to_string(),
+                self.path.display().to_string(),
+            )
+        })?;
+        self.history.extend_from_slice(lines);
+        self.resume = true;
+        Ok(())
+    }
+}
 
 /// What a Mei driver hands the terminal's one writer.
 pub(crate) enum MeiEvent {
@@ -302,17 +427,31 @@ pub(crate) struct MeiProcess {
 }
 
 impl MeiProcess {
-    pub(crate) fn spawn(prompt: &str, to: SyncSender<Show>) -> Result<MeiProcess, String> {
+    pub(crate) fn spawn(
+        prompt: &str,
+        resume: Option<&Path>,
+        to: SyncSender<Show>,
+    ) -> Result<MeiProcess, String> {
         let program = std::env::var_os("MEI_BIN").unwrap_or_else(|| "mei".into());
-        MeiProcess::spawn_with_program(prompt, to, &program)
+        MeiProcess::spawn_with_program_and_resume(prompt, resume, to, &program)
     }
 
+    #[cfg(test)]
     fn spawn_with_program(
         prompt: &str,
         to: SyncSender<Show>,
         program: &std::ffi::OsStr,
     ) -> Result<MeiProcess, String> {
-        let mut command = child::command(program);
+        MeiProcess::spawn_with_program_and_resume(prompt, None, to, program)
+    }
+
+    fn spawn_with_program_and_resume(
+        prompt: &str,
+        resume: Option<&Path>,
+        to: SyncSender<Show>,
+        program: &std::ffi::OsStr,
+    ) -> Result<MeiProcess, String> {
+        let mut command = mei_command(program, resume);
         let child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -383,6 +522,14 @@ impl MeiProcess {
             .join()
             .map_err(|_| "the Mei driver panicked".to_owned())
     }
+}
+
+fn mei_command(program: &std::ffi::OsStr, resume: Option<&Path>) -> std::process::Command {
+    let mut command = child::command(program);
+    if let Some(path) = resume {
+        command.arg("--resume").arg(path);
+    }
+    command
 }
 
 impl Drop for MeiProcess {
@@ -504,6 +651,45 @@ pub fn verb(replay: Option<&str>) -> std::process::ExitCode {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_session_files_are_unique_and_leave_the_old_bytes_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut first = MeiSession::create_in(dir.path(), TimeMs::new(100)).unwrap();
+        first
+            .append(&[
+                "{\"role\":\"user\",\"content\":\"first\"}".to_owned(),
+                "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}"
+                    .to_owned(),
+            ])
+            .unwrap();
+        let first_path = first.path().to_path_buf();
+        let before = std::fs::read(&first_path).unwrap();
+        let second = MeiSession::create_in(dir.path(), TimeMs::new(100)).unwrap();
+        assert_ne!(first_path, second.path());
+        assert_eq!(std::fs::read(&first_path).unwrap(), before);
+        assert_eq!(std::fs::read(second.path()).unwrap(), b"");
+
+        let mut resumed = MeiSession::import(&first_path).unwrap();
+        assert_eq!(resumed.history(), first.history());
+        assert_eq!(resumed.resume_path(), Some(first_path.as_path()));
+        resumed
+            .append(&["{\"role\":\"user\",\"content\":\"next\"}".to_owned()])
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(first_path).unwrap().lines().count(),
+            3
+        );
+    }
+
+    #[test]
+    fn the_selected_jsonl_is_passed_to_the_process_interface() {
+        let dir = tempfile::tempdir().unwrap();
+        let session = dir.path().join("chosen.jsonl");
+        let command = mei_command(std::ffi::OsStr::new("mei"), Some(&session));
+        let arguments: Vec<&std::ffi::OsStr> = command.get_args().collect();
+        assert_eq!(arguments, ["--resume".as_ref(), session.as_os_str()]);
+    }
 
     #[test]
     fn messages_map_to_existing_entries_and_live_state() {
