@@ -14,6 +14,7 @@
 /// A verb this binary carries out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Verb {
+    Mei,
     Up,
     Init,
     Serve,
@@ -116,6 +117,11 @@ const fn flag(name: &'static str, takes: Takes, says: &'static str) -> Flag {
 use Need::{Optional, Required};
 use Takes::{Level, Nothing, Value};
 
+const MEI_REPLAY: Flag = flag(
+    "--replay",
+    Value("jsonl"),
+    "display a saved Mei stderr stream without starting a model",
+);
 const LOG: Flag = flag("--log", Level, "the floor of what the diagnostics write");
 const OPEN: Flag = flag("--open", Nothing, "open the WebUI once the port answers");
 const NO_OPEN: Flag = flag(
@@ -187,6 +193,16 @@ pub(super) fn forwarded(args: &[String]) -> Vec<String> {
 
 /// The table. Its order is the order the overview prints.
 pub(super) const VERBS: &[Row] = &[
+    Row {
+        verb: Verb::Mei,
+        name: "mei",
+        aliases: &[],
+        positionals: &[],
+        flags: &[MEI_REPLAY],
+        says: "run the academic single-shot harness in this terminal, or replay its messages",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
     Row {
         verb: Verb::PrivacyStatus,
         name: "privacy status",

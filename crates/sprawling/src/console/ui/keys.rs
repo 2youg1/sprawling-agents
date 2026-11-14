@@ -64,39 +64,33 @@ impl Ui {
         if self.menu.is_some() && self.in_menu(key) {
             return;
         }
-        let edit = match (key.code, alt) {
-            (KeyCode::Enter, _) if key.modifiers.contains(KeyModifiers::SHIFT) => Edit::Newline,
-            (KeyCode::Enter, _) => return self.enter(),
-            (KeyCode::Esc, _) => return self.escape(),
-            (KeyCode::Tab, _) => return self.complete(),
-            (KeyCode::Char(answer @ ('y' | 'n')), false) if self.editor.is_empty() => {
-                let verdict = if answer == 'y' {
-                    kernel::Ruling::Allow
-                } else {
-                    kernel::Ruling::Deny
-                };
-                let answered = match self.session.as_mut() {
-                    Some(session) => session.answer_waiting(&self.inside, verdict, &self.say),
-                    None => false,
-                };
-                if answered {
-                    return self.redraw(&[]);
-                }
-                Edit::Insert(answer)
+        if matches!(key.code, KeyCode::Enter) && !key.modifiers.contains(KeyModifiers::SHIFT) {
+            return self.enter();
+        }
+        if key.code == KeyCode::Esc {
+            return self.escape();
+        }
+        if key.code == KeyCode::Tab {
+            return self.complete();
+        }
+        if let (KeyCode::Char(answer @ ('y' | 'n')), false) = (key.code, alt)
+            && self.editor.is_empty()
+        {
+            let verdict = if answer == 'y' {
+                kernel::Ruling::Allow
+            } else {
+                kernel::Ruling::Deny
+            };
+            let answered = match self.session.as_mut() {
+                Some(session) => session.answer_waiting(&self.inside, verdict, &self.say),
+                None => false,
+            };
+            if answered {
+                return self.redraw(&[]);
             }
-            (KeyCode::Char(ch), false) => Edit::Insert(ch),
-            (KeyCode::Backspace, true) => Edit::DeleteWord,
-            (KeyCode::Left, true) => Edit::WordLeft,
-            (KeyCode::Right, true) => Edit::WordRight,
-            (KeyCode::Backspace, false) => Edit::Backspace,
-            (KeyCode::Delete, _) => Edit::Delete,
-            (KeyCode::Left, false) => Edit::Left,
-            (KeyCode::Right, false) => Edit::Right,
-            (KeyCode::Home, _) => Edit::Home,
-            (KeyCode::End, _) => Edit::End,
-            (KeyCode::Up, _) => Edit::Older,
-            (KeyCode::Down, _) => Edit::Newer,
-            _ => return,
+        }
+        let Some(edit) = editing(key, alt) else {
+            return;
         };
         self.editor.apply(edit);
         self.refilter();
@@ -269,5 +263,26 @@ impl Ui {
         if let Err(unopened) = crate::firstrun::open_paired(&self.terminal.url, &self.inside.door) {
             self.notice(format!("  {}: {}", unopened.action(), unopened.recovery()));
         }
+    }
+}
+
+/// The editing keys shared by the City and Mei composers. Backend-specific
+/// Enter, Esc, Tab and approval meanings stay in each backend.
+pub(super) fn editing(key: KeyEvent, alt: bool) -> Option<Edit> {
+    match (key.code, alt) {
+        (KeyCode::Enter, _) if key.modifiers.contains(KeyModifiers::SHIFT) => Some(Edit::Newline),
+        (KeyCode::Char(ch), false) => Some(Edit::Insert(ch)),
+        (KeyCode::Backspace, true) => Some(Edit::DeleteWord),
+        (KeyCode::Left, true) => Some(Edit::WordLeft),
+        (KeyCode::Right, true) => Some(Edit::WordRight),
+        (KeyCode::Backspace, false) => Some(Edit::Backspace),
+        (KeyCode::Delete, _) => Some(Edit::Delete),
+        (KeyCode::Left, false) => Some(Edit::Left),
+        (KeyCode::Right, false) => Some(Edit::Right),
+        (KeyCode::Home, _) => Some(Edit::Home),
+        (KeyCode::End, _) => Some(Edit::End),
+        (KeyCode::Up, _) => Some(Edit::Older),
+        (KeyCode::Down, _) => Some(Edit::Newer),
+        _ => None,
     }
 }

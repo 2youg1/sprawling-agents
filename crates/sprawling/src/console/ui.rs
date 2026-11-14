@@ -34,6 +34,7 @@ use super::cli::{Say, Session};
 use super::editor::Editor;
 use super::lifecycle::{Event, Face, Handoff, INTERRUPT_GRACE, Sinks};
 use super::local_time;
+use super::mei::MeiEvent as ExternalMeiEvent;
 use super::program_status::{self, Held, Reporting};
 use super::screen::{QuietLines, Screen, Written};
 use super::terminal::{Inside, Terminal};
@@ -69,6 +70,7 @@ pub(crate) enum Show {
     /// Text the terminal handed over as one paste.
     Paste(String),
     Record(wire::Committed),
+    Mei(ExternalMeiEvent),
     Resized,
     /// Reading the terminal failed: it is gone.
     Lost,
@@ -268,6 +270,7 @@ impl Ui {
                 };
                 self.print(entries);
             }
+            Show::Mei(_) => {}
             Show::Resized => {
                 if self.shown == Face::QuietHost {
                     self.quiet();
@@ -387,5 +390,6 @@ pub(crate) fn lines_to_stdout() -> Say {
 mod input;
 mod keys;
 mod live;
+pub(crate) mod mei;
 mod menu;
 mod reporting;

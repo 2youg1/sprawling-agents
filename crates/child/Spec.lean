@@ -84,6 +84,9 @@ D4 `clippy.toml` 的 `disallowed-methods` 拒绝 `std::process::Command::new`，
 - 开发工具包（xtask、citysim、benchstat）：它们起的 cargo、git、浏览器与被测的二进制属于开发者，不属于城，不持有城的秘密；开发工具要能用终端的 Ctrl+C 结束它们，要按进程树杀掉浏览器。这些包不依赖本 crate。
 - 构建脚本（`crates/desktop/ffi/build.rs` 起 `zig`）：它在 cargo 里跑，不在城里。
 - 测试代码：测试起的是它自己的夹具进程。经生产入口（如 `runtime::Backlog`）交进去的 `Command` 也是夹具，生产调用点交进去的由 `command` 造。
+- 独立 Archetype 进程：`Mei` 不依赖城市，也不持有城市的秘密；它直接启动自己的 Python，
+  让解释器与 Mei 留在同一进程组，外层 killpg 才能覆盖它。Sprawling TUI 启动 Mei 时仍走
+  `command`，只有 Mei 自己启动 Python 的这一处例外。
 
 被否：给开发工具包一份自己的 `clippy.toml`（clippy 只读离 crate 最近的一份，于是时钟与 HTTP 客户端的禁令要复制一份）；crate 级的 `expect`（同一个 lint 名也管 `Instant::now` 与 `reqwest` 的禁令，crate 级的一条会把它们一起盖住）；测试也改走 `command`（Unix 上的进程组与 Windows 上的无窗口控制台会改变夹具进程与测试之间的控制台和信号关系，一个测试要的是它自己写下的那组标志）。重开条件：clippy 能按路径给出禁令的作用范围，或者测试需要验证的正是 `command` 的标志。
 -/
