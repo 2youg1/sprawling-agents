@@ -122,10 +122,18 @@ Mei 核心不知道这里的任何类型。
 
 ```text
 sprawling mei [--replay <jsonl>]
+/new
+/resume <jsonl>
 ```
 
+Mei 后端只增加这两个斜杠命令，不继承 City 的其它命令。`/new` 在当前目录以
+`create_new` 建立一个新的 `mei-<time>-<pid>-<counter>.jsonl` 并打印完整路径，旧文件不删不改；
+首个普通任务也会建立这样的当前文件。`/resume <jsonl>` 显式导入已有日志，不接受无参数形式。
+普通后续任务继续当前文件；只有成功任务追加本段，取消或失败不追加。
+
 `MEI_BIN` 指定要启动的 `mei`，缺省在 PATH 上找 `mei`。真实后端不用 `-p`，
-而是把刚提交的 prompt 写入子进程 stdin 后关闭 stdin；这样启动与递归默认用法一致。
+而是把刚提交的 prompt 写入子进程 stdin 后关闭 stdin；已有当前历史时加 `--resume <jsonl>`。
+核心在下次模型请求与 Python 启动前验证导入日志；恢复只带消息，不恢复 Python 现场。
 replay 逐行读 Mei stderr 保存的 JSONL，和真实子进程共用 `Mei::line` 一个转换入口，
 不启动模型或 Python；replay 是只读显示，不再提交新任务。启动 `mei` 失败与打开回放文件
 失败都渲染成结构化诊断：一个 `toml` 围栏块的 Note，含稳定 `code`、`action`、`subject`、
@@ -151,7 +159,9 @@ pub(crate) fn verb(replay: Option<&str>) -> ExitCode;
   `Answered` 只表示工具已返回，不断言代码没有异常。非 JSON 行逐行成为 `Note`。
 - **结束**：进程退出状态更新 `Ended` 与 OSC 7501；成功是 Done，非零是 Limit/error，
   Esc 是 Cancelled。最终 stdout 只用于最终答复核对，若与最后一条 assistant text 相同，
-  不重复画一份。每次只有一个本地任务在途；结束后可以提交新的独立任务，不恢复旧会话。
+  不重复画一份。每次只有一个本地任务在途；结束后可以提交下一项任务。
+  有当前会话文件时下一项继承其消息；`/new` 换文件并切断历史，`/resume` 导入指定文件。
+  当前段先留在内存，成功后才追加；写入失败明确报告，不能宣称该段已保存。
 - **键**：Enter 提交，Shift+Enter 插入换行（与 City 的 typing 同一规则）；Esc 先清草稿，
   再停任务，最后退出。
 - **回放分批**：每批至多读 `REPLAY_BATCH`（64）行，批次之间处理积压事件（Esc、终端丢失）；
@@ -176,12 +186,18 @@ D108 Esc 在 Unix 终止 Mei 的整个进程组，而不是只终止直接子进
 D109 回放按有界批次（每批 64 行）读取与绘制，批次之间处理退出与终端丢失：整份读完再等人的
 旧形状让长 JSONL 期间 Esc 与终端丢失失效；被否的是每读一行等待一次键（无键输入时回放停摆）。
 
-**本节接口的当前状态**：replay 是调试适配器，不是 Mei 的持久化或恢复能力。
+D110 `/new` 与 `/resume <jsonl>` 复用本后端，不另写 CLI 或自动选择最近会话。每次 `/new`
+用 `create_new` 留下独立 JSONL，成功段才追加；恢复只带消息。被否的是自动会话数据库、删除旧档、
+恢复 Python 现场和把 replay 变成可写恢复入口。
+
+**本节接口的当前状态**：replay 仍是只读调试适配器，不接受新任务；`/resume` 才是消息恢复入口。
+JSONL 首条是初始 user prompt，assistant 行另带 `stop_reason`；恢复时核心剥去该元数据。
 服务端工具块只在 assistant 原文中出现，其可见 text/thinking 可投影；不虚构服务端工具计时。
 真实 City 后端不读这些类型，现有 `stream::Room` 不改。
 
 **本章测试**：`console::mei` 的纯投影测试覆盖普通回答、工具波、thinking、多行错误、
 截断输出、字符串 content、最终答案去重与 replay/真实入口复用，以及缺失 MEI_BIN 的结构化
-诊断；`console::ui::mei` 覆盖回放分批、整份回放先于等键与 Shift+Enter 换行；进程组测试在
+诊断；会话测试覆盖 `/new` 文件唯一且旧文件不动、显式恢复、成功才追加与失败不追加；
+`console::ui::mei` 覆盖回放分批、整份回放先于等键与 Shift+Enter 换行；进程组测试在
 Unix 验证 Esc 后子进程被回收；既有 `console::tests::stream` 与 `console_ffi` 全部保持通过。
 -/

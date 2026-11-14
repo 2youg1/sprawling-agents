@@ -4,6 +4,7 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import Mei.spec.Agent
+import Mei.spec.Session
 
 /-! # Archetype:Mei 的规格
 
@@ -25,9 +26,11 @@ import Mei.spec.Agent
 | `error` | 稳定错误码、失败动作、主题、违反规则与可执行恢复步骤 |
 | `MEI.md` | 唯一静态系统提示词，构建时注入；二次开发可直接修改后重建 |
 | `spec/Agent.lean` | 反馈顺序、整波预检、终止与保真的形式模型 |
+| `spec/Session.lean` | 完整日志恢复、`/new` 切断历史并增加文件代次的形式模型 |
 
-核心没有会话恢复、权限、成本、审查、专用文件工具、异步运行时、Provider 抽象、
-SSE、重试、压缩、记忆、Skills、MCP/ACP、图片输入或原生 Windows 支持。
+核心有一次性运行与完整消息日志恢复，没有 Python 进程现场恢复、权限、成本、审查、专用文件工具、
+异步运行时、Provider 抽象、SSE、重试、压缩、长期记忆、Skills、MCP/ACP、图片输入或原生 Windows 支持。
+`/new` 与 `/resume <jsonl>` 只存在于现有 Sprawling CLI 的 Mei 后端；直接 `mei` 仍是单任务进程。
 隔离由外层容器、VM、bwrap 或专用用户承担；没有内部安全边界。
 -/
 
@@ -42,7 +45,10 @@ SSE、重试、压缩、记忆、Skills、MCP/ACP、图片输入或原生 Window
 - 真实 Python 进程验证变量保留、顺序调用、异常与 SystemExit、子进程 stdin EOF、
   fd 输出捕获、非 UTF-8、空输出、大输出头尾截断、超时后继续、非法帧和解释器死亡。
 - 整波在任何副作用之前验证；解释器死亡后不伪造完整 user/tool-result 历史。
-- stdout 只含最终 text blocks，不加换行；stderr 每条新加消息一行相同 JSON，其余行是普通错误。
+- `spec/Session.lean` 证明：`/new` 清空历史并进入新文件代次，`/resume` 只恢复完整日志，
+  恢复剥去 stop 元数据且保持消息顺序。
+- stdout 只含最终 text blocks，不加换行；stderr 先写本次 user prompt，再写每条新加消息；
+  assistant 日志另带 `stop_reason`，恢复时剥去，其余行是普通错误。
 - live V1/V2（真实 magpie 非流式 EOF、非 Anthropic 模型工具调用与 thinking 回传）
   必须实测后才能宣称支持；本地生产路径验证不替代这两项。
 - 实测记录：`curl --http1.0 -i -X POST http://127.0.0.1:3425/v1/messages` 在
@@ -76,7 +82,9 @@ SSE、重试、压缩、记忆、Skills、MCP/ACP、图片输入或原生 Window
 
 /-! ## 5 权威信源
 
-- User 的 Archetype:Mei 封闭设计及后续 ruling：顶层 `Mei/`、学术原型定位、`src/MEI.md`、端口约束。
+- User 的 Archetype:Mei 封闭设计及后续 ruling：顶层 `Mei/`、学术原型定位、`src/MEI.md`、端口约束；
+  本次追加 ruling 是在现有 `sprawling mei` CLI 提供 `/new` 与 `/resume <jsonl>`，不增加其它斜杠命令；
+  每次 `/new` 新建 JSONL，旧文件原地保留。
 - Anthropic Messages 与 client tools 官方文档，以及[官方 TypeScript SDK 声明](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/src/resources/messages/messages.ts)
   （跟踪版本见 `docs/third-party.md` §1）：
   `/v1/messages`、`tool_use`/`tool_result`、thinking 原样回传、string content、`pause_turn` 与透明服务端工具块。
@@ -96,7 +104,8 @@ Mei 的状态只有 `request: serde_json::Value`。没有 `Conversation`、`Chat
 
 /-! ## 7 模块边界
 
-`agent` 是决策；`transport`、`python` 是适配器；`main` 是唯一装配点；`error` 是诊断值。
+`agent` 是决策；`transport`、`python` 是适配器；`resume` 只读完整 JSONL 消息；
+`main` 是唯一装配点；`error` 是诊断值。Sprawling CLI 拥有 `/new`、`/resume <jsonl>` 与当前会话日志文件。
 核心生产依赖只有 `serde_json`，不依赖 Sprawling 的 TUI、城市运行时、账本、gateway crate 或 `console_ffi`。
 依赖方向只有现有 Sprawling TUI 在进程边界适配 Mei，Mei 不知道消费者的类型。
 
@@ -142,15 +151,19 @@ impl Py {
 `HARNESS_MODEL` 必填；`ANTHROPIC_BASE_URL` 默认 `http://127.0.0.1:3425`，只接受 `http://authority` 与可选末尾 `/`；
 `ANTHROPIC_API_KEY` 默认 `magpie`；`HARNESS` 未预设才写为 `current_exe()`。
 
-CLI 只有 `mei -p PROMPT` 与无 `-p` 时读取 stdin 全部内容。无 `-p` 且 stdin 是 TTY 时立即拒绝，
-避免看似挂起。`-p` 缺值、其它参数、缺模型、非法 JSON 都在启动副作用前失败。
+一次性 CLI 接受 `mei -p PROMPT`、无 `-p` 时读取 stdin 全部内容，并可加
+`--resume <jsonl>` 在 prompt 前装入一份完整日志。无 `-p` 且 stdin 是 TTY 时仍立即拒绝；
+Mei 自身没有交互循环或斜杠命令。`-p` 缺值、重复/未知参数、缺模型、非法 JSON、
+空/畸形/未完整结束的恢复日志都在模型请求与 Python 启动之前失败。
+恢复只带入 role/content 与消息顺序；当前环境重新决定 model、system、tools 与网关，Python 重新启动。
 -/
 
 /-! ## 9 工作流程
 
 ```text
 A = post(R)
-R.messages.push(assistant(A.content)); trace
+trace 本次 user prompt                    -- 首个有效响应到达才写；已有历史不重复
+R.messages.push(assistant(A.content)); trace role/content/stop_reason
 if pause_turn: continue                         -- 不加 user
 if end_turn: return 顺序连接的 text blocks
 if stop != tool_use: fail                       -- max_tokens 也不执行
@@ -161,6 +174,10 @@ R.messages.push(user(Y)); trace; continue
 `server_tool_use` 与其结果块原样留在 assistant 历史，不产生本地 tool_result。
 每轮至多一个模型请求在途、至多一段由主循环发起的 Python 代码执行；只有主循环写 messages。
 没有 turn ceiling；模型不停止时由外部 Ctrl-C、kill 或进程管理结束。
+恢复读取逐行 JSON，首条必须是本次会话的 user prompt，末条必须是 `stop_reason=end_turn` 的 assistant；
+只把 role/content 送回 Messages。Sprawling CLI 在 `/new` 时用 `create_new` 建立新 JSONL 并打印完整路径；
+每次成功任务才把本段日志追加到当前文件，取消或失败不追加。`/resume` 显式选择已有文件，
+不搜索或维护最近会话；旧文件从不因 `/new` 删除或改写。
 -/
 
 /-! ## 10 实现逻辑
@@ -187,8 +204,9 @@ R.messages.push(user(Y)); trace; continue
 
 /-! ## 11 边界枚举
 
-空 prompt、Unicode prompt、stdin EOF、缺环境变量、非法 URL、非 200、缺 status line、
-缺 CRLF 分界、chunked、网关接受后停滞、connect 超预算、content 缺失或类型错误、空工具波、
+空 prompt、Unicode prompt、stdin EOF、重复/未知参数、恢复文件缺失/空/坏行/无初始 user/未完整结束、
+缺环境变量、非法 URL、非 200、缺 status line、缺 CRLF 分界、chunked、网关接受后停滞、connect 超预算、
+content 缺失或类型错误、空工具波、
 未知客户端工具、空 ID、重复 ID、max_tokens、pause_turn、refusal、解释器死亡、非法控制帧、
 SystemExit、非 UTF-8、空输出、16000/16001 字符边界、后台线程跨调用写入、后台写入与快照交错、
 收口时存活的非 daemon 线程、递归超时与 kill 后 wait 都必须有明确行为或测试。
@@ -233,7 +251,7 @@ trait Model/Tool（生产各只有一个实现，脚本闭包已是第二真实�
 ```bash
 cargo nextest run -p sprawling-mei
 cargo clippy -p sprawling-mei --all-targets --all-features -- -D warnings
-lake build Mei.Spec Mei.spec.Agent
+lake build Mei.Spec Mei.spec.Agent Mei.spec.Session
 cargo test -p sprawling-mei --test cli
 ```
 
@@ -244,7 +262,8 @@ Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 
 
 /-! ## 17 文档关系
 
-`Mei/README.md` 是学术原型使用与二次开发入口；`architecture.toml` 注册模块；
+`Mei/README.md` 与 `Mei/README.zh-CN.md` 分别是学术原型使用与二次开发的英文、中文入口；
+`architecture.toml` 注册模块；
 `docs/ARCHITECTURE.md` §3 注册无产品 crate 依赖的拓扑；`docs/third-party.md` 跟踪协议事实。
 `crates/sprawling/spec/Console.lean` §8-174 拥有 TUI 适配合同，本规格不复制它。
 修改协议、固定值、进程边界或验收声明时，同时重审上述对应权威。
@@ -268,3 +287,6 @@ Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 
 /-! D8 传输对每个地址设 10 s 连接预算、对读写设 600 s 宽松预算：非流式响应可能合法思考数分钟，
 接受后停滞的网关必须返回 `E_MEI_TRANSPORT` 且不重试；被否的是不设时限（脚本化调用无限挂起）与
 短时限（截断合法的长思考响应）。 -/
+/-! D9 User 常用的 `/new` 与 `/resume <jsonl>` 由现有 Sprawling CLI 提供，核心只增加完整消息日志恢复。
+每次 `/new` 新建独立 JSONL，旧文件原地保留；成功后才追加本段，恢复消息而不恢复 Python 现场。
+被否的是另写交互 UI、自动选择最近会话、会话数据库、Python 进程快照，以及把取消或失败的尾段追加进日志。 -/

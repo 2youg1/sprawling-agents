@@ -17,6 +17,7 @@ module = [
   { name = "mei::agent", file = "Mei/src/agent.rs", owns = "the one serial feedback loop over the mutable Messages request", shape = "decision", since = "CS18", status = "built", spec = "Mei.spec.Agent" },
   { name = "mei::transport", file = "Mei/src/transport.rs", owns = "the minimal Anthropic Messages HTTP/1.0 adapter", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
   { name = "mei::python", file = "Mei/src/python.rs", owns = "the persistent Python process and its one-line JSON control channel", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
+  { name = "mei::resume", file = "Mei/src/resume.rs", owns = "explicit complete JSONL message recovery and observation-metadata removal", shape = "adapter", since = "CS18", status = "built", spec = "Mei.spec.Session" },
   { name = "mei::error", file = "Mei/src/error.rs", owns = "stable repair diagnostics and raw provider error bodies", shape = "value", since = "CS18", status = "built", spec = "Mei.Spec" },
   { name = "kernel::origin", file = "crates/kernel/src/origin.rs", owns = "where a session branched off: a run, and the line of it the branch inherits through", shape = "value", since = "V0.0.6", status = "built", spec = "crates.kernel.spec.Event" },
   { name = "kernel::address", file = "crates/kernel/src/address.rs", owns = "canonical relative paths, write-domain primitive, protected metadata, and the read bound: what one building may read of another", shape = "value", since = "S1", status = "built", spec = "crates.kernel.spec.Address" },

@@ -12,7 +12,7 @@ use std::process::ExitCode;
 use serde_json::{Value, json};
 
 use mei::error::{Code, Diagnostic, Error, Result};
-use mei::{agent, python, transport};
+use mei::{agent, python, resume, transport};
 
 const MAX_TOKENS: u64 = 16000;
 const SYSTEM: &str = include_str!("MEI.md");
@@ -37,7 +37,9 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<String> {
-    let prompt = prompt()?;
+    let arguments = arguments()?;
+    let prompt = prompt(arguments.prompt)?;
+    let history = arguments.resume.as_deref().map(resume::read).transpose()?;
     let model = optional_environment("HARNESS_MODEL")?.ok_or_else(|| {
         Error::Diagnostic(Diagnostic::new(
             Code::Config,
@@ -56,16 +58,22 @@ fn run() -> Result<String> {
     }
     let extra = optional_environment("HARNESS_EXTRA")?;
     let tools = optional_environment("MEI_TOOLS")?;
-    let mut request = initial_request(&model, &prompt, extra.as_deref(), tools.as_deref())?;
+    let task = Task {
+        model: &model,
+        prompt: &prompt,
+        history,
+    };
+    let mut request = initial_request(task, extra.as_deref(), tools.as_deref())?;
     let base = environment_or("ANTHROPIC_BASE_URL", DEFAULT_BASE)?;
     let key = environment_or("ANTHROPIC_API_KEY", "magpie")?;
     let client = transport::Client::new(&base, key)?;
     let mut python = python::Py::spawn()?;
+    let mut trace = std::io::stderr();
     let result = agent::run(
         &mut request,
         |request| client.post(request),
         |code| python.run(code),
-        &mut std::io::stderr(),
+        &mut trace,
     );
     match result {
         Ok(answer) => {
@@ -98,39 +106,74 @@ fn environment_or(name: &str, default: &str) -> Result<String> {
     Ok(optional_environment(name)?.unwrap_or_else(|| default.to_owned()))
 }
 
-fn prompt() -> Result<String> {
-    let args = std::env::args().skip(1).collect::<Vec<_>>();
-    match args.as_slice() {
-        [flag, prompt] if flag == "-p" => Ok(prompt.clone()),
-        [] if !std::io::stdin().is_terminal() => {
-            let mut prompt = String::new();
-            std::io::stdin()
-                .read_to_string(&mut prompt)
-                .map_err(|err| {
-                    Error::Diagnostic(Diagnostic::new(
-                        Code::Usage,
-                        "read the prompt from stdin",
-                        err.to_string(),
-                        "use `mei -p PROMPT` or pipe a complete prompt on stdin",
-                    ))
-                })?;
-            Ok(prompt)
-        }
-        _ => Err(Error::Diagnostic(Diagnostic::new(
-            Code::Usage,
-            "parse the command line",
-            "expected `mei -p PROMPT` or a non-terminal stdin prompt",
-            "use `mei -p PROMPT`; without -p, pipe input instead of leaving stdin on a terminal",
-        ))),
-    }
+struct Arguments {
+    prompt: Option<String>,
+    resume: Option<std::path::PathBuf>,
 }
 
-fn initial_request(
-    model: &str,
-    prompt: &str,
-    extra: Option<&str>,
-    server_tools: Option<&str>,
-) -> Result<Value> {
+fn arguments() -> Result<Arguments> {
+    let mut prompt = None;
+    let mut resume = None;
+    let mut args = std::env::args().skip(1);
+    while let Some(flag) = args.next() {
+        let value = args
+            .next()
+            .ok_or_else(|| usage(format!("{flag} requires a value")))?;
+        match flag.as_str() {
+            "-p" if prompt.is_none() => prompt = Some(value),
+            "--resume" if resume.is_none() => resume = Some(value.into()),
+            "-p" | "--resume" => return Err(usage(format!("duplicate {flag}"))),
+            _ => return Err(usage(format!("unknown argument `{flag}`"))),
+        }
+    }
+    Ok(Arguments { prompt, resume })
+}
+
+fn usage(subject: String) -> Error {
+    Diagnostic::new(
+        Code::Usage,
+        "parse the command line",
+        subject,
+        "use `mei [-p PROMPT] [--resume JSONL]`; without -p, pipe a complete prompt on stdin",
+    )
+    .into()
+}
+
+fn prompt(argument: Option<String>) -> Result<String> {
+    if let Some(prompt) = argument {
+        return Ok(prompt);
+    }
+    if std::io::stdin().is_terminal() {
+        return Err(usage(
+            "without -p, stdin must be a complete non-terminal prompt".to_owned(),
+        ));
+    }
+    let mut prompt = String::new();
+    std::io::stdin()
+        .read_to_string(&mut prompt)
+        .map_err(|err| {
+            Error::Diagnostic(Diagnostic::new(
+                Code::Usage,
+                "read the prompt from stdin",
+                err.to_string(),
+                "use `mei -p PROMPT` or pipe a complete prompt on stdin",
+            ))
+        })?;
+    Ok(prompt)
+}
+
+struct Task<'a> {
+    model: &'a str,
+    prompt: &'a str,
+    history: Option<Vec<Value>>,
+}
+
+fn initial_request(task: Task, extra: Option<&str>, server_tools: Option<&str>) -> Result<Value> {
+    let Task {
+        model,
+        prompt,
+        history,
+    } = task;
     let mut request = json!({
         "model": model,
         "max_tokens": MAX_TOKENS,
@@ -195,7 +238,13 @@ fn initial_request(
         })?
         .insert(
             "messages".to_owned(),
-            json!([{"role": "user", "content": prompt}]),
+            Value::Array(
+                history
+                    .unwrap_or_default()
+                    .into_iter()
+                    .chain([json!({"role": "user", "content": prompt})])
+                    .collect(),
+            ),
         );
     if let Some(server_tools) = server_tools {
         let additional: Value = serde_json::from_str(server_tools).map_err(|err| {
@@ -250,11 +299,15 @@ mod tests {
     #[test]
     fn the_request_has_one_state_and_the_prompt_owns_messages() {
         let request = initial_request(
-            "provider/model",
-            "new prompt",
+            Task {
+                model: "provider/model",
+                prompt: "new prompt",
+                history: None,
+            },
             Some(r#"{"system":"custom","messages":[{"role":"user","content":"old"}],"max_tokens":42}"#),
             Some(r#"[{"type":"web_search_20250305","name":"web_search","max_uses":2}]"#),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(request["model"], "provider/model");
         assert_eq!(request["system"], "custom");
         assert_eq!(request["max_tokens"], 42);
@@ -265,10 +318,40 @@ mod tests {
     }
 
     #[test]
+    fn resumed_messages_precede_the_new_prompt() {
+        let request = initial_request(
+            Task {
+                model: "provider/model",
+                prompt: "new",
+                history: Some(vec![
+                    json!({"role": "user", "content": "old"}),
+                    json!({"role": "assistant", "content": "answer"}),
+                ]),
+            },
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            request["messages"],
+            json!([
+                {"role": "user", "content": "old"},
+                {"role": "assistant", "content": "answer"},
+                {"role": "user", "content": "new"}
+            ])
+        );
+    }
+
+    #[test]
     fn forbidden_configuration_is_refused_before_any_side_effect() {
-        assert!(initial_request("m", "p", Some("[]"), None).is_err());
-        assert!(initial_request("m", "p", Some(r#"{"stream":true}"#), None).is_err());
-        assert!(initial_request("m", "p", Some(r#"{"tools":[]}"#), None).is_err());
-        assert!(initial_request("m", "p", None, Some("{}")).is_err());
+        let task = || Task {
+            model: "m",
+            prompt: "p",
+            history: None,
+        };
+        assert!(initial_request(task(), Some("[]"), None).is_err());
+        assert!(initial_request(task(), Some(r#"{"stream":true}"#), None).is_err());
+        assert!(initial_request(task(), Some(r#"{"tools":[]}"#), None).is_err());
+        assert!(initial_request(task(), None, Some("{}")).is_err());
     }
 }
