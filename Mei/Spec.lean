@@ -59,7 +59,8 @@ SSE、重试、压缩、记忆、Skills、MCP/ACP、图片输入或原生 Window
 - 评审补充与原始封闭表的冲突按以下当前决定解决：`pause_turn` 继续；`MEI_TOOLS` 追加透明服务端工具；
   非法控制帧使运行失败；`HARNESS` 未预设才回填；整波先预检；显式收口子进程。
 - `SIGALRM` 是 Harness 保留资源，每轮重设 handler 并在 `finally` 取消 alarm；但执行代码仍可捕获异常、
-  修改或忽略信号，C 调用也可能不返回，所以 120 秒只是 best-effort，不是硬截止。
+  修改或忽略信号，C 调用也可能不返回，所以 250 秒只是 best-effort，不是硬截止。
+  取 250 秒是为了让模型代码等得起网络波动恢复（例如重插线缆后的重连），不是硬截止的替代。
 - “串行”只约束主循环发起的请求和调用。模型代码留下的线程和进程可并发，输出是调用结束时的快照。
 - `os.dup` 只防止常规 exec 型子进程继承私有控制 fd；裸 `fork` 的子孙仍可能继承它，不作更强的私有性承诺。
 - 递归子任务整体处于父 Python 调用的 best-effort 超时内。默认只读子进程 stdout；
@@ -130,8 +131,9 @@ impl Py {
 ```
 
 `Result` 的错误是 `error::Error`：`Diagnostic` 渲染一个 `toml` fenced block，
-含稳定 `code`、`action`、`subject`、`path`（适用时）、`value`（适用时）、`rule` 与 `recovery`；
-`Body` 仅用于非 200，原文写 stderr，不额外包装。
+含稳定 `code`（`error::Code` 枚举，一种规则一个变体，穷尽匹配不带兜底）、`action`、`subject`、
+`path`（适用时）、`value`（适用时）、`rule` 与 `recovery`；协议族错误的 path/value 指向失败字段
+（如 `messages[1].content[3].id`）及其取值。`Body` 仅用于非 200，原文写 stderr，不额外包装。
 
 启动请求包含 `model`、`max_tokens = 16000`、`system`、`tools = [python]` 与一个 user prompt。
 `HARNESS_EXTRA` 是 object，启动时浅合并一次，然后重新写入 prompt messages；
@@ -165,7 +167,9 @@ R.messages.push(user(Y)); trace; continue
 
 - 请求 JSON 每次只序列化一次，`Content-Length` 按 UTF-8 字节数；发送 `Connection: close`，
   不发送 `Accept-Encoding`。响应读至 EOF，只解析状态行、CRLF header/body 分界与 JSON body。
-  缺少分界时错误附前 200 字节；chunked 明确拒绝。
+  缺少分界时错误附前 200 字节；chunked 明确拒绝。传输对每个地址用 `CONNECT_TIMEOUT`（10 s）
+  连接预算、对读写用 `IO_TIMEOUT`（600 s）宽松预算：非流式响应可能合法思考数分钟，而接受后
+  停滞的网关必须返回 `E_MEI_TRANSPORT` 诊断且不重试，不能无限挂起脚本化调用。
 - assistant content 作为 JSON 值追加。读时 string 视为单 text block，写回仍是原 string；
   其它未知块不建模。serde_json 默认数值语义是当前支持范围，不承诺任意高精度扩展数字的字节级保真。
 - `boot.py` 用二进制私有 fd 信道，每帧是一行 UTF-8 JSON string。先解码并检查帧类型，
@@ -173,15 +177,21 @@ R.messages.push(user(Y)); trace; continue
 - fd 0 改 `/dev/null`，每轮 fd 1/2 指向当前二进制临时文件；Python 标准流明确 UTF-8 + replacement。
 - 输出经增量 UTF-8 decoder 分块读取，内存只保留解码块、头 8000 与尾 8000 字符。
   超过 16000 字符时保留头尾并留下完整文件路径，否则删除临时文件。空输出为 `(no output)`。
-- `main` 成功时关闭 stdin 并 wait；失败时 kill 并 wait；`Drop` 仅作最后兜底，不代替显式收口。
+  快照经独立只读句柄按 `fstat` 固定上界读取：模型线程留在共享输出偏移上的后续追加只越过上界、
+  不能覆盖开头或延长快照。
+- `main` 成功时在 `CLOSE_GRACE`（5 s）内有界 wait 后关闭 stdin；模型留下的非 daemon 线程会阻止
+  Python 退出，超时后 kill 并 wait——强制清理是正常收口，不是运行失败（模型已给出最终答案）。
+  失败时 kill 并 wait；`Drop` 仅作最后兜底，不代替显式收口。宽限按 `CLOSE_POLL`（20 ms）轮询倍数计，
+  不采样时钟。
 -/
 
 /-! ## 11 边界枚举
 
 空 prompt、Unicode prompt、stdin EOF、缺环境变量、非法 URL、非 200、缺 status line、
-缺 CRLF 分界、chunked、content 缺失或类型错误、空工具波、未知客户端工具、空 ID、重复 ID、
-max_tokens、pause_turn、refusal、解释器死亡、非法控制帧、SystemExit、非 UTF-8、空输出、
-16000/16001 字符边界、后台线程跨调用写入、递归超时与 kill 后 wait 都必须有明确行为或测试。
+缺 CRLF 分界、chunked、网关接受后停滞、connect 超预算、content 缺失或类型错误、空工具波、
+未知客户端工具、空 ID、重复 ID、max_tokens、pause_turn、refusal、解释器死亡、非法控制帧、
+SystemExit、非 UTF-8、空输出、16000/16001 字符边界、后台线程跨调用写入、后台写入与快照交错、
+收口时存活的非 daemon 线程、递归超时与 kill 后 wait 都必须有明确行为或测试。
 -/
 
 /-! ## 12 错误处理
@@ -203,7 +213,8 @@ trait Model/Tool（生产各只有一个实现，脚本闭包已是第二真实�
 
 /-! ## 14 硬编码声明
 
-`max_tokens = 16000`、超时 120 秒、输出 16000 字符且头尾各 8000、空输出文本、
+`max_tokens = 16000`、超时 250 秒（`boot.py` 的 `alarm`）、输出 16000 字符且头尾各 8000、
+空输出文本、连接预算 10 s 与读写预算 600 s（`transport.rs`）、收口宽限 5 s 与轮询 20 ms（`python.rs`）、
 默认网关 `http://127.0.0.1:3425`、默认 key `magpie`、`anthropic-version: 2023-06-01`
 各只有一处权威。`MEI.md` 是系统提示词唯一来源，修改它即可改变构建时的静态提示；
 不再为二次开发复制一份 TOML 配置。服务端工具的结果绕过 Python 输出上限并逐轮重传，
@@ -251,3 +262,9 @@ Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 
 被否的是 Provider 分支、服务端工具建模与截断其结果。 -/
 /-! D6 `MEI.md` 在构建时注入，不新增动态配置体系：二次开发直接修改源码资源；
 被否的是再引入 TOML 配置解析和第二份提示词。 -/
+/-! D7 `close()` 用 5 s 有界等待代替无限 wait，超时 kill 并回收：模型留下的非 daemon 线程原会让
+解释器永不退出、扣住最终答案；被否的是无限 wait（最终 stdout 被模型代码劫持）与把超时当运行失败
+（答案已完整，升级清理不该吞掉它）。 -/
+/-! D8 传输对每个地址设 10 s 连接预算、对读写设 600 s 宽松预算：非流式响应可能合法思考数分钟，
+接受后停滞的网关必须返回 `E_MEI_TRANSPORT` 且不重试；被否的是不设时限（脚本化调用无限挂起）与
+短时限（截断合法的长思考响应）。 -/

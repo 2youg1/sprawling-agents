@@ -11,10 +11,57 @@ use std::fmt::{Display, Formatter};
 /// The result used by every Mei adapter.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The stable code naming the rule a diagnostic enforces. One variant per
+/// rule, so a misspelled or newly added code fails at compile time instead
+/// of landing in a catch-all arm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Code {
+    Usage,
+    Config,
+    Transport,
+    Protocol,
+    Python,
+    Unsupported,
+}
+
+impl Code {
+    /// The wire spelling, stable across releases.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Code::Usage => "E_MEI_USAGE",
+            Code::Config => "E_MEI_CONFIG",
+            Code::Transport => "E_MEI_TRANSPORT",
+            Code::Protocol => "E_MEI_PROTOCOL",
+            Code::Python => "E_MEI_PYTHON",
+            Code::Unsupported => "E_MEI_UNSUPPORTED",
+        }
+    }
+
+    /// The rule this code enforces; one arm per variant, no default.
+    fn rule(self) -> &'static str {
+        match self {
+            Code::Usage => "Only `mei -p PROMPT` or a non-terminal stdin prompt is accepted",
+            Code::Config => {
+                "Configuration must preserve the closed Messages and transport contract"
+            }
+            Code::Transport => {
+                "Only plain HTTP with a complete status line, header/body boundary and JSON body is accepted"
+            }
+            Code::Protocol => {
+                "The response must satisfy the minimal Anthropic Messages and sole-Python-tool contract"
+            }
+            Code::Python => {
+                "The private Python channel must carry one valid JSON string frame per call and the interpreter must stay alive"
+            }
+            Code::Unsupported => "Mei requires POSIX process and signal semantics",
+        }
+    }
+}
+
 /// A failure with a stable code and a checked next step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    pub code: &'static str,
+    pub code: Code,
     pub action: Box<str>,
     pub subject: Box<str>,
     pub path: Option<Box<str>>,
@@ -23,9 +70,9 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    /// One diagnostic; its rule is derived from the stable code in one place.
+    /// One diagnostic; its rule is derived from the code in one place.
     pub fn new(
-        code: &'static str,
+        code: Code,
         action: impl Into<String>,
         subject: impl Into<String>,
         recovery: impl Into<String>,
@@ -53,23 +100,7 @@ impl Diagnostic {
     }
 
     fn rule(&self) -> &'static str {
-        match self.code {
-            "E_MEI_USAGE" => "Only `mei -p PROMPT` or a non-terminal stdin prompt is accepted",
-            "E_MEI_CONFIG" => {
-                "Configuration must preserve the closed Messages and transport contract"
-            }
-            "E_MEI_TRANSPORT" => {
-                "Only plain HTTP with a complete status line, header/body boundary and JSON body is accepted"
-            }
-            "E_MEI_PROTOCOL" => {
-                "The response must satisfy the minimal Anthropic Messages and sole-Python-tool contract"
-            }
-            "E_MEI_PYTHON" => {
-                "The private Python channel must carry one valid JSON string frame per call and the interpreter must stay alive"
-            }
-            "E_MEI_UNSUPPORTED" => "Mei requires POSIX process and signal semantics",
-            _ => "Correct the named operation before running Mei again",
-        }
+        self.code.rule()
     }
 }
 
@@ -83,7 +114,7 @@ pub enum Error {
 impl Display for Diagnostic {
     fn fmt(&self, out: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(out, "```toml")?;
-        writeln!(out, "code = {:?}", self.code)?;
+        writeln!(out, "code = {:?}", self.code.as_str())?;
         writeln!(out, "action = {:?}", self.action)?;
         writeln!(out, "subject = {:?}", self.subject)?;
         if let Some(path) = &self.path {
@@ -109,13 +140,21 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Convenience for the frequent protocol family.
+/// Convenience for the frequent protocol family: a `Diagnostic` carrying
+/// the `Protocol` code, ready for `with_path`/`with_value`. `?` and
+/// [`From<Diagnostic>`] lift it into [`Error`] at the call site.
 pub fn protocol(
     action: impl Into<String>,
     subject: impl Into<String>,
     recovery: impl Into<String>,
-) -> Error {
-    Error::Diagnostic(Diagnostic::new("E_MEI_PROTOCOL", action, subject, recovery))
+) -> Diagnostic {
+    Diagnostic::new(Code::Protocol, action, subject, recovery)
+}
+
+impl From<Diagnostic> for Error {
+    fn from(diagnostic: Diagnostic) -> Error {
+        Error::Diagnostic(diagnostic)
+    }
 }
 
 #[cfg(test)]

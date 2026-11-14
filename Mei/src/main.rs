@@ -11,7 +11,7 @@ use std::process::ExitCode;
 
 use serde_json::{Value, json};
 
-use mei::error::{Diagnostic, Error, Result};
+use mei::error::{Code, Diagnostic, Error, Result};
 use mei::{agent, python, transport};
 
 const MAX_TOKENS: u64 = 16000;
@@ -40,7 +40,7 @@ fn run() -> Result<String> {
     let prompt = prompt()?;
     let model = optional_environment("HARNESS_MODEL")?.ok_or_else(|| {
         Error::Diagnostic(Diagnostic::new(
-            "E_MEI_CONFIG",
+            Code::Config,
             "read HARNESS_MODEL",
             "the variable is required and must not be empty",
             "set HARNESS_MODEL to magpie's provider/model spelling",
@@ -48,7 +48,7 @@ fn run() -> Result<String> {
     })?;
     if model.is_empty() {
         return Err(Error::Diagnostic(Diagnostic::new(
-            "E_MEI_CONFIG",
+            Code::Config,
             "read HARNESS_MODEL",
             "the variable must not be empty",
             "set HARNESS_MODEL to magpie's provider/model spelling",
@@ -86,7 +86,7 @@ fn optional_environment(name: &str) -> Result<Option<String>> {
         Ok(value) => Ok(Some(value)),
         Err(std::env::VarError::NotPresent) => Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => Err(Error::Diagnostic(Diagnostic::new(
-            "E_MEI_CONFIG",
+            Code::Config,
             format!("read {name}"),
             "the environment value is not Unicode",
             format!("set {name} to valid UTF-8 or leave it unset"),
@@ -108,7 +108,7 @@ fn prompt() -> Result<String> {
                 .read_to_string(&mut prompt)
                 .map_err(|err| {
                     Error::Diagnostic(Diagnostic::new(
-                        "E_MEI_USAGE",
+                        Code::Usage,
                         "read the prompt from stdin",
                         err.to_string(),
                         "use `mei -p PROMPT` or pipe a complete prompt on stdin",
@@ -117,7 +117,7 @@ fn prompt() -> Result<String> {
             Ok(prompt)
         }
         _ => Err(Error::Diagnostic(Diagnostic::new(
-            "E_MEI_USAGE",
+            Code::Usage,
             "parse the command line",
             "expected `mei -p PROMPT` or a non-terminal stdin prompt",
             "use `mei -p PROMPT`; without -p, pipe input instead of leaving stdin on a terminal",
@@ -141,7 +141,7 @@ fn initial_request(
     if let Some(extra) = extra {
         let extra: Value = serde_json::from_str(extra).map_err(|err| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "parse HARNESS_EXTRA",
                 err.to_string(),
                 "set HARNESS_EXTRA to one JSON object; messages are supplied by the prompt",
@@ -149,7 +149,7 @@ fn initial_request(
         })?;
         let fields = extra.as_object().ok_or_else(|| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "merge HARNESS_EXTRA",
                 "the value is not an object",
                 "set HARNESS_EXTRA to one JSON object",
@@ -157,7 +157,7 @@ fn initial_request(
         })?;
         if fields.contains_key("tools") {
             return Err(Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "merge HARNESS_EXTRA",
                 "tools would replace the sole local Python tool",
                 "put transparent server-side declarations in MEI_TOOLS, not HARNESS_EXTRA.tools",
@@ -165,7 +165,7 @@ fn initial_request(
         }
         if fields.get("stream") == Some(&Value::Bool(true)) {
             return Err(Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "merge HARNESS_EXTRA",
                 "stream=true requires SSE, which Mei does not implement",
                 "remove stream or set it to false; Mei waits for complete HTTP responses",
@@ -173,7 +173,7 @@ fn initial_request(
         }
         let target = request.as_object_mut().ok_or_else(|| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "construct the Messages request",
                 "the base request is not an object",
                 "keep the base request as a JSON object",
@@ -187,7 +187,7 @@ fn initial_request(
         .as_object_mut()
         .ok_or_else(|| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "construct the Messages request",
                 "the base request is not an object",
                 "keep the base request as a JSON object",
@@ -200,7 +200,7 @@ fn initial_request(
     if let Some(server_tools) = server_tools {
         let additional: Value = serde_json::from_str(server_tools).map_err(|err| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "parse MEI_TOOLS",
                 err.to_string(),
                 "set MEI_TOOLS to a JSON array of transparent server-side tool declarations",
@@ -208,7 +208,7 @@ fn initial_request(
         })?;
         let additional = additional.as_array().ok_or_else(|| {
             Error::Diagnostic(Diagnostic::new(
-                "E_MEI_CONFIG",
+                Code::Config,
                 "append MEI_TOOLS",
                 "the value is not an array",
                 "set MEI_TOOLS to a JSON array; the local Python declaration stays first",
@@ -219,7 +219,7 @@ fn initial_request(
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
                 Error::Diagnostic(Diagnostic::new(
-                    "E_MEI_CONFIG",
+                    Code::Config,
                     "append MEI_TOOLS",
                     "tools is not an array",
                     "keep the local Python declaration first in tools",
@@ -233,7 +233,7 @@ fn initial_request(
 fn python_tool() -> Value {
     json!({
         "name": "python",
-        "description": "A persistent Python 3 interpreter. Variables survive across calls. Returns stdout+stderr. Output over 16000 chars is truncated and the full text is saved to a file named in the result. Each call has a 120 s best-effort timeout. Use subprocess for shell commands and print for expression results.",
+        "description": "A persistent Python 3 interpreter. Variables survive across calls. Returns stdout+stderr. Output over 16000 chars is truncated and the full text is saved to a file named in the result. Each call has a 250 s best-effort timeout. Use subprocess for shell commands and print for expression results.",
         "input_schema": {
             "type": "object",
             "properties": {"code": {"type": "string"}},

@@ -24,6 +24,10 @@ use super::{Show, UI_DEPTH};
 use super::{input, keys, live as console_live};
 use crate::assembly::SystemClock;
 
+/// How many replay lines one batch draws before pending keys, exits and a
+/// lost terminal take effect again; a long trace stays interruptible.
+const REPLAY_BATCH: usize = 64;
+
 /// Opens the Mei writer. A replay file uses the same messages and screen as
 /// a real process; no second display path exists.
 pub(crate) fn run(replay: Option<&str>) -> ExitCode {
@@ -31,7 +35,19 @@ pub(crate) fn run(replay: Option<&str>) -> ExitCode {
         Some(path) => match std::fs::File::open(path) {
             Ok(file) => Some(BufReader::new(file)),
             Err(err) => {
-                eprintln!("open Mei replay {path}: {err}");
+                eprintln!(
+                    "{}",
+                    super::super::mei::AdapterFailure {
+                        code: "E_MEI_CONFIG",
+                        action: "open the Mei replay file",
+                        rule: "the replay path must name a readable Mei JSONL file",
+                        recovery: "pass the file saved from a live run, for example `sprawling mei --replay run.jsonl`",
+                        subject: err.to_string(),
+                        path: path.to_owned(),
+                        value: path.to_owned(),
+                    }
+                    .render()
+                );
                 return ExitCode::FAILURE;
             }
         },
@@ -67,8 +83,8 @@ impl Ui {
             screen: Screen::default(),
             seen: Mei::new(model),
             process: None,
+            replay_done: replay.is_none(),
             replay,
-            replay_done: false,
             reporting: Reporting::from_environment(),
             held: Held::OPENING,
             lost: false,
@@ -77,7 +93,7 @@ impl Ui {
 
     fn run(&mut self, from: &Receiver<Show>) -> ExitCode {
         if self.screen.take() == Written::Lost {
-            return ExitCode::FAILURE;
+            return self.give_back(from, ExitCode::FAILURE);
         }
         self.print(vec![Entry::Banner {
             city: "Archetype:Mei".to_owned(),
@@ -89,19 +105,41 @@ impl Ui {
                 return self.give_back(from, ExitCode::FAILURE);
             }
             self.advance_replay();
-            match from.recv() {
+            match from.try_recv() {
                 Ok(show) => {
                     if let Some(code) = self.show(show) {
                         return self.give_back(from, code);
                     }
                 }
-                Err(_) => return self.give_back(from, ExitCode::SUCCESS),
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    if self.replay_done {
+                        match from.recv() {
+                            Ok(show) => {
+                                if let Some(code) = self.show(show) {
+                                    return self.give_back(from, code);
+                                }
+                            }
+                            Err(_) => return self.give_back(from, ExitCode::SUCCESS),
+                        }
+                    }
+                    // A replay still draining loops around: the next batch
+                    // prints without waiting for a key.
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    return self.give_back(from, ExitCode::SUCCESS);
+                }
             }
         }
     }
 
+    /// Draws the next bounded batch of replay lines. Esc, a lost terminal
+    /// and a running task take effect between batches, and the caller keeps
+    /// calling without waiting for keys until the trace is drained.
     fn advance_replay(&mut self) {
-        while !self.replay_done && self.process.is_none() {
+        for _ in 0..REPLAY_BATCH {
+            if self.replay_done || self.process.is_some() || self.lost {
+                return;
+            }
             let Some(replay) = self.replay.as_mut() else {
                 return;
             };
@@ -144,7 +182,7 @@ impl Ui {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return None;
         }
-        if key.code == KeyCode::Enter {
+        if key.code == KeyCode::Enter && !key.modifiers.contains(KeyModifiers::SHIFT) {
             self.enter();
         } else if key.code == KeyCode::Esc {
             return self.escape();
@@ -373,5 +411,37 @@ mod tests {
         ui.screen.cut();
         ui.advance_replay();
         assert!(ui.replay_done);
+    }
+
+    #[test]
+    fn replay_advances_in_bounded_batches_so_escape_stays_live() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("trace.jsonl");
+        let mut text = String::new();
+        for index in 0..REPLAY_BATCH + 4 {
+            text.push_str(&format!(
+                "{{\"role\":\"assistant\",\"content\":\"line {index}\"}}\n"
+            ));
+        }
+        std::fs::write(&path, text).unwrap();
+        let replay = BufReader::new(std::fs::File::open(path).unwrap());
+        let (to, _from) = std::sync::mpsc::sync_channel(UI_DEPTH);
+        let mut ui = Ui::new(to, Some(replay));
+        ui.screen.cut();
+        ui.advance_replay();
+        assert!(!ui.replay_done, "one batch must not pin the whole trace");
+        ui.advance_replay();
+        assert!(ui.replay_done);
+    }
+
+    #[test]
+    fn shift_enter_inserts_a_newline_instead_of_submitting() {
+        let (to, _from) = std::sync::mpsc::sync_channel(UI_DEPTH);
+        let mut ui = Ui::new(to, None);
+        ui.screen.cut();
+        ui.key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        ui.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT));
+        assert_eq!(ui.editor.text(), "x\n");
+        assert!(ui.process.is_none());
     }
 }

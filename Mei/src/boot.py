@@ -4,13 +4,15 @@ os.dup2(os.open(os.devnull, os.O_RDONLY), 0)
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 g = {"__name__": "__main__"}
-def boom(*_): raise TimeoutError("timeout after 120s")
-def snapshot(f):
+def boom(*_): raise TimeoutError("timeout after 250s")
+def snapshot(f, size):
     decoder = codecs.getincrementaldecoder("utf-8")("replace")
     head, tail, count = "", "", 0
-    while True:
-        chunk = f.read(65536)
+    left = size
+    while left > 0:
+        chunk = f.read(min(65536, left))
         if not chunk: break
+        left -= len(chunk)
         text = decoder.decode(chunk)
         count += len(text)
         head = (head + text)[:8000]
@@ -29,11 +31,17 @@ for line in rx:
     f = tempfile.NamedTemporaryFile("w+b", delete=False)
     os.dup2(f.fileno(), 1); os.dup2(f.fileno(), 2)
     signal.signal(signal.SIGALRM, boom)
-    signal.alarm(120)
+    signal.alarm(250)
     try: exec(code, g)
     except BaseException as e: traceback.print_exception(type(e), e, e.__traceback__.tb_next)
     finally: signal.alarm(0)
     sys.stdout.flush(); sys.stderr.flush()
-    f.seek(0); out, truncated = snapshot(f); f.close()
-    if not truncated: os.unlink(f.name)
+    size = os.fstat(f.fileno()).st_size
+    name = f.name
+    f.close()
+    # A fresh handle owns its file offset: a model thread still writing to
+    # the shared output offset appends past the bounded snapshot instead of
+    # overwriting its head, and the fstat bound keeps the snapshot finite.
+    with open(name, "rb") as r: out, truncated = snapshot(r, size)
+    if not truncated: os.unlink(name)
     tx.write(json.dumps(out or "(no output)").encode("utf-8") + b"\n"); tx.flush()

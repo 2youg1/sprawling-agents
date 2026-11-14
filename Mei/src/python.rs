@@ -10,11 +10,25 @@
 use std::io::{BufRead, BufReader, Write};
 #[cfg(unix)]
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+#[cfg(unix)]
+use std::time::Duration;
 
-use crate::error::{Diagnostic, Error, Result};
+use crate::error::{Code, Diagnostic, Error, Result};
 
 #[cfg(unix)]
 const BOOT: &str = include_str!("boot.py");
+
+/// How often a closing interpreter is checked for exit. The close grace is
+/// a multiple of this poll, so the bounded wait needs no clock of its own.
+#[cfg(unix)]
+const CLOSE_POLL: Duration = Duration::from_millis(20);
+
+/// How long a closing interpreter may take to exit before it is killed and
+/// reaped. A clean interpreter exits in moments; model code that leaves
+/// non-daemon threads behind would otherwise hold the final answer hostage
+/// forever, because Python refuses to exit while any of them lives.
+#[cfg(unix)]
+const CLOSE_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(unix)]
 fn failure(
@@ -22,7 +36,7 @@ fn failure(
     subject: impl Into<String>,
     recovery: impl Into<String>,
 ) -> Error {
-    Error::Diagnostic(Diagnostic::new("E_MEI_PYTHON", action, subject, recovery))
+    Error::Diagnostic(Diagnostic::new(Code::Python, action, subject, recovery))
 }
 
 /// The direct child and its private one-line JSON channel.
@@ -176,18 +190,52 @@ impl Py {
 
     /// Closes control input and reaps a normally idle interpreter.
     ///
+    /// The wait is bounded by [`CLOSE_GRACE`]: model code may leave
+    /// non-daemon threads behind, and Python refuses to exit while any of
+    /// them lives, so after the grace the interpreter is killed and reaped.
+    /// A forced cleanup is ordinary shutdown, not a run failure; the model
+    /// already returned its final answer.
+    ///
     /// # Errors
-    /// Waiting for the interpreter fails. On an active or broken run use
-    /// [`Py::kill_and_wait`] instead.
+    /// Waiting on or killing/reaping the interpreter fails. On an active
+    /// or broken run use [`Py::kill_and_wait`] instead.
     pub fn close(&mut self) -> Result<()> {
+        self.close_within(CLOSE_GRACE)
+    }
+
+    /// Polls the interpreter for exit at most `grace` long, then escalates.
+    fn close_within(&mut self, grace: Duration) -> Result<()> {
         drop(self.input.take());
-        self.child.wait().map(|_| ()).map_err(|err| {
-            failure(
+        let Some(polls) = grace.as_millis().checked_div(CLOSE_POLL.as_millis()) else {
+            return Err(failure(
+                "close and wait for Python",
+                "the close poll has no length",
+                "keep the close poll positive",
+            ));
+        };
+        for _ in 0..polls {
+            match self.child.try_wait() {
+                Ok(Some(_)) => return Ok(()),
+                Ok(None) => {}
+                Err(err) => {
+                    return Err(failure(
+                        "close and wait for Python",
+                        err.to_string(),
+                        "if the interpreter does not exit, kill it and wait again",
+                    ));
+                }
+            }
+            std::thread::sleep(CLOSE_POLL);
+        }
+        match self.child.try_wait() {
+            Ok(Some(_)) => Ok(()),
+            Ok(None) => self.kill_and_wait(),
+            Err(err) => Err(failure(
                 "close and wait for Python",
                 err.to_string(),
                 "if the interpreter does not exit, kill it and wait again",
-            )
-        })
+            )),
+        }
     }
 
     /// Kills the direct interpreter and always attempts to reap it.
@@ -235,7 +283,7 @@ impl Py {
     /// Always returns `E_MEI_UNSUPPORTED`.
     pub fn spawn() -> Result<Py> {
         Err(Error::Diagnostic(Diagnostic::new(
-            "E_MEI_UNSUPPORTED",
+            Code::Unsupported,
             "start Python for Mei",
             "native Windows has no SIGALRM or POSIX fd semantics",
             "run Mei inside a POSIX container, VM, bwrap or dedicated POSIX account",
@@ -346,7 +394,7 @@ mod tests {
 
     #[test]
     fn a_timeout_returns_feedback_and_the_next_call_reuses_state() {
-        let boot = BOOT.replace("120s", "1s").replace("alarm(120)", "alarm(1)");
+        let boot = BOOT.replace("250s", "1s").replace("alarm(250)", "alarm(1)");
         let mut python = Py::with_boot(&boot).unwrap();
         let output = python.run("x = 42\nwhile True: pass").unwrap();
         assert!(
@@ -369,6 +417,35 @@ mod tests {
     fn an_interpreter_death_is_an_error() {
         let mut python = Py::spawn().unwrap();
         assert!(python.run("import os\nos._exit(7)").is_err());
+        python.kill_and_wait().unwrap();
+    }
+
+    #[test]
+    fn leftover_background_threads_cannot_hold_the_final_answer_hostage() {
+        let mut python = Py::spawn().unwrap();
+        python
+            .run("import threading\nthreading.Thread(target=threading.Event().wait).start()\nprint('answered')")
+            .unwrap();
+        // A non-daemon thread never finishes: the bounded close kills and
+        // reaps the interpreter instead of waiting forever.
+        python
+            .close_within(Duration::from_millis(200))
+            .expect("the close escalates instead of hanging");
+    }
+
+    #[test]
+    fn a_background_writer_during_snapshot_cannot_overwrite_or_extend_it() {
+        let mut python = Py::spawn().unwrap();
+        let first = python
+            .run(
+                "import os, threading\nprint('head', flush=True)\nthreading.Thread(target=lambda: [os.write(1, b'x') for _ in range(50000)]).start()",
+            )
+            .unwrap();
+        // The snapshot is read through an independent handle, bounded to the
+        // size captured before the read: the head survives and late background
+        // appends cannot prolong it (they land past the bound).
+        assert!(first.starts_with("head\n"), "{first}");
+        assert!(first.len() < 64, "the snapshot stays bounded: {first}");
         python.kill_and_wait().unwrap();
     }
 }

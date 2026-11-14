@@ -11,7 +11,25 @@ use std::io::Write;
 
 use serde_json::{Value, json};
 
-use crate::error::{Result, protocol};
+use crate::error::{Error, Result, protocol};
+
+/// Renders the value found at a failed field, naming absence plainly.
+fn found(value: Option<&Value>) -> String {
+    value.map_or_else(|| "<missing>".to_owned(), |value| value.to_string())
+}
+
+/// The path of the assistant message just appended, so a diagnostic can
+/// name the offending content block.
+fn message_path(request: &Value) -> String {
+    request
+        .get("messages")
+        .and_then(Value::as_array)
+        .and_then(|messages| messages.len().checked_sub(1))
+        .map_or_else(
+            || "messages".to_owned(),
+            |index| format!("messages[{index}]"),
+        )
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Call {
@@ -43,6 +61,8 @@ pub fn run(
                     "stop_reason is missing or is not a string",
                     "return a complete Anthropic Messages response with a string stop_reason",
                 )
+                .with_path("response.stop_reason")
+                .with_value(found(response.get("stop_reason")))
             })?
             .to_owned();
         let content = response.get("content").cloned().ok_or_else(|| {
@@ -51,30 +71,39 @@ pub fn run(
                 "content is missing",
                 "return a complete Anthropic Messages response with content",
             )
+            .with_path("response.content")
+            .with_value(found(response.get("content")))
         })?;
         if !content.is_string() && !content.is_array() {
             return Err(protocol(
                 "read response.content",
                 "content is neither a string nor an array",
                 "return text as a string or an array of content blocks",
-            ));
+            )
+            .with_path("response.content")
+            .with_value(found(Some(&content)))
+            .into());
         }
         append(
             request,
             json!({"role": "assistant", "content": content.clone()}),
             trace,
         )?;
+        let base = message_path(request);
         match stop.as_str() {
             "pause_turn" => continue,
-            "end_turn" => return text(&content),
+            "end_turn" => return text(&content, &base),
             "tool_use" => {
-                let calls = calls(&content)?;
+                let calls = calls(&content, &base)?;
                 if calls.is_empty() {
                     return Err(protocol(
                         "validate a Python tool wave",
                         "stop_reason is tool_use but no client tool call is present",
                         "return at least one valid python tool_use block, or use another stop_reason",
-                    ));
+                    )
+                    .with_path(format!("{base}.content"))
+                    .with_value(found(Some(&content)))
+                    .into());
                 }
                 let mut results = Vec::with_capacity(calls.len());
                 for call in calls {
@@ -92,20 +121,28 @@ pub fn run(
                     "continue after max_tokens",
                     "the model exhausted max_tokens",
                     "raise max_tokens in HARNESS_EXTRA or finish the task in a smaller piece; no tool call was executed",
-                ));
+                )
+                .with_path("response.stop_reason")
+                .with_value("max_tokens")
+                .into());
             }
             reason => {
                 return Err(protocol(
                     "continue after a stop reason",
                     format!("unsupported stop_reason `{reason}`"),
                     "use a provider/model that returns end_turn, tool_use or pause_turn; this run was not continued",
-                ));
+                )
+                .with_path("response.stop_reason")
+                .with_value(reason)
+                .into());
             }
         }
     }
 }
 
 fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<()> {
+    // Sampled before the mutable borrow the closure cannot take.
+    let seen = found(request.get("messages"));
     let messages = request
         .get_mut("messages")
         .and_then(Value::as_array_mut)
@@ -115,6 +152,8 @@ fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<
                 "request.messages is missing or is not an array",
                 "construct one Messages request with messages as an array before calling agent::run",
             )
+            .with_path("request.messages")
+            .with_value(seen)
         })?;
     messages.push(message.clone());
     serde_json::to_writer(&mut *trace, &message).map_err(|err| {
@@ -123,25 +162,29 @@ fn append(request: &mut Value, message: Value, trace: &mut dyn Write) -> Result<
             err.to_string(),
             "keep stderr writable; the message was appended but no tool effect was started by this trace call",
         )
+        .with_path("trace")
     })?;
     trace
         .write_all(b"\n")
         .and_then(|()| trace.flush())
         .map_err(|err| {
-            protocol(
-                "flush an appended trace message",
-                err.to_string(),
-                "keep stderr writable so the next request cannot outrun its observation",
+            Error::from(
+                protocol(
+                    "flush an appended trace message",
+                    err.to_string(),
+                    "keep stderr writable so the next request cannot outrun its observation",
+                )
+                .with_path("trace"),
             )
         })
 }
 
-fn text(content: &Value) -> Result<String> {
+fn text(content: &Value, base: &str) -> Result<String> {
     if let Some(text) = content.as_str() {
         return Ok(text.to_owned());
     }
     let mut answer = String::new();
-    for block in content.as_array().into_iter().flatten() {
+    for (index, block) in content.as_array().into_iter().flatten().enumerate() {
         match block.get("type").and_then(Value::as_str) {
             Some("text") => {
                 let part = block.get("text").and_then(Value::as_str).ok_or_else(|| {
@@ -150,6 +193,8 @@ fn text(content: &Value) -> Result<String> {
                         "a text block has no string text",
                         "return every text block with a string text field",
                     )
+                    .with_path(format!("{base}.content[{index}].text"))
+                    .with_value(found(block.get("text")))
                 })?;
                 answer.push_str(part);
             }
@@ -159,23 +204,28 @@ fn text(content: &Value) -> Result<String> {
                     "read a content block type",
                     "a content block has no string type",
                     "return every content block with a string type",
-                ));
+                )
+                .with_path(format!("{base}.content[{index}].type"))
+                .with_value(found(block.get("type")))
+                .into());
             }
         }
     }
     Ok(answer)
 }
 
-fn calls(content: &Value) -> Result<Vec<Call>> {
+fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
     let mut calls = Vec::new();
     let mut ids = BTreeSet::new();
-    for block in content.as_array().into_iter().flatten() {
+    for (index, block) in content.as_array().into_iter().flatten().enumerate() {
         let kind = block.get("type").and_then(Value::as_str).ok_or_else(|| {
             protocol(
                 "read a content block type",
                 "a content block has no string type",
                 "return every content block with a string type",
             )
+            .with_path(format!("{base}.content[{index}].type"))
+            .with_value(found(block.get("type")))
         })?;
         if kind != "tool_use" {
             continue;
@@ -187,11 +237,19 @@ fn calls(content: &Value) -> Result<Vec<Call>> {
             .filter(|id| !id.is_empty());
         let code = block.pointer("/input/code").and_then(Value::as_str);
         let (Some(id), Some(code)) = (id, code) else {
+            let (field, value) = if id.is_none() {
+                ("id", found(block.get("id")))
+            } else {
+                ("input.code", found(block.pointer("/input/code")))
+            };
             return Err(protocol(
                 "validate a Python tool call",
                 "tool_use id or input.code is missing or has the wrong type",
                 "return a non-empty string id and a string input.code for every python call",
-            ));
+            )
+            .with_path(format!("{base}.content[{index}].{field}"))
+            .with_value(value)
+            .into());
         };
         if !valid {
             return Err(protocol(
@@ -204,14 +262,20 @@ fn calls(content: &Value) -> Result<Vec<Call>> {
                         .unwrap_or("<missing>")
                 ),
                 "the only local client tool is python; server_tool_use blocks need no local result",
-            ));
+            )
+            .with_path(format!("{base}.content[{index}].name"))
+            .with_value(found(block.get("name")))
+            .into());
         }
         if !ids.insert(id.to_owned()) {
             return Err(protocol(
                 "validate a Python tool wave",
                 format!("duplicate tool_use id `{id}`"),
                 "give every tool_use in this wave a unique id; no call in the wave was executed",
-            ));
+            )
+            .with_path(format!("{base}.content[{index}].id"))
+            .with_value(id)
+            .into());
         }
         calls.push(Call {
             id: id.to_owned(),
@@ -365,11 +429,11 @@ mod tests {
                 ))
             },
             |_| {
-                Err(protocol(
+                Err(Error::from(protocol(
                     "execute Python",
                     "the interpreter died",
                     "start a new Mei process",
-                ))
+                )))
             },
             &mut trace,
         );
@@ -384,5 +448,27 @@ mod tests {
         assert!(result.is_err());
         let (result, _, _, _) = drive(vec![response("end_turn", json!([{"type": "text"}]))]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn protocol_errors_name_the_offending_path_and_value() {
+        let (result, _, _, _) = drive(vec![json!({"content": "missing stop"})]);
+        let shown = result.unwrap_err().to_string();
+        assert!(shown.contains("path = \"response.stop_reason\""), "{shown}");
+        assert!(shown.contains("value = \"<missing>\""), "{shown}");
+        let wave = response(
+            "tool_use",
+            json!([
+                {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "first()"}},
+                {"type": "tool_use", "name": "python", "input": {"code": "second()"}}
+            ]),
+        );
+        let (result, _, _, executed) = drive(vec![wave]);
+        assert!(executed.is_empty());
+        let shown = result.unwrap_err().to_string();
+        assert!(
+            shown.contains("path = \"messages[1].content[1].id\""),
+            "{shown}"
+        );
     }
 }

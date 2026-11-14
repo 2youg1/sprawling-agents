@@ -253,6 +253,29 @@ fn note(said: &str) -> Entry {
     }
 }
 
+/// One adapter failure: the stable code, the rule it broke, the exact
+/// repair, and what failed — subject, full path and offending value.
+pub(crate) struct AdapterFailure {
+    pub(crate) code: &'static str,
+    pub(crate) action: &'static str,
+    pub(crate) rule: &'static str,
+    pub(crate) recovery: &'static str,
+    pub(crate) subject: String,
+    pub(crate) path: String,
+    pub(crate) value: String,
+}
+
+impl AdapterFailure {
+    /// The structured diagnostic the repository rule asks for: a `toml`
+    /// fenced block carrying every field, ready for the terminal boundary.
+    pub(crate) fn render(&self) -> String {
+        format!(
+            "```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\npath = {:?}\nvalue = {:?}\nrule = {:?}\nrecovery = {:?}\n```",
+            self.code, self.action, self.subject, self.path, self.value, self.rule, self.recovery
+        )
+    }
+}
+
 struct Signals {
     done: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
@@ -283,7 +306,19 @@ impl MeiProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|err| format!("start Mei: {err}; set MEI_BIN to a working executable"))?;
+            .map_err(|err| {
+                let program = program.to_string_lossy().into_owned();
+                AdapterFailure {
+                    code: "E_MEI_CONFIG",
+                    action: "start Mei",
+                    rule: "MEI_BIN must name an executable Mei binary",
+                    recovery: "set MEI_BIN to the built binary, for example `MEI_BIN=target/debug/mei`, or put `mei` on PATH",
+                    subject: err.to_string(),
+                    path: program.clone(),
+                    value: program,
+                }
+                .render()
+            })?;
         let pid = child.id();
         let signals = Signals {
             done: Arc::new(AtomicBool::new(false)),
@@ -588,6 +623,23 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         assert!(gone(), "the ordinary grandchild survived its driver");
+    }
+
+    #[test]
+    fn a_missing_mei_binary_is_a_structured_diagnostic() {
+        let (to, _from) = std::sync::mpsc::sync_channel(1);
+        let error = match MeiProcess::spawn_with_program(
+            "prompt",
+            to,
+            std::ffi::OsStr::new("mei-definitely-not-on-path-xyz"),
+        ) {
+            Ok(_) => panic!("a missing binary must not spawn"),
+            Err(error) => error,
+        };
+        assert!(error.contains("```toml"), "{error}");
+        assert!(error.contains("E_MEI_CONFIG"), "{error}");
+        assert!(error.contains("mei-definitely-not-on-path-xyz"), "{error}");
+        assert!(error.contains("MEI_BIN"), "{error}");
     }
 
     #[cfg(unix)]

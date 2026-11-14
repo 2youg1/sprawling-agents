@@ -52,7 +52,9 @@ sprawling mei --replay run.jsonl
 
 ## Boundaries that matter
 
-- A 120-second alarm is best-effort. Each call reinstalls the handler and clears the alarm afterward, but executed code can change it or ignore the exception, and C calls can outlast it. Use an outer process manager for a hard deadline.
+- A 250-second alarm is best-effort. Each call reinstalls the handler and clears the alarm afterward, but executed code can change it or ignore the exception, and C calls can outlast it. The 250 seconds are meant to outlast network hiccups (a stalled request while a cable is reconnected, for example); use an outer process manager for a hard deadline.
+- The transport gives each gateway address a 10 s connect budget and a generous 600 s read/write budget. A gateway that accepts a connection and then stalls returns an `E_MEI_TRANSPORT` diagnostic instead of hanging forever; the request is not retried.
+- On success the interpreter gets a 5 s grace to exit after its stdin closes. Model code that leaves non-daemon threads behind would otherwise block Python's exit forever, so after the grace Mei kills and reaps the interpreter; that forced cleanup is ordinary shutdown, not a run failure.
 - Output is captured in a binary temporary file and decoded incrementally. Only the decoding block and the 8000-character head/tail windows are held in memory. Output over 16000 characters is truncated and its full path is returned; other capture files are deleted.
 - A whole tool wave is validated before the first side effect. Duplicate ids, unknown client tools, malformed calls, and an empty wave are protocol errors.
 - A dead interpreter or private channel ends the run. Earlier effects are not rolled back, and no complete result message is invented.
