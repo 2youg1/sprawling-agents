@@ -175,4 +175,19 @@ mod tests {
         }
         assert!(shown.ends_with("```"));
     }
+
+    #[test]
+    fn diagnostic_values_use_toml_string_escapes() {
+        let error = protocol(
+            "read response.content",
+            "content is invalid",
+            "return valid content",
+        )
+        .with_value("quote \" \\ \t \u{1b} \0 \u{7f}");
+        let shown = error.to_string();
+        assert!(
+            shown.contains(r#"value = "quote \" \\ \t \u001B \u0000 \u007F""#),
+            "{shown}"
+        );
+    }
 }

@@ -642,6 +642,29 @@ mod tests {
         assert!(error.contains("MEI_BIN"), "{error}");
     }
 
+    #[test]
+    fn adapter_diagnostics_with_control_characters_are_parseable_toml() {
+        let rendered = AdapterFailure {
+            code: "E_MEI_CONFIG",
+            action: "start Mei",
+            rule: "MEI_BIN must name an executable Mei binary",
+            recovery: "set MEI_BIN to a working executable",
+            subject: "invalid program".to_owned(),
+            path: "MEI_BIN".to_owned(),
+            value: "bad\u{1b}\0\u{7f}".to_owned(),
+        }
+        .render();
+        let document = rendered
+            .strip_prefix("```toml\n")
+            .and_then(|body| body.strip_suffix("\n```"))
+            .unwrap();
+        let parsed: toml::Table = toml::from_str(document).unwrap();
+        assert_eq!(
+            parsed.get("value").and_then(toml::Value::as_str),
+            Some("bad\u{1b}\0\u{7f}")
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn requesting_stop_lets_the_writer_drain_a_full_queue() {
