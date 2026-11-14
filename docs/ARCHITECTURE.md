@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->488<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->489<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -171,6 +171,7 @@ counting its rows is how you learn how many there are, which is why no
 number appears in this sentence.
 
 ```depmap
+mei:
 kernel:
 child:
 storage: kernel, child
@@ -189,6 +190,8 @@ desktop: kernel, agent_protocols, desktop_ffi, child
 desktop_ffi: child
 console_ffi:
 ```
+
+The `mei` row is empty on purpose. Archetype:Mei is a standalone academic prototype under the top-level `Mei/` directory, not a city component. Its only relationship to the city is a process-boundary adapter in the existing console: the console starts `mei` and projects its JSONL, while Mei has no crate dependency on the console or any other city crate. The default magpie address is an outbound client destination only; neither Mei nor this adapter listens on `2501` or `3425`.
 
 The `child` row is empty on purpose: `child::command` is the one place a
 child process is configured (detached from the city's console, in its own
@@ -1318,6 +1321,7 @@ flowchart TD
     gateway --> child
     gateway --> kernel
     kernel
+    mei
     remote_access --> child
     remote_access --> kernel
     runtime --> child

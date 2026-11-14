@@ -1,6 +1,6 @@
 # crates
 
-Every Rust package of the product lives in this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../docs/ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
+Every Rust package of the city lives in this directory. Standalone archetypes can live at the repository root when their design makes them independent of the city; `Mei/` is the current example, with no production edge into this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../docs/ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
 
 Development-only packages and fixtures also live here; [Development tools](development-tools.md) lists them. Their manifests keep them outside the product graph, and none enters the `sprawling` binary or a release archive.
 
@@ -11,6 +11,7 @@ Development-only packages and fixtures also live here; [Development tools](devel
 <!-- xtask:begin crate_table -->
 | Directory | Package | Lib | Owns | May depend on | SPEC |
 |---|---|---|---|---|---|
+| `Mei` | `sprawling-mei` | `mei` | a standalone single-shot harness: one Messages request, one serial loop and one persistent Python interpreter | nothing | `Mei/Spec.lean` |
 | `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/Spec.lean` |
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `child`, `gateway`, `kernel` | `crates/agent_protocols/Spec.lean` |
 | `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/Spec.lean` |

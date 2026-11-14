@@ -24,6 +24,8 @@ debug.skipKernelTC = false
 [[lean_lib]]
 name = "Spec"
 globs = [
+  "Mei.Spec",
+  "Mei.spec.+",
   "crates.accounting.Spec",
   "crates.accounting.spec.+",
   "crates.adversary.Spec",
