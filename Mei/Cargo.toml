@@ -1,0 +1,30 @@
+[package]
+name = "sprawling-mei"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+publish.workspace = true
+description = "Archetype:Mei, an academic minimal Agent Harness prototype for secondary development and technical discussion."
+keywords = ["agents", "llm", "harness", "prototype", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "mei"
+
+[[bin]]
+name = "mei"
+path = "src/main.rs"
+
+[[test]]
+name = "cli"
+path = "test/cli.rs"
+
+[dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

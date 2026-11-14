@@ -78,6 +78,7 @@ pub(super) fn main() -> ExitCode {
 fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
     let nth = |n| read.positional(n);
     match verb {
+        Verb::Mei => sprawling::console::mei::verb(read.value("--replay")),
         Verb::Status => status(args),
         Verb::PrivacyElevatedWrite => {
             match sprawling::privacy::cli::elevated_write(nth(1).map(String::as_str)) {

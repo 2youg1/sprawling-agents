@@ -91,6 +91,10 @@ tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
 
 # The peak memory a command `sprawling gauge` measured reached, read
 # after it exits and before its handle closes (`crates/sprawling/Spec.lean` §8-129-4).
+[target.'cfg(unix)'.dependencies]
+# Esc terminates the whole Mei process group through a safe POSIX interface.
+rustix = { version = "1.1.5", features = ["process"] }
+
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 # Windows self-uninstall releases the installed name before exit (Install.lean D53).
@@ -138,6 +142,8 @@ winresource = { version = "0.1.31", default-features = false }
 [dev-dependencies]
 proptest.workspace = true
 tempfile.workspace = true
+# The console adapter is tested against the real core loop, without a production edge.
+mei.workspace = true
 
 [lints]
 workspace = true

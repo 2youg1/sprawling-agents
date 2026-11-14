@@ -111,3 +111,77 @@ pub(crate) fn serving(terminal: &Terminal, vitals: Option<&wire::MetricsAnswer>,
 - **常驻内存不进这一屏**：「resident 在本平台叫什么」的唯一权威是 `xtask::mem`；`/serving` 印出 pid，`cargo xtask mem <pid>` 只差一次粘贴。**翻案条件**：新增一个 unit 承载这一个计数器，届时两个调用方共用一份定义。
 - **斜杠词表一张**（`wire::slash`，`crates/wire/spec/Slash.lean`）：`/help`、`/room <addr>`、`/new`、`/stop`、`/halt [--all]`、`/release [--all]`、`/model [<id>]`、`/effort [<level>]`、`/approve [<id>]`、`/deny [<id>]`、`/web`、`/quit`、`/serving`、`/remote <verb>`、`/acp [<text>]`、`/wire <verb> [<json>]`，每行写明在 CLI、WebUI 还是两处都提供。CLI 读它，客户端经 `cargo xtask wire-ts` 生成的 `SLASH` 读它；`/at` 不再存在，选房间是 `/room`。
 -/
+
+/-!
+## 8-174 Mei 后端：现有 Console 适配独立 Harness
+
+**原因**：Mei 是学术探索与二次开发原型，普通单发任务不需要 City 的持久会话与恢复。
+现有 Console 已拥有 editor、screen、renderer、单写者终端、回滚和 OSC 7501，
+所以新增一个后端比复制一套 TUI 更简单。City 后端的命令、投影与测试保持原样；
+Mei 核心不知道这里的任何类型。
+
+```text
+sprawling mei [--replay <jsonl>]
+```
+
+`MEI_BIN` 指定要启动的 `mei`，缺省在 PATH 上找 `mei`。真实后端不用 `-p`，
+而是把刚提交的 prompt 写入子进程 stdin 后关闭 stdin；这样启动与递归默认用法一致。
+replay 逐行读 Mei stderr 保存的 JSONL，和真实子进程共用 `Mei::line` 一个转换入口，
+不启动模型或 Python；replay 是只读显示，不再提交新任务。启动 `mei` 失败与打开回放文件
+失败都渲染成结构化诊断：一个 `toml` 围栏块的 Note，含稳定 `code`、`action`、`subject`、
+`path`、`value`、`rule` 与可执行的 `recovery`。
+
+```rust
+pub(crate) struct Mei { /* local run id, opening, tool wave, final rest */ }
+impl Mei {
+    fn begin(&mut self, at: TimeMs);
+    fn line(&mut self, line: &str, at: TimeMs) -> Vec<Entry>;
+    fn finished(&mut self, result: Result<String, String>, at: TimeMs) -> Vec<Entry>;
+}
+pub(crate) fn verb(replay: Option<&str>) -> ExitCode;
+```
+
+- **本地信息由本后端补齐**：每次提交分配仅用于显示的 RunId；收到消息时由 `SystemClock`
+  采样 `TimeMs`；刚提交的文本画 `Entry::You`；首个 assistant 画 `Entry::Head`。
+  没有核心 run id、初始 prompt 事件、时间戳、精确工具计时或递归进程树。
+- **同一投影**：带 `role/content` 的 JSON object 按消息处理；assistant 的 thinking 变成
+  `Reasoning`，text 变成 `Reply`，客户端工具波把 live state 标成
+  `Calling { name: "python", subject: "工具波执行中" }`。user/tool_result 变成
+  `Outcome::Answered` 的 `Tool`，其字符串内容（含多行和截断标记）变成 `Note`；
+  `Answered` 只表示工具已返回，不断言代码没有异常。非 JSON 行逐行成为 `Note`。
+- **结束**：进程退出状态更新 `Ended` 与 OSC 7501；成功是 Done，非零是 Limit/error，
+  Esc 是 Cancelled。最终 stdout 只用于最终答复核对，若与最后一条 assistant text 相同，
+  不重复画一份。每次只有一个本地任务在途；结束后可以提交新的独立任务，不恢复旧会话。
+- **键**：Enter 提交，Shift+Enter 插入换行（与 City 的 typing 同一规则）；Esc 先清草稿，
+  再停任务，最后退出。
+- **回放分批**：每批至多读 `REPLAY_BATCH`（64）行，批次之间处理积压事件（Esc、终端丢失）；
+  回放未读完前不等待键盘，读完才回到等键的阻塞读。
+- **终端交还**：screen take 失败、主循环发现终端丢失或正常退出，都经同一条 `give_back`
+  停任务、报 Closed 并关闭 raw mode 后才返回，不留下处于 raw mode 的调用终端。
+- **进程组**：Mei 由 `child::command` 启动，在 Unix 自成进程组；Esc 用安全 `rustix`
+  接口向该组发 SIGKILL，驱动线程 wait 直接子进程。TUI 退出也停止并回收尚未结束的组，
+  避免 Mei、Python 与常规子孙成为孤儿。核心 Python 仍在 Mei 的组内，因此这一组覆盖它。
+- **OSC 7501**：复用 `program_status::step`，提交时 Counted(1,0)，结束时先 Ended(rest)
+  再 Counted(0,0)，交还终端前 Closed；没有第二个状态机或状态协议。
+- **非交互输入输出不是终端时拒绝**，不制造一个看似可用却没有键盘的界面。
+
+D107 Mei 成为 Console 的第二个真实后端，而不是核心的一种事件源：入口用 `sprawling mei`，
+replay 与真实进程共用消息投影。理由是两个后端都需要把人的输入变成工作、把工作过程变成
+Entry 与 live state，缝归 Console；被否的是在 Mei 核心定义 TUI trait 或事件类型。
+
+D108 Esc 在 Unix 终止 Mei 的整个进程组，而不是只终止直接子进程：Python 与常规子孙都在
+该组内。理由是 `Child` 离开作用域不会自动 kill/wait，显式 killpg + wait 才能关闭孤儿路径；
+被否的是仅 `Child::kill` 或依赖 Drop 自动清理。
+
+D109 回放按有界批次（每批 64 行）读取与绘制，批次之间处理退出与终端丢失：整份读完再等人的
+旧形状让长 JSONL 期间 Esc 与终端丢失失效；被否的是每读一行等待一次键（无键输入时回放停摆）。
+
+**本节接口的当前状态**：replay 是调试适配器，不是 Mei 的持久化或恢复能力。
+服务端工具块只在 assistant 原文中出现，其可见 text/thinking 可投影；不虚构服务端工具计时。
+真实 City 后端不读这些类型，现有 `stream::Room` 不改。
+
+**本章测试**：`console::mei` 的纯投影测试覆盖普通回答、工具波、thinking、多行错误、
+截断输出、字符串 content、最终答案去重与 replay/真实入口复用，以及缺失 MEI_BIN 的结构化
+诊断；`console::ui::mei` 覆盖回放分批、整份回放先于等键与 Shift+Enter 换行；进程组测试在
+Unix 验证 Esc 后子进程被回收；既有 `console::tests::stream` 与 `console_ffi` 全部保持通过。
+-/

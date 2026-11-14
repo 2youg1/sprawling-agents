@@ -376,6 +376,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | 8-171 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-172 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-173 | `crates/sprawling/spec/Serving/Memory.lean` |
+| 8-174 | `crates/sprawling/spec/Console.lean` |
 
 §8-163 到 §8-172 是迁移时给重号的节新编的号：这几节在 Markdown 里与另一节同号（§8-27、§8-28、§8-29、§8-40、§8-41、§8-42、§8-50、§8-60 各有两到三节），保留原号的是先出现、被引用的那一节。
 -/
@@ -483,6 +484,8 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D80 | `crates/sprawling/spec/Supervising.lean` |
 | D105 | `crates/sprawling/spec/Nightly.lean` |
 | D106 | `crates/sprawling/spec/Console.lean` |
+| D107 | `crates/sprawling/spec/Console.lean` |
+| D108 | `crates/sprawling/spec/Console.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

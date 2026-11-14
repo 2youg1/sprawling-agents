@@ -38,7 +38,8 @@ A process that will not start is `spawn`'s own `io::Error`, and it belongs to th
   - a command `gauge` measures, which runs in the person's own terminal and must receive Ctrl+C;
   - the development packages (`xtask`, `citysim`, `benchstat`), whose processes belong to a developer;
   - a build script, which runs inside cargo rather than inside the city;
-  - a test fixture process, which is held to exactly the flags its test states.
+  - a test fixture process, which is held to exactly the flags its test states;
+  - an independent Archetype process. Mei starts its own Python without depending on the city or holding city secrets; it deliberately keeps the interpreter in Mei's process group so the outer killpg reaches both. The Sprawling TUI still starts Mei through `command`.
 
 - A key the caller sets with `env` after `command` is passed on. That is a value the caller chose to hand over, and it is how `agent_protocols` gives an MCP server the names a `[[mcp]]` table declared and the vault redeemed.
 - D3: keys are removed by name instead of emptying the environment and re-adding a whitelist, because each call site needs a different environment, and a whitelist would be a second configuration surface per call site.

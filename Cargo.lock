@@ -2952,6 +2952,7 @@ dependencies = [
  "proptest",
  "qrcodegen",
  "reqwest",
+ "rustix",
  "self-replace",
  "serde",
  "serde_json",
@@ -2966,6 +2967,7 @@ dependencies = [
  "sprawling-desktop-ffi",
  "sprawling-gateway",
  "sprawling-kernel",
+ "sprawling-mei",
  "sprawling-remote-access",
  "sprawling-runtime",
  "sprawling-storage",
@@ -3165,6 +3167,13 @@ dependencies = [
  "url",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "sprawling-mei"
+version = "0.0.16"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

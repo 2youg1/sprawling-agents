@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "Mei",
     "crates/kernel",
     "crates/child",
     "crates/storage",
@@ -23,6 +24,7 @@ members = [
     "crates/benchstat",
 ]
 default-members = [
+    "Mei",
     "crates/kernel",
     "crates/child",
     "crates/storage",
@@ -294,6 +296,7 @@ sprawling = { path = "crates/sprawling", version = "=0.0.16" }
 desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.16" }
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.16" }
 console_ffi = { package = "sprawling-console-ffi", path = "crates/console_ffi", version = "=0.0.16" }
+mei = { package = "sprawling-mei", path = "Mei", version = "=0.0.16" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.
