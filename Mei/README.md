@@ -1,8 +1,8 @@
-# Mei
+# Archetype:Mei
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Mei is a minimal Agent Harness: a model receives a task, acts through one Python 3 tool, receives a **path handle** to each effect, and repeats until it has a final answer. This package is the **headless** core. Mei does not contain a terminal shell.
+Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one Python 3 tool, receives a **path handle** to each effect, and repeats until it has a final answer. This package is the **headless** core. Mei does not contain a terminal shell.
 
 The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone.
 
