@@ -1,8 +1,8 @@
-# Mei
+# Archetype:Mei
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Mei 是极简 Agent Harness：把任务交给模型，模型通过一个 Python 3 工具行动，每次效应只拿回**路径句柄**，再继续直到最终答案。本包是**无头核**。Mei 不含终端壳。
+Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个 Python 3 工具行动，每次效应只拿回**路径句柄**，再继续直到最终答案。本包是**无头核**。Mei 不含终端壳。
 
 交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时发布无头 `mei` 与 `calyx` 面：TTY 且无 `-p` 时走 Calyx，`-p` 或管道仍走无头核。脚本只用无头路径。
 
