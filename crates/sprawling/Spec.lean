@@ -65,9 +65,9 @@ import crates.sprawling.spec.WireClient
 | `spec/Assembly/ChainWatch.lean` | `bin::assembly::chain_watch` |
 | `spec/Assembly/Listening.lean` | `bin::assembly::listening` |
 | `spec/BrowserBidi.lean` | `bin::browser_bidi` |
-| `spec/Console.lean` | `bin::console` |
-| `spec/Console/Lifecycle.lean` | `bin::console::lifecycle` |
-| `spec/Console/ProgramStatus.lean` | `bin::console::program_status` |
+| `spec/Console.lean` | `calyx::console` |
+| `spec/Console/Lifecycle.lean` | `calyx::console::lifecycle` |
+| `spec/Console/ProgramStatus.lean` | `calyx::console::program_status` |
 | `spec/Doctor.lean` | `bin::doctor` |
 | `spec/Firstrun.lean` | `bin::firstrun` |
 | `spec/Install.lean` | `bin::install` |

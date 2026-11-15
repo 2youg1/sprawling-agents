@@ -1,323 +1,120 @@
-# Archetype:Mei
+# Mei
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Mei is an academic prototype asking how small an Agent Harness can be: a model receives a task, acts through one Python 3 tool, receives the result, and repeats until it has a final answer. It is for learning, experiments, and secondary development, not a ready-made product.
+Mei is a minimal Agent Harness: a model receives a task, acts through one Python 3 tool, receives a **path handle** to each effect, and repeats until it has a final answer. This package is the **headless** core. Mei does not contain a terminal shell.
 
-> **Safety first:** Mei has no sandbox, permission prompts, or undo button. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
+The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone.
 
-## Published packages
+> **Safety first:** Mei has no sandbox, permission prompts, or undo. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
 
-On macOS arm64 or Linux x64, after configuring magpie and `HARNESS_MODEL` as shown below:
+## Install and run
 
-```sh
-bunx @sprawling/mei -p 'Use Python to calculate 40 + 2'
-```
-
-Or install the Rust command from crates.io:
-
-```sh
-cargo install sprawling-mei --locked
-mei -p 'Use Python to calculate 40 + 2'
-```
-
-npm publishes no native Windows binary. On Windows, run either command inside WSL or another POSIX environment.
-
-## From zero on a new Windows laptop
-
-This path assumes Windows 10/11, an internet connection, no repository, no Docker, no Linux, and no development tools. No prior Agent or programming experience is needed. You need administrator access and an API key for a model that supports tool calls; model use may cost money.
-
-### The few words that matter
-
-| Term | Meaning here |
+| Goal | Command |
 |---|---|
-| Agent | A model that can act through tools, not merely chat |
-| Terminal | A text window for commands; PowerShell and Ubuntu are different terminals |
-| WSL / Ubuntu | WSL runs Linux on Windows; Ubuntu is the Linux system installed below |
-| Python | The only local tool Mei gives the model |
-| Git | Downloads source and inspects project changes |
-| Rust / Cargo | Mei's implementation language and build tool |
-| Zig | Builds the terminal renderer used by `sprawling mei`; version 0.17.0 is required |
-| magpie | A local gateway that connects Mei to different model providers |
-| API key | A password-like credential issued by your model provider; never publish it |
+| Script / one-shot | `bunx @sprawling/mei -p '…'` or `cargo install sprawling-mei --locked` then `mei -p '…'` |
+| Interactive (`/new`, `/resume`, Esc) | `bunx @sprawling/mei` in the workspace, or `cargo install sprawling-mei sprawling-calyx --locked` then `calyx` (sibling `mei` or `MEI_BIN`) |
 
-WSL reduces accidental Windows file access but **is not a hard security boundary**: it can still reach Windows files and the network. Do not inspect private files under `/mnt/c`. For stronger isolation, use a disposable VM, container, bwrap, or dedicated account.
+`@sprawling/mei` ships the headless core and Calyx face for Windows x64, macOS arm64, and Linux x64 musl. Mei never embeds a shell in-process; Calyx also serves the city console inside `sprawling`.
 
-### 1. Install and open Ubuntu
+## Black-box path (keyboard only)
 
-Search **PowerShell** in the Windows Start menu, right-click it, choose **Run as administrator**, and run:
+Needs internet, a tool-calling model API key, and a disposable folder. No clone of this repository.
 
-```powershell
-wsl --install -d Ubuntu
-```
+### A. Script smoke
 
-Restart when asked. Then open **Ubuntu** from the Start menu. Its first launch asks for a Linux username and password. Nothing appears while typing the password; that is normal.
-
-Open Ubuntu from the Start menu next time as well. **All commands below run in the Ubuntu terminal unless explicitly marked PowerShell.** Microsoft's [official WSL guide](https://learn.microsoft.com/windows/wsl/install) covers installation failures.
-
-### 2. Install every dependency
-
-In Ubuntu, run:
+1. Install [bun](https://bun.sh) if needed.
+2. Magpie in one terminal:
 
 ```sh
-sudo apt update
-sudo apt install -y ca-certificates curl git python3 build-essential xz-utils rsync
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source "$HOME/.cargo/env"
 curl -fsSL https://usemagpie.ai/install.sh | sh -s -- --tui
-exec "$SHELL" -l
-```
-
-`sudo` may ask for the Ubuntu password. These steps install download and build tools, Git, Python, Rust, and magpie. The last command starts a fresh login shell so Ubuntu's default user command path takes effect. Docker, Node.js, and a database are not needed.
-
-Install the exact Zig version used by the terminal renderer. This block supports ordinary x86-64 and ARM64 laptops and verifies the official SHA-256. Paste the whole block: its separate shell stops on the first failed download, check, extraction, link, or version command. Do not continue until it prints `0.17.0`:
-
-```sh
-bash -e <<'EOF'
-case "$(uname -m)" in
-  x86_64) ZIG_ARCH=x86_64; ZIG_SHA256=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 ;;
-  aarch64) ZIG_ARCH=aarch64; ZIG_SHA256=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 ;;
-  *) echo "unsupported CPU: $(uname -m)"; exit 1 ;;
-esac
-cd /tmp
-curl -fSLO "https://ziglang.org/download/0.17.0/zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
-echo "$ZIG_SHA256  zig-$ZIG_ARCH-linux-0.17.0.tar.xz" | sha256sum -c -
-sudo tar -C /opt -xf "zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
-ln -sf "/opt/zig-$ZIG_ARCH-linux-0.17.0/zig" "$HOME/.cargo/bin/zig"
-cd ~
-zig version
-EOF
-```
-
-Check the remaining tools:
-
-```sh
-git --version
-python3 --version
-cargo --version
-magpie help
-```
-
-The first three print versions and the last prints magpie's commands.
-
-### 3. Configure a model
-
-Create an API key on your provider's website and give it a quota or spending limit. DeepSeek is the example below; `magpie presets` lists other providers.
-
-```sh
-read -rsp 'Paste the DeepSeek API key, then press Enter: ' DEEPSEEK_KEY; echo
-magpie provider add deepseek "$DEEPSEEK_KEY"
-unset DEEPSEEK_KEY
-magpie models
-```
-
-The key remains invisible while pasted. The last command lists models as `provider/model`. Choose one that supports tool calls; `deepseek/deepseek-flash` works for the examples if it appears in your list.
-
-Keep this window open and start the gateway:
-
-```sh
+magpie provider add deepseek
 magpie serve
 ```
 
-Open **a second Ubuntu window** from the Start menu. All Mei commands below run there. Mei defaults to `http://127.0.0.1:3425` in the same Ubuntu environment, so no gateway address or gateway key needs configuring.
-
-### 4. Download, build, and open Mei
-
-In the second Ubuntu window:
-
-```sh
-source "$HOME/.cargo/env"
-cd ~
-git clone https://github.com/2youg1/sprawling-agents.git
-cd sprawling-agents
-cargo build -p sprawling-mei -p sprawling
-```
-
-Replace the model below with an actual `magpie models` entry:
+3. Second terminal:
 
 ```sh
 export HARNESS_MODEL='deepseek/deepseek-flash'
-mkdir -p ~/mei-playground
-cd ~/mei-playground
-MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
+mkdir -p ~/mei-playground && cd ~/mei-playground
+bunx @sprawling/mei -p 'Use Python to calculate 40 + 2, then answer with only the number.'
 ```
 
-`HARNESS_MODEL` selects the model and is forgotten when this window closes. The last command opens Mei's interactive terminal. The first task creates a `mei-….jsonl` file in the current directory and prints its full path.
+Stdout is `42`. Failures are a `toml` block with `description` / `cause` / `resolution`.
 
-### 5. Have the first simple conversation
+### B. First workspace (interactive)
 
-At the Mei input line, type this and press Enter:
+1. Magpie as in A; set `HARNESS_MODEL`.
+2. Copy a disposable project into a new directory.
+3. In that directory:
 
-```text
-Use Python to calculate 40 + 2, then answer with only the number.
+```sh
+bunx @sprawling/mei
 ```
 
-The answer should be `42`. Mei waits for each complete non-streaming response, so a quiet screen does not necessarily mean it is stuck. The terminal shows model replies and Python results as they arrive.
-
-The current JSONL contains the initial prompt and every successful message in this conversation. Later tasks in this console continue that history. Each task starts a fresh Python process; Python variables do not survive across tasks.
-
-### 6. Features and commands
-
-**Features:**
-
-- One local `python` tool provides file, shell, network, and project-command access.
-- Python variables, imports, working-directory changes, and environment changes persist within one task.
-- Model and tool calls are serial. Final stdout contains only the final answer; observation messages can be saved as JSONL.
-- Edit [`src/MEI.md`](src/MEI.md) to change the build-time system prompt, or use `MEI_TOOLS` to add provider-executed tools.
-- There is no permission UI, spending cap, automatic retry, context compaction, or Python process recovery.
-
-**Inside `sprawling mei`:**
-
-| Input | What it does |
+| Keys | Effect |
 |---|---|
-| Ordinary text, then Enter | Runs a task in the current JSONL conversation |
-| `/new` | Creates a new JSONL and starts with empty history; old files stay untouched |
-| `/resume <path.jsonl>` | Imports that complete JSONL and continues it; successful new segments append to it |
-| Shift+Enter | Inserts a newline |
-| Esc | Clears the draft, then stops the running task, then exits |
+| Text, Enter | Run a task; first success creates `mei-….jsonl` in cwd |
+| `/new` | New JSONL; old files stay |
+| `/resume <path.jsonl>` | Continue that complete log |
+| Shift+Enter | Newline |
+| Esc | Clear draft → stop run → quit |
 
-These are the only Mei slash commands. `/resume` needs a path and does not guess a recent file. Imported history must begin with the initial user prompt and end with an assistant `end_turn`; malformed or partial logs fail with `E_MEI_SESSION` before the next model request or Python process. Restoring messages never restores Python variables or process state.
+Banner shows cwd; composer shows `HARNESS_MODEL · usage` (or `unknown` until a response carries usage). A live run shows Mei working; pulse lines are silent.
 
-For a read-only display of a log:
-
-```sh
-"$HOME/sprawling-agents/target/debug/sprawling" mei --replay run.jsonl
-```
-
-For scripts, the standalone binary remains one-shot and has no slash commands:
-
-```sh
-"$HOME/sprawling-agents/target/debug/mei" -p 'Use Python to calculate 40 + 2' 2>run.jsonl
-printf 'Explain this directory' | "$HOME/sprawling-agents/target/debug/mei"
-```
-
-Its optional `--resume <jsonl>` flag is the process interface used by the console. Press Ctrl+C to stop a standalone task.
-
-### 7. Start work on the first large project
-
-Use a **disposable project copy**, never the only original. Replace `/mnt/c/path/to/ProjectCopy` with the copy's Ubuntu path; `/mnt/c` is the Windows C: drive as seen from Ubuntu. Then paste this whole block:
-
-```sh
-bash -e <<'EOF'
-PROJECT_COPY='/mnt/c/path/to/ProjectCopy'
-DEST="$HOME/work/my-project"
-if [ -e "$DEST" ] || [ -L "$DEST" ]; then
-  echo "destination already exists: $DEST" >&2
-  exit 1
-fi
-mkdir -p "$HOME/work"
-mkdir "$DEST"
-rsync -a --safe-links \
-  --exclude='.env' --exclude='.env.*' \
-  --exclude='*.pem' --exclude='*.key' \
-  --exclude='id_rsa*' --exclude='id_ed25519*' \
-  --exclude='private/' --exclude='secrets/' \
-  "$PROJECT_COPY/" "$DEST/"
-find "$DEST" -type f \
-  \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
-     -o -name 'id_rsa*' -o -name 'id_ed25519*' \
-     -o -path '*/private/*' -o -path '*/secrets/*' \) -print
-EOF
-```
-
-The destination must be new, and `--safe-links` omits absolute links and links escaping the copied tree. Common credential files and private directories are excluded too, and `find` must print nothing. Inspect the rest of the copy: filename patterns cannot recognise every private file. Only after confirming that the copy contains no credentials or private material, start Mei:
-
-```sh
-cd ~/work/my-project
-export HARNESS_MODEL='deepseek/deepseek-flash'
-MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
-```
-
-First ask for a read-only survey:
+First prompt:
 
 ```text
 Read the project guide and directory layout without changing files. Tell me how to build and test it, then suggest the smallest useful first task.
 ```
 
-After checking that answer, give one bounded task at a time:
+Verify with `git status` and the project's own tests.
 
-```text
-Goal: … . Scope: modify only … . Done means: run … successfully. If blocked, report the blocker instead of widening the change. Finish with changed files, test commands, and their results.
-```
+From source without npm: `cargo install sprawling-mei sprawling-calyx --locked`, then `calyx` with `mei` on PATH or `MEI_BIN` set. Building `sprawling` from crates.io on Windows still needs Zig **0.17.0** for Calyx's frame leaf.
 
-The console carries history in the current JSONL, but Mei does not preload an entire large project or compact an old conversation. Use `/new` when unrelated history would distract the model, then restate the goal, scope, and done condition. Avoid “improve the whole project.”
-
-Verify the result yourself: in a Git project, run `git status --short` and `git diff`; otherwise compare against the original copy. Run the project's tests yourself rather than treating “done” as test evidence. There is no hard turn or spending ceiling: press Esc to stop and inspect usage in magpie.
-
-### Reopen and troubleshoot
-
-After reopening Ubuntu, run `magpie serve` in one window. In another, use the full binary paths and set `MEI_BIN` on the same command:
+### C. Automated stranger-entry E2E (no API key)
 
 ```sh
-source "$HOME/.cargo/env"
-export HARNESS_MODEL='deepseek/deepseek-flash'
-cd ~/work/my-project
-MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
+cargo test -p sprawling-mei --test cli e2e_beginner_workflow_from_first_prompt_to_project_change
+cargo test -p sprawling-calyx --lib console::mei
+cargo test -p sprawling-calyx --lib console::ui::mei
 ```
 
-Use `/resume <path>` to continue a particular log.
+The first drives real `mei` + Python against a local scripted gateway (calc → project edit → tests). It does not install npm or drive the TUI.
 
-| Symptom | Repair |
+## Process Face
+
+| Channel | Contract |
 |---|---|
-| `cargo` or `magpie` not found | Run `exec "$SHELL" -l`, then repeat the `source` line above |
-| Zig refuses the build | `zig version` must print exactly `0.17.0` |
-| `E_MEI_CONFIG` / `HARNESS_MODEL` | Set the variable to an entry printed by `magpie models` |
-| `E_MEI_TRANSPORT` / connection failure | Keep `magpie serve` running in another window in the same Ubuntu environment |
-| `python3` not found | Run `sudo apt install -y python3` |
-| `E_MEI_SESSION` | Choose a complete JSONL, or use `/new`; a partial task cannot be resumed |
-| Provider 401, 402, 429, or a tool error | Check the key, quota, model id, and tool-call support; try another model if needed |
-
-## Technical reference
-
-### Shape
-
-- One state object: the Messages request JSON, including every message.
-- One loop: post, execute valid Python calls in content order, append results, and stop on `end_turn`.
-- One local tool: a persistent Python 3 interpreter within each task.
-- One protocol: non-streaming Anthropic Messages over HTTP/1.0.
-- No sandbox, permissions UI, cost accounting, retries, compaction, provider abstraction, dedicated file/shell tools, or Python process recovery.
-
-### Environment and process interface
+| cwd | Caller's working directory is the workspace |
+| `-p` / stdin | Prompt; without `-p`, stdin must be a non-terminal complete prompt |
+| `--replay` (Calyx) | Optional JSONL for the interactive face |
+| `--resume <jsonl>` | Optional complete message log |
+| stdout | Final answer, no added newline |
+| stderr | Message JSONL; `mei.obs` pulse/usage; failures as Description/Cause/Resolution |
+| cancel | Kill the process group |
+| tool_result | Path to captured stdout+stderr |
 
 | Variable | Meaning |
 |---|---|
-| `HARNESS_MODEL` | Required magpie `provider/model` spelling |
-| `ANTHROPIC_BASE_URL` | Outbound Anthropic gateway; default `http://127.0.0.1:3425`; Mei never listens here or on `2501` |
-| `ANTHROPIC_API_KEY` | Gateway key; default `magpie` |
-| `HARNESS_EXTRA` | One JSON object shallow-merged once at startup; `stream: true` and `tools` are refused |
-| `MEI_TOOLS` | Optional JSON array appended after the local Python declaration; set `max_uses` where supported |
-| `HARNESS` | Recursive executable path; Mei fills it with `current_exe()` only when unset |
+| `HARNESS_MODEL` | Required magpie `provider/model` |
+| `ANTHROPIC_BASE_URL` | Default `http://127.0.0.1:3425`; Mei never listens |
+| `ANTHROPIC_API_KEY` | Default `magpie` |
+| `HARNESS_EXTRA` | One JSON object at startup; refuses `stream` / `tools` |
+| `MEI_BIN` | Path Calyx uses to spawn this core; npm shim sets it to the sibling core |
 
-The standalone grammar is `mei [-p PROMPT] [--resume JSONL]`; without `-p`, non-terminal stdin supplies the complete prompt. Recovery imports only role/content in file order. Current environment settings choose the model, system prompt, tools, and gateway again.
+## Boundaries
 
-Successful stdout is final text with no added newline. A successful stderr segment starts with the new user prompt, followed by assistant/tool-result JSONL. Assistant observations add `stop_reason`, which recovery strips. Fatal errors remain plain text; a first transport failure does not write a prompt ahead of the raw provider error.
+No in-process Python timeout; connect 10s / IO 600s; empty tool output is still a path; no `MEI_TOOLS`, no output truncation window, no runtime AGENTS/Skills injection, no in-core TUI.
 
-### Boundaries that matter
+## Spec and checks
 
-- The 250-second Python alarm is best-effort: code can alter or ignore it, and C calls can outlast it. Use an outer process manager for a hard deadline.
-- Each gateway address has a 10-second connect budget and a 600-second read/write budget. A stall reports `E_MEI_TRANSPORT`; the request is not retried.
-- Successful interpreter shutdown has a 5-second grace, then kill and reap. This ordinary cleanup is not a task failure.
-- Output is decoded incrementally with 8000-character head/tail windows. Over 16000 characters, output is truncated and the full temporary path is returned.
-- A whole tool wave is validated before its first side effect. Duplicate ids, unknown client tools, malformed calls, and empty waves are protocol errors.
-- Interpreter or private-channel death ends the task. Earlier effects are not rolled back and no complete result is invented.
-- Recursive children share the filesystem and external isolation boundary, not parent messages or Python namespace.
-- Transparent server-side tools can return arbitrarily large blocks that bypass Python's output window and are retransmitted each round. Bound their use in the declaration.
-
-### Specification and checks
-
-The core contract is [`Spec.lean`](Spec.lean), with the serial feedback model in [`spec/Agent.lean`](spec/Agent.lean) and explicit JSONL recovery in [`spec/Session.lean`](spec/Session.lean). The console adapter contract is `crates/sprawling/spec/Console.lean` §8-174.
+[`Spec.lean`](Spec.lean), [`spec/Agent.lean`](spec/Agent.lean), [`spec/Session.lean`](spec/Session.lean); terminal [`Calyx/Spec.lean`](../Calyx/Spec.lean).
 
 ```sh
 cargo nextest run -p sprawling-mei
-cargo test -p sprawling-mei --test cli e2e_beginner_workflow_from_first_prompt_to_project_change
-cargo test -p sprawling --lib console::mei
-cargo test -p sprawling --lib console::ui::mei
-cargo clippy -p sprawling-mei --all-targets --all-features -- -D warnings
+cargo test -p sprawling-mei --test cli
+cargo test -p sprawling-calyx --lib console::mei
+cargo clippy -p sprawling-mei -p sprawling-calyx --all-targets -- -D warnings
 lake build Mei.Spec Mei.spec.Agent Mei.spec.Session
 ```
-
-The second command is the beginner-flow E2E: real `mei` processes, real Python, a temporary project, and a local scripted gateway cover the first calculation, project change, and project tests without a real provider or API key. Resume tests cover complete-history import and pre-side-effect rejection. Console tests cover distinct `/new` files, untouched old files, explicit `/resume`, and success-only append. POSIX behavior is verified in the Unix lane.
-
-### Observed through magpie
-
-Live V1/V2 passed only with `deepseek/deepseek-flash` through local magpie; this is not a claim about every provider dialect. A direct Messages request returned HTTP/1.0 and non-streaming `end_turn`; a calculation completed a Python round trip while preserving signed thinking; another task read a file marker through Python. Original observation streams are local debugging artifacts, not Python-state recovery or provider-independent fixtures.

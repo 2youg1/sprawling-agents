@@ -4,7 +4,7 @@ A violation turns the check red with a message naming the rule, the violation an
 
 | Gate | Holds |
 |---|---|
-| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); `unsafe` only in `crates/desktop/ffi` and `crates/console_ffi` |
+| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); `unsafe` only in `crates/desktop/ffi` and `Calyx/ffi` |
 | `xtask header` | the MPL-2.0 notice, then the copyright line, atop every `.rs` file |
 | `xtask lexicon` | one name per concept, from the glossary |
 | `xtask modmap`, `xtask length` | production modules in the module map; Rust, TypeScript and Svelte source files within 500 lines; production functions within 200 lines and 4 parameters |
@@ -28,7 +28,7 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask specalign` | kernel enums and the tables and rosters of `crates/kernel/Spec.lean` agree variant by variant; every module's SPEC anchor resolves |
 | `xtask spec` | one effective specification per crate; no prose naming a SPEC the tree lacks; the checker and the specifications import along the crate graph, never each other; no `sorry`, `admit` or `axiom` in any `.lean`; every cited path on disk; each `D<n>` heading one decision (`cargo xtask spec <lib>` writes a skeleton, the gate of that name only judges) |
 | `xtask release` | nothing published names one machine's home directory, its working notes, or a document this tree does not contain |
-| `xtask guard` | the two lint tables of their own, `crates/desktop/ffi`'s and `crates/console_ffi`'s, each equal to the workspace's except `unsafe_code`, every other crate inheriting the workspace's; every workspace package pinned in `[workspace.dependencies]` to `=` the `[workspace.package]` version and named by no member through a path of its own |
+| `xtask guard` | the two lint tables of their own, `crates/desktop/ffi`'s and `Calyx/ffi`'s, each equal to the workspace's except `unsafe_code`, every other crate inheriting the workspace's; every workspace package pinned in `[workspace.dependencies]` to `=` the `[workspace.package]` version and named by no member through a path of its own |
 
 - A red gate has three exits: fix the code, narrow the rule to a precise scope, or delete the gate. Never add an exception. A scope names the property that makes every included case legitimate and has positive and negative fixtures. Review judges that property; a waiver, suppression, grandfather entry or re-priced threshold is not a substitute for it.
 - Put a change to gate machinery — `crates/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `crates/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it.

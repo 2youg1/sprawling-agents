@@ -68,9 +68,57 @@ fn the_shim_execs_rather_than_installs() {
         !shim.contains("sprawling install"),
         "PATH belongs to whoever installed; the shim must not install"
     );
-    // Which packages the shim knows is `platform::restated`'s question,
-    // asked of the file on disk; asserting it here too would be a
-    // second reader of one fact.
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
+fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
+    let shim = super::SHIM;
+    let start = shim
+        .find("function wantsHeadless")
+        .expect("Calyx D4 lives in wantsHeadless");
+    let rest = shim
+        .get(start..)
+        .expect("wantsHeadless starts on a char boundary");
+    let end = rest
+        .find("\n}\n")
+        .expect("wantsHeadless is a closed function");
+    let function = rest
+        .get(..=end + 1)
+        .expect("wantsHeadless ends on a char boundary");
+    assert!(
+        function.contains("\"-p\"")
+            && function.contains("--resume")
+            && function.contains("stdinIsTTY"),
+        "{function}"
+    );
+    assert!(shim.contains("childEnv.MEI_BIN = core"));
+    assert!(shim.contains("row.face"));
+
+    let script = format!(
+        "{function}\n\
+         const cases = [\n\
+           [['-p', 'x'], true, true],\n\
+           [['--resume', 'a.jsonl'], true, true],\n\
+           [['--resume=a.jsonl'], true, true],\n\
+           [[], true, false],\n\
+           [[], false, true],\n\
+           [['--replay', 'a.jsonl'], true, false],\n\
+         ];\n\
+         for (const [argv, tty, want] of cases) {{\n\
+           const got = wantsHeadless(argv, tty);\n\
+           if (got !== want) {{\n\
+             console.error(JSON.stringify({{ argv, tty, got, want }}));\n\
+             process.exit(1);\n\
+           }}\n\
+         }}\n"
+    );
+    let status = std::process::Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .status()
+        .expect("node runs the shim smoke matrix");
+    assert!(status.success(), "Mei shim routing smoke failed: {status}");
 }
 
 #[test]
@@ -117,6 +165,14 @@ description = 'fixture description'
         )
         .unwrap();
         zip.write_all(b"Mei archive binary bytes").unwrap();
+        zip.start_file(
+            "archive/calyx",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Calyx archive binary bytes").unwrap();
         zip.finish().unwrap();
     }
     let out = fixture.join("npm");
@@ -165,6 +221,10 @@ description = 'fixture description'
             std::fs::read(out.join(package).join("bin/mei")).unwrap(),
             b"Mei archive binary bytes"
         );
+        assert_eq!(
+            std::fs::read(out.join(package).join("bin/calyx")).unwrap(),
+            b"Calyx archive binary bytes"
+        );
     }
     assert!(
         std::fs::read_to_string(mei_root.join("bin/mei.cmd"))
@@ -175,7 +235,7 @@ description = 'fixture description'
 }
 
 #[test]
-fn channel_requires_posix_mei_archives() {
+fn channel_requires_mei_archives_with_the_platform_binary_name() {
     use std::io::Write as _;
     let fixture =
         std::env::temp_dir().join(format!("sprawling-mei-channel-{}", std::process::id()));
@@ -192,7 +252,7 @@ fn channel_requires_posix_mei_archives() {
     .unwrap();
     std::fs::write(
         fixture.join("Mei/Cargo.toml"),
-        "[package]\ndescription = 'Archetype:Mei fixture'\n",
+        "[package]\ndescription = 'Mei fixture'\n",
     )
     .unwrap();
     let row = &PLATFORMS[0];
@@ -228,14 +288,19 @@ fn channel_requires_posix_mei_archives() {
     .unwrap();
     zip.write_all(b"mei").unwrap();
     zip.finish().unwrap();
-    let windows = super::run(
+    let wrong_name = super::run(
         &fixture,
         "v0.0.10-Alpha-261005",
         &assets,
-        &fixture.join("windows"),
+        &fixture.join("wrong-name"),
     )
-    .expect_err("Mei has no native Windows package");
-    assert!(windows.to_string().contains("not a supported Mei archive"));
+    .expect_err("a Windows Mei archive must hold mei.exe");
+    assert!(
+        wrong_name
+            .to_string()
+            .contains("holds no file named mei.exe"),
+        "{wrong_name}"
+    );
     std::fs::remove_dir_all(fixture).unwrap();
 }
 
@@ -285,6 +350,14 @@ description = 'fixture'
         )
         .unwrap();
         zip.write_all(b"Mei binary").unwrap();
+        zip.start_file(
+            "application/calyx",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Calyx binary").unwrap();
         zip.finish().unwrap();
     }
     let out = fixture.join("out");

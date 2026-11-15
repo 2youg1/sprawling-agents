@@ -698,7 +698,7 @@ jobs:
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
       # The Zig the console's renderer is built with on every platform
-      # (`crates/console_ffi/Spec.lean` D1).
+      # (`Calyx/ffi/Spec.lean` D1).
       - uses: ./.github/actions/zig
       - id: tree
         shell: bash

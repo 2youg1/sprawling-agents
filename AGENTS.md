@@ -48,7 +48,7 @@ Before adopting an external project, tool, or API, read its official documentati
 
 ## Rust
 
-The workspace lint table owns the mechanical rules: warnings are errors, arithmetic is checked, `#[expect]` carries a reason, and `unsafe_code` is forbidden outside `crates/desktop/ffi` and `crates/console_ffi`. Fix a red check at its cause. For judgment the compiler cannot supply:
+The workspace lint table owns the mechanical rules: warnings are errors, arithmetic is checked, `#[expect]` carries a reason, and `unsafe_code` is forbidden outside `crates/desktop/ffi` and `Calyx/ffi`. Fix a red check at its cause. For judgment the compiler cannot supply:
 
 - Handle or return every `Result`. `let _ =`, `unwrap_or_default()`, and `.ok()` erase the reason a caller needs.
 - A diagnostic is a structured repair instruction. Render it as one fenced block whose tag names the format (`toml`), opening with the stable error code and carrying the failed action, the subject, the full path of what failed, the offending value, the rule it broke, and the exact command or edit that fixes it — one whose success the author has checked. Prose may surround the block; the block is what a reader acts on, and a field it omits is a defect, because a symptom stated without its repair spends the attention it was meant to save.

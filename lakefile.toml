@@ -26,6 +26,7 @@ name = "Spec"
 globs = [
   "Mei.Spec",
   "Mei.spec.+",
+  "Calyx.Spec",
   "crates.accounting.Spec",
   "crates.accounting.spec.+",
   "crates.adversary.Spec",
@@ -43,7 +44,7 @@ globs = [
   "crates.citysim.spec.+",
   "crates.collab.Spec",
   "crates.collab.spec.+",
-  "crates.console_ffi.Spec",
+  "Calyx.ffi.Spec",
   "crates.desktop.Spec",
   "crates.desktop.spec.+",
   "crates.desktop.ffi.Spec",

@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which platforms a release builds for, and how each one is spelled.
-//!
-//! **One table, five readers.** The workflow that builds the archives,
-//! the two install scripts that download one, the npm shim that execs
-//! one, and the channel that repackages them all had to name the same
-//! platforms, and each wrote its own list. Only two of the five were
-//! ever compared, so `install.sh` came to offer a suffix the matrix
-//! never produces — a download that answers 404 on the one platform
-//! whose archive is built from a triple.
-//!
-//! The table below is the authority. The four files that restate it are
-//! written in YAML, shell, PowerShell and JavaScript, so they are held
-//! to it by reading them rather than by generating them: a gate does not
-//! rewrite a workflow or an install script, it refuses one that disagrees
-//! (`wiring` already reads real sources for the same reason).
-//!
-//! **What the reading reaches, and what it does not.** A matrix row and
-//! a shim key are structured, so they are compared whole. A suffix built
-//! by interpolation — `"-${os}-${arch}.zip"` — is not a spelling this
-//! can compare, so only suffixes written out in full are judged. That is
-//! an under-report and it is the affordable half: an archive name spelled
-//! out wrongly is the defect that has happened, and an interpolated one
-//! is refused by the download itself with the list of what the release
-//! does carry.
-
 use std::path::Path;
 
 use crate::budget;
@@ -35,61 +10,21 @@ use crate::budget::REGISTER;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// One platform a release publishes a binary for, in every spelling the
-/// tree needs: the archive's, the workflow's, npm's, and the file name
-/// inside the archive.
+mod mei;
+pub(crate) use mei::{MEI_ARCHIVE_PREFIX, MEI_ROOT_PACKAGE, calyx_binary, mei_binary, mei_package};
+
 pub(crate) struct Platform {
-    /// What the release archive's name ends with.
     pub(crate) suffix: &'static str,
-    /// The runner image `release.yml` builds this row on.
     pub(crate) runner: &'static str,
-    /// The `--target` the matrix passes down, empty for a host build.
     pub(crate) cargo_target: &'static str,
     pub(crate) package: &'static str,
-    /// npm's own spelling of the platform, which is what makes the
-    /// install conditional: npm and bun skip an optional dependency
-    /// whose `os`/`cpu` do not match, so one machine downloads one
-    /// binary.
     pub(crate) os: &'static str,
     pub(crate) cpu: &'static str,
     pub(crate) binary: &'static str,
 }
 
-/// The root package's name, and the scope every platform package sits
-/// under — the scope *is* the root name, so `sprawling` and
-/// `@sprawling/…` are one constant rather than two spellings that can
-/// disagree. `channel` writes every package from this.
-///
-/// **The scope rule is asserted beside `PLATFORMS`, not merely stated.**
-/// A package that reached the registry outside the organisation could
-/// only be taken back by unpublishing the name it landed on, which costs
-/// the whole channel: the root name is what `bunx sprawling` resolves
-/// and what `sprawling status --check` asks for its `latest` tag.
 pub(crate) const ROOT_PACKAGE: &str = "sprawling";
 
-/// Mei's scoped npm root. The display name Archetype:Mei is deliberately
-/// not a registry name: npm's bare `mei` name already belongs to somebody.
-pub(crate) const MEI_ROOT_PACKAGE: &str = "@sprawling/mei";
-
-/// The independent archive prefix and executable name shared by the
-/// packager, the npm channel and the shim's conformance check.
-pub(crate) const MEI_ARCHIVE_PREFIX: &str = "mei-";
-pub(crate) const MEI_BINARY: &str = "mei";
-
-/// Every platform this project ships a binary for.
-///
-/// An archive with no row here is refused rather than skipped: the day a
-/// Linux archive returns, the channel says so instead of publishing one
-/// that quietly lacks it.
-///
-/// **These names carry the `@sprawling` scope, and the versions at or
-/// below `UNSCOPED_THROUGH` do not.** npm never reuses a `name@version`,
-/// so the rename cannot reach backwards: everything already on the
-/// registry under a bare name stays there and is deprecated in place,
-/// pointing at the scoped name that succeeds it. The root package keeps
-/// its bare name whatever happens to these: `bunx sprawling` is the
-/// whole reason that channel exists, and a scoped root would spell it
-/// `bunx @sprawling/sprawling`.
 pub(crate) const PLATFORMS: [Platform; 3] = [
     Platform {
         suffix: "-windows-x86_64.zip",
@@ -120,34 +55,14 @@ pub(crate) const PLATFORMS: [Platform; 3] = [
     },
 ];
 
-/// The platform whose archive name ends with `suffix`, or nothing when
-/// this release publishes no such archive.
-///
-/// Every other spelling of a platform hangs off the row this answers
-/// with, so the packager asks by the name it is about to give an archive
-/// and is handed the file name that belongs inside it — rather than
-/// deciding a second time from the machine it happens to be running on.
 pub(crate) fn with_suffix(suffix: &str) -> Option<&'static Platform> {
     PLATFORMS.iter().find(|row| row.suffix == suffix)
 }
 
-/// Mei's package on a supported POSIX row, using the same platform
-/// identity as sprawling rather than another suffix or architecture table.
-pub(crate) fn mei_package(row: &Platform) -> Option<&'static str> {
-    match (row.os, row.cpu) {
-        ("darwin", "arm64") => Some("@sprawling/mei-darwin-arm64"),
-        ("linux", "x64") => Some("@sprawling/mei-linux-x64-musl"),
-        _ => None,
-    }
-}
-
-/// The workflow whose matrix builds one archive per row.
 pub(crate) const WORKFLOW: &str = ".github/workflows/release.yml";
 
-/// The shim that picks a package for the machine running it.
 const SHIM: &str = "crates/xtask/src/channel/shim.js";
 
-/// Every file that writes an archive name out in full.
 const SPELLERS: [&str; 4] = [
     WORKFLOW,
     "install.sh",
@@ -155,13 +70,8 @@ const SPELLERS: [&str; 4] = [
     "crates/sprawling/Cargo.toml",
 ];
 
-/// The register row that records the suffixes spelled before this rule.
 const REGISTER_ROW: &str = "archive_naming";
 
-/// Every place a foreign file restates this table still restates it.
-///
-/// # Errors
-/// When a restating file or the budget register cannot be read.
 pub(crate) fn restated(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = matrix_rows(root)?;
     violations.extend(shim_rows(root)?);
@@ -169,12 +79,6 @@ pub(crate) fn restated(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// What the workflow's archive matrix builds, as `(runner, target)`.
-///
-/// Read by shape rather than by a YAML parser: a matrix entry opens with
-/// `- os:` and states its `target:` on the next line, and this workflow
-/// is the only reader of that shape. A matrix written some other way is
-/// reported as a row this cannot find, never as agreement.
 fn matrix(text: &str) -> Vec<(String, String)> {
     let lines: Vec<&str> = text.lines().map(str::trim).collect();
     let mut out = Vec::new();
@@ -191,7 +95,6 @@ fn matrix(text: &str) -> Vec<(String, String)> {
     out
 }
 
-/// A YAML or JavaScript scalar without its quotes or trailing comma.
 fn unquoted(value: &str) -> String {
     value
         .trim()
@@ -231,19 +134,15 @@ fn matrix_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(out)
 }
 
-/// What the shim hands a machine: the key it looks the machine up by,
-/// the package it resolves, and the file it execs.
-///
-/// Read from the object rather than from its lines. `bun fmt` wraps an
-/// entry that outgrows the print width, and a reader that needed a key
-/// and both fields on one line would report every row of the table
-/// missing the moment the formatter widened one.
 fn shim(text: &str) -> Vec<(String, String, String)> {
     shim_table(text, "PLATFORMS = {")
 }
 
-fn mei_shim(text: &str) -> Vec<(String, String, String)> {
-    shim_table(text, "MEI_PLATFORMS = {")
+fn mei_shim(text: &str) -> Vec<(String, String, String, String)> {
+    let Some(body) = object_body(text, "MEI_PLATFORMS = {") else {
+        return Vec::new();
+    };
+    entries(body).into_iter().filter_map(mei_entry).collect()
 }
 
 fn shim_table(text: &str, header: &str) -> Vec<(String, String, String)> {
@@ -253,8 +152,6 @@ fn shim_table(text: &str, header: &str) -> Vec<(String, String, String)> {
     entries(body).into_iter().filter_map(entry).collect()
 }
 
-/// The text between the brace `header` ends with and the brace that
-/// closes it, with strings left alone.
 fn object_body<'a>(text: &'a str, header: &str) -> Option<&'a str> {
     let body = text.split_once(header)?.1;
     let mut depth = 1_usize;
@@ -281,7 +178,6 @@ fn object_body<'a>(text: &'a str, header: &str) -> Option<&'a str> {
     None
 }
 
-/// One entry per comma that sits at the object's own depth.
 fn entries(body: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut from = 0_usize;
@@ -313,8 +209,6 @@ fn entries(body: &str) -> Vec<&str> {
     out
 }
 
-/// One `"key": { package: "…", binary: "…" }` of the table, however it
-/// is laid out.
 fn entry(entry: &str) -> Option<(String, String, String)> {
     let key = entry.trim_start().strip_prefix('"')?;
     let (key, _) = key.split_once('"')?;
@@ -323,8 +217,15 @@ fn entry(entry: &str) -> Option<(String, String, String)> {
     Some((key.to_owned(), package, binary))
 }
 
-/// One `name: "value"` out of an entry, whatever whitespace separates
-/// the name from the value.
+fn mei_entry(entry: &str) -> Option<(String, String, String, String)> {
+    let key = entry.trim_start().strip_prefix('"')?;
+    let (key, _) = key.split_once('"')?;
+    let package = field(entry, "package:")?;
+    let core = field(entry, "core:")?;
+    let face = field(entry, "face:")?;
+    Some((key.to_owned(), package, core, face))
+}
+
 fn field(text: &str, key: &str) -> Option<String> {
     let after = text.split_once(key)?.1.trim_start();
     let inner = after.strip_prefix('"')?;
@@ -364,14 +265,15 @@ fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }
 
     let held = mei_shim(&text);
-    let wanted: Vec<(String, String, String)> = PLATFORMS
+    let wanted: Vec<(String, String, String, String)> = PLATFORMS
         .iter()
         .filter_map(|row| {
             mei_package(row).map(|package| {
                 (
                     format!("{} {}", row.os, row.cpu),
                     package.to_owned(),
-                    MEI_BINARY.to_owned(),
+                    mei_binary(row).to_owned(),
+                    calyx_binary(row).to_owned(),
                 )
             })
         })
@@ -381,8 +283,8 @@ fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             out.push(disagrees(
                 SHIM,
                 format!(
-                    "no Mei entry maps `{}` to `{}` and `{}`",
-                    row.0, row.1, row.2
+                    "no Mei entry maps `{}` to `{}`, core `{}`, face `{}`",
+                    row.0, row.1, row.2, row.3
                 ),
             ));
         }
@@ -392,7 +294,7 @@ fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             out.push(disagrees(
                 SHIM,
                 format!(
-                    "Mei maps `{}` to `{}`, which is not a supported POSIX package",
+                    "Mei maps `{}` to `{}`, which is not a supported Mei package",
                     row.0, row.1
                 ),
             ));
@@ -407,8 +309,6 @@ fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(out)
 }
 
-/// Every archive suffix written out in full names an archive a release
-/// publishes, unless the register still records it.
 fn spelled_suffixes(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let recorded = registered(root)?;
     let mut out = Vec::new();
@@ -438,11 +338,6 @@ fn spelled_suffixes(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(out)
 }
 
-/// The register rows that no longer record anything.
-///
-/// Same discipline as the two length registers and `boundary`'s: a
-/// recorded exception that has become unnecessary is struck, so the
-/// register removes itself rather than waiting to be remembered.
 fn spent_suffixes(recorded: &[String], met: &[String]) -> Vec<Violation> {
     let mut out = Vec::new();
     for suffix in recorded {
@@ -466,7 +361,6 @@ fn spent_suffixes(recorded: &[String], met: &[String]) -> Vec<Violation> {
     out
 }
 
-/// The suffixes the register still records.
 fn registered(root: &Path) -> Result<Vec<String>, XtaskError> {
     let register = budget::register(root)?;
     let Some(listed) = register
@@ -488,12 +382,6 @@ fn registered(root: &Path) -> Result<Vec<String>, XtaskError> {
     Ok(out)
 }
 
-/// Every archive suffix one line writes out in full.
-///
-/// A suffix is a run of name characters that opens with `-` and closes
-/// with `.zip`. An interpolated name breaks the run at its `$`, so it
-/// arrives here as `.zip` and is dropped: what cannot be compared is not
-/// guessed at.
 fn suffixes(line: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();

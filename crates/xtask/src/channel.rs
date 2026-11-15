@@ -3,60 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Release archives projected into npm and AUR packages (xtask D32).
-//!
-//! **The archives are the artefact, and this repackages them.** It reads
-//! the zips a tag published, takes the binary out of each, and writes
-//! one npm package per platform plus a root per product that depends on
-//! its platform packages optionally. Nothing is compiled here: a binary
-//! that reached a person through npm and a binary that reached them through a download
-//! are the same bytes, or one of the two is unaccounted for.
-//!
-//! **Three rules this channel is built around.**
-//!
-//! *The version is derived, never written.* npm accepts semver and
-//! nothing else, so `v0.0.4-Pre-alpha-260911` cannot be published under
-//! its own name. It becomes `0.0.4-pre.260911`, out of the workspace
-//! version and the tag's date — and the tag's own version has to agree
-//! with the workspace's, or this refuses. A hand-written npm version
-//! would be a second answer to "which release is this".
-//!
-//! That conversion lives in `kernel::Release` rather than here, because
-//! the binary being packaged reads it too: `sprawling status --check`
-//! asks the registry which release is newest, and it can only compare
-//! that answer with itself if both ends spell a release the same way.
-//!
-//! *PATH belongs to whoever installed.* `sprawling install` owns the
-//! archive path; npm and bun own theirs. The shim resolves and execs,
-//! and never calls `sprawling install` — see `crates/xtask/src/channel/shim.js`.
-//!
-//! *The platform list comes from the assets.* An archive with no row in
-//! `xtask::platform` is refused rather than skipped: the day a Linux
-//! archive returns, this says so instead of publishing a channel that
-//! quietly lacks it.
-
 use sha2::{Digest as _, Sha256};
 use std::io::Read as _;
 
 use std::path::{Path, PathBuf};
 
 use crate::platform::{
-    MEI_ARCHIVE_PREFIX, MEI_BINARY, MEI_ROOT_PACKAGE, PLATFORMS, Platform, ROOT_PACKAGE,
-    mei_package,
+    MEI_ARCHIVE_PREFIX, MEI_ROOT_PACKAGE, PLATFORMS, Platform, ROOT_PACKAGE, calyx_binary,
+    mei_binary, mei_package,
 };
 use crate::report::XtaskError;
 
 mod system;
 
-/// The shim, compiled in so the file a reader opens and the file a
-/// package carries are the same bytes — the rule `crates/city/templates/`
-/// already follows for the documents a city writes.
 const SHIM: &str = include_str!("channel/shim.js");
 const RUNTIME_ENTRY: &str = "sprawling-runtime";
 const MEI_RUNTIME_ENTRY: &str = "mei-runtime";
 const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
-/// One file's bytes, out of a zip that holds it at any depth.
 struct ArchiveBinary {
     bytes: Vec<u8>,
     mode: u32,
@@ -120,17 +84,11 @@ fn write(path: &Path, bytes: &[u8]) -> Result<(), XtaskError> {
     })
 }
 
-/// What every package of the channel states alike: which release it is,
-/// and where its source lives. Both are read out of the workspace
-/// manifest, the one place either is written.
 struct Stem<'a> {
     version: &'a str,
     repository: &'a str,
 }
 
-/// The manifest shared by every package here: the same licence, the same
-/// repository, the same description stem — stated once so two packages
-/// cannot disagree about what this project is.
 fn manifest(stem: &Stem<'_>, name: &str, description: &str, extra: &str) -> String {
     let Stem {
         version,
@@ -149,42 +107,40 @@ fn manifest(stem: &Stem<'_>, name: &str, description: &str, extra: &str) -> Stri
     )
 }
 
-/// One platform binary and the npm package that carries it.
 struct BinaryPackage<'a> {
     platform: &'a Platform,
     name: &'a str,
-    binary: &'a str,
+    binaries: &'a [&'a str],
     description: String,
 }
 
-/// Preserve one archive binary in its platform package, including the
-/// executable mode that npm's own metadata cannot carry.
 fn carry(
     stem: &Stem<'_>,
     archive: &Path,
     package: &BinaryPackage<'_>,
     out: &Path,
 ) -> Result<(), XtaskError> {
-    let binary = extract(archive, package.binary)?;
-    // A scoped npm name writes one directory level more than a bare one.
     let dir = out.join(package.name);
-    let path = dir.join("bin").join(package.binary);
-    if binary.mode & 0o111 == 0 {
-        return Err(XtaskError::Cmd {
-            cmd: "npm channel".to_owned(),
-            msg: format!("{} has no executable permission bits", archive.display()),
-        });
-    }
-    write(&path, &binary.bytes)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(binary.mode)).map_err(
-            |source| XtaskError::Io {
-                path: path.display().to_string(),
-                source,
-            },
-        )?;
+    for name in package.binaries {
+        let binary = extract(archive, name)?;
+        if binary.mode & 0o111 == 0 {
+            return Err(XtaskError::Cmd {
+                cmd: "npm channel".to_owned(),
+                msg: format!("{} has no executable permission bits", archive.display()),
+            });
+        }
+        let path = dir.join("bin").join(name);
+        write(&path, &binary.bytes)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(binary.mode)).map_err(
+                |source| XtaskError::Io {
+                    path: path.display().to_string(),
+                    source,
+                },
+            )?;
+        }
     }
     let extra = format!(
         "  \"os\": [\"{}\"],\n  \"cpu\": [\"{}\"],\n  \"files\": [\"bin\"]\n",
@@ -196,7 +152,6 @@ fn carry(
     )
 }
 
-/// Mei's own manifest owns the description shown by every npm package.
 fn mei_description(root: &Path) -> Result<String, XtaskError> {
     let path = root.join("Mei/Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
@@ -218,7 +173,6 @@ fn mei_description(root: &Path) -> Result<String, XtaskError> {
         })
 }
 
-/// Assemble Mei's POSIX-only npm channel from its independent archives.
 fn write_mei_channel(
     root: &Path,
     stem: &Stem<'_>,
@@ -250,18 +204,22 @@ fn write_mei_channel(
                 cmd: "npm channel".to_owned(),
                 msg: format!(
                     "{name} is not a supported Mei archive; Mei publishes npm binaries \
-                     only for macOS arm64 and Linux x64 musl"
+                     for Windows x64, macOS arm64, and Linux x64 musl"
                 ),
             });
         };
+        let binaries = [mei_binary(row), calyx_binary(row)];
         carry(
             stem,
             archive,
             &BinaryPackage {
                 platform: row,
                 name: package,
-                binary: MEI_BINARY,
-                description: format!("The Archetype:Mei binary for {} {}.", row.os, row.cpu),
+                binaries: &binaries,
+                description: format!(
+                    "Mei headless core and Calyx interactive face for {} {}.",
+                    row.os, row.cpu
+                ),
             },
             out,
         )?;
@@ -302,11 +260,6 @@ fn write_mei_channel(
         .collect())
 }
 
-/// Assemble the channel from a directory of release archives.
-///
-/// # Errors
-/// When the tag is misshapen, when an archive holds no binary, when an
-/// archive matches no row, or when the output cannot be written.
 pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<String, XtaskError> {
     let workspace = crate::package::workspace_package(root, "version")?;
     let repository = crate::package::workspace_package(root, "repository")?;
@@ -382,7 +335,7 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             &BinaryPackage {
                 platform: row,
                 name: row.package,
-                binary: row.binary,
+                binaries: &[row.binary],
                 description: format!("The sprawling binary for {} {}.", row.os, row.cpu),
             },
             out,

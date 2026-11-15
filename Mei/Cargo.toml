@@ -8,8 +8,8 @@ repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
 publish.workspace = true
-description = "Archetype:Mei, an academic minimal Agent Harness prototype for secondary development and technical discussion."
-keywords = ["agents", "llm", "harness", "prototype", "cli"]
+description = "Mei, a minimal headless Agent Harness: one Python tool, path-only effects, and a process Face for Calyx or scripts."
+keywords = ["agents", "llm", "harness", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 
 [lib]

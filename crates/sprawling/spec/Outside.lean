@@ -10,7 +10,7 @@
 -/
 
 /-!
-## 8-140 控制台的 `/remote`（`bin::outside::console`、`bin::console::language`；remote_access D4）
+## 8-140 控制台的 `/remote`（`bin::outside::console`、`calyx::console::language`；remote_access D4）
 
 ```rust
 pub(crate) enum RemoteLine { Open(Lasting), Pair { name: String, authority: Authority }, Close, Devices,

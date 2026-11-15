@@ -96,7 +96,7 @@ jobs:
           shared-key: platforms-macos
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # The Zig the console's renderer is built with on every platform
-      # (`crates/console_ffi/Spec.lean` D1).
+      # (`Calyx/ffi/Spec.lean` D1).
       - uses: ./.github/actions/zig
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with:
@@ -189,7 +189,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The Zig the console's renderer is built with on every platform
-      # (`crates/console_ffi/Spec.lean` D1).
+      # (`Calyx/ffi/Spec.lean` D1).
       - uses: ./.github/actions/zig
       - name: the release rust-version names
         id: floor

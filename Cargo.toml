@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "Mei",
+    "Calyx",
     "crates/kernel",
     "crates/child",
     "crates/storage",
@@ -15,7 +16,7 @@ members = [
     "crates/browser",
     "crates/desktop",
     "crates/desktop/ffi",
-    "crates/console_ffi",
+    "Calyx/ffi",
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
@@ -25,6 +26,7 @@ members = [
 ]
 default-members = [
     "Mei",
+    "Calyx",
     "crates/kernel",
     "crates/child",
     "crates/storage",
@@ -38,7 +40,7 @@ default-members = [
     "crates/browser",
     "crates/desktop",
     "crates/desktop/ffi",
-    "crates/console_ffi",
+    "Calyx/ffi",
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
@@ -295,7 +297,8 @@ accounting = { package = "sprawling-accounting", path = "crates/accounting", ver
 sprawling = { path = "crates/sprawling", version = "=0.0.17" }
 desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.17" }
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.17" }
-console_ffi = { package = "sprawling-console-ffi", path = "crates/console_ffi", version = "=0.0.17" }
+console_ffi = { package = "sprawling-console-ffi", path = "Calyx/ffi", version = "=0.0.17" }
+calyx = { package = "sprawling-calyx", path = "Calyx", version = "=0.0.17" }
 mei = { package = "sprawling-mei", path = "Mei", version = "=0.0.17" }
 
 # C3 hardening: panicking constructs and silent numeric

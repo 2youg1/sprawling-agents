@@ -266,7 +266,7 @@ jobs:
           xtask_build=$!
           just --no-deps dist "$ARCHIVE_TARGET"
           wait "$xtask_build"
-          if [ "$RUNNER_OS" != Windows ] && [ "$RELEASE_CHANNEL" != nightly ]; then
+          if [ "$RELEASE_CHANNEL" != nightly ]; then
             just dist-mei "$ARCHIVE_TARGET"
           fi
           echo "build_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
@@ -387,7 +387,7 @@ jobs:
         run: |
           set -euo pipefail
           just archive "$ARCHIVE_TARGET"
-          if [ "$RUNNER_OS" != Windows ] && [ "$RELEASE_CHANNEL" != nightly ]; then
+          if [ "$RELEASE_CHANNEL" != nightly ]; then
             just archive-mei "$ARCHIVE_TARGET"
           fi
           if [ "$RELEASE_CHANNEL" != nightly ]; then

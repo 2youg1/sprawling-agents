@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every tool a person needs to develop this code (`crates/sprawling/spec/Doctor.lean`
-//! §8-58).
-//!
-//! Data, with no branch in it. `table::REQUIREMENTS` lists these rows in
-//! install order, because a later row's recipe starts a program an
-//! earlier row installs: `cargo install` needs rustup, `elan toolchain
-//! install` needs elan, `uv python install` needs uv. `just prereqs`
-//! reads the same rows through `prereqs.tsv`, which `table::prereqs`
-//! renders.
-//!
-//! `Required` means `just check` cannot run without it; `Optional` means
-//! `just check` skips it when it is absent, or only a recipe a person
-//! runs on purpose calls it, and the row says which recipe that is.
-
 use wire::DoctorUnread;
 
 use crate::doctor::family::{CHROMIUM_RECIPE, Family};
@@ -25,9 +11,6 @@ use crate::doctor::{Detection, Need, Pack, PerPlatform, Pin, Recipe, Requirement
 
 use super::NOWHERE;
 
-/// One command, spelled once and answered on all three platforms.
-/// Every tool below that installs the same way everywhere uses it, so
-/// the three columns are never one line copied three times.
 const fn same_command(program: &'static str, args: &'static [&'static str]) -> PerPlatform<Recipe> {
     PerPlatform {
         windows: Recipe::Command { program, args },
@@ -36,7 +19,6 @@ const fn same_command(program: &'static str, args: &'static [&'static str]) -> P
     }
 }
 
-/// A program on the search path, asked its version with `--version`.
 const fn program(name: &'static str) -> Detection {
     Detection::Program {
         program: name,
@@ -45,7 +27,6 @@ const fn program(name: &'static str) -> Detection {
     }
 }
 
-/// A row of this tier; everything but the facts that differ per tool.
 const fn row(
     name: &'static str,
     need: Need,
@@ -68,8 +49,6 @@ const fn row(
     }
 }
 
-/// The three facts a row states beyond its detection and its recipe,
-/// chained onto `row` so that each row says only the ones it has.
 impl Requirement {
     const fn from(mut self, upstream: Upstream) -> Requirement {
         self.upstream = upstream;
@@ -81,7 +60,6 @@ impl Requirement {
         self
     }
 
-    /// A cargo tool this repository calls, installed from its crate.
     const fn packed(mut self, krate: &'static str) -> Requirement {
         self.pack = Some(Pack::RustTools);
         self.upstream = Upstream::Crate(krate);
@@ -165,9 +143,6 @@ pub(super) const RUSTUP: Requirement = row(
 )
 .from(Upstream::RustupChannel);
 
-/// The compiler itself. `rustup default stable` puts one on the search
-/// path; inside this repository rustup then fetches the version
-/// `rust-toolchain.toml` pins on first use.
 pub(super) const RUST: Requirement = row(
     "rust",
     Need::Required,
@@ -262,9 +237,6 @@ pub(super) const BUN: Requirement = row(
 )
 .from(Upstream::GitHub("oven-sh/bun"));
 
-/// The browser the render gate measures the built client in. The same
-/// family and recipe as the browser tool's Chromium row, under the tier
-/// that needs it for another reason.
 pub(super) const RENDER_BROWSER: Requirement = row(
     "render-browser",
     Need::Required,
@@ -318,7 +290,6 @@ const fn lean_install(pin: &'static str) -> &'static str {
     if pin.is_empty() { "stable" } else { pin }
 }
 
-/// The toolchain this build installs for the `lean` row.
 const LEAN_INSTALL: &str = lean_install(LEAN_PIN);
 
 pub(super) const LEAN: Requirement = row(
@@ -336,9 +307,6 @@ pub(super) const LEAN: Requirement = row(
 .from(Upstream::GitHub("leanprover/lean4"))
 .pinned(Pin::LeanToolchain);
 
-/// The Zig version `crates/desktop/ffi/zig-version` pins, the one file the
-/// leaf's build script and CI's install step read too (`crates/sprawling/spec/Doctor.lean`
-/// §8-146).
 const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
 
 /// winget's arguments for Zig at one pin, without `--version` when the
@@ -366,14 +334,10 @@ macro_rules! winget_zig {
     };
 }
 
-/// The compiler of the two Zig leaves. Required on every platform: the
-/// console's renderer, `crates/console_ffi`, is compiled into every build
-/// of this binary, and the desktop server's leaf into every Windows build
-/// (`crates/sprawling/spec/Doctor.lean` §8-146).
 pub(super) const ZIG: Requirement = row(
     "zig",
     Need::Required,
-    "the Zig leaves: crates/console_ffi on every platform and crates/desktop/ffi on Windows, at the version crates/desktop/ffi/zig-version pins",
+    "the Zig leaves: Calyx/ffi on every platform and crates/desktop/ffi on Windows, at the version crates/desktop/ffi/zig-version pins",
     Detection::Listed {
         program: "zig",
         args: &["version"],
@@ -415,7 +379,6 @@ pub(super) const UV: Requirement = row(
 )
 .from(Upstream::GitHub("astral-sh/uv"));
 
-/// Present when uv can name an interpreter, whichever installed it.
 pub(super) const PYTHON: Requirement = row(
     "python",
     Need::Optional,

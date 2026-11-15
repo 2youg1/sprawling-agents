@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use mei::error::{Code, Diagnostic, Error, Result};
 use mei::{agent, python, resume, transport};
 
-const MAX_TOKENS: u64 = 16000;
+const MAX_TOKENS: u64 = 65536;
 const SYSTEM: &str = include_str!("MEI.md");
 const DEFAULT_BASE: &str = "http://127.0.0.1:3425";
 
@@ -57,13 +57,12 @@ fn run() -> Result<String> {
         )));
     }
     let extra = optional_environment("HARNESS_EXTRA")?;
-    let tools = optional_environment("MEI_TOOLS")?;
     let task = Task {
         model: &model,
         prompt: &prompt,
         history,
     };
-    let mut request = initial_request(task, extra.as_deref(), tools.as_deref())?;
+    let mut request = initial_request(task, extra.as_deref())?;
     let base = environment_or("ANTHROPIC_BASE_URL", DEFAULT_BASE)?;
     let key = environment_or("ANTHROPIC_API_KEY", "magpie")?;
     let client = transport::Client::new(&base, key)?;
@@ -71,7 +70,7 @@ fn run() -> Result<String> {
     let mut trace = std::io::stderr();
     let result = agent::run(
         &mut request,
-        |request| client.post(request),
+        |request, pulse| client.post(request, pulse),
         |code| python.run(code),
         &mut trace,
     );
@@ -183,7 +182,7 @@ struct Task<'a> {
     history: Option<Vec<Value>>,
 }
 
-fn initial_request(task: Task, extra: Option<&str>, server_tools: Option<&str>) -> Result<Value> {
+fn initial_request(task: Task, extra: Option<&str>) -> Result<Value> {
     let Task {
         model,
         prompt,
@@ -218,7 +217,7 @@ fn initial_request(task: Task, extra: Option<&str>, server_tools: Option<&str>) 
                 Code::Config,
                 "merge HARNESS_EXTRA",
                 "tools would replace the sole local Python tool",
-                "put transparent server-side declarations in MEI_TOOLS, not HARNESS_EXTRA.tools",
+                "keep tools out of HARNESS_EXTRA; Mei declares only python",
             )));
         }
         if fields.get("stream") == Some(&Value::Bool(true)) {
@@ -261,43 +260,13 @@ fn initial_request(task: Task, extra: Option<&str>, server_tools: Option<&str>) 
                     .collect(),
             ),
         );
-    if let Some(server_tools) = server_tools {
-        let additional: Value = serde_json::from_str(server_tools).map_err(|err| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Config,
-                "parse MEI_TOOLS",
-                err.to_string(),
-                "set MEI_TOOLS to a JSON array of transparent server-side tool declarations",
-            ))
-        })?;
-        let additional = additional.as_array().ok_or_else(|| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Config,
-                "append MEI_TOOLS",
-                "the value is not an array",
-                "set MEI_TOOLS to a JSON array; the local Python declaration stays first",
-            ))
-        })?;
-        let tools = request
-            .get_mut("tools")
-            .and_then(Value::as_array_mut)
-            .ok_or_else(|| {
-                Error::Diagnostic(Diagnostic::new(
-                    Code::Config,
-                    "append MEI_TOOLS",
-                    "tools is not an array",
-                    "keep the local Python declaration first in tools",
-                ))
-            })?;
-        tools.extend(additional.iter().cloned());
-    }
     Ok(request)
 }
 
 fn python_tool() -> Value {
     json!({
         "name": "python",
-        "description": "A persistent Python 3 interpreter. Variables survive across calls. Returns stdout+stderr. Output over 16000 chars is truncated and the full text is saved to a file named in the result. Each call has a 250 s best-effort timeout. Use subprocess for shell commands and print for expression results.",
+        "description": "A persistent Python 3 interpreter. Variables survive across calls. Each call writes stdout+stderr to a file and returns that file path; open the path to read output. Use subprocess for shell commands.",
         "input_schema": {
             "type": "object",
             "properties": {"code": {"type": "string"}},
@@ -320,16 +289,14 @@ mod tests {
                 history: None,
             },
             Some(r#"{"system":"custom","messages":[{"role":"user","content":"old"}],"max_tokens":42}"#),
-            Some(r#"[{"type":"web_search_20250305","name":"web_search","max_uses":2}]"#),
         )
         .unwrap();
         assert_eq!(request["model"], "provider/model");
         assert_eq!(request["system"], "custom");
         assert_eq!(request["max_tokens"], 42);
         assert_eq!(request["messages"][0]["content"], "new prompt");
-        assert_eq!(request["tools"].as_array().unwrap().len(), 2);
+        assert_eq!(request["tools"].as_array().unwrap().len(), 1);
         assert_eq!(request["tools"][0]["name"], "python");
-        assert_eq!(request["tools"][1]["name"], "web_search");
     }
 
     #[test]
@@ -343,7 +310,6 @@ mod tests {
                     json!({"role": "assistant", "content": "answer"}),
                 ]),
             },
-            None,
             None,
         )
         .unwrap();
@@ -364,9 +330,8 @@ mod tests {
             prompt: "p",
             history: None,
         };
-        assert!(initial_request(task(), Some("[]"), None).is_err());
-        assert!(initial_request(task(), Some(r#"{"stream":true}"#), None).is_err());
-        assert!(initial_request(task(), Some(r#"{"tools":[]}"#), None).is_err());
-        assert!(initial_request(task(), None, Some("{}")).is_err());
+        assert!(initial_request(task(), Some("[]")).is_err());
+        assert!(initial_request(task(), Some(r#"{"stream":true}"#)).is_err());
+        assert!(initial_request(task(), Some(r#"{"tools":[]}"#)).is_err());
     }
 }

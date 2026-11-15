@@ -3,22 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The served city carried through its lifecycle
+//! Lifecycle carry-out for a served city
 //! (`crates/sprawling/spec/Console/Lifecycle.lean`, `crates/sprawling/spec/Console.lean` §8-11).
-//!
-//! Every way a served process can be asked to change - a signal, the
-//! console's `/web` and `/quit`, a page's `CloseCity`, a lost terminal,
-//! the listener failing, the worker landing, the time limit passing -
-//! arrives here as one `Event` and is fed to `console::lifecycle::step`,
-//! which alone decides what it means. This file only carries the answer
-//! out: the desk closed with the cause the step gave, the runs
-//! interrupted and the limit armed whenever the face interrupts, the
-//! listener dropped, the face published for the console to draw.
-//!
-//! The point a reader most often gets wrong: the listener stops
-//! accepting the moment the city starts closing, and the worker is
-//! joined on a blocking thread, so a close that waits for runs keeps the
-//! reactor free to serve the lanes that are landing.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -32,11 +18,8 @@ use crate::console::lifecycle::{
     self, Asker, Cause, Event, Face, Handoff, INTERRUPT_GRACE, Surface,
 };
 
-/// How many events may wait for the lifecycle: a person types slower
-/// than this drains, and a signal that finds it full was a repeat.
 pub(crate) const EVENTS: usize = 64;
 
-/// What the lifecycle carries its answers out on.
 pub(crate) struct Living {
     pub(crate) desk: Arc<CommandDesk>,
     pub(crate) worker: std::thread::JoinHandle<()>,
@@ -44,10 +27,6 @@ pub(crate) struct Living {
     pub(crate) surface: Surface,
 }
 
-/// Feeds every event to the lifecycle until the process is gone, and
-/// answers how it went: `Ok` once the handoff is written after a close
-/// somebody asked for, the failure when serving failed, and a refusal
-/// when the process ends without its handoff.
 pub(crate) async fn live(
     serving: impl Future<Output = Result<(), AxError>>,
     mut events: tokio::sync::mpsc::Receiver<Event>,
@@ -94,16 +73,11 @@ pub(crate) async fn live(
         let (next, cause) = lifecycle::step(face, event);
         if let Some(cause) = cause {
             desk.close(closing(cause, next, failure.as_ref()));
-            // The listener stops accepting first; the worker is joined
-            // off the reactor, which keeps serving the lanes that land.
             serving = None;
             landing = worker
                 .take()
                 .map(|worker| tokio::task::spawn_blocking(move || worker.join()));
         }
-        // Every face that interrupts is armed (D75), and the limit runs
-        // from the step that first interrupted: a later step that keeps
-        // interrupting does not push it back.
         if next.armed() {
             desk.interrupt();
             if !face.armed() {
@@ -112,7 +86,6 @@ pub(crate) async fn live(
         }
         face = next;
         match faces.send(face) {
-            // Nobody watching the face is a city with no console.
             Ok(()) | Err(_) => {}
         }
         match face {
@@ -127,13 +100,8 @@ pub(crate) async fn live(
     }
 }
 
-/// The Commands the listener is given, with a page's `CloseCity` taken
-/// first and handed to the lifecycle (`crates/sprawling/spec/Console.lean` §8-11).
-///
-/// Accepted only while the listener is bound to loopback: the command
-/// sink carries no peer address, and a loopback bind is the one case in
-/// which every peer is on this machine without asking. The relay never
-/// brings it, because its class is `LocalOnly`.
+/// `CloseCity` from a page reaches the lifecycle only on loopback
+/// (`crates/sprawling/spec/Console.lean` §8-11); the sink has no peer address.
 pub(super) fn closing_from_a_page(
     at: std::net::SocketAddr,
     lifecycle: tokio::sync::mpsc::Sender<Event>,
@@ -153,16 +121,12 @@ pub(super) fn closing_from_a_page(
                 .with_recovery("type /quit in the terminal the city runs in"));
             }
             match lifecycle.try_send(Event::Quit(Asker::Page, mode)) {
-                // A full queue holds a close already on its way, and a
-                // closed one belongs to a city that is already closing:
-                // either way the page asked for what is happening.
                 Ok(()) | Err(_) => Ok(()),
             }
         }
     })
 }
 
-/// The closing the desk is told, from the cause the step gave.
 fn closing(cause: Cause, next: Face, failure: Option<&AxError>) -> Closing {
     let mode = match next {
         Face::Stopping { mode, .. } => mode,
@@ -178,7 +142,6 @@ fn closing(cause: Cause, next: Face, failure: Option<&AxError>) -> Closing {
     }
 }
 
-/// A future that may be absent: absent, it never completes.
 async fn maybe<F: Future + Unpin>(future: &mut Option<F>) -> F::Output {
     match future {
         Some(future) => future.await,
@@ -213,9 +176,6 @@ fn without_a_handoff() -> AxError {
     .with_recovery("run `sprawling resume` on this city, which closes what was left open")
 }
 
-/// The signals a served process listens for, each read as the event it
-/// is. A handler that cannot be installed leaves that signal at its
-/// platform default, which is said once; the city keeps serving.
 struct Signals {
     #[cfg(windows)]
     interrupt: Option<tokio::signal::windows::CtrlC>,
@@ -231,14 +191,10 @@ struct Signals {
     hangup: Option<tokio::signal::unix::Signal>,
 }
 
-/// One handler, or nothing and a line that says so.
 fn installed<T>(name: &str, handler: std::io::Result<T>) -> Option<T> {
     match handler {
         Ok(handler) => Some(handler),
         Err(source) => {
-            // Said before the console takes the terminal, which is the
-            // one moment a line on standard error reaches nobody's screen
-            // twice.
             eprintln!(
                 "{name} cannot be listened for ({source}); it ends the city without a handoff"
             );
@@ -247,8 +203,6 @@ fn installed<T>(name: &str, handler: std::io::Result<T>) -> Option<T> {
     }
 }
 
-/// The next arrival of one signal; a handler that is absent, or whose
-/// stream ended, never completes.
 macro_rules! arrival {
     ($signal:expr) => {
         async {

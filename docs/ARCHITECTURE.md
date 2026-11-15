@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->489<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->490<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -152,11 +152,11 @@ scanning of ledger envelopes, safe Rust runs level with or faster than Zig
 workflow and buy nothing. When a leaf measures the other way, re-argue the
 rule.
 
-The console's renderer, `crates/console_ffi`, entered by neither route: it
+The console's renderer, `Calyx/ffi`, entered by neither route: it
 is Zig by a separate ruling of the person, a pure leaf that reads a borrowed
 scene and writes a borrowed buffer, and its cost is that building the
 workspace on every platform needs the pinned Zig
-(`crates/console_ffi/Spec.lean` D1).
+(`Calyx/ffi/Spec.lean` D1).
 
 ## 3 The units and the dependency law
 
@@ -172,6 +172,7 @@ number appears in this sentence.
 
 ```depmap
 mei:
+calyx: console_ffi, kernel, accounting, wire, child
 kernel:
 child:
 storage: kernel, child
@@ -185,13 +186,13 @@ agent_protocols: kernel, gateway, child
 wire: kernel, documents
 remote_access: kernel, child
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire, documents
-sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, console_ffi, remote_access, child
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, calyx, remote_access, child
 desktop: kernel, agent_protocols, desktop_ffi, child
 desktop_ffi: child
 console_ffi:
 ```
 
-The `mei` row is empty on purpose. Archetype:Mei is a standalone academic prototype under the top-level `Mei/` directory, not a city component. Its only relationship to the city is a process-boundary adapter in the existing console: the console starts `mei` and projects its JSONL, while Mei has no crate dependency on the console or any other city crate. The default magpie address is an outbound client destination only; neither Mei nor this adapter listens on `2501` or `3425`.
+The `mei` row is empty on purpose. Mei is a headless harness under the top-level `Mei/` directory, not a city component. Interactive terminal residence belongs to top-level `Calyx/` (production, not Archetype): City and Mei console backends live there and start `mei` across a process boundary. Mei has no crate dependency on Calyx or any city crate. The default magpie address is an outbound client destination only; neither Mei nor that adapter listens on `2501` or `3425`.
 
 The `child` row is empty on purpose: `child::command` is the one place a
 child process is configured (detached from the city's console, in its own
@@ -209,9 +210,9 @@ image quality domain, the MCP revision and the effect-unknown key, and for
 nothing else.
 
 The `console_ffi` row is the other: the console's renderer
-(`crates/console_ffi`), a Zig leaf that turns a scene into the bytes of
+(`Calyx/ffi`), a Zig leaf that turns a scene into the bytes of
 one terminal frame, with the same lint table and its one `unsafe` at the
-call into the leaf (`crates/console_ffi/Spec.lean` D1). Its row is empty
+call into the leaf (`Calyx/ffi/Spec.lean` D1). Its row is empty
 because the scene is written in its own words: the console decides what
 the screen holds and names `console_ffi`, and the leaf names nothing.
 
@@ -803,10 +804,10 @@ production except where a test module relaxes it locally: no `unwrap`,
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
 denied; `unsafe_code` is forbidden in every workspace crate but two. The
 desktop server's FFI seam (`crates/desktop/ffi`) and the console's renderer
-(`crates/console_ffi`) each carry the workspace's table with `unsafe_code`
+(`Calyx/ffi`) each carry the workspace's table with `unsafe_code`
 at `deny`, and hold one `unsafe` block per call into their Zig leaf, each
 with the precondition that makes it sound (`crates/desktop/Spec.lean`
-section 8-12 and D14, `crates/console_ffi/Spec.lean` D1); `xtask guard`
+section 8-12 and D14, `Calyx/ffi/Spec.lean` D1); `xtask guard`
 holds both tables to the workspace's, key by key. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.
@@ -1307,6 +1308,11 @@ flowchart TD
     agent_protocols --> gateway
     agent_protocols --> kernel
     browser --> kernel
+    calyx --> accounting
+    calyx --> child
+    calyx --> console_ffi
+    calyx --> kernel
+    calyx --> wire
     child
     city --> kernel
     collab --> kernel
@@ -1332,10 +1338,10 @@ flowchart TD
     sprawling --> accounting
     sprawling --> agent_protocols
     sprawling --> browser
+    sprawling --> calyx
     sprawling --> child
     sprawling --> city
     sprawling --> collab
-    sprawling --> console_ffi
     sprawling --> desktop
     sprawling --> desktop_ffi
     sprawling --> gateway
