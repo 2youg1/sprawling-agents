@@ -23,6 +23,32 @@ use std::process::Output;
 use serde_json::Value;
 
 #[cfg(unix)]
+fn non_unicode_argument() -> std::ffi::OsString {
+    use std::os::unix::ffi::OsStringExt as _;
+    std::ffi::OsString::from_vec(vec![0xff])
+}
+
+#[cfg(windows)]
+fn non_unicode_argument() -> std::ffi::OsString {
+    use std::os::windows::ffi::OsStringExt as _;
+    std::ffi::OsString::from_wide(&[0xd800])
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "argument fixture process")]
+fn cli_non_unicode_prompt_is_a_usage_error() {
+    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
+        .arg("-p")
+        .arg(non_unicode_argument())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("E_MEI_USAGE"), "{error}");
+    assert!(!error.contains("panicked"), "{error}");
+}
+
+#[cfg(unix)]
 fn read_request_body(reader: &mut BufReader<std::net::TcpStream>) -> Vec<u8> {
     let mut length = 0;
     loop {
@@ -404,8 +430,12 @@ assert result.returncode == 0
 #[test]
 #[expect(clippy::disallowed_methods, reason = "resume fixture process")]
 fn cli_resume_imports_only_complete_message_history() {
+    use std::os::unix::ffi::OsStrExt as _;
+
     let dir = tempfile::tempdir().unwrap();
-    let session = dir.path().join("session.jsonl");
+    let session = dir
+        .path()
+        .join(std::ffi::OsStr::from_bytes(b"session-\xff.jsonl"));
     std::fs::write(
         &session,
         concat!(

@@ -183,21 +183,27 @@ printf '介绍当前目录' | "$HOME/sprawling-agents/target/debug/mei"
 ```sh
 bash -e <<'EOF'
 PROJECT_COPY='/mnt/c/path/to/ProjectCopy'
-mkdir -p "$HOME/work/my-project"
-rsync -a \
+DEST="$HOME/work/my-project"
+if [ -e "$DEST" ] || [ -L "$DEST" ]; then
+  echo "目标目录已存在：$DEST" >&2
+  exit 1
+fi
+mkdir -p "$HOME/work"
+mkdir "$DEST"
+rsync -a --safe-links \
   --exclude='.env' --exclude='.env.*' \
   --exclude='*.pem' --exclude='*.key' \
   --exclude='id_rsa*' --exclude='id_ed25519*' \
   --exclude='private/' --exclude='secrets/' \
-  "$PROJECT_COPY/" "$HOME/work/my-project/"
-find "$HOME/work/my-project" -type f \
+  "$PROJECT_COPY/" "$DEST/"
+find "$DEST" -type f \
   \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
      -o -name 'id_rsa*' -o -name 'id_ed25519*' \
      -o -path '*/private/*' -o -path '*/secrets/*' \) -print
 EOF
 ```
 
-复制过程会排除常见凭据文件和私人目录，`find` 必须没有任何输出。还要检查副本中的其它文件，因为文件名规则认不出所有私人资料。确认副本不含凭据或私人资料后，才能启动 Mei：
+目标目录必须全新；`--safe-links` 会忽略绝对链接和逃出复制树的链接，常见凭据文件和私人目录也会被排除，`find` 必须没有任何输出。还要检查副本中的其它文件，因为文件名规则认不出所有私人资料。确认副本不含凭据或私人资料后，才能启动 Mei：
 
 ```sh
 cd ~/work/my-project

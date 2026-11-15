@@ -183,21 +183,27 @@ Use a **disposable project copy**, never the only original. Replace `/mnt/c/path
 ```sh
 bash -e <<'EOF'
 PROJECT_COPY='/mnt/c/path/to/ProjectCopy'
-mkdir -p "$HOME/work/my-project"
-rsync -a \
+DEST="$HOME/work/my-project"
+if [ -e "$DEST" ] || [ -L "$DEST" ]; then
+  echo "destination already exists: $DEST" >&2
+  exit 1
+fi
+mkdir -p "$HOME/work"
+mkdir "$DEST"
+rsync -a --safe-links \
   --exclude='.env' --exclude='.env.*' \
   --exclude='*.pem' --exclude='*.key' \
   --exclude='id_rsa*' --exclude='id_ed25519*' \
   --exclude='private/' --exclude='secrets/' \
-  "$PROJECT_COPY/" "$HOME/work/my-project/"
-find "$HOME/work/my-project" -type f \
+  "$PROJECT_COPY/" "$DEST/"
+find "$DEST" -type f \
   \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
      -o -name 'id_rsa*' -o -name 'id_ed25519*' \
      -o -path '*/private/*' -o -path '*/secrets/*' \) -print
 EOF
 ```
 
-The copy excludes common credential files and private directories, and `find` must print nothing. Inspect the rest of the copy too: filename patterns cannot recognise every private file. Only after confirming that the copy contains no credentials or private material, start Mei:
+The destination must be new, and `--safe-links` omits absolute links and links escaping the copied tree. Common credential files and private directories are excluded too, and `find` must print nothing. Inspect the rest of the copy: filename patterns cannot recognise every private file. Only after confirming that the copy contains no credentials or private material, start Mei:
 
 ```sh
 cd ~/work/my-project

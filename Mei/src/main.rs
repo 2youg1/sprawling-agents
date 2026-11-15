@@ -114,16 +114,31 @@ struct Arguments {
 fn arguments() -> Result<Arguments> {
     let mut prompt = None;
     let mut resume = None;
-    let mut args = std::env::args().skip(1);
+    let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
         let value = args
             .next()
-            .ok_or_else(|| usage(format!("{flag} requires a value")))?;
-        match flag.as_str() {
-            "-p" if prompt.is_none() => prompt = Some(value),
-            "--resume" if resume.is_none() => resume = Some(value.into()),
-            "-p" | "--resume" => return Err(usage(format!("duplicate {flag}"))),
-            _ => return Err(usage(format!("unknown argument `{flag}`"))),
+            .ok_or_else(|| usage(format!("{} requires a value", flag.to_string_lossy())))?;
+        match flag.to_str() {
+            Some("-p") if prompt.is_none() => {
+                let value = value.into_string().map_err(|value| {
+                    usage(format!(
+                        "-p prompt must be valid UTF-8, got `{}`",
+                        value.to_string_lossy()
+                    ))
+                })?;
+                prompt = Some(value);
+            }
+            Some("--resume") if resume.is_none() => resume = Some(value.into()),
+            Some("-p" | "--resume") => {
+                return Err(usage(format!("duplicate {}", flag.to_string_lossy())));
+            }
+            _ => {
+                return Err(usage(format!(
+                    "unknown argument `{}`",
+                    flag.to_string_lossy()
+                )));
+            }
         }
     }
     Ok(Arguments { prompt, resume })

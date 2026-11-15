@@ -156,6 +156,9 @@ impl Py {
 Mei 自身没有交互循环或斜杠命令。`-p` 缺值、重复/未知参数、缺模型、非法 JSON、
 空/畸形/未完整结束的恢复日志都在模型请求与 Python 启动之前失败。
 恢复只带入 role/content 与消息顺序；当前环境重新决定 model、system、tools 与网关，Python 重新启动。
+`--resume` 的路径从 `OsString` 直接进入 `PathBuf`，POSIX 非 UTF-8 路径不会触发 panic；flags 与
+`-p` prompt 需要 Unicode，转换失败以 `E_MEI_USAGE` 拒绝。恢复字段验证诊断的 `value` 保留实际
+role、content 或终端 stop_reason，完整性拒绝也指出最后一条为何不能闭合日志。
 -/
 
 /-! ## 9 工作流程
@@ -290,3 +293,7 @@ Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 
 /-! D9 User 常用的 `/new` 与 `/resume <jsonl>` 由现有 Sprawling CLI 提供，核心只增加完整消息日志恢复。
 每次 `/new` 新建独立 JSONL，旧文件原地保留；成功后才追加本段，恢复消息而不恢复 Python 现场。
 被否的是另写交互 UI、自动选择最近会话、会话数据库、Python 进程快照，以及把取消或失败的尾段追加进日志。 -/
+
+/-! D10 恢复参数与诊断保留调用者提供的事实：路径不经 UTF-8 往返，字段错误附实际值。
+理由是 POSIX 路径不要求 Unicode，而修复者需要看到被-rule 拒绝的 role/content/stop_reason；
+被否的是 `std::env::args()` 的隐式 panic，以及只留下 `value = None` 的验证诊断。 -/

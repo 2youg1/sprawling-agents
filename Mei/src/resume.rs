@@ -11,13 +11,13 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::error::{Code, Diagnostic, Error, Result};
+use crate::error::{Code, Diagnostic, Result};
 
 fn failure(
     action: impl Into<String>,
     subject: impl Into<String>,
     path: impl Into<String>,
-) -> Error {
+) -> Diagnostic {
     Diagnostic::new(
         Code::Session,
         action,
@@ -25,7 +25,10 @@ fn failure(
         "use a Mei JSONL whose first line is the initial user prompt and whose last assistant line has stop_reason=end_turn",
     )
     .with_path(path)
-    .into()
+}
+
+fn offending_value(value: Option<&Value>) -> String {
+    value.map_or_else(|| "<missing>".to_owned(), Value::to_string)
 }
 
 /// Reads role/content in file order from a complete Mei observation log.
@@ -40,7 +43,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
         )
     })?;
     let mut messages = Vec::new();
-    let mut final_stop = None;
+    let mut last_entry = None;
     for (index, line) in std::io::BufReader::new(file).lines().enumerate() {
         let line_number = index.saturating_add(1);
         let where_failed = format!("{}:{line_number}", path.display());
@@ -64,23 +67,28 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
                 "each line must be one message object",
                 where_failed.clone(),
             )
+            .with_value(value.to_string())
         })?;
-        let role = object.get("role").and_then(Value::as_str).ok_or_else(|| {
+        let role_value = object.get("role");
+        let role = role_value.and_then(Value::as_str).ok_or_else(|| {
             failure(
                 "validate a Mei resume log line",
                 "role must be user or assistant",
                 where_failed.clone(),
             )
+            .with_value(offending_value(role_value))
         })?;
         if role != "user" && role != "assistant" {
             return Err(failure(
                 "validate a Mei resume log line",
                 "role must be user or assistant",
                 where_failed,
-            ));
+            )
+            .with_value(offending_value(role_value))
+            .into());
         }
-        let content = object
-            .get("content")
+        let content_value = object.get("content");
+        let content = content_value
             .filter(|content| content.is_string() || content.is_array())
             .ok_or_else(|| {
                 failure(
@@ -88,34 +96,47 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
                     "content must be a string or an array",
                     where_failed.clone(),
                 )
+                .with_value(offending_value(content_value))
             })?;
         if messages.is_empty() && (role != "user" || !content.is_string()) {
+            let offending = if role != "user" {
+                role_value
+            } else {
+                Some(content)
+            };
             return Err(failure(
                 "validate the initial Mei prompt",
                 "the first line must contain the initial user prompt as a string",
                 where_failed,
-            ));
+            )
+            .with_value(offending_value(offending))
+            .into());
         }
-        final_stop = if role == "assistant" {
-            object
-                .get("stop_reason")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        } else {
-            None
-        };
         messages.push(json!({"role": role, "content": content}));
+        last_entry = Some(value);
     }
-    let complete = messages
-        .last()
-        .is_some_and(|message| message["role"] == "assistant")
-        && final_stop.as_deref() == Some("end_turn");
+    let complete = last_entry.as_ref().is_some_and(|entry| {
+        entry.get("role").and_then(Value::as_str) == Some("assistant")
+            && entry.get("stop_reason").and_then(Value::as_str) == Some("end_turn")
+    });
     if !complete {
+        let offending = last_entry.as_ref().map_or_else(
+            || "<empty log>".to_owned(),
+            |entry| {
+                if entry.get("role").and_then(Value::as_str) == Some("assistant") {
+                    offending_value(entry.get("stop_reason"))
+                } else {
+                    offending_value(entry.get("role"))
+                }
+            },
+        );
         return Err(failure(
             "validate the complete Mei session",
             "the log is empty or does not end with an assistant end_turn",
             path.display().to_string(),
-        ));
+        )
+        .with_value(offending)
+        .into());
     }
     Ok(messages)
 }
@@ -124,6 +145,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
 #[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use super::*;
+    use crate::error::Error;
 
     #[test]
     fn a_complete_log_preserves_messages_and_drops_observation_metadata() {
@@ -144,6 +166,44 @@ mod tests {
                 json!({"role": "assistant", "content": [{"type": "text", "text": "done"}]})
             ]
         );
+    }
+
+    #[test]
+    fn validation_failures_carry_role_content_and_stop_values() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, bytes, expected) in [
+            (
+                "bad-role",
+                "{\"role\":\"system\",\"content\":\"first\"}\n",
+                "\"system\"",
+            ),
+            ("bad-content", "{\"role\":\"user\",\"content\":42}\n", "42"),
+            (
+                "array-prompt",
+                concat!(
+                    "{\"role\":\"user\",\"content\":[]}\n",
+                    "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}\n"
+                ),
+                "[]",
+            ),
+            (
+                "bad-stop",
+                concat!(
+                    "{\"role\":\"user\",\"content\":\"first\"}\n",
+                    "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"tool_use\"}\n"
+                ),
+                "\"tool_use\"",
+            ),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, bytes).unwrap();
+            match read(&path).unwrap_err() {
+                Error::Diagnostic(diagnostic) => {
+                    assert_eq!(diagnostic.value.as_deref(), Some(expected), "{name}");
+                }
+                error @ Error::Body(_) => panic!("{name}: unexpected raw body: {error}"),
+            }
+        }
     }
 
     #[test]

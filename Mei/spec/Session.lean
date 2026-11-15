@@ -25,10 +25,17 @@ structure Entry where
 
 abbrev Log := List Entry
 
-/-- 只有最后一条已观察为 `end_turn` 的 assistant 才构成可恢复的完整日志。 -/
+/-- 完整日志以字符串内容的 user prompt 开始，以已观察为 `end_turn` 的 assistant 结束。 -/
 def completed (entries : Log) : Bool :=
-  match entries.getLast? with
-  | some entry => entry.message.role == Role.assistant && entry.stop == some Stop.endTurn
+  match entries.head? with
+  | some first =>
+    first.message.role == Role.user &&
+      (match first.message.content with
+       | .string _ =>
+         match entries.getLast? with
+         | some last => last.message.role == Role.assistant && last.stop == some Stop.endTurn
+         | none => false
+       | .items _ => false)
   | none => false
 
 /-- 恢复保留消息内容与顺序，剥去仅属于日志的 stop 元数据；不完整日志没有恢复结果。 -/
@@ -77,6 +84,16 @@ theorem resume_preserves_messages (state : State) (entries : Log)
   simp [resume, restore_preserves_messages entries complete]
 
 example : restore [] = none := by native_decide
+
+example : restore [⟨Mei.Agent.assistant (.string "done"), some Stop.endTurn⟩] = none := by
+  native_decide
+
+example :
+    restore [
+      ⟨(⟨Role.user, Content.items []⟩ : Message), none⟩,
+      ⟨Mei.Agent.assistant (.string "done"), some Stop.endTurn⟩
+    ] = none := by
+  native_decide
 
 example :
     let entries := [
