@@ -6,10 +6,11 @@
 //! Canonical content identity for one verification node (xtask `spec/Ci.lean`).
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+#[cfg(any(test, target_os = "linux"))]
+use std::path::Path;
 
+use super::view::Snapshot;
 use crate::report::XtaskError;
-use crate::walk;
 
 use super::graph::{Action, Input, Operation};
 
@@ -40,53 +41,56 @@ impl Key {
 pub(crate) struct Environment {
     pub(crate) os: String,
     pub(crate) arch: String,
+    pub(crate) verifier: Option<String>,
 }
 
 impl Environment {
     pub(crate) fn current() -> Self {
+        Self::from_probe(running_image())
+    }
+
+    pub(super) fn from_probe(image: Result<Option<String>, XtaskError>) -> Self {
+        let verifier = match image {
+            Ok(identity) => identity,
+            Err(error) => {
+                eprintln!(
+                    "```toml\ncode = \"verifier-unavailable\"\naction = \"identify the loaded verifier for result reuse\"\nsubject = \"running image\"\npath = \"/proc/self/exe\"\nvalue = {:?}\nrule = \"only an identified loaded image may reuse verdicts\"\nrepair = \"continue with real verification; result reuse stays disabled\"\n```",
+                    error.to_string()
+                );
+                None
+            }
+        };
         Self {
             os: std::env::consts::OS.to_owned(),
             arch: std::env::consts::ARCH.to_owned(),
+            verifier,
+        }
+    }
+
+    pub(crate) fn reuse(&self, declared: super::graph::Reuse) -> super::graph::Reuse {
+        if self.verifier.is_some() {
+            declared
+        } else {
+            super::graph::Reuse::Never
         }
     }
 }
 
-/// One immutable view of the checkout; every file is hashed at most once per run.
-#[derive(Debug)]
-pub(crate) struct Snapshot {
-    files: BTreeMap<String, blake3::Hash>,
-    root: PathBuf,
+/// Linux's procfs link opens the executing image, including after unlink or
+/// rename. A pathname returned by current_exe does not offer that guarantee.
+#[cfg(target_os = "linux")]
+fn running_image() -> Result<Option<String>, XtaskError> {
+    let path = Path::new("/proc/self/exe");
+    let bytes = std::fs::read(path).map_err(|source| XtaskError::Io {
+        path: "read the executing verifier through /proc/self/exe (verifier-identity)".to_owned(),
+        source,
+    })?;
+    Ok(Some(blake3::hash(&bytes).to_hex().to_string()))
 }
 
-impl Snapshot {
-    pub(crate) fn capture(root: &Path) -> Result<Self, XtaskError> {
-        let mut files = BTreeMap::new();
-        for file in walk::files(root)? {
-            let path = walk::rel(root, &file);
-            if walk::in_isolation_zone(&path) {
-                continue;
-            }
-            let bytes = std::fs::read(&file).map_err(|source| XtaskError::Io {
-                path: path.clone(),
-                source,
-            })?;
-            files.insert(path, blake3::hash(&bytes));
-        }
-        Ok(Self {
-            files,
-            root: root.to_path_buf(),
-        })
-    }
-
-    /// The source view the actions read; its lifetime belongs to this capture.
-    pub(crate) fn root(&self) -> &Path {
-        &self.root
-    }
-
-    /// Release the captured view and report a cleanup failure to the caller.
-    pub(crate) fn close(self) -> Result<(), XtaskError> {
-        Ok(())
-    }
+#[cfg(not(target_os = "linux"))]
+fn running_image() -> Result<Option<String>, XtaskError> {
+    Ok(None)
 }
 
 /// Inputs that always travel together when deriving a content key.
@@ -94,12 +98,15 @@ pub(crate) struct Identity<'a> {
     pub(crate) base: &'a [Input],
     pub(crate) dependencies: &'a BTreeMap<String, Key>,
     pub(crate) environment: &'a Environment,
+    pub(crate) variables: &'a BTreeMap<String, String>,
 }
 
 /// Hash one node and all of its declared inputs; used by isolated fixture tests.
 #[cfg(test)]
 fn key(root: &Path, action: &Action, identity: &Identity) -> Result<Key, XtaskError> {
-    key_in_snapshot(&Snapshot::capture(root)?, action, identity)
+    let snapshot = Snapshot::capture(root)?;
+    let result = key_in_snapshot(&snapshot, action, identity);
+    snapshot.finish(result)
 }
 
 /// Derive a node key without rereading the checkout.
@@ -131,7 +138,19 @@ pub(crate) fn key_in_snapshot(
     )?;
     text(&mut hash, &identity.environment.os)?;
     text(&mut hash, &identity.environment.arch)?;
+    text(
+        &mut hash,
+        identity
+            .environment
+            .verifier
+            .as_deref()
+            .unwrap_or("unavailable"),
+    )?;
     operation(&mut hash, action.operation)?;
+    for (name, value) in identity.variables {
+        text(&mut hash, name)?;
+        text(&mut hash, value)?;
+    }
     for (id, key) in identity.dependencies {
         text(&mut hash, id)?;
         text(&mut hash, key.as_str())?;
@@ -148,7 +167,7 @@ fn matching_files<'a>(
     specs: &[Input],
 ) -> Result<BTreeMap<&'a String, &'a blake3::Hash>, XtaskError> {
     let mut found = BTreeMap::new();
-    for (path, digest) in &snapshot.files {
+    for (path, digest) in snapshot.files() {
         if specs.iter().any(|spec| spec.matches(path)) {
             found.insert(path, digest);
         }
@@ -229,6 +248,7 @@ mod tests {
         Environment {
             os: "test-os".to_owned(),
             arch: "test-arch".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         }
     }
 
@@ -240,7 +260,13 @@ mod tests {
             base: &[],
             dependencies,
             environment,
+            variables: empty_variables(),
         }
+    }
+
+    fn empty_variables() -> &'static BTreeMap<String, String> {
+        static VARIABLES: BTreeMap<String, String> = BTreeMap::new();
+        &VARIABLES
     }
 
     #[test]
@@ -299,6 +325,7 @@ mod tests {
                 &Environment {
                     os: "other".to_owned(),
                     arch: "test-arch".to_owned(),
+                    verifier: Some("test-verifier".to_owned()),
                 },
             ),
         )
@@ -344,5 +371,99 @@ mod tests {
             1,
             "the real header gate must read captured A, even after the original became B then A"
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_replaced_executable_path_does_not_replace_the_loaded_identity() {
+        const CHILD: &str = "XTASK_CI_IMAGE_REPLACEMENT_TEST";
+        if std::env::var_os(CHILD).is_some() {
+            let before = Environment::current();
+            assert!(before.verifier.is_some());
+            let executable = std::env::current_exe().unwrap();
+            std::fs::rename(&executable, executable.with_extension("running")).unwrap();
+            std::fs::write(&executable, b"replacement path bytes").unwrap();
+            std::fs::remove_file(executable.with_extension("running")).unwrap();
+            assert_eq!(Environment::current(), before);
+            assert_ne!(
+                before.verifier.unwrap(),
+                blake3::hash(&std::fs::read(executable).unwrap())
+                    .to_hex()
+                    .to_string()
+            );
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("verifier");
+        std::fs::copy(std::env::current_exe().unwrap(), &executable).unwrap();
+        let output = std::process::Command::new(executable)
+            .args(["--exact", "ci::content::tests::a_replaced_executable_path_does_not_replace_the_loaded_identity", "--nocapture"])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        dir.close().unwrap();
+    }
+
+    #[test]
+    fn unavailable_loaded_identity_disables_reuse() {
+        let mut environment = environment();
+        environment.verifier = None;
+        assert_eq!(environment.reuse(Reuse::SuccessOnly), Reuse::Never);
+        assert_eq!(environment.reuse(Reuse::Never), Reuse::Never);
+    }
+
+    #[test]
+    fn loaded_verifier_and_explicit_process_inputs_change_the_key() {
+        let root = fixture("explicit-identity");
+        std::fs::write(root.join("src/lib.rs"), "fn same() {}\n").unwrap();
+        let environment = environment();
+        let dependencies = BTreeMap::new();
+        let variables =
+            BTreeMap::from([("SPRAWLING_CI_SOURCE_SHA".to_owned(), "first".to_owned())]);
+        let first = key(
+            &root,
+            &action(),
+            &Identity {
+                base: &[],
+                dependencies: &dependencies,
+                environment: &environment,
+                variables: &variables,
+            },
+        )
+        .unwrap();
+        let mut other = environment.clone();
+        other.verifier = Some("other-loaded-verifier".to_owned());
+        let changed_verifier = key(
+            &root,
+            &action(),
+            &Identity {
+                base: &[],
+                dependencies: &dependencies,
+                environment: &other,
+                variables: &variables,
+            },
+        )
+        .unwrap();
+        let variables =
+            BTreeMap::from([("SPRAWLING_CI_SOURCE_SHA".to_owned(), "second".to_owned())]);
+        let changed_head = key(
+            &root,
+            &action(),
+            &Identity {
+                base: &[],
+                dependencies: &dependencies,
+                environment: &environment,
+                variables: &variables,
+            },
+        )
+        .unwrap();
+        assert_ne!(first, changed_verifier);
+        assert_ne!(first, changed_head);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

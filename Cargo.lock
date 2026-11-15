@@ -4852,6 +4852,7 @@ dependencies = [
  "sprawling-kernel",
  "sprawling-wire",
  "syn 3.0.10",
+ "tempfile",
  "thiserror 2.0.21",
  "toml",
  "zip",

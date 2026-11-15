@@ -1,8 +1,8 @@
 # The gate a change closes on, run by a machine.
 #
-# Every job calls the recipes `just check` is made of and spells no command
-# of its own, so the check a person runs at their desk and the check a pull
-# request gets are one set of commands rather than two copies that drift.
+# Product jobs call the recipes `just check` is made of, so the local and
+# pull-request checks share their commands. The verifier additionally gets
+# native Linux clippy and CI-domain regressions: `check-core` excludes xtask.
 # The jobs together are exactly `just check`, plus the two things a tree
 # alone cannot hold: the commit messages of the range under review, and the
 # kani proofs, which need a Linux host.
@@ -195,6 +195,7 @@ jobs:
               - 'architecture.toml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/ci-cache/**'
               - 'deny.toml'
             # Client sources and the formatter config that judges them.
             client:
@@ -217,6 +218,7 @@ jobs:
               - 'architecture.toml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/ci-cache/**'
               - 'deny.toml'
             lean:
               - '**/*.lean'
@@ -280,6 +282,7 @@ jobs:
           bun-version-file: client/package.json
       - name: install the content-cache adapter
         if: ${{ !cancelled() }}
+        continue-on-error: true
         working-directory: .github/ci-cache
         run: bun install --frozen-lockfile
       # One graph owns formatting, source gates, workflow self-tests and the
@@ -287,9 +290,7 @@ jobs:
       # failures and unavailable cache storage always execute the action.
       - name: content-addressed source verification
         if: ${{ !cancelled() }}
-        env:
-          SPRAWLING_CI_CACHE_ADAPTER: .github/ci-cache/cache.ts
-        run: just verify-sources
+        uses: ./.github/ci-cache
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
       # (crates/xtask/Spec.lean §8-35). History and title are not content-
@@ -594,6 +595,23 @@ jobs:
       - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-nextest,just
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: client/package.json
+      - name: install the content-cache adapter
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        working-directory: .github/ci-cache
+        run: bun install --frozen-lockfile
+      - name: lint the verifier on Linux
+        if: ${{ !cancelled() }}
+        run: cargo clippy -p xtask --all-targets --all-features --locked -- -D warnings
+      - name: verifier input, execution and storage regressions on Linux
+        if: ${{ !cancelled() }}
+        run: "cargo test -p xtask --all-features --locked ci::"
+      - name: content-addressed source verification on Linux
+        if: ${{ !cancelled() }}
+        uses: ./.github/ci-cache
       # The same scratch the `compile` test slice keeps, for the same
       # reason: cold, the trybuild suites dominate this job's test run.
       # Restored after the Rust cache, which never holds `target/tests`.
@@ -604,6 +622,7 @@ jobs:
           key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
+        if: ${{ !cancelled() }}
         run: just check-core
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}

@@ -61,8 +61,24 @@ const GIT: &str = ".git";
 
 /// All regular files under `root`, sorted by their relative forward-slash path.
 pub(crate) fn files(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {
+    source_files(root, Aliases::Follow)
+}
+
+/// Capture's source surface: the same skip policy, with aliases and special
+/// items refused before traversal. A private copy must not hide a link's scope.
+pub(crate) fn files_without_aliases(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {
+    source_files(root, Aliases::Refuse)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Aliases {
+    Follow,
+    Refuse,
+}
+
+fn source_files(root: &Path, aliases: Aliases) -> Result<Vec<PathBuf>, XtaskError> {
     let mut out = Vec::new();
-    collect(root, &mut out)?;
+    collect(root, root, &mut out, aliases)?;
     out.sort_by_key(|p| rel(root, p));
     Ok(out)
 }
@@ -116,6 +132,21 @@ pub(crate) fn in_isolation_zone(rel: &str) -> bool {
     rel == "local" || rel.starts_with("local/")
 }
 
+/// The path-only part of the source walk, shared with immutable Git trees.
+/// A Git tree does not descend into another checkout (a gitlink) either.
+pub(crate) fn excluded_source_path(path: &str) -> bool {
+    if in_isolation_zone(path) {
+        return true;
+    }
+    let mut parts = path.split('/').peekable();
+    while let Some(part) = parts.next() {
+        if part == GIT || (parts.peek().is_some() && SKIP_DIRS.contains(&part)) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Where the web client's sources are, spelled once for every gate that
 /// walks them.
 ///
@@ -157,7 +188,12 @@ pub(crate) fn client_files(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, X
     )
 }
 
-fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
+fn collect(
+    root: &Path,
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    aliases: Aliases,
+) -> Result<(), XtaskError> {
     let entries = std::fs::read_dir(dir).map_err(|source| XtaskError::Io {
         path: dir.to_string_lossy().into_owned(),
         source,
@@ -169,16 +205,43 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
         })?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name == GIT {
+        if name == GIT || (aliases == Aliases::Refuse && in_isolation_zone(&rel(root, &path))) {
             continue;
+        }
+        if path.is_dir() && SKIP_DIRS.contains(&name.as_str()) {
+            continue;
+        }
+        if aliases == Aliases::Refuse {
+            let metadata = std::fs::symlink_metadata(&path).map_err(|source| XtaskError::Io {
+                path: path.display().to_string(),
+                source,
+            })?;
+            if is_alias(&metadata) || (!metadata.is_dir() && !metadata.is_file()) {
+                return Err(XtaskError::Doc {
+                    file: path.display().to_string(),
+                    msg: "capture source input (source-alias): replace the link, reparse point or special item with ordinary source files before running verification".to_owned(),
+                });
+            }
         }
         if !path.is_dir() {
             out.push(path);
-        } else if !SKIP_DIRS.contains(&name.as_str()) && !is_checkout(&path)? {
-            collect(&path, out)?;
+        } else if !is_checkout(&path)? {
+            collect(root, &path, out, aliases)?;
         }
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn is_alias(metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt as _;
+    // FILE_ATTRIBUTE_REPARSE_POINT includes directory junctions as well as symlinks.
+    metadata.file_attributes() & 0x400 != 0
+}
+
+#[cfg(not(windows))]
+fn is_alias(metadata: &std::fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
 }
 
 fn is_checkout(dir: &Path) -> Result<bool, XtaskError> {

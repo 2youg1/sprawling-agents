@@ -473,9 +473,9 @@ test-timings baseline current:
 
 # The packages every non-Windows platform builds and tests. The desktop
 # server and its FFI seam serve a Windows desktop only, and xtask judges
-# the repository rather than shipping in it, so `ci.yml` lints and tests
-# those three on Windows alone; Linux `core` and `platforms.yml`'s macOS
-# job compile the two desktop packages only as what the binary links.
+# the repository rather than shipping in it. Linux core separately lints
+# xtask and tests its CI domain; the core package suite still excludes it.
+# Linux and macOS compile the desktop packages as what the binary links.
 core_packages := "--workspace --exclude sprawling-desktop --exclude sprawling-desktop-ffi --exclude xtask"
 
 # Clippy and the suite over the core packages, on whatever platform runs it.
@@ -498,6 +498,7 @@ gates: gates-sources gates-artifacts
 # The content-addressed source verification phase: formatting, source gates,
 # workflow self-tests and the Zig leaves. Extra arguments select the affected
 # graph, for example `just verify-sources --base main`.
+[positional-arguments]
 verify-sources *args:
     cargo xtask ci run "$@"
 

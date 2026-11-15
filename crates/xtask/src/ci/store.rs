@@ -56,17 +56,20 @@ impl Store {
         Self::Local(path)
     }
 
-    pub(crate) fn for_root(root: &Path, local_override: Option<PathBuf>) -> Self {
+    pub(crate) fn for_root(
+        root: &Path,
+        local_override: Option<PathBuf>,
+    ) -> Result<Self, XtaskError> {
         if let Some(path) = local_override {
-            return Self::Local(path);
+            return local_store(root, &path).map(Self::Local);
         }
-        match std::env::var_os("SPRAWLING_CI_CACHE_ADAPTER") {
+        Ok(match std::env::var_os("SPRAWLING_CI_CACHE_ADAPTER") {
             Some(adapter) if !adapter.is_empty() => Self::Remote(RemoteStore {
-                adapter: PathBuf::from(adapter),
-                work: root.join("target/ci/remote"),
+                adapter: root.join(adapter),
+                work: local_store(root, Path::new("target/ci/remote"))?,
             }),
-            _ => Self::Local(root.join("target/ci/verdicts")),
-        }
+            _ => Self::Local(local_store(root, Path::new("target/ci/verdicts"))?),
+        })
     }
 
     pub(crate) fn restore(
@@ -76,7 +79,7 @@ impl Store {
         environment: &Environment,
         policy: Reuse,
     ) -> Result<Option<Cached>, XtaskError> {
-        if policy == Reuse::Never {
+        if environment.reuse(policy) == Reuse::Never {
             return Ok(None);
         }
         let cached = match self {
@@ -94,6 +97,14 @@ impl Store {
         key: &Key,
         environment: &Environment,
     ) -> Result<(), XtaskError> {
+        if environment.verifier.is_none() {
+            return Err(XtaskError::Doc {
+                file: "verification cache (verifier-unavailable)".to_owned(),
+                msg:
+                    "execute the check; this platform cannot identify the loaded verifier for reuse"
+                        .to_owned(),
+            });
+        }
         let cached = Cached {
             key: key.as_str().to_owned(),
             verdict: Verdict::Green,
@@ -122,7 +133,68 @@ fn read_local(path: &Path) -> Result<Option<Cached>, XtaskError> {
             });
         }
     };
-    Ok(serde_json::from_slice(&bytes).ok())
+    match serde_json::from_slice(&bytes) {
+        Ok(cached) => Ok(Some(cached)),
+        Err(error) => {
+            eprintln!(
+                "```toml\ncode = \"verdict-corrupt\"\naction = \"restore cached verification\"\npath = {:?}\nvalue = {:?}\nrule = \"a complete JSON verdict with an exact green content key\"\nrepair = \"rerun verification; a successful execution replaces this entry\"\n```",
+                path.display().to_string(),
+                error.to_string()
+            );
+            Ok(None)
+        }
+    }
+}
+
+/// Resolve the existing prefix before checking the scan boundary, so a
+/// directory alias outside the checkout cannot write back into source.
+fn local_store(root: &Path, requested: &Path) -> Result<PathBuf, XtaskError> {
+    let path = root.join(requested);
+    if path
+        .components()
+        .any(|part| part == std::path::Component::ParentDir)
+    {
+        return Err(store_in_source(&path));
+    }
+    let mut prefix = path.as_path();
+    let mut tail = Vec::new();
+    while !prefix.try_exists().map_err(|source| XtaskError::Io {
+        path: prefix.display().to_string(),
+        source,
+    })? {
+        let name = prefix.file_name().ok_or_else(|| store_in_source(&path))?;
+        tail.push(name);
+        prefix = prefix.parent().ok_or_else(|| store_in_source(&path))?;
+    }
+    let mut resolved = prefix.canonicalize().map_err(|source| XtaskError::Io {
+        path: prefix.display().to_string(),
+        source,
+    })?;
+    for name in tail.into_iter().rev() {
+        resolved.push(name);
+    }
+    let root = root.canonicalize().map_err(|source| XtaskError::Io {
+        path: root.display().to_string(),
+        source,
+    })?;
+    if let Ok(relative) = resolved.strip_prefix(&root) {
+        let relative = relative
+            .to_str()
+            .ok_or_else(|| store_in_source(&resolved))?;
+        #[cfg(windows)]
+        let relative = relative.replace('\\', "/");
+        if !crate::walk::excluded_source_path(&format!("{relative}/verdict.json")) {
+            return Err(store_in_source(&resolved));
+        }
+    }
+    Ok(resolved)
+}
+
+fn store_in_source(path: &Path) -> XtaskError {
+    XtaskError::Doc {
+        file: format!("{} (store-in-source)", path.display()),
+        msg: "choose --store target/ci/verdicts or an absolute directory outside the source tree, without parent components".to_owned(),
+    }
 }
 
 fn write_local(path: &Path, cached: &Cached) -> Result<(), XtaskError> {
@@ -257,6 +329,65 @@ mod tests {
     }
 
     #[test]
+    fn custom_store_paths_cannot_become_captured_source() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(local_store(root.path(), Path::new("cache with spaces")).is_err());
+        assert!(local_store(root.path(), Path::new("target/../src/cache")).is_err());
+        assert!(local_store(root.path(), Path::new("target/ci/cache with spaces")).is_ok());
+        assert!(!root.path().join("cache with spaces").exists());
+        root.close().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_outside_store_alias_cannot_write_into_source() {
+        let outer = tempfile::tempdir().unwrap();
+        let root = outer.path().join("checkout");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        let alias = outer.path().join("alias");
+        std::os::unix::fs::symlink(root.join("src"), &alias).unwrap();
+        assert!(local_store(&root, &alias.join("new-cache")).is_err());
+        outer.close().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn default_target_alias_obeys_the_same_source_boundary() {
+        let outer = tempfile::tempdir().unwrap();
+        let root = outer.path().join("checkout");
+        std::fs::create_dir_all(root.join("src/cache")).unwrap();
+        let target = root.join("target");
+        std::os::unix::fs::symlink(root.join("src/cache"), &target).unwrap();
+        assert!(Store::for_root(&root, None).is_err());
+        std::fs::remove_file(&target).unwrap();
+        let external = outer.path().join("build");
+        std::fs::create_dir(&external).unwrap();
+        std::os::unix::fs::symlink(&external, &target).unwrap();
+        assert!(Store::for_root(&root, None).is_ok());
+        outer.close().unwrap();
+    }
+
+    #[test]
+    fn no_loaded_identity_never_reads_or_publishes_verdicts() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::local(root.path().to_owned());
+        let environment = Environment {
+            os: "unsupported".to_owned(),
+            arch: "test".to_owned(),
+            verifier: None,
+        };
+        assert!(store.save_green("gate", &key(), &environment).is_err());
+        assert!(
+            store
+                .restore("gate", &key(), &environment, Reuse::SuccessOnly)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        root.close().unwrap();
+    }
+
+    #[test]
     fn only_the_same_green_content_is_reused() {
         let green = Cached {
             key: "same-content".to_owned(),
@@ -288,6 +419,7 @@ mod tests {
         let environment = Environment {
             os: "test".to_owned(),
             arch: "test".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         };
         store.save_green("gate", &key(), &environment).unwrap();
         assert!(
@@ -333,6 +465,7 @@ mod tests {
         let environment = Environment {
             os: "test".to_owned(),
             arch: "test".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         };
         std::thread::scope(|scope| {
             for _ in 0..8 {
@@ -355,10 +488,12 @@ mod tests {
         let environment = Environment {
             os: "windows".to_owned(),
             arch: "x86_64".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         };
         let other = Environment {
             os: "linux".to_owned(),
             arch: "x86_64".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         };
         let keys = BTreeSet::from([key().cache_key(&environment), key().cache_key(&other)]);
         assert_eq!(keys.len(), 2);
@@ -401,6 +536,7 @@ if (operation === "save") {{
         let environment = Environment {
             os: "test".to_owned(),
             arch: "test".to_owned(),
+            verifier: Some("test-verifier".to_owned()),
         };
         for key in [key(), Key::named("next-generation".to_owned())] {
             store.save_green("gate", &key, &environment).unwrap();

@@ -6,15 +6,17 @@
 //! Content-addressed verification: the graph owns identity and selection;
 //! storage and process execution live behind adapters (xtask D43).
 
+mod baseline;
 mod content;
 mod execute;
 mod graph;
 mod store;
 mod suite;
+mod view;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use serde::Serialize;
 
@@ -56,12 +58,15 @@ fn parse(args: &[String]) -> Result<Options, XtaskError> {
         }
     };
     let mut base = None;
+    let mut full = false;
     let mut store = None;
     let mut it = args.iter().skip(1);
     while let Some(arg) = it.next() {
         match arg.as_str() {
-            "--full" if base.is_none() => {}
-            "--base" if base.is_none() => {
+            "--full" if !full && base.is_none() => {
+                full = true;
+            }
+            "--base" if !full && base.is_none() => {
                 base = Some(
                     it.next()
                         .ok_or_else(|| usage("--base needs a revision", "missing-base"))?
@@ -107,53 +112,65 @@ struct PlanRow {
 
 fn plan(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
     let environment = Environment::current();
-    let prepared = suite::prepare(root, &environment)?;
-    let selected = selected(root, options, &prepared)?;
-    let rows: Vec<PlanRow> = prepared
-        .iter()
-        .map(|prepared| PlanRow {
-            id: prepared.action.id,
-            key: store::remote_key(prepared.action.id, &prepared.key, &environment),
-            operation: operation_name(prepared.action.operation).to_owned(),
-            needs: prepared.action.needs,
-            reuse: match prepared.action.reuse {
-                Reuse::SuccessOnly => "success-only",
-                Reuse::Never => "never",
-            },
-            selected: selected.contains(prepared.action.id),
-        })
-        .collect();
-    let text = serde_json::to_string_pretty(&rows).map_err(|err| XtaskError::Doc {
-        file: "ci plan (plan-serialize)".to_owned(),
-        msg: err.to_string(),
-    })?;
-    println!("{text}");
-    Ok(ExitCode::SUCCESS)
+    let head = baseline::head(root)?;
+    let snapshot = view::Snapshot::capture(root)?;
+    let result = (|| {
+        let prepared = suite::prepare(&snapshot, &environment, &head)?;
+        let selected = selected(root, options, &snapshot, &prepared)?;
+        let rows: Vec<PlanRow> = prepared
+            .iter()
+            .map(|prepared| PlanRow {
+                id: prepared.action.id,
+                key: store::remote_key(prepared.action.id, &prepared.key, &environment),
+                operation: operation_name(prepared.action.operation).to_owned(),
+                needs: prepared.action.needs,
+                reuse: match environment.reuse(prepared.action.reuse) {
+                    Reuse::SuccessOnly => "success-only",
+                    Reuse::Never => "never",
+                },
+                selected: selected.contains(prepared.action.id),
+            })
+            .collect();
+        let text = serde_json::to_string_pretty(&rows).map_err(|err| XtaskError::Doc {
+            file: "ci plan (plan-serialize)".to_owned(),
+            msg: err.to_string(),
+        })?;
+        println!("{text}");
+        Ok(ExitCode::SUCCESS)
+    })();
+    snapshot.finish(result)
 }
 
 fn execute(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
+    let store = Store::for_root(root, options.store.clone())?;
     let environment = Environment::current();
-    let prepared = suite::prepare(root, &environment)?;
-    let selected = selected(root, options, &prepared)?;
-    let store = Store::for_root(root, options.store.clone());
-    Ok(execute::run(
-        &execute::Execution {
-            root,
-            store: &store,
-            environment: &environment,
-        },
-        &prepared,
-        &selected,
-    ))
+    let head = baseline::head(root)?;
+    let snapshot = view::Snapshot::capture(root)?;
+    let result = (|| {
+        let prepared = suite::prepare(&snapshot, &environment, &head)?;
+        let selected = selected(root, options, &snapshot, &prepared)?;
+        Ok(execute::run(
+            &execute::Execution {
+                view: &snapshot,
+                work: root,
+                store: &store,
+                environment: &environment,
+            },
+            &prepared,
+            &selected,
+        ))
+    })();
+    snapshot.finish(result)
 }
 
 fn selected(
     root: &Path,
     options: &Options,
+    snapshot: &view::Snapshot,
     prepared: &[suite::PreparedAction],
 ) -> Result<BTreeSet<String>, XtaskError> {
     if let Some(base) = &options.base {
-        let changed = changed(root, base)?;
+        let changed = baseline::changed(root, base, snapshot)?;
         let actions: Vec<graph::Action> = prepared.iter().map(|row| *row.action).collect();
         Ok(graph::affected_with_base(
             &actions,
@@ -176,36 +193,18 @@ fn operation_name(operation: graph::Operation) -> String {
     }
 }
 
-fn changed(root: &Path, base: &str) -> Result<BTreeSet<String>, XtaskError> {
-    let tracked = git(root, &["diff", "--name-only", "--no-renames", base, "--"])?;
-    let untracked = git(root, &["ls-files", "--others", "--exclude-standard"])?;
-    Ok(tracked
-        .into_iter()
-        .chain(untracked)
-        .filter(|path| !crate::walk::in_isolation_zone(path))
-        .collect())
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
-fn git(root: &Path, args: &[&str]) -> Result<Vec<String>, XtaskError> {
-    let output = Command::new("git")
-        .current_dir(root)
-        .args(args)
-        .output()
-        .map_err(|source| XtaskError::Io {
-            path: format!("git {}", args.join(" ")),
-            source,
-        })?;
-    if !output.status.success() {
-        return Err(XtaskError::Cmd {
-            cmd: format!("git {}", args.join(" ")),
-            msg: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
+    #[test]
+    fn full_and_base_conflict_in_both_orders_and_cannot_repeat() {
+        for args in [
+            vec!["run", "--full", "--base", "main"],
+            vec!["run", "--base", "main", "--full"],
+            vec!["run", "--full", "--full"],
+        ] {
+            assert!(parse(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_err());
+        }
     }
-    String::from_utf8(output.stdout)
-        .map(|text| text.lines().map(str::to_owned).collect())
-        .map_err(|err| XtaskError::Doc {
-            file: format!("git {}", args.join(" ")),
-            msg: format!("paths are not UTF-8: {err} (non-utf8-path)"),
-        })
 }
