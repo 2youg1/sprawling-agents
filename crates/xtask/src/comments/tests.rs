@@ -110,6 +110,37 @@ fn markup_urls_are_not_line_comments() {
 }
 
 #[test]
+fn svelte_control_blocks_do_not_swallow_following_comments() {
+    let source = "{#if ready}\n<p>ok</p>\n{/if}\n<!-- note -->\n";
+    let reading = lexer::measure(source, Language::Svelte);
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
+}
+
+#[test]
+fn svelte_script_open_tags_may_span_lines() {
+    let source =
+        "<script\n  lang=\"ts\"\n>\n  // first\n  // second\n  const value = 1;\n</script>\n";
+    let reading = lexer::measure(source, Language::Svelte);
+    assert_eq!(reading.comment_lines, 2, "{reading:?}");
+}
+
+#[test]
+fn rust_keeps_a_line_comment_after_a_colon() {
+    let source = "struct Item { value: u8 }\nfn item() -> Item {\n    Item { value:// rationale\n        0 }\n}\n";
+    let reading = lexer::measure(source, Language::Rust);
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
+}
+
+#[test]
+fn division_after_index_still_sees_a_block_comment() {
+    let reading = lexer::measure(
+        "const ratio = values[0] / divisor; /* note */\n",
+        Language::TypeScript,
+    );
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
+}
+
+#[test]
 fn svelte_mpl_headers_are_excluded_in_every_leading_shape() {
     let wrap =
         "<!--\n".to_owned() + &header::notice(Leader::Rust).join("\n") + "\n-->\n<p>ok</p>\n";

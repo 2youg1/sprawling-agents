@@ -507,6 +507,7 @@ gates: gates-sources gates-artifacts
 
 # The gates that read sources alone, which answer in seconds, so `check`
 # runs them before clippy's minutes and a red arrives first.
+[positional-arguments]
 gates-sources mode="" *paths:
     #!/usr/bin/env bash
     set -euo pipefail

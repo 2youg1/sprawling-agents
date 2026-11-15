@@ -97,6 +97,12 @@ impl Scanner<'_> {
             return self.html_comment(index);
         }
         if byte == b'{' {
+            if matches!(
+                self.bytes.get(index.saturating_add(1)),
+                Some(b'/' | b'#' | b':')
+            ) {
+                return self.svelte_block(index);
+            }
             self.mark_code();
             self.modes.push(Mode::Code {
                 template_expression: true,
@@ -120,6 +126,35 @@ impl Scanner<'_> {
         self.advance(index)
     }
 
+    fn svelte_block(&mut self, mut index: usize) -> usize {
+        let mut depth = 0_usize;
+        while index < self.bytes.len() {
+            let Some(&byte) = self.bytes.get(index) else {
+                break;
+            };
+            if byte == b'\n' {
+                index = self.advance(index);
+                continue;
+            }
+            if byte == b'{' {
+                depth = depth.saturating_add(1);
+                self.mark_code();
+            } else if byte == b'}' {
+                self.mark_code();
+                index = self.advance(index);
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return index;
+                }
+                continue;
+            } else if !byte.is_ascii_whitespace() {
+                self.mark_code();
+            }
+            index = self.advance(index);
+        }
+        index
+    }
+
     fn script_or_style_open(&self, index: usize) -> Option<usize> {
         for name in [b"script".as_slice(), b"style".as_slice()] {
             let start = index.saturating_add(1);
@@ -130,7 +165,7 @@ impl Scanner<'_> {
             while cursor < self.bytes.len() {
                 match self.bytes.get(cursor) {
                     Some(b'>') => return Some(cursor.saturating_add(1)),
-                    Some(b'\n') | None => return None,
+                    None => return None,
                     _ => cursor = cursor.saturating_add(1),
                 }
             }
@@ -189,7 +224,10 @@ impl Scanner<'_> {
             return end;
         }
         if at(self.bytes, index, b"//") {
-            if index > 0 && self.bytes.get(index.saturating_sub(1)) == Some(&b':') {
+            if self.language == Language::TypeScript
+                && index > 0
+                && self.bytes.get(index.saturating_sub(1)) == Some(&b':')
+            {
                 self.mark_code();
                 return self.advance(index);
             }

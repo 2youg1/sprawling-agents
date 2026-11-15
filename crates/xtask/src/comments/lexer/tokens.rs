@@ -175,7 +175,7 @@ impl Scanner<'_> {
         if b"=([{,!?:;>&|*%^~".contains(&byte) {
             return true;
         }
-        if byte == b')' || byte == b']' {
+        if byte == b')' {
             return true;
         }
         if byte.is_ascii_alphabetic() {
@@ -211,7 +211,10 @@ impl Scanner<'_> {
                 break;
             }
             if !in_class && byte == b'/' {
-                if self.bytes.get(index.saturating_add(1)) == Some(&b'/') {
+                if matches!(
+                    self.bytes.get(index.saturating_add(1)),
+                    Some(b'/') | Some(b'*')
+                ) {
                     return index;
                 }
                 self.mark_code();
