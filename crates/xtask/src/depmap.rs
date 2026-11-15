@@ -3,20 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Dependency gate (redline C5). Two assertions, one authority each:
-//! actual crate edges (normal + build deps) are a subset of the `depmap`
-//! fenced block in ARCHITECTURE.md — no hidden edge, kernel stays at
-//! zero; and `pub trait` appears only in the files the seam table lists —
-//! one adapter is a hypothetical seam, so a trait outside the seam list is
-//! decoration, not architecture. A third reads inside a crate: the
-//! `directions` block names the paths a module's production code never
-//! names, which is how a cycle between two modules of one crate is seen
-//! (`directions`).
-//!
-//! The seam table is read out of its own section (`architecture`), never
-//! out of the whole document: a whitelist recognised by the shape of a
-//! table grows the day somebody writes a table of that shape somewhere
-//! else, and nothing says so.
+//! Actual crate edges must stay within ARCHITECTURE.md's `depmap` block;
+//! `pub trait` belongs only to registered seams with a second adapter.
+//! `directions` applies the same rule between modules of one crate.
+//! `architecture` reads only the owning sections, never lookalike tables.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -72,11 +62,7 @@ pub(crate) fn graph(text: &str) -> Result<String, XtaskError> {
         .join("\n"))
 }
 
-/// Parse the ```depmap fenced block: `name:` or `name: dep, dep`.
-///
-/// The one reader of the block: this gate, [`graph`] and the crate
-/// table docnum draws (crates/xtask/Spec.lean §8-40) all read it here, so
-/// no two of them can read a different topology.
+/// Parse the sole ```depmap block into `name: dep, dep` rows.
 ///
 /// # Errors
 /// When the document holds no closed block, or a line in it has no colon.
@@ -173,7 +159,7 @@ fn check_edges(
                 rule: "every product crate is registered in the depmap block (section 2)"
                     .to_owned(),
                 violation: format!("crate {name} missing from the depmap block"),
-                alternative: "register the crate and its allowed edges (verdict required)"
+                alternative: "register the crate and only the edges its responsibility needs in the depmap block"
                     .to_owned(),
             });
             continue;
@@ -192,8 +178,7 @@ fn check_edges(
                        (section 2, C5); dependencies point inward only"
                     .to_owned(),
                 violation: format!("hidden edge {name} -> {dep}"),
-                alternative: "remove the dependency, or change the topology \
-                              first (a ruling, then the topology)"
+                alternative: "remove the dependency, or record the allowed edge in the depmap block and move the responsibility it serves"
                     .to_owned(),
             });
         }
@@ -219,8 +204,7 @@ fn check_pub_traits(
                                one adapter = hypothetical seam)"
                             .to_owned(),
                         violation: "pub trait outside the seam list".to_owned(),
-                        alternative: "use pub(crate) trait, or register a real seam \
-                                      with a second adapter (verdict required)"
+                        alternative: "use pub(crate) trait, or register the seam only with a real second adapter and its SPEC contract"
                             .to_owned(),
                     });
                 }

@@ -168,7 +168,9 @@ jobs:
         run: cargo test -p xtask channel::tests
       - name: xtask gates
         if: ${{ !cancelled() }}
-        run: cargo xtask gates
+        # File-level migration debt is judged on the files each change touches
+        # in ci.yml; this platform lane checks every other source gate.
+        run: cargo xtask gates $(cargo xtask gates --list | grep -vxE 'length|comments')
 
   # The oldest compiler a `cargo install sprawling` may use, exactly.
   #

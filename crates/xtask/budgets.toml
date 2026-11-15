@@ -161,9 +161,9 @@ best_bytes = 26819584
 measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x86_64"
 status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, just dist, then cargo xtask budget retakes it"
 
-# The unit is a production function. A file is not measured: a cap on
-# file length forced a correct file to be split and removed no defect
-# (crates/xtask/Spec.lean §10-7). Across 1,800 production
+# The unit here is a production function; the separate 500-line file
+# budget lives in length::FILE_LINE_LIMIT (crates/xtask/Spec.lean D39).
+# Across 1,800 production
 # functions the median is 9 lines, p90 is 39 and p99 is 145, so 200 sits
 # well above where the repository actually writes; what it catches is a
 # whole flow of control written into one body. `dispatch_in` was 1,069

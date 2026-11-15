@@ -22,7 +22,7 @@ A new core feature must clear all five tests before any implementation: the need
 
 Before designing or changing code, load [ub-mode](../crates/city/skills/ub-mode/SKILL.md) and follow its loop for scope, specification, regression evidence, implementation and closure. [The view layer](../AGENTS.md#the-view-layer) defines the client exemptions; [SPECs and Markdown](../AGENTS.md#specs-and-markdown) defines where an unfinished interface is recorded.
 
-Keep a pull request's change surface as small as the coherent result permits, ideally within 99 files. Do not split a deletion that removes more than it adds merely for its size. A larger migration lands in stages that each hold on their own, split along actual call sites rather than file counts.
+Choose the smallest complete change that removes the cause; never preserve a defective structure to keep the diff small. Split a migration only at independently verifiable boundaries, not by file or line counts.
 
 ## 3 Three tiers of verification
 
@@ -32,7 +32,7 @@ Use [Verification](verification.md) for the narrow local checks, branch CI, batc
 
 [The machine gates](gates.md) holds the rules and their enforcement. `cargo xtask gates --list` prints the current roster; `cargo xtask gates <name>...` runs selected gates. A failure names the rule, the violation and an alternative.
 
-Fix the reported cause, and follow that section's requirements for separate machinery commits and approval when loosening a gate in the change it rejects. Passing gates supplements review; it does not establish that a feature belongs in the core or that a design is sound.
+A red gate has three exits: fix the code, narrow the rule to a precise scope, or delete the gate. Never add an exception. Keep gate machinery in a separate commit from the source it judges. Passing gates supplements behavioral evidence; it does not establish that a feature belongs in the core or that a design is sound.
 
 ## 4.1 Continuous integration
 
@@ -42,7 +42,7 @@ Before submission, apply [tier 1](verification.md#tier-1--while-iterating) to th
 
 Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state specifications and decision placement.
 
-A comment is an MPL notice, interface documentation, a consequence warning, or intent the code cannot carry. Document every interface at every visibility with what its signature cannot say, because the repository defaults to `pub(crate)` and no reader sees the call sites. Write a reason once beside its enforcement and link to it elsewhere: two copies are two authorities, and the one nobody edits keeps asserting what the code no longer does. A function still owns its own contract — its `# Errors` section and its guarantee to a caller are not a copy.
+Write no comment by default. Keep one only for an MPL notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry. Delete narration, obvious behaviour and workaround justification; rename or reshape the code, or encode the constraint in a type, test, lint or SPEC. The `comments` gate caps comment-bearing lines at 15% of nonblank lines after the exact MPL header; it is a ceiling, not a target. Write a reason once beside its enforcement and link to it elsewhere. A function still owns its `# Errors` section and its guarantee to a caller.
 
 A pull request description and the text around a review comment carry the same scope, uncertainty and verification as the change. Identifiers, commands, paths and diagnostics stay unchanged across versions, and shared evidence appears once.
 

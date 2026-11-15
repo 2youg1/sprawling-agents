@@ -198,3 +198,44 @@ fn a_long_zig_function_is_named_and_a_long_zig_file_is_not() {
         Ok(vec!["tools/k/zig/long.zig:2: long is 201 lines".to_owned()])
     );
 }
+
+#[test]
+fn a_source_file_passes_at_five_hundred_lines_and_fails_at_five_hundred_one() {
+    let root = crate::root::fixture::relocated("length-file-budget");
+    crate::root::fixture::write(&root, REGISTER, FIXTURE_REGISTER);
+    crate::root::fixture::write(
+        &root,
+        "tools/k/src/a.rs",
+        &"// filler\n".repeat(FILE_LINE_LIMIT),
+    );
+    let accepted = check(&root).unwrap();
+    assert!(
+        accepted
+            .iter()
+            .all(|finding| finding.location != "tools/k/src/a.rs"),
+        "{accepted:#?}"
+    );
+    crate::root::fixture::write(
+        &root,
+        "tools/k/src/a.rs",
+        &"// filler\n".repeat(FILE_LINE_LIMIT.saturating_add(1)),
+    );
+    let rejected = check(&root).unwrap();
+    assert!(
+        rejected
+            .iter()
+            .any(|finding| finding.location == "tools/k/src/a.rs"
+                && finding.violation.contains("501 lines")),
+        "{rejected:#?}"
+    );
+    let scope = crate::source::Scope::new(&["tools/k/src/a.rs".to_owned()]).unwrap();
+    assert!(
+        check_scoped(&root, &scope)
+            .unwrap()
+            .iter()
+            .any(|finding| finding.location == "tools/k/src/a.rs")
+    );
+    let empty = crate::source::Scope::new(&[]).unwrap();
+    assert!(check_scoped(&root, &empty).unwrap().is_empty());
+    std::fs::remove_dir_all(&root).unwrap();
+}

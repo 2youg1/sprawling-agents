@@ -83,7 +83,7 @@ fn scan(location: &str, text: &str, entries: &[Entry], out: &mut Vec<Violation>)
                         rule: "the vocabulary authority is docs/glossary.md".to_owned(),
                         violation: format!("banned term {:?}", entry.banned),
                         alternative: format!(
-                            "use {}; or justify inline with `{EXEMPT_MARK} <reason>`",
+                            "use {}; if this is another concept, narrow the scanner to that exact context instead of adding a waiver",
                             entry.replacement
                         ),
                     });

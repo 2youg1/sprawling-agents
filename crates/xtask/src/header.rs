@@ -3,60 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! MPL-2.0 header gate: every `.rs` and every `.zig` in the repo opens
-//! with the exact Exhibit A notice, then the copyright line, behind the
-//! `//` both languages comment a line with.
-//!
-//! Markdown is out of this gate's scope by ruling: a skill document
-//! carries its own licence in its frontmatter and in `crates/city/skills/LICENSES.md`,
-//! and an MPL notice on one of the MIT adaptations would misstate its
-//! terms.
-//!
-//! The notice is what the licence asks for. The copyright line is not:
-//! Mozilla's own FAQ answers "what do I have to do" with the notice alone
-//! and says a name "is not necessary" (MPL 2.0 FAQ, Q4). It ships here
-//! because the person who owns this tree chose to be named in it, and it
-//! is gated for the reason every other convention in this repo is gated -
-//! a line nothing checks is a line the next new file will not carry.
-//!
-//! The notice takes the first three rows because MPL 2.0 section 3.4
-//! forbids altering the substance of a licence notice, so it is the part
-//! that must stay quotable and verbatim, and nothing may split it. The
-//! copyright line follows immediately, with no blank comment row between
-//! them: the four rows are one head, and a reader who has finished the
-//! third row is already at the name.
-//!
-//! The year is the year of first publication and does not advance with the
-//! calendar - a gate that demanded the current year would turn every
-//! January red across every file at once, which is a chore rather than a
-//! fact about the work.
-//!
-//! "and the sprawling contributors" names people who do not exist yet on
-//! purpose. Contributors hold copyright in what they write and grant it
-//! downstream themselves under section 2.1, so the clause transfers
-//! nothing; what it buys is that the first outside contribution does not
-//! oblige anyone to rewrite every header in the tree. Exhibit A allows
-//! "additional accurate notices of copyright ownership", and a standing
-//! class is accurate in a way an enumerated list is not - Mozilla dropped
-//! the per-file contributor list in the 1.1 to 2.0 upgrade because it was
-//! "neither a complete nor accurate list" and a source of merge conflicts.
-//!
-//! RefRain and kusanagi carry the same four rows with their own project
-//! name. Anyone changing the shape here changes it in all three.
-//!
-//! **The notice appears once, and the gate reads the whole file to say
-//! so.** Comparing only the first four rows would let a second copy of
-//! the header live further down and stay green. A duplicated notice is
-//! how a file records that it was assembled from two files, and the
-//! module documentation it splits is what the next reader needs.
+//! Require [`NOTICE`] exactly once at the top of every `.rs` and `.zig`.
+//! The first three rows are the MPL notice; the owner's copyright row is
+//! fourth. Its year is first publication, not the current year. Markdown
+//! keeps licence metadata in frontmatter and `crates/city/skills/LICENSES.md`.
+//! RefRain and kusanagi use the same shape with their own project names.
+//! A repeated notice marks a file assembled from two modules.
 
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The MPL-2.0 notice and the copyright line, without the comment leader
-/// a language puts in front of them; `notice` adds it.
+/// The four header rows without a language's comment leader.
 pub(crate) const NOTICE: [&str; 4] = [
     "This Source Code Form is subject to the terms of the Mozilla Public",
     "License, v. 2.0. If a copy of the MPL was not distributed with this",
@@ -72,9 +31,7 @@ pub(crate) enum Leader {
     Lean,
 }
 
-/// The languages this gate judges, each known by its file extension.
-/// A Zig leaf is admitted only when this gate reads its files
-/// (ARCHITECTURE.md section 2, condition 5).
+/// File extensions accepted by the gate, including the Zig FFI condition.
 const JUDGED: [(Leader, &str); 2] = [(Leader::Rust, "rs"), (Leader::Zig, "zig")];
 
 /// The four rows as a file in that language spells them.
@@ -110,7 +67,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 rule: "every .rs and .zig file carries the MPL-2.0 notice and the copyright line"
                     .to_owned(),
                 violation: "the first four lines differ from the header".to_owned(),
-                alternative: "prepend the exact 4-line header; see any existing module".to_owned(),
+                alternative: "prepend the exact four lines in `header::NOTICE` with the language's comment leader"
+                    .to_owned(),
             });
             continue;
         }
@@ -139,9 +97,7 @@ fn leader_of(file: &Path) -> Option<Leader> {
         .map(|(leader, _)| *leader)
 }
 
-/// The one-based line where the notice begins a second time, if it
-/// does. The first row is enough to find it: the opening comparison has
-/// already established that this file starts with the whole notice.
+/// The one-based line of a repeated notice, if present.
 fn repeated(rows: &[&str], expected: &[String; 4]) -> Option<usize> {
     let first = expected.first()?;
     rows.iter()

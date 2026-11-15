@@ -24,6 +24,7 @@ mod budget;
 mod bundle;
 mod channel;
 mod color;
+mod comments;
 mod commits;
 mod depmap;
 mod docnum;
@@ -51,6 +52,7 @@ mod sbom;
 mod secret;
 mod sheet;
 mod shots;
+mod source;
 mod spec;
 mod specalign;
 mod theme;
@@ -91,7 +93,7 @@ fn main() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Some("gates") => gates::run(&root, &gate_names(&args)),
+        Some("gates") => gates::run(&root, &gate_names(&args), file_args(&args)),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -277,18 +279,26 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 /// The gate names typed after `gates`: every argument that is neither a
 /// flag nor the value `--range` takes. No gate reads history, so a
 /// `--range` a CI job still passes is skipped rather than read as a gate
-/// name.
+/// name. Arguments after `--files` belong to the file scope.
 fn gate_names(args: &[String]) -> Vec<String> {
     let mut names = Vec::new();
     let mut it = args.iter().skip(1);
     while let Some(arg) = it.next() {
         if arg == "--range" {
             it.next();
+        } else if arg == "--files" {
+            break;
         } else if !arg.starts_with("--") {
             names.push(arg.clone());
         }
     }
     names
+}
+
+fn file_args(args: &[String]) -> Option<Vec<String>> {
+    args.iter()
+        .position(|arg| arg == "--files")
+        .map(|index| args.iter().skip(index.saturating_add(1)).cloned().collect())
 }
 
 /// One command this tool answers beyond running a gate: what a person
@@ -309,8 +319,8 @@ const TOOLS: [Tool; 17] = [
         gives: "the ACP registry index, written as the catalog snapshot the build ships",
     },
     Tool {
-        call: "gates [<gate>...]",
-        gives: "every gate, or only the named ones",
+        call: "gates [<gate>...] [--files <path>...]",
+        gives: "every gate, named gates, or length/comments over only the named files",
     },
     Tool {
         call: "gates --list",

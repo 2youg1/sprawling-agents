@@ -707,7 +707,7 @@ the part worth knowing before starting, not after.
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
-| a gate itself | `crates/xtask/` + `crates/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| a gate itself | `crates/xtask/` + `crates/xtask/Spec.lean` | a red gate is resolved by fixing the code, narrowing its precise scope, or deleting it; never by adding an exception |
 | how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
 
 Two documents sit beside this one rather than inside it: operating a

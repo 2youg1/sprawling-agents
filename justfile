@@ -22,8 +22,9 @@ default: check
 # Lean models follow for the same reason: each answers in seconds, before
 # clippy's minutes.
 #
-# `ci.yml` runs the same recipes, one job per slice of this line, so a
-# green pull request implies exactly this and no less.
+# `ci.yml` runs the same recipes, one job per slice of this line. Its
+# length/comments checks use the changed-file scope; this full `check`
+# remains the migration inventory and the integrated-tree gate after cleanup.
 check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
 
 # The merge's whole check: the phases of `check`, but every phase runs
@@ -89,7 +90,7 @@ check-branch base="main":
     packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
-    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm') || exit 2
+    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments') || exit 2
     step guard cargo xtask gates guard --range "$mb..HEAD"
     step fmt just fmt-check
     touched client && step build-web just build-web
@@ -99,6 +100,8 @@ check-branch base="main":
     fi
     # shellcheck disable=SC2086
     step gates cargo xtask gates $gates --range "$mb..HEAD"
+    # shellcheck disable=SC2086
+    step file-gates cargo xtask gates length comments --files $changed
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched crates/desktop/ffi && step desktop just check-desktop
@@ -505,10 +508,15 @@ gates: gates-sources gates-artifacts
 
 # The gates that read sources alone, which answer in seconds, so `check`
 # runs them before clippy's minutes and a red arrives first.
-gates-sources:
+gates-sources mode="" *paths:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+    if [ "{{mode}}" = "changed" ]; then
+        cargo xtask gates length comments --files {{paths}}
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
+    else
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+    fi
 
 # The gates that judge the client bundle, after it is built.
 gates-artifacts: build-web

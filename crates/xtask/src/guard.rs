@@ -3,24 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Guard gate: whether a rule this repository states is still the rule
-//! it enforces, judged on the tree and never on history.
-//!
-//! Two copies in the manifests have no rule about commits that could
-//! see them drift. One member, the desktop server's FFI seam, carries a
-//! lint table of its own that copies the workspace's in every line but
-//! one; `wall` compares the two, key by key, and holds every other member
-//! to inheriting the workspace's. And every one of the workspace's own
-//! packages is pinned in the root manifest to the workspace's version,
-//! because a path dependency without one cannot be published; `version`
-//! holds each pin to that version and every member to taking the
-//! package through the root manifest.
-//!
-//! A `Verdict:` trailer on a commit that loosens a gate beside the work it
-//! judges stays a rule of AGENTS.md, held by review rather than by this
-//! gate: reading history made every gate run depend on the range a caller
-//! passed, and the two-commit hole it left open was recorded rather than
-//! closed.
+//! `wall` compares manifest lint tables with the workspace; `version`
+//! checks workspace package pins. Gate changes fix code, narrow a precise
+//! scope or delete a rule, never add an exception. No history is read.
 
 use std::path::Path;
 
@@ -54,11 +39,7 @@ fn manifest(root: &Path, rel: &str) -> Result<toml::Value, XtaskError> {
     })
 }
 
-/// One value as a refusal prints it, including its absence.
-///
-/// A lint is as often a table (`{ level = "deny", … }`) as a bare
-/// string, and the table is shown as Debug rather than re-serialised:
-/// what a reader needs is the difference, not valid TOML.
+/// A lint value or `absent`, rendered for a diagnostic.
 fn shown(value: Option<&toml::Value>) -> String {
     match value {
         None => "absent".to_owned(),

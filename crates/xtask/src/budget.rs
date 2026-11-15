@@ -3,21 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The performance ratchet: a number may improve freely, and may drift
-//! back only within a stated slack.
-//!
-//! The register is `crates/xtask/budgets.toml`, which holds every budget the
-//! design states rather than only the ones a machine can check. A row it
-//! cannot check says what it needs; an entry that quietly vanished
-//! because nobody could measure it is how a budget stops existing.
-//!
-//! A row is weighed only when it is marked gated and states a budget, a
-//! best reading and a slack in bytes. No row is gated today: runtime
-//! speed comes before size, so the bytes of a built artifact are read
-//! and printed like the lockfile's package count, and refused by nothing
-//! (crates/xtask/Spec.lean §8-25). Wall-clock figures are not gated,
-//! because gating them would turn a busy runner into a defect report,
-//! and the register says so per row.
+//! Performance ratchet over `crates/xtask/budgets.toml`.
+//! Only rows marked `gated` with byte budgets are weighed. Artifact bytes
+//! and wall-clock readings are otherwise reported, not refused (xtask §8-25).
 
 use std::path::Path;
 
@@ -105,10 +93,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 location: format!("{} is {measured} B", row.name),
                 rule: "a reading stays inside the budget the design states".to_owned(),
                 violation: format!("{measured} B exceeds the {} B budget", row.budget),
-                alternative:
-                    "bring the reading back, or change the budget in the design and say why in \
-                     the same change-set"
-                        .to_owned(),
+                alternative: "bring the reading back; if this budget no longer predicts a real defect, redefine its scope or delete it with evidence"
+                    .to_owned(),
             });
             continue;
         }
@@ -122,23 +108,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     "{measured} B is more than {} B worse than the best recorded {} B",
                     row.slack, row.best
                 ),
-                alternative:
-                    "recover the reading, or record the new one in crates/xtask/budgets.toml \
-                              with the reason it moved"
-                        .to_owned(),
+                alternative: "recover the reading; if the regression is intentional, record the measurement and the precise reason the old baseline stopped applying"
+                    .to_owned(),
             });
         }
     }
     Ok(violations)
 }
 
-/// Reports every row: what it is, what it costs today, and what it is
-/// allowed to cost. A gate that only speaks when it is unhappy leaves a
-/// person guessing whether it measured anything at all.
-///
-/// A row outside the gated table is printed with its reading when
-/// `measure` knows how to take one, and with its status alone when it
-/// does not: a number nobody could measure is not printed as zero.
+/// Every row and its reading when available; an unmeasured row is never zero.
 pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     let parsed = register(root)?;
     let mut out = String::from("budget                 reading      best      budget\n");
@@ -181,23 +159,8 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     Ok(out)
 }
 
-/// The release profile is the one the register's reading was taken with.
-///
-/// **A size is a fact about the linker that produced it**, so a reading
-/// taken at one `opt-level` describes a binary nobody ships the moment
-/// the profile says another. The register names the platform its
-/// reading was linked on; this check holds the other half of what a
-/// size depends on. It is a check rather than a comment because the
-/// setting is one word in a manifest and the reading it invalidates is
-/// the size of the whole binary, and it costs a read: the binary itself
-/// is weighed only when somebody has built one.
-///
-/// `3` rather than `"z"` or `"s"` was decided on runtime speed over the
-/// product's common operations, by a criterion written down before the
-/// readings existed (the root `Cargo.toml` states it beside the setting).
-/// The register carries no row for a losing arm, because once `3` is what
-/// ships, a second row describing another binary is the second home the
-/// register exists to prevent.
+/// Reject a release profile different from the one that produced the
+/// register's binary-size reading. The root manifest records why `3` ships.
 fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let path = root.join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {

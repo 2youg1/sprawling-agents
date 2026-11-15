@@ -40,6 +40,14 @@ pub(crate) enum XtaskError {
     )]
     GatePanicked { name: &'static str, message: String },
     #[error(
+        "run gate `{name}` with --files: this gate has no file-scoped judgement (unsupported-file-scope); select only `length` and/or `comments`, or omit --files for a full-tree judgement"
+    )]
+    UnsupportedFileScope { name: &'static str },
+    #[error(
+        "read --files path `{path}`: the path is not repository-relative (invalid-file-scope); pass paths from `git diff --name-only`, without absolute paths or `..`"
+    )]
+    InvalidFileScope { path: String },
+    #[error(
         "judge tree {here}: this xtask was built from {built} (stale-build); run `cargo clean -p xtask` and the command again, so cargo rebuilds it from this tree"
     )]
     StaleBuild { built: String, here: String },
@@ -188,9 +196,7 @@ mod tests {
 
     #[test]
     fn a_broken_gate_outranks_a_violation() {
-        // The regression this pins: a gate failing to run used to
-        // discard `guard`'s findings, so a commit that had loosened a
-        // gate printed the same thing as a commit that had not.
+        // A gate failing to run must not discard another gate's findings.
         assert_eq!(RunOutcome::of(1, 7), RunOutcome::Broken);
         assert_eq!(RunOutcome::of(1, 0), RunOutcome::Broken);
         assert_eq!(RunOutcome::of(0, 7), RunOutcome::Refused);
