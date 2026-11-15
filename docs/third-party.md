@@ -237,7 +237,7 @@ The skills under `crates/city/skills/` travel with this tree; the city crate's b
 | `crates/city/skills/why/SKILL.md` | design rationale read off evidence, with citations | MIT | modified adaptation of pstack's `why` |
 | `crates/city/skills/how/SKILL.md` | how a subsystem works, and how to critique it | MIT | modified adaptation of pstack's `how` |
 | `crates/city/skills/blast-radius/SKILL.md` | what a change breaks somewhere else | MIT | modified adaptation of pstack's `blast-radius` |
-| `crates/city/skills/authority-review/SKILL.md` | a branch before it merges: correctness, security and the recorded decision, then one lens over the whole diff — a fact with more than one authoritative definition | MIT | modified adaptation of the Thermos plugin (`cursor/plugins`), pass two recut as the owner's one-fact-one-authority audit |
+| `crates/city/skills/authority-review/SKILL.md` | resolution of changed or conflicting authorities through the authority order and executable evidence | MIT | modified adaptation of the Thermos plugin (`cursor/plugins`), narrowed from general review to authority conflicts |
 | `crates/city/skills/ub-mode/SKILL.md` | a code-change loop with evidence-based surgical or structural scope and project-owned verification | MIT | modified adaptation of `unclebob/ub-mode` and pstack's principles and refactoring playbook |
 
 The archived `tutor` alternative lives under `docs/ArchiveSKILL/tutor/`; the city neither embeds nor shelves it by default.

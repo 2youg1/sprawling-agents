@@ -3,18 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Lexicon gate: one concept, one name. Scans markdown, Rust sources, Lean
-//! and the client's `lang.json` for banned terms (the machine subset of the
-//! retired-term list; data face is crates/xtask/lexicon.toml). A line is exempt
-//! when it or the line above carries `lexicon-ok: <reason>` (redline C6).
+//! One concept, one name. Data face is `crates/xtask/lexicon.toml`; exempt
+//! with `lexicon-ok: <reason>` on the line or the line above (redline C6).
 
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// Where the retired words live, repo-relative: the gate opens it here,
-/// its messages name it, and `vocabulary` reads the same file.
+/// Retired words; `vocabulary` reads the same path.
 pub(crate) const PATH: &str = "crates/xtask/lexicon.toml";
 
 const EXEMPT_MARK: &str = "lexicon-ok:";
@@ -34,25 +31,16 @@ struct Entry {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let data = load(root)?;
     let mut violations = Vec::new();
-    // The same gate also holds the two ways a vocabulary grows a second
-    // authority; see `vocabulary`.
     violations.extend(crate::vocabulary::check(root)?);
     for rel in sources(root)? {
         let text = walk::read_text(&root.join(&rel))?;
         scan(&rel, &text, &data.entry, &mut violations);
     }
-    // Every word a reader is given comes from here, so a retired word in
-    // it reaches the screen; the wording gate owns its shape, this gate
-    // owns its vocabulary.
     let text = walk::read_text(&root.join(LANG))?;
     scan(LANG, &text, &data.entry, &mut violations);
     Ok(violations)
 }
 
-/// The files whose words a reader meets: documents, Rust and the Lean
-/// specifications, whose comments are Chinese prose that names concepts
-/// by their English names (crates/xtask/Spec.lean §8-43). The isolation
-/// zone is never published, so it is left out.
 fn sources(root: &Path) -> Result<Vec<String>, XtaskError> {
     Ok(walk::files_with_ext(root, &["md", "rs", "lean"])?
         .iter()
@@ -83,7 +71,7 @@ fn scan(location: &str, text: &str, entries: &[Entry], out: &mut Vec<Violation>)
                         rule: "the vocabulary authority is docs/glossary.md".to_owned(),
                         violation: format!("banned term {:?}", entry.banned),
                         alternative: format!(
-                            "use {}; or justify inline with `{EXEMPT_MARK} <reason>`",
+                            "use {}; if this is another concept, narrow the scanner to that exact context instead of adding a waiver",
                             entry.replacement
                         ),
                     });

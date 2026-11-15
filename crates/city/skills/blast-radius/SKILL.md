@@ -8,7 +8,7 @@ license: MIT
 
 Find what a change breaks somewhere else, before it ships. Use for "blast radius of X", "what could this break", or reviewing a small diff you don't trust yet.
 
-Companion to `how` and `why`. `how` tells you what the code does. `why` tells you why it's shaped that way. Blast radius tells you what it breaks somewhere else. For a full pre-merge audit of the diff itself rather than its reach, use `authority-review`.
+Companion to `how` and `why`. `how` tells you what the code does. `why` tells you why it's shaped that way. Blast radius tells you what it breaks somewhere else. When the question is which record governs the change rather than what it breaks, use `authority-review`.
 
 > Adapted from pstack — `pstack/skills/blast-radius` in [cursor/plugins](https://github.com/cursor/plugins), the skill collection by Lauren Tan (poteto), released under the MIT licence. Modified and adapted by 2youg1, 2026. Acknowledgment and thanks to the upstream and its author. The parallel-model step is rewritten for agents that have no sub-agents.
 
@@ -37,7 +37,7 @@ Any safety fact you can't get to step 4, say so out loud. Don't write it up as s
 3. Look where grep stops. Read the source of the library you call, and check its pinned version and any local patch. Work out when things run: microtasks, unmount and teardown, Solid versus React. Follow what a symbol search misses: the JSON an API returns, a DB column, a wire format, another language reading the same bytes, a feature flag, code three hops downstream.
 4. Be honest about each risk. Give it a real chance of happening and a real cost if it does. Keep the risks you confirmed; list the ones you checked and cleared separately. Same rules as `why`. Cite a real `file:line`, a search that finds nothing is still an answer, and never make up a caller or an API.
 5. Prove the one fact. Write a script or test that runs the real code, run it, and paste what happened. If you can't prove it cheaply, mark it unproven. Don't round up.
-6. For a big or wide change, take the question again from a different starting point. The original skill sent it to several models in parallel and merged the answers, because different models catch different real bugs. One agent cannot reproduce that, so approximate it: re-enter from the opposite end of the data flow (from the consumer backward instead of the change forward), and refuse to carry the first pass's verdict in. When the change is expensive to get wrong, say plainly that a second model should be asked the same question separately.
+6. For a big or wide change, attack the same safety fact from the opposite end of the data flow and produce independent evidence: a replay against the old artifact, a property or fuzz run, a Lean theorem, or a second production-door scenario. Do not substitute another abstract review for execution. If the decisive hypothesis cannot be executed, mark it unproven; only then ask for an independent model to examine that named hypothesis.
 
 ## What to hand back
 

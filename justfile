@@ -22,8 +22,9 @@ default: check
 # Lean models follow for the same reason: each answers in seconds, before
 # clippy's minutes.
 #
-# `ci.yml` runs the same recipes, one job per slice of this line, so a
-# green pull request implies exactly this and no less.
+# `ci.yml` runs the same recipes, one job per slice of this line. Its
+# length/comments checks use the changed-file scope; this full `check`
+# remains the migration inventory and the integrated-tree gate after cleanup.
 check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
 
 # The merge's whole check: the phases of `check`, but every phase runs
@@ -78,18 +79,18 @@ check-branch base="main":
     #!/usr/bin/env bash
     set -uo pipefail
     tree=$(git rev-parse 'HEAD^{tree}') && mb=$(git merge-base '{{base}}' HEAD) || exit 2
-    mark="${CARGO_TARGET_DIR:-target}/check-branch/$tree.ok"
+    mark="${CARGO_TARGET_DIR:-target}/check-branch/$tree-$mb.ok"
     clean=$([ -z "$(git status --porcelain)" ] && echo yes)
-    if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree is already green"; exit 0; fi
-    changed=$(git diff --name-only "$mb" HEAD)
-    touched() { printf '%s\n' "$changed" | grep -q "^$1/"; }
+    if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree vs $mb is already green"; exit 0; fi
+    mapfile -d '' -t changed < <(git diff --name-only -z "$mb" HEAD) || exit 2
+    touched() { printf '%s\0' "${changed[@]}" | grep -qz "^$1/"; }
     # Which package holds a path is cargo metadata's answer (crates/xtask/Spec.lean
     # §8-39); the paths go through stdin, since a rename branch
     # lists more of them than one command line holds.
-    packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
+    packages=$(printf '%s\0' "${changed[@]}" | tr '\0' '\n' | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
-    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm') || exit 2
+    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments') || exit 2
     step guard cargo xtask gates guard --range "$mb..HEAD"
     step fmt just fmt-check
     touched client && step build-web just build-web
@@ -99,6 +100,7 @@ check-branch base="main":
     fi
     # shellcheck disable=SC2086
     step gates cargo xtask gates $gates --range "$mb..HEAD"
+    step file-gates cargo xtask gates length comments --files "${changed[@]}"
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched crates/desktop/ffi && step desktop just check-desktop
@@ -106,7 +108,7 @@ check-branch base="main":
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (crates/xtask/Spec.lean §8-43).
-    printf '%s\n' "$changed" | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
+    printf '%s\0' "${changed[@]}" | tr '\0' '\n' | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
         && step models just models
     [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
     exit "$rc"
@@ -505,10 +507,24 @@ gates: gates-sources gates-artifacts
 
 # The gates that read sources alone, which answer in seconds, so `check`
 # runs them before clippy's minutes and a red arrives first.
-gates-sources:
+[positional-arguments]
+gates-sources mode="" *paths:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+    if [ "{{mode}}" = "changed" ]; then
+        if [ -n "${GATES_CHANGED_NUL:-}" ]; then
+            mapfile -d '' -t files < "$GATES_CHANGED_NUL"
+        else
+            files=("$@")
+            if [ "${#files[@]}" -gt 0 ] && [ "${files[0]}" = "changed" ]; then
+                files=("${files[@]:1}")
+            fi
+        fi
+        cargo xtask gates length comments --files "${files[@]}"
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
+    else
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+    fi
 
 # The gates that judge the client bundle, after it is built.
 gates-artifacts: build-web

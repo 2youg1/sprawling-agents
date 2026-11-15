@@ -3,13 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Run every gate in a fixed order and aggregate the findings. Order is
-//! cheap-and-local first, git last; violations from all gates are rendered
-//! together so a builder sees the full list, not the first stumble.
-//!
-//! The array below is the only authority for which gates run and in what
-//! order; `COUNT` is its length parameter, one token away. `report` owns
-//! what a run's outcome reads like and what it exits with.
+//! Run every gate in roster order and aggregate findings. `GATES`/`COUNT`
+//! are the only authority for which gates run; `report` owns the exit.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -17,15 +12,13 @@ use std::thread;
 
 use crate::report::{self, Violation, XtaskError};
 use crate::{
-    artifact, boundary, budget, color, depmap, docnum, guard, header, length, lexicon, modmap,
-    motion, npm, packaged, proof, release, render, secret, spec, specalign, unused, wire_ts,
-    wiring, wording,
+    artifact, boundary, budget, color, comments, depmap, docnum, guard, header, length, lexicon,
+    modmap, motion, npm, packaged, proof, release, render, secret, spec, specalign, unused,
+    wire_ts, wiring, wording,
 };
 
-/// How many gates run. The array below is typed by it, so the number and
-/// the list are one token apart and cannot disagree; `vocabulary` reads
-/// it so no document has to hold a copy.
-pub(crate) const COUNT: usize = 24;
+/// Roster length; types `GATES` so the count and the list cannot disagree.
+pub(crate) const COUNT: usize = 25;
 
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
@@ -33,8 +26,7 @@ pub(crate) struct Gate {
     check: fn(&Path) -> Result<Vec<Violation>, XtaskError>,
 }
 
-/// Every gate, in the order a run reports them. The only roster: `--list`,
-/// usage and name selection all read it.
+/// Sole roster: `--list`, usage and name selection all read it.
 pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "header",
@@ -53,6 +45,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
         check: length::check,
     },
     Gate {
+        name: "comments",
+        check: comments::check,
+    },
+    Gate {
         name: "boundary",
         check: boundary::check,
     },
@@ -60,8 +56,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "artifact",
         check: artifact::check,
     },
-    // Beside `artifact`: both answer what a person downloads is built
-    // from, this one for the archive crates.io carries.
     Gate {
         name: "packaged",
         check: packaged::check,
@@ -86,8 +80,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "color",
         check: color::check,
     },
-    // Beside `color`: the same scan for the theme's other vocabulary, a
-    // transition's curve and duration.
     Gate {
         name: "motion",
         check: motion::check,
@@ -104,9 +96,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "wiring",
         check: wiring::check,
     },
-    // `wire-ts` renders the client's wire types in this process and
-    // compares one file; it sits beside `wiring` because both judge the
-    // same socket seam.
     Gate {
         name: "wire-ts",
         check: wire_ts::check,
@@ -165,12 +154,34 @@ pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError>
 
 /// Run the gates `names` selects and report them together; the gates
 /// judge in parallel, and the report keeps roster order.
-pub(crate) fn run(root: &Path, names: &[String]) -> ExitCode {
+pub(crate) fn run(root: &Path, names: &[String], files: Option<Vec<String>>) -> ExitCode {
     let gates = match select(names) {
         Ok(gates) => gates,
         Err(err) => return report::internal_failure(&err),
     };
-    report::finish_all(judge(&gates, root))
+    let scope = match files
+        .map(|paths| crate::source::Scope::new(&paths))
+        .transpose()
+    {
+        Ok(scope) => scope,
+        Err(err) => return report::internal_failure(&err),
+    };
+    if scope.is_some()
+        && let Err(err) = ensure_scope_supported(&gates)
+    {
+        return report::internal_failure(&err);
+    }
+    report::finish_all(judge(&gates, root, scope.as_ref()))
+}
+
+fn ensure_scope_supported(gates: &[&Gate]) -> Result<(), XtaskError> {
+    if let Some(gate) = gates
+        .iter()
+        .find(|gate| !matches!(gate.name, "comments" | "length"))
+    {
+        return Err(XtaskError::UnsupportedFileScope { name: gate.name });
+    }
+    Ok(())
 }
 
 /// Every gate's verdict, in the order `gates` lists them. Each gate
@@ -180,11 +191,21 @@ pub(crate) fn run(root: &Path, names: &[String]) -> ExitCode {
 fn judge(
     gates: &[&'static Gate],
     root: &Path,
+    file_scope: Option<&crate::source::Scope>,
 ) -> Vec<(&'static str, Result<Vec<Violation>, XtaskError>)> {
     thread::scope(|scope| {
         gates
             .iter()
-            .map(|gate| (gate.name, scope.spawn(move || (gate.check)(root))))
+            .map(|gate| {
+                (
+                    gate.name,
+                    scope.spawn(move || match (gate.name, file_scope) {
+                        ("comments", Some(scope)) => comments::check_scoped(root, scope),
+                        ("length", Some(scope)) => length::check_scoped(root, scope),
+                        _ => (gate.check)(root),
+                    }),
+                )
+            })
             .collect::<Vec<_>>()
             .into_iter()
             .map(|(name, verdict)| {
@@ -224,7 +245,7 @@ mod tests {
     use std::sync::Mutex;
     use std::thread::{self, ThreadId};
 
-    use super::{Gate, judge, select};
+    use super::{Gate, ensure_scope_supported, judge, select};
     use crate::report::{Violation, XtaskError};
 
     static JUDGED_ON: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
@@ -254,7 +275,7 @@ mod tests {
 
     #[test]
     fn a_gate_that_panics_reports_the_panic_message_in_its_verdict() {
-        let verdicts: Vec<(&str, String)> = judge(&[&EXPLODES], Path::new("."))
+        let verdicts: Vec<(&str, String)> = judge(&[&EXPLODES], Path::new("."), None)
             .into_iter()
             .map(|(name, verdict)| (name, verdict.unwrap_err().to_string()))
             .collect();
@@ -270,7 +291,7 @@ mod tests {
     #[test]
     fn gates_judge_off_the_calling_thread_and_report_in_roster_order() {
         JUDGED_ON.lock().unwrap().clear();
-        let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."))
+        let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."), None)
             .into_iter()
             .map(|(name, _)| name)
             .collect();
@@ -282,6 +303,20 @@ mod tests {
             judged_on.iter().all(|id| *id != caller),
             "a gate judged on the calling thread: {judged_on:?}"
         );
+    }
+
+    #[test]
+    fn file_scope_refuses_a_gate_without_a_scoped_judgement() {
+        assert!(ensure_scope_supported(&[&FIRST]).is_err());
+        let comments = Gate {
+            name: "comments",
+            check: record,
+        };
+        let length = Gate {
+            name: "length",
+            check: record,
+        };
+        assert!(ensure_scope_supported(&[&comments, &length]).is_ok());
     }
 
     #[test]

@@ -67,11 +67,11 @@ Where a measurement would settle a review finding, clone and run whichever upstr
 
 When the same defect class recurs, **eliminate it through structure, types, or a check whose message names the repair**, rather than adding another instruction for agents to follow; verify a new check actually fails on the real past failure before trusting it.
 
-For refactoring, compare behaviour against the pin and judge whether a reader now traces fewer layers and less hidden state. When a file exceeds 500 lines, evaluate its architecture and file boundaries together; split along responsibilities when that reduces reader load and simplifies maintenance, without treating the threshold as an automatic split rule. Revert a reshape that only moves complexity or adds indirection.
+For refactoring, compare behaviour against the pin and judge whether a reader now traces fewer layers and less hidden state. The `length` gate caps Rust, TypeScript and Svelte files at 500 lines and the `comments` gate caps comment-bearing lines at 10% after the MPL header is stripped; both are refusal boundaries, not targets. Split along responsibilities and delete comments the code makes unnecessary. Revert a reshape that only moves complexity or adds indirection.
 
 ## 5. Verify and deliver
 
-Use the repository's verification guide to run every check affected by the final diff and no unrelated suite by habit. Exercise the real behaviour or artifact when the claim needs more than compilation. Apply the repository's blast-radius and authority reviews before its final check, then rerun the affected checks after every repair.
+Use the repository's verification guide to run every check affected by the final diff and no unrelated suite by habit. Exercise the real behaviour or artifact when the claim needs more than compilation. Apply blast-radius before the final check; every safety fact it needs must reach a runnable proof, replay, property or formal check. Use authority-review only to resolve changed or conflicting authorities, then rerun the affected checks after every repair.
 
 Before opening a pull request, follow the repository's contribution guide and submission template. Complete its required local checks and, when required, a green fork CI run rather than treating the pull request as the first test run. Commit, push, or publish only within the user's request and project rules; no workflow here pushes directly to the mainline by default.
 

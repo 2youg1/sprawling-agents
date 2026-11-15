@@ -3,53 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Boundary gate: which side of the process boundary a check stands on
-//! decides the language it is written in.
-//!
-//! **White box is Rust, black box is Lean** (the person's ruling). A
-//! check that links these crates and enters by their public faces is
-//! written in Rust beside the code it judges. A check that reaches the
-//! product the way a stranger does - spawning the binary, opening a
-//! socket to a served city, speaking the wire from outside - is written
-//! in Lean under `crates/adversary/`.
-//!
-//! **The parameter that makes this a rule rather than a preference** is
-//! what the two kinds of check are able to say. A Rust test shares the
-//! product's types, so it inherits every assumption those types encode
-//! and cannot testify about a client that does not. `crates/adversary/` is a
-//! third client, out of tree, in a language with none of this
-//! repository's vocabulary, and what it buys is quantification over
-//! traces rather than one trace somebody thought of
-//! (ARCHITECTURE.md section 11, V10). A subprocess test written in Rust
-//! is the worst of both: it pays the cost of a process boundary and
-//! still inherits the assumptions, and it reports as a unit test.
-//!
-//! **What is measured is direction, not mechanism.** The first cut of
-//! this gate looked for sockets and subprocesses in test code, and it
-//! convicted `accounting::worker::driving` three times over: that test stands up a
-//! fake model provider and speaks HTTP to it, which is the test playing
-//! **the outside world** rather than consuming this product. Three
-//! waivers in one file is a gate saying its predicate is wrong, and the
-//! honest reading is that `TcpStream::connect` says a socket exists
-//! without saying which way it points.
-//!
-//! So the tokens below name the surfaces **this product raises** - its
-//! binary and its server. A check reaching one of those is standing
-//! outside, whatever else it does; a check that stands up a double and
-//! talks to that is inside, however many sockets it opens. Under this
-//! reading the whole tree needs no waiver at all.
-//!
-//! Scope is test code only. `runtime::tools::exec` spawns processes for
-//! a living, `bin::wire_client` is a shipped WebSocket client, and
-//! `wire::server` is the real `axum::serve`; the rule is about where
-//! a *check* stands, never about what production code may call.
-//!
-//! A line may still be excused with `boundary-ok: <reason>` on itself or
-//! on the line above, the same waiver `lexicon` uses and read the same
-//! way. **A whole file that predates the rule goes in the register
-//! instead**, because a waiver is permanent and a debt should remove
-//! itself: a file the register names may cross, and a file it names that
-//! has stopped crossing must be struck.
+//! Product-raised crossings only (ARCHITECTURE.md V10). Test code only;
+//! `boundary-ok` covers its line and the following; spent `predating` rows
+//! must be removed.
 
 use std::path::Path;
 
@@ -62,15 +18,7 @@ use crate::walk;
 
 const EXEMPT_MARK: &str = "boundary-ok:";
 
-/// The surfaces this product raises, which a check can only be reaching
-/// from outside.
-///
-/// Closed, and narrow on purpose. Every entry names *our* binary or
-/// *our* server, so its presence in a check admits no second reading.
-/// Three tokens were tried here and removed: `TcpStream::connect`,
-/// `Command::new` and `process::Command` say that a socket or a process
-/// exists, not which side of the boundary it points at, and each of them
-/// is what a test double looks like from the inside.
+/// Product-raised surfaces; generic socket/process APIs are absent.
 const CROSSINGS: [(&str, &str); 5] = [
     (
         "CARGO_BIN_EXE",
@@ -94,25 +42,14 @@ const CROSSINGS: [(&str, &str); 5] = [
     ),
 ];
 
-/// The fuzz targets. They are a workspace of their own, so no package the
-/// members reader lists holds them, and every line in them is a check.
 const FUZZ: &str = "crates/fuzz/";
-
-/// The package this gate is compiled into. Its production code is gate
-/// logic and its tests sit in `#[cfg(test)]` items, as a product's do;
-/// every other tool package - the deterministic simulator - is a check
-/// shaped like a crate.
 const GATES: &str = env!("CARGO_PKG_NAME");
 
-/// How much of one file is test code, decided by where it lives
-/// (crates/xtask/Spec.lean §8-39).
+/// Test-code extent by address (xtask Spec §8-39).
 #[derive(Debug, PartialEq, Eq)]
 enum Reading {
-    /// The whole file is test code by its address.
     Whole,
-    /// Only the items marked `#[cfg(test)]` are.
     Marked,
-    /// No package holds it, so it is nobody's check.
     Skipped,
 }
 
@@ -130,13 +67,7 @@ fn reading(rel: &str, found: &[Member]) -> Reading {
     }
 }
 
-/// Where test code hides inside a source file: the line span of every
-/// item marked `#[cfg(test)]`.
-///
-/// Found by parsing rather than by looking for the attribute and reading
-/// to the end of the file. A `#[cfg(test)] mod tests` is usually last and
-/// usually is the rest of the file, and a gate that assumed so would be
-/// wrong in exactly the files where it is not.
+/// Line spans of `#[cfg(test)]` items, from the parse tree.
 fn test_spans(text: &str, rel: &str) -> Result<Vec<(usize, usize)>, XtaskError> {
     let parsed = syn::parse_file(text).map_err(|err| XtaskError::Doc {
         file: rel.to_owned(),
@@ -188,7 +119,6 @@ fn marked_test(attrs: &[syn::Attribute]) -> bool {
     })
 }
 
-/// The register row naming the files that crossed before the rule did.
 const ROW: &str = "boundary";
 const PREDATING: &str = "predating";
 
@@ -232,9 +162,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.extend(found);
         }
     }
-    // A row naming a file that has stopped crossing is a licence nobody
-    // decided to keep granting, and it would silently re-admit the file
-    // if anybody put a socket back into it.
     for spent in excused.difference(&crossing) {
         violations.push(Violation {
             gate: "boundary",
@@ -249,7 +176,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The files that were already crossing when the rule was drawn.
 fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError> {
     let register = crate::budget::register(root)?;
     let Some(listed) = register
@@ -271,14 +197,10 @@ fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError
     Ok(out)
 }
 
-/// One file, and where in it the test code is: four values that always
-/// travel together and are never chosen independently.
 struct Sweep<'a> {
     rel: &'a str,
     text: &'a str,
-    /// Whether the whole file is test code by its address.
     whole: bool,
-    /// The line spans of `#[cfg(test)]` items, when it is not.
     spans: &'a [(usize, usize)],
 }
 
@@ -320,8 +242,8 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
             .to_owned(),
         violation: format!("`{token}` in test code: {what}"),
         alternative: "move it to crates/adversary/ as a property over traces, or drive the same \
-                      thing in-process through the door wire::server uses - and if \
-                      neither is what you meant, mark the line `boundary-ok: <reason>`"
+                      thing in-process through the door wire::server uses; if this is not \
+                      this product's boundary, narrow CROSSINGS to the exact external surface"
             .to_owned(),
     }
 }
@@ -336,7 +258,6 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
 mod tests {
     use super::*;
 
-    /// A product package holding `rel`, at its first two segments.
     fn owner(rel: &str) -> Member {
         Member {
             package: "product".to_owned(),
@@ -362,9 +283,6 @@ mod tests {
         out
     }
 
-    /// The finding that corrected this gate. A test standing up a fake
-    /// provider and speaking HTTP to it is playing the outside world,
-    /// which is the opposite of reaching this product from outside.
     #[test]
     fn a_socket_to_a_double_the_test_raised_is_not_a_crossing() {
         let source = "\
@@ -378,8 +296,6 @@ mod tests {
         assert!(found("crates/accounting/src/worker/driving.rs", source).is_empty());
     }
 
-    /// Reaching the binary this repository builds is standing outside it,
-    /// and that check belongs to `crates/adversary/`.
     #[test]
     fn driving_the_built_binary_is_refused() {
         let source = "\
@@ -396,10 +312,6 @@ mod tests {
         assert!(out[0].location.ends_with(":6"), "{:?}", out[0].location);
     }
 
-    /// A whole file under `crates/*/tests/` is test code by its address,
-    /// with no attribute to find - and raising this product's own server
-    /// to speak HTTP at it is the crossing `enrolment.rs` made before it
-    /// drove the router in process.
     #[test]
     fn a_file_under_tests_is_test_code_by_where_it_lives() {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";
@@ -407,8 +319,6 @@ mod tests {
         assert!(found("crates/wire/src/server.rs", source).is_empty());
     }
 
-    /// The waiver is read on the line and on the line above, which is
-    /// how `lexicon` reads its own.
     #[test]
     fn a_waiver_on_the_line_or_the_line_above_is_honoured() {
         let source = "\
