@@ -19,6 +19,9 @@
 # dot directories unless they are ignored (client/eslint.config.ts).
 .svelte-check/
 
+# The CI cache adapter's installed dependencies are build output too.
+.github/ci-cache/node_modules/
+
 # Working records never ship. To a contributor and to a model they are
 # noise; to an attacker they are intelligence — they name a machine, a
 # toolchain, an account, a schedule, and the words a decision arrived in.

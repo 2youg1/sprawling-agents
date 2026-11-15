@@ -29,7 +29,7 @@
 #   proof     the kernel propositions kani can hold; `changes` decides
 #             whether a change touched anything a proof is about
 #
-# The nine phases of `just check-all` map onto these jobs one to one or
+# The phases of `just check-all` map onto these jobs one to one or
 # into a job that holds several: fmt, desktop and source gates ->
 # gates-sources, build-web and artifact gates -> gates-artifacts, clippy
 # and features -> clippy, test -> the test jobs, the supply-chain read of
@@ -278,41 +278,25 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: client/package.json
-      - name: native payloads in system channel validation
+      - name: install the content-cache adapter
+        if: ${{ !cancelled() }}
+        working-directory: .github/ci-cache
+        run: bun install --frozen-lockfile
+      # One graph owns formatting, source gates, workflow self-tests and the
+      # Zig leaves. Every green verdict carries its complete content key;
+      # failures and unavailable cache storage always execute the action.
+      - name: content-addressed source verification
         if: ${{ !cancelled() }}
         env:
-          PYTHONUTF8: "1"
-        run: python crates/xtask/src/channel/validate_test.py
-      - name: fmt
-        if: ${{ !cancelled() }}
-        run: just fmt-check
-      - name: CI tool cache contract
-        if: ${{ !cancelled() }}
-        run: bash .github/workflows/test-ci-tools.sh
-      - name: the gates that read sources
-        if: ${{ !cancelled() }}
-        run: just gates-sources
-      - name: nightly publication decisions, without GitHub
-        if: ${{ !cancelled() }}
-        run: sh .github/workflows/test-nightly-release.sh
+          SPRAWLING_CI_CACHE_ADAPTER: .github/ci-cache/cache.ts
+        run: just verify-sources
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
-      # (crates/xtask/Spec.lean §8-35).
+      # (crates/xtask/Spec.lean §8-35). History and title are not content-
+      # cached: this verdict still runs on every change-set.
       - name: commit messages
         if: ${{ !cancelled() }}
         uses: ./.github/actions/commit-messages
-      # The desktop server and its FFI seam are workspace members, so
-      # clippy and the suite judge them; what is left is the Zig leaf's
-      # own tests, which no cargo command runs (`crates/desktop/Spec.lean`
-      # section 8-12).
-      - name: the Zig leaf's own tests
-        if: ${{ !cancelled() }}
-        run: just check-desktop
-      # The console renderer's own Zig tests, which no cargo command runs
-      # either (`crates/console_ffi/Spec.lean`).
-      - name: the console leaf's own tests
-        if: ${{ !cancelled() }}
-        run: just check-console
 
   # Bundle half of the gates: npm, render and budget. Its own runner so
   # the five render passes do not share four processors with zig test
