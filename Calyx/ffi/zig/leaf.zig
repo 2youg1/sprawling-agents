@@ -59,3 +59,22 @@ test {
     _ = @import("transcript.zig");
     _ = @import("live.zig");
 }
+
+// Seeded hostile-byte smoke: every input is Drawn / Full / Malformed.
+// Coverage-guided `zig test --fuzz` stays #83.
+test "hostile scene bytes never trap the draw export" {
+    var prng = std.Random.DefaultPrng.init(0x5eed_c01a);
+    const random = prng.random();
+    var buf: [4096]u8 = undefined;
+    var scratch: [512]u8 = undefined;
+    var drawn: Drawn = undefined;
+    var round: usize = 0;
+    while (round < 4096) : (round += 1) {
+        const n = random.intRangeAtMost(usize, 0, scratch.len);
+        random.bytes(scratch[0..n]);
+        const status = sprawling_console_draw(scratch[0..n].ptr, n, &buf, buf.len, &drawn);
+        try std.testing.expect(status == @backingInt(part.Status.Drawn)
+            or status == @backingInt(part.Status.Full)
+            or status == @backingInt(part.Status.Malformed));
+    }
+}

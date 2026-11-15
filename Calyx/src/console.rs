@@ -15,8 +15,6 @@ pub(crate) mod stream;
 pub(crate) mod terminal;
 pub(crate) mod ui;
 pub use lifecycle::Surface;
-pub use terminal::{
-    Answering, CarryRemote, Clock, Inside, OpenPaired, Terminal, start,
-};
+pub use terminal::{Answering, CarryRemote, Clock, Inside, OpenPaired, Terminal, start};
 #[cfg(test)]
 mod tests;

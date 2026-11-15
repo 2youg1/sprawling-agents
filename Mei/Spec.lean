@@ -58,7 +58,7 @@ LLM compaction、验真门、运行时 AGENTS/Skills 注入、为弱模型准备
 /-! ## 4 现状分析
 
 核去掉输出窗与 POSIX-only 拒绝；删除 `MEI_TOOLS`。交互后端在 `Calyx/src/console`，
-入口为 `calyx` 二进制（npm：TTY 无 `-p` 时由 shim 启动）并通过 `MEI_BIN`／同目录
+入口为 `calyx` 二进制（npm：TTY 且无 `-p`／`--resume` 时由 shim 启动）并通过 `MEI_BIN`／同目录
 `mei`／PATH 解析无头核。`@sprawling/mei` 归档同时携带无头核与 Calyx 面（含 Windows）。
 V1/V2 实测以 magpie + 已测模型为准，不外推。
 -/

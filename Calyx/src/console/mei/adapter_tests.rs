@@ -11,6 +11,7 @@
     reason = "test code"
 )]
 
+use super::super::ui::Show;
 use super::mei_command;
 
 use super::*;
@@ -127,22 +128,18 @@ fn plain_errors_and_failures_are_notes_not_replies() {
 fn observations_update_offer_without_notes() {
     let mut seen = Mei::new("deepseek/flash".to_owned());
     assert_eq!(seen.offer(), "deepseek/flash · unknown");
-    assert!(seen
-        .line(
-            r#"{"type":"mei.obs","kind":"pulse"}"#,
-            TimeMs::new(1),
-        )
-        .is_empty());
-    assert!(seen
-        .line(
+    assert!(
+        seen.line(r#"{"type":"mei.obs","kind":"pulse"}"#, TimeMs::new(1),)
+            .is_empty()
+    );
+    assert!(
+        seen.line(
             r#"{"type":"mei.obs","kind":"usage","usage":{"input_tokens":3}}"#,
             TimeMs::new(2),
         )
-        .is_empty());
-    assert_eq!(
-        seen.offer(),
-        "deepseek/flash · {\"input_tokens\":3}"
+        .is_empty()
     );
+    assert_eq!(seen.offer(), "deepseek/flash · {\"input_tokens\":3}");
 }
 
 #[cfg(target_os = "linux")]
@@ -225,12 +222,9 @@ fn adapter_diagnostics_with_control_characters_are_parseable_toml() {
 fn requesting_stop_lets_the_writer_drain_a_full_queue() {
     let (to, from) = std::sync::mpsc::sync_channel(1);
     to.send(Show::Resized).unwrap();
-    let mut process = MeiProcess::spawn_with_program(
-        "echo busy >&2\nsleep 30",
-        to,
-        std::ffi::OsStr::new("sh"),
-    )
-    .unwrap();
+    let mut process =
+        MeiProcess::spawn_with_program("echo busy >&2\nsleep 30", to, std::ffi::OsStr::new("sh"))
+            .unwrap();
     process.request_stop().unwrap();
     let mut cancelled = false;
     for _ in 0..3 {
@@ -253,6 +247,21 @@ fn stopping_a_process_group_reaps_its_driver() {
     let (to, from) = std::sync::mpsc::sync_channel(2);
     let mut process =
         MeiProcess::spawn_with_program("sleep 30", to, std::ffi::OsStr::new("sh")).unwrap();
+    process.stop().unwrap();
+    let Show::Mei(MeiEvent::Finished { cancelled, .. }) = from.recv().unwrap() else {
+        panic!("missing process result");
+    };
+    assert!(cancelled);
+}
+
+#[cfg(windows)]
+#[test]
+fn stopping_a_windows_job_reaps_its_driver() {
+    let dir = tempfile::tempdir().unwrap();
+    let script = dir.path().join("sleep.cmd");
+    std::fs::write(&script, "@echo busy>&2\r\nping -n 40 127.0.0.1 >nul\r\n").unwrap();
+    let (to, from) = std::sync::mpsc::sync_channel(2);
+    let mut process = MeiProcess::spawn_with_program("", to, script.as_os_str()).unwrap();
     process.stop().unwrap();
     let Show::Mei(MeiEvent::Finished { cancelled, .. }) = from.recv().unwrap() else {
         panic!("missing process result");

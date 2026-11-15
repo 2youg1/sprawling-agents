@@ -144,12 +144,7 @@ impl Client {
                     .with_path(path.clone()),
             )
         })?;
-        let response = read_to_eof(
-            &mut stream,
-            &self.timeouts,
-            pulse,
-            &path,
-        )?;
+        let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path)?;
         parse(&response)
     }
 
@@ -209,21 +204,17 @@ fn read_to_eof(
         })?;
         match stream.read(&mut chunk) {
             Ok(0) => return Ok(response),
-            Ok(count) => response.extend_from_slice(
-                chunk
-                    .get(..count)
-                    .ok_or_else(|| {
-                        Error::Diagnostic(
-                            Diagnostic::new(
-                                Code::Transport,
-                                "read the Messages response to EOF",
-                                "read returned a length past the buffer",
-                                "retry the request against the same gateway; no retry was attempted",
-                            )
-                            .with_path(path),
-                        )
-                    })?,
-            ),
+            Ok(count) => response.extend_from_slice(chunk.get(..count).ok_or_else(|| {
+                Error::Diagnostic(
+                    Diagnostic::new(
+                        Code::Transport,
+                        "read the Messages response to EOF",
+                        "read returned a length past the buffer",
+                        "retry the request against the same gateway; no retry was attempted",
+                    )
+                    .with_path(path),
+                )
+            })?),
             Err(err)
                 if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
             {
@@ -270,17 +261,20 @@ fn write_pulse(pulse: &mut dyn Write, path: &str) -> Result<()> {
             )
         },
     )?;
-    pulse.write_all(b"\n").and_then(|()| pulse.flush()).map_err(|err| {
-        Error::Diagnostic(
-            Diagnostic::new(
-                Code::Transport,
-                "write a mei.obs pulse",
-                err.to_string(),
-                "keep stderr writable during a blocked Messages read",
+    pulse
+        .write_all(b"\n")
+        .and_then(|()| pulse.flush())
+        .map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "write a mei.obs pulse",
+                    err.to_string(),
+                    "keep stderr writable during a blocked Messages read",
+                )
+                .with_path(path),
             )
-            .with_path(path),
-        )
-    })
+        })
 }
 
 fn authority(base: &str) -> Result<String> {

@@ -6,13 +6,13 @@
 //! The Mei backend: display-local identity, one JSONL converter, replay,
 //! and the child process group (`crates/sprawling/spec/Console.lean` §8-174).
 
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use crate::part::{Ending, Outcome};
 use crate::scene::Entry;
 use kernel::{RunId, TimeMs};
 use serde_json::Value;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::local_time;
 use super::program_status::{Counts, Rest};
@@ -458,15 +458,15 @@ fn note(said: &str) -> Entry {
 
 mod process;
 
-pub(crate) use process::{AdapterFailure, MeiProcess};
 #[cfg(test)]
-#[allow(unused_imports, reason = "adapter_tests reaches mei_command through super")]
+#[allow(
+    unused_imports,
+    reason = "adapter_tests reaches mei_command through super"
+)]
 use process::mei_command;
+pub(crate) use process::{AdapterFailure, MeiProcess};
 
-pub fn verb(
-    replay: Option<&str>,
-    clock: super::terminal::Clock,
-) -> std::process::ExitCode {
+pub fn verb(replay: Option<&str>, clock: super::terminal::Clock) -> std::process::ExitCode {
     super::ui::mei::run(replay, clock)
 }
 

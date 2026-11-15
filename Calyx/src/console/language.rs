@@ -41,14 +41,8 @@ pub(crate) enum Line {
     Remote(String),
     Frame(Box<wire::ClientFrame>),
     Work(String),
-    Unknown {
-        verb: String,
-        nearest: Vec<String>,
-    },
-    Malformed {
-        verb: String,
-        reason: String,
-    },
+    Unknown { verb: String, nearest: Vec<String> },
+    Malformed { verb: String, reason: String },
 }
 
 pub(crate) fn snake(camel: &str) -> String {

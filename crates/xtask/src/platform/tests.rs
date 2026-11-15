@@ -5,8 +5,6 @@
 
 use super::{PLATFORMS, matrix, shim, shim_rows, spent_suffixes, suffixes};
 
-/// Two rows claiming one platform would make which binary a person
-/// gets depend on the order the assets were read in.
 #[test]
 fn no_two_rows_claim_one_platform_or_one_suffix() {
     for (index, row) in PLATFORMS.iter().enumerate() {
@@ -22,8 +20,6 @@ fn no_two_rows_claim_one_platform_or_one_suffix() {
     }
 }
 
-/// A matrix row is a runner and the target it passes down; a host build
-/// states an empty target and must be read as one rather than skipped.
 #[test]
 fn a_matrix_row_is_read_as_its_runner_and_its_target() {
     let text = "        include:\n          - os: windows-latest\n            target: \"\"\n\
@@ -40,7 +36,6 @@ fn a_matrix_row_is_read_as_its_runner_and_its_target() {
     );
 }
 
-/// The shim's table maps a machine to a package and the file to exec.
 #[test]
 fn a_shim_entry_is_read_as_its_key_its_package_and_its_binary() {
     let text = "const PLATFORMS = {\n  \"win32 x64\": { package: \"@sprawling/sprawling-windows-x64\", \
@@ -55,8 +50,6 @@ fn a_shim_entry_is_read_as_its_key_its_package_and_its_binary() {
     );
 }
 
-/// An entry the formatter wrapped still reads: the table is an object,
-/// not one line per platform.
 #[test]
 fn a_wrapped_entry_is_read_as_one_row() {
     let text = "const PLATFORMS = {\n  \"darwin arm64\": {\n    package: \"@sprawling/sprawling-darwin-arm64\",\n    binary: \"sprawling\",\n  },\n  \"linux x64\": {\n    package: \"@sprawling/sprawling-linux-x64-musl\",\n    binary: \"sprawling\",\n  },\n};\n";
@@ -77,8 +70,6 @@ fn a_wrapped_entry_is_read_as_one_row() {
     );
 }
 
-/// The Mei copy is judged too: a scoped platform name that drifts from
-/// `mei_package` is a violation rather than a package nobody can resolve.
 #[test]
 fn a_mismatched_mei_shim_package_is_reported() {
     let root = std::env::temp_dir().join(format!("sprawling-mei-shim-{}", std::process::id()));
@@ -107,8 +98,6 @@ fn a_mismatched_mei_shim_package_is_reported() {
     std::fs::remove_dir_all(root).unwrap();
 }
 
-/// A name written out in full is compared; one built by interpolation
-/// is not a spelling, and guessing at it would convict a correct script.
 #[test]
 fn only_a_suffix_written_out_in_full_is_read() {
     assert_eq!(
@@ -125,8 +114,6 @@ fn only_a_suffix_written_out_in_full_is_read() {
     assert!(suffixes("          path: target/package/*.zip").is_empty());
 }
 
-/// The register cleans itself in both directions: a recorded suffix the
-/// release now builds, and one nobody spells any more, are each struck.
 #[test]
 fn a_recorded_suffix_that_is_no_longer_needed_is_reported() {
     let built = PLATFORMS[0].suffix.to_owned();

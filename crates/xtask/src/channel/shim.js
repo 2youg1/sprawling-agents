@@ -4,8 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 //
 // The npm channel's entry point: find the binary for this machine and
-// become it. Never installs. For @sprawling/mei: a TTY without `-p`
-// becomes Calyx; `-p` or a non-TTY stdin becomes the headless core.
+// become it. Never installs. For @sprawling/mei: a TTY without `-p` or
+// `--resume` becomes Calyx; `-p`, `--resume`, or a non-TTY stdin becomes
+// the headless core.
 
 "use strict";
 
@@ -59,9 +60,10 @@ function spec(name) {
   return typeof packageManifest.version === "string" ? `${name}@${packageManifest.version}` : name;
 }
 
-function wantsHeadless(argv) {
+function wantsHeadless(argv, stdinIsTTY = process.stdin.isTTY) {
   if (argv.includes("-p")) return true;
-  if (!process.stdin.isTTY) return true;
+  if (argv.some((arg) => arg === "--resume" || arg.startsWith("--resume="))) return true;
+  if (!stdinIsTTY) return true;
   return false;
 }
 

@@ -233,11 +233,7 @@ impl Py {
 }
 
 fn python_program() -> &'static str {
-    if cfg!(windows) {
-        "python"
-    } else {
-        "python3"
-    }
+    if cfg!(windows) { "python" } else { "python3" }
 }
 
 impl Drop for Py {
@@ -265,9 +261,7 @@ mod tests {
     use super::*;
 
     fn read_path(path: &str) -> String {
-        std::fs::read_to_string(path)
-            .unwrap()
-            .replace("\r\n", "\n")
+        std::fs::read_to_string(path).unwrap().replace("\r\n", "\n")
     }
 
     #[test]
@@ -279,9 +273,7 @@ mod tests {
         assert_eq!(read_path(&path), "42\n");
         let path = python.run("pass").unwrap();
         assert_eq!(read_path(&path), "");
-        assert!(
-            read_path(&python.run("raise SystemExit(3)").unwrap()).contains("SystemExit: 3")
-        );
+        assert!(read_path(&python.run("raise SystemExit(3)").unwrap()).contains("SystemExit: 3"));
         python.close().unwrap();
     }
 
@@ -320,4 +312,3 @@ mod tests {
             .expect("the close escalates instead of hanging");
     }
 }
-

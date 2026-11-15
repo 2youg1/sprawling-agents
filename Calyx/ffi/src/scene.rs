@@ -21,13 +21,18 @@ pub enum Entry {
         address: String,
         url: String,
     },
-    You { at: Option<TimeOfDay>, said: String },
+    You {
+        at: Option<TimeOfDay>,
+        said: String,
+    },
     Head {
         at: Option<TimeOfDay>,
         resident: String,
         facts: Vec<String>,
     },
-    Reasoning { characters: u64 },
+    Reasoning {
+        characters: u64,
+    },
     Tool {
         at: Option<TimeOfDay>,
         name: String,
@@ -35,8 +40,12 @@ pub enum Entry {
         took_us: Option<u64>,
         outcome: Outcome,
     },
-    Reply { said: String },
-    Note { said: String },
+    Reply {
+        said: String,
+    },
+    Note {
+        said: String,
+    },
     Ended {
         at: Option<TimeOfDay>,
         ending: Ending,

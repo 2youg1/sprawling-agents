@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 use std::path::Path;
 
 use crate::budget;
@@ -12,9 +11,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 mod mei;
-pub(crate) use mei::{
-    MEI_ARCHIVE_PREFIX, MEI_ROOT_PACKAGE, calyx_binary, mei_binary, mei_package,
-};
+pub(crate) use mei::{MEI_ARCHIVE_PREFIX, MEI_ROOT_PACKAGE, calyx_binary, mei_binary, mei_package};
 
 pub(crate) struct Platform {
     pub(crate) suffix: &'static str,

@@ -211,11 +211,7 @@ impl Room {
         }]
     }
 
-    fn frozen(
-        &mut self,
-        record: &EventRecord,
-        at: Option<crate::scene::TimeOfDay>,
-    ) -> Vec<Entry> {
+    fn frozen(&mut self, record: &EventRecord, at: Option<crate::scene::TimeOfDay>) -> Vec<Entry> {
         let working = self.run == Some(record.run());
         if !working && self.run.is_some() {
             return Vec::new();

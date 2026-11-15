@@ -85,8 +85,7 @@ fn new_and_resume_select_explicit_jsonl_files_without_rewriting_old_ones() {
         .unwrap()
         .append(&[
             "{\"role\":\"user\",\"content\":\"first\"}".to_owned(),
-            "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}"
-                .to_owned(),
+            "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}".to_owned(),
         ])
         .unwrap();
     let before = std::fs::read(&first).unwrap();

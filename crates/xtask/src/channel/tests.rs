@@ -68,9 +68,57 @@ fn the_shim_execs_rather_than_installs() {
         !shim.contains("sprawling install"),
         "PATH belongs to whoever installed; the shim must not install"
     );
-    // Which packages the shim knows is `platform::restated`'s question,
-    // asked of the file on disk; asserting it here too would be a
-    // second reader of one fact.
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
+fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
+    let shim = super::SHIM;
+    let start = shim
+        .find("function wantsHeadless")
+        .expect("Calyx D4 lives in wantsHeadless");
+    let rest = shim
+        .get(start..)
+        .expect("wantsHeadless starts on a char boundary");
+    let end = rest
+        .find("\n}\n")
+        .expect("wantsHeadless is a closed function");
+    let function = rest
+        .get(..=end + 1)
+        .expect("wantsHeadless ends on a char boundary");
+    assert!(
+        function.contains("\"-p\"")
+            && function.contains("--resume")
+            && function.contains("stdinIsTTY"),
+        "{function}"
+    );
+    assert!(shim.contains("childEnv.MEI_BIN = core"));
+    assert!(shim.contains("row.face"));
+
+    let script = format!(
+        "{function}\n\
+         const cases = [\n\
+           [['-p', 'x'], true, true],\n\
+           [['--resume', 'a.jsonl'], true, true],\n\
+           [['--resume=a.jsonl'], true, true],\n\
+           [[], true, false],\n\
+           [[], false, true],\n\
+           [['--replay', 'a.jsonl'], true, false],\n\
+         ];\n\
+         for (const [argv, tty, want] of cases) {{\n\
+           const got = wantsHeadless(argv, tty);\n\
+           if (got !== want) {{\n\
+             console.error(JSON.stringify({{ argv, tty, got, want }}));\n\
+             process.exit(1);\n\
+           }}\n\
+         }}\n"
+    );
+    let status = std::process::Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .status()
+        .expect("node runs the shim smoke matrix");
+    assert!(status.success(), "Mei shim routing smoke failed: {status}");
 }
 
 #[test]
@@ -248,7 +296,9 @@ fn channel_requires_mei_archives_with_the_platform_binary_name() {
     )
     .expect_err("a Windows Mei archive must hold mei.exe");
     assert!(
-        wrong_name.to_string().contains("holds no file named mei.exe"),
+        wrong_name
+            .to_string()
+            .contains("holds no file named mei.exe"),
         "{wrong_name}"
     );
     std::fs::remove_dir_all(fixture).unwrap();

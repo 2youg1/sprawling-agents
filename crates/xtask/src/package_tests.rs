@@ -3,7 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
 
 use crate::platform;
 
@@ -134,8 +139,7 @@ fn two_runs_over_the_same_files_produce_the_same_bytes() {
 
 #[test]
 fn mei_archive_carries_its_posix_binary_guide_and_licence() {
-    let root =
-        std::env::temp_dir().join(format!("sprawling-mei-package-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("sprawling-mei-package-{}", std::process::id()));
     if root.exists() {
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -177,7 +181,10 @@ fn mei_archive_carries_its_posix_binary_guide_and_licence() {
 #[test]
 fn mei_names_the_windows_binary_mei_exe() {
     let row = platform::with_suffix("-windows-x86_64.zip").unwrap();
-    assert_eq!(platform::mei_package(row), Some("@sprawling/mei-windows-x64"));
+    assert_eq!(
+        platform::mei_package(row),
+        Some("@sprawling/mei-windows-x64")
+    );
     assert_eq!(platform::mei_binary(row), "mei.exe");
     assert_eq!(platform::calyx_binary(row), "calyx.exe");
 }

@@ -45,11 +45,7 @@ impl Inside {
     }
 }
 
-pub fn serving(
-    terminal: &Terminal,
-    vitals: Option<&wire::MetricsAnswer>,
-    pid: u32,
-) -> String {
+pub fn serving(terminal: &Terminal, vitals: Option<&wire::MetricsAnswer>, pid: u32) -> String {
     let reach = if terminal.bind.ip().is_loopback() {
         "this machine only"
     } else if terminal.bind.ip().is_unspecified() {

@@ -24,11 +24,11 @@ Calyx 不实现模型环、不声明工具、不注入 AGENTS。
 
 /-! ## 2 验收标准
 
-- 交互：`calyx`（或 npm shim 在 TTY 无 `-p` 时启动的同名二进制）在工作区打开 Mei 后端；
+- 交互：`calyx`（或 npm shim 在 TTY 无 `-p`／`--resume` 时启动的同名二进制）在工作区打开 Mei 后端；
   `MEI_BIN`、同目录 `mei`、或 PATH 上的 `mei` 解析无头核；
   `/new`、`/resume`、Esc 保持 Console §8-174；横幅为 cwd；composer 为 `model · usage|unknown`；
-  运行中显示 working；`mei.obs` pulse/usage 不落成 Note。
-- 无头 `mei -p` 与管道 stdin 不依赖 Calyx 进程。
+  运行中显示 working；`mei.obs` pulse/usage 不落成 Note；Esc 在 Windows 上经 Job 结束子树。
+- 无头 `mei -p`、`mei --resume` 与管道 stdin 不依赖 Calyx 进程。
 - `cargo test -p sprawling-calyx --lib` 与 `cargo test -p sprawling-console-ffi --lib` 绿色。
 -/
 
@@ -62,6 +62,6 @@ sprawling 经 `calyx::console` 装配城钩子。Console 合同正文仍在
 /-! D1 Calyx 是唯一终端壳权威；城与 Mei 后端都是它的适配。 -/
 /-! D2 Mei 交互只经进程 Face spawn 无头 `mei`。 -/
 /-! D3 不设 Archetype 前缀；本包为生产面。 -/
-/-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核。理由：一次完成要求无参 TTY 即可进入交互，且「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程。 -/
+/-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p`／`--resume` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核（`-p`、`--resume`、非 TTY stdin）。理由：一次完成要求无参 TTY 即可进入交互；无头 `--resume` 是核旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把 `--resume` 交给只认 `--replay` 的 `calyx`。 -/
 /-! D5 Mei 状态行：cwd、model·usage|unknown、working；pulse/usage 观测吞掉不刷 Note。 -/
 /-! D6 `calyx` 二进制是本 crate 的装配根；墙钟采样只发生在该根（`calyx::clock::Wall`），库面仍接收注入的时钟闭包。 -/

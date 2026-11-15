@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
 
-use super::MeiEvent;
 use super::super::ui::Show;
+use super::MeiEvent;
 
 /// One adapter failure: the stable code, the rule it broke, the exact
 /// repair, and what failed — subject, full path and offending value.
@@ -36,7 +36,10 @@ impl AdapterFailure {
     /// fenced block carrying every field, ready for the terminal boundary.
     pub(crate) fn render(&self) -> String {
         let description = format!("{}: {}", self.action, self.subject);
-        let cause = format!("{}\npath = {}\nvalue = {}", self.rule, self.path, self.value);
+        let cause = format!(
+            "{}\npath = {}\nvalue = {}",
+            self.rule, self.path, self.value
+        );
         format!(
             "```toml\ncode = {}\ndescription = {}\ncause = {}\nresolution = {}\n```",
             toml_string(self.code),
@@ -55,7 +58,10 @@ struct Signals {
 /// One running child and the driver which reaps it. The two signals travel
 /// together so Esc and the driver agree on the terminal state.
 pub(crate) struct MeiProcess {
+    #[cfg(unix)]
     pid: u32,
+    #[cfg(windows)]
+    job: Option<win32job::Job>,
     signals: Signals,
     driver: Option<std::thread::JoinHandle<()>>,
 }
@@ -64,7 +70,10 @@ impl MeiProcess {
     #[cfg(test)]
     pub(crate) fn finished_for_test() -> MeiProcess {
         MeiProcess {
+            #[cfg(unix)]
             pid: 0,
+            #[cfg(windows)]
+            job: None,
             signals: Signals {
                 done: Arc::new(AtomicBool::new(true)),
                 cancelled: Arc::new(AtomicBool::new(false)),
@@ -98,7 +107,7 @@ impl MeiProcess {
         program: &std::ffi::OsStr,
     ) -> Result<MeiProcess, String> {
         let mut command = mei_command(program, resume);
-        let child = command
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -116,7 +125,21 @@ impl MeiProcess {
                 }
                 .render()
             })?;
+        #[cfg(unix)]
         let pid = child.id();
+        #[cfg(windows)]
+        let job = match assign_job(&child) {
+            Ok(job) => Some(job),
+            Err(err) => {
+                if let Err(kill) = child.kill() {
+                    return Err(format!("{err}; also failed to stop Mei: {kill}"));
+                }
+                if let Err(wait) = child.wait() {
+                    return Err(format!("{err}; also failed to reap Mei: {wait}"));
+                }
+                return Err(err);
+            }
+        };
         let signals = Signals {
             done: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
@@ -130,28 +153,42 @@ impl MeiProcess {
             drive(child, prompt, to, &driver_signals);
         });
         Ok(MeiProcess {
+            #[cfg(unix)]
             pid,
+            #[cfg(windows)]
+            job,
             signals,
             driver: Some(driver),
         })
     }
 
-    /// Requests group termination without waiting for the UI's event queue.
+    /// Requests group termination without waiting for the UI's event loop.
     pub(crate) fn request_stop(&mut self) -> Result<(), String> {
         if !self.signals.done.swap(true, Ordering::SeqCst) {
             self.signals.cancelled.store(true, Ordering::SeqCst);
-            stop_group(self.pid)
+            self.terminate_tree()
         } else {
             Ok(())
         }
     }
 
-    /// Stops the whole process group on Unix, then joins the driver.
-    #[cfg(all(test, unix))]
+    /// Stops the process tree, then joins the driver.
+    #[cfg(test)]
     pub(crate) fn stop(&mut self) -> Result<(), String> {
         let stopped = self.request_stop();
         let reaped = self.reap();
         stopped.and(reaped)
+    }
+
+    #[cfg(unix)]
+    fn terminate_tree(&mut self) -> Result<(), String> {
+        stop_group(self.pid)
+    }
+
+    #[cfg(windows)]
+    fn terminate_tree(&mut self) -> Result<(), String> {
+        drop(self.job.take());
+        Ok(())
     }
 
     pub(crate) fn is_finished(&self) -> bool {
@@ -185,7 +222,10 @@ fn mei_program() -> std::ffi::OsString {
     std::ffi::OsString::from("mei")
 }
 
-pub(super) fn mei_command(program: &std::ffi::OsStr, resume: Option<&Path>) -> std::process::Command {
+pub(super) fn mei_command(
+    program: &std::ffi::OsStr,
+    resume: Option<&Path>,
+) -> std::process::Command {
     let mut command = child::command(program);
     if let Some(path) = resume {
         command.arg("--resume").arg(path);
@@ -197,6 +237,10 @@ impl Drop for MeiProcess {
     fn drop(&mut self) {
         if let Err(err) = self.request_stop() {
             eprintln!("stop Mei process group: {err}");
+        }
+        #[cfg(windows)]
+        {
+            drop(self.job.take());
         }
         if let Err(err) = self.reap() {
             eprintln!("reap Mei process group: {err}");
@@ -278,7 +322,7 @@ fn stop_after_io_failure(child: &mut Child) -> Result<(), String> {
     stop_group(child.id())
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn stop_after_io_failure(child: &mut Child) -> Result<(), String> {
     child.kill().map_err(|err| err.to_string())
 }
@@ -292,7 +336,17 @@ fn stop_group(pid: u32) -> Result<(), String> {
         .map_err(|err| format!("terminate Mei process group {pid}: {err}"))
 }
 
-#[cfg(not(unix))]
-fn stop_group(_pid: u32) -> Result<(), String> {
-    Err("Mei process groups require POSIX".to_owned())
+#[cfg(windows)]
+fn assign_job(child: &Child) -> Result<win32job::Job, String> {
+    use std::os::windows::io::AsRawHandle as _;
+
+    let mut limits = win32job::ExtendedLimitInfo::new();
+    limits.limit_kill_on_job_close();
+    let job = win32job::Job::create_with_limit_info(&limits)
+        .map_err(|err| format!("create Mei job: {err}"))?;
+    let handle = isize::try_from(child.as_raw_handle().addr())
+        .map_err(|err| format!("Mei process handle: {err}"))?;
+    job.assign_process(handle)
+        .map_err(|err| format!("assign Mei to job: {err}"))?;
+    Ok(job)
 }
