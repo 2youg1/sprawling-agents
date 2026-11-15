@@ -73,8 +73,6 @@ test "hostile scene bytes never trap the draw export" {
         const n = random.intRangeAtMost(usize, 0, scratch.len);
         random.bytes(scratch[0..n]);
         const status = sprawling_console_draw(scratch[0..n].ptr, n, &buf, buf.len, &drawn);
-        try std.testing.expect(status == @backingInt(part.Status.Drawn)
-            or status == @backingInt(part.Status.Full)
-            or status == @backingInt(part.Status.Malformed));
+        try std.testing.expect(status == @backingInt(part.Status.Drawn) or status == @backingInt(part.Status.Full) or status == @backingInt(part.Status.Malformed));
     }
 }

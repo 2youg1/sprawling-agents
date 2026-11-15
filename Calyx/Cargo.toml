@@ -29,7 +29,6 @@ console_ffi = { workspace = true }
 crossterm = { workspace = true }
 getrandom = { workspace = true }
 kernel = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
@@ -43,7 +42,6 @@ win32job = { workspace = true }
 
 [dev-dependencies]
 mei = { workspace = true }
-proptest = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

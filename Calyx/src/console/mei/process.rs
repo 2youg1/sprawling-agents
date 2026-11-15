@@ -107,7 +107,7 @@ impl MeiProcess {
         program: &std::ffi::OsStr,
     ) -> Result<MeiProcess, String> {
         let mut command = mei_command(program, resume);
-        let mut child = command
+        let child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -131,6 +131,7 @@ impl MeiProcess {
         let job = match assign_job(&child) {
             Ok(job) => Some(job),
             Err(err) => {
+                let mut child = child;
                 if let Err(kill) = child.kill() {
                     return Err(format!("{err}; also failed to stop Mei: {kill}"));
                 }
