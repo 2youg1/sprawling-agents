@@ -88,6 +88,12 @@ description = 'fixture description'
 ",
     )
     .unwrap();
+    std::fs::create_dir_all(fixture.join("Mei")).unwrap();
+    std::fs::write(
+        fixture.join("Mei/Cargo.toml"),
+        "[package]\ndescription = 'Archetype:Mei fixture'\n",
+    )
+    .unwrap();
     let row = &PLATFORMS[0];
     let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
     let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
@@ -100,6 +106,19 @@ description = 'fixture description'
     .unwrap();
     zip.write_all(b"archive binary bytes").unwrap();
     zip.finish().unwrap();
+    for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
+        let archive = assets.join(format!("mei-0.0.10{}", row.suffix));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+        zip.start_file(
+            "archive/mei",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Mei archive binary bytes").unwrap();
+        zip.finish().unwrap();
+    }
     let out = fixture.join("npm");
     super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(
@@ -129,6 +148,94 @@ description = 'fixture description'
             0o755
         );
     }
+    let mei_root = out.join("@sprawling/mei");
+    let mei_manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(mei_root.join("package.json")).unwrap()).unwrap();
+    assert_eq!(mei_manifest["bin"]["mei"], "bin/mei.js");
+    assert_eq!(
+        mei_manifest["optionalDependencies"]
+            .as_object()
+            .unwrap()
+            .len(),
+        2
+    );
+    for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
+        let package = super::mei_package(row).expect("a POSIX row has a Mei package");
+        assert_eq!(
+            std::fs::read(out.join(package).join("bin/mei")).unwrap(),
+            b"Mei archive binary bytes"
+        );
+    }
+    assert!(
+        std::fs::read_to_string(mei_root.join("bin/mei.cmd"))
+            .unwrap()
+            .contains("mei: install Bun or Node.js")
+    );
+    std::fs::remove_dir_all(fixture).unwrap();
+}
+
+#[test]
+fn channel_requires_posix_mei_archives() {
+    use std::io::Write as _;
+    let fixture =
+        std::env::temp_dir().join(format!("sprawling-mei-channel-{}", std::process::id()));
+    if fixture.exists() {
+        std::fs::remove_dir_all(&fixture).unwrap();
+    }
+    let assets = fixture.join("assets");
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::create_dir_all(fixture.join("Mei")).unwrap();
+    std::fs::write(
+        fixture.join("Cargo.toml"),
+        "[workspace.package]\nversion = '0.0.10'\nrepository = 'https://example.invalid/source'\ndescription = 'fixture'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        fixture.join("Mei/Cargo.toml"),
+        "[package]\ndescription = 'Archetype:Mei fixture'\n",
+    )
+    .unwrap();
+    let row = &PLATFORMS[0];
+    let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+    zip.start_file(
+        format!("archive/{}", row.binary),
+        zip::write::SimpleFileOptions::default()
+            .system(zip::System::Unix)
+            .unix_permissions(0o755),
+    )
+    .unwrap();
+    zip.write_all(b"sprawling").unwrap();
+    zip.finish().unwrap();
+
+    let missing = super::run(
+        &fixture,
+        "v0.0.10-Alpha-261005",
+        &assets,
+        &fixture.join("missing"),
+    )
+    .expect_err("a release must not silently omit Mei's npm channel");
+    assert!(missing.to_string().contains("no Mei release archive"));
+
+    let archive = assets.join(format!("mei-0.0.10{}", row.suffix));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+    zip.start_file(
+        "archive/mei",
+        zip::write::SimpleFileOptions::default()
+            .system(zip::System::Unix)
+            .unix_permissions(0o755),
+    )
+    .unwrap();
+    zip.write_all(b"mei").unwrap();
+    zip.finish().unwrap();
+    let windows = super::run(
+        &fixture,
+        "v0.0.10-Alpha-261005",
+        &assets,
+        &fixture.join("windows"),
+    )
+    .expect_err("Mei has no native Windows package");
+    assert!(windows.to_string().contains("not a supported Mei archive"));
     std::fs::remove_dir_all(fixture).unwrap();
 }
 
@@ -148,6 +255,12 @@ description = 'fixture'
 ",
     )
     .unwrap();
+    std::fs::create_dir_all(fixture.join("Mei")).unwrap();
+    std::fs::write(
+        fixture.join("Mei/Cargo.toml"),
+        "[package]\ndescription = 'Archetype:Mei fixture'\n",
+    )
+    .unwrap();
     for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
         let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
         let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
@@ -159,6 +272,19 @@ description = 'fixture'
         )
         .unwrap();
         zip.write_all(b"binary").unwrap();
+        zip.finish().unwrap();
+    }
+    for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
+        let archive = assets.join(format!("mei-0.0.10{}", row.suffix));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+        zip.start_file(
+            "application/mei",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Mei binary").unwrap();
         zip.finish().unwrap();
     }
     let out = fixture.join("out");

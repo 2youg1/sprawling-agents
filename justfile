@@ -911,6 +911,10 @@ dist target="": build-web
     cargo build --release -p sprawling --locked --timings {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
 
+# Mei's standalone POSIX binary; it embeds no client and needs no city SBOM.
+dist-mei target="":
+    cargo build --release -p sprawling-mei --locked {{ if target == "" { "" } else { "--target " + target } }}
+
 # The release archive: the one file a person downloads, unpacks and runs.
 # `dist` first, because the archive is assembled out of its artifacts and
 # never out of whatever happened to be in target/ from an earlier build.
@@ -924,6 +928,10 @@ package target="": (dist target) (archive target)
 # triple is ignored there, and the packer then looks in target/release.
 archive target="":
     cargo xtask package {{ if target == "" { "" } else { "--target " + target } }}
+
+# Mei's independent archive: binary, beginner guide and licence only.
+archive-mei target="":
+    cargo xtask package --mei {{ if target == "" { "" } else { "--target " + target } }}
 
 # Offline chain verification (A2); strictly read-only.
 replay log:

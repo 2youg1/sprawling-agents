@@ -159,6 +159,11 @@ Mei 自身没有交互循环或斜杠命令。`-p` 缺值、重复/未知参数�
 `--resume` 的路径从 `OsString` 直接进入 `PathBuf`，POSIX 非 UTF-8 路径不会触发 panic；flags 与
 `-p` prompt 需要 Unicode，转换失败以 `E_MEI_USAGE` 拒绝。恢复字段验证诊断的 `value` 保留实际
 role、content 或终端 stop_reason，完整性拒绝也指出最后一条为何不能闭合日志。
+
+发布不改变上述核心接口。crate 名是 `sprawling-mei`，npm 根包是 `@sprawling/mei`，安装后的命令
+均为 `mei`；独立归档为 `mei-<version>-<label>.zip`，只提供 macOS arm64 与 Linux x64 musl。
+npm 不提供原生 Windows 包，Windows 的使用路径仍是 POSIX/WSL。`cargo xtask package --mei`、
+npm 平台包与 trusted-publisher 顺序由 `crates/xtask/Spec.lean` D31 拥有，本节不复制其实现合同。
 -/
 
 /-! ## 9 工作流程
@@ -297,3 +302,9 @@ Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 
 /-! D10 恢复参数与诊断保留调用者提供的事实：路径不经 UTF-8 往返，字段错误附实际值。
 理由是 POSIX 路径不要求 Unicode，而修复者需要看到被-rule 拒绝的 role/content/stop_reason；
 被否的是 `std::env::args()` 的隐式 panic，以及只留下 `value = None` 的验证诊断。 -/
+
+/-! D11 注册表身份与产品展示名分开：crate 使用 `sprawling-mei`，npm 使用 `@sprawling/mei`，
+命令与展示名保持 `mei` / Archetype:Mei。理由是 npm 新包不允许大写或冒号，且两个注册表的
+裸名 `mei` 均已被占用；被否的是占用他人的名字、把展示名强行当作注册表名，以及为迎合
+既有三平台发布表而提供原生 Windows 二进制。首次发布由人引导 trusted publisher，
+后续发布仍复用同一 Tag 的构建证据。 -/

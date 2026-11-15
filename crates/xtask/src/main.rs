@@ -115,16 +115,21 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        Some("package") => match package::run(
-            &root,
-            &package::ReleaseTarget::from_arg(value_arg(&args, "--target").as_deref()),
-        ) {
-            Ok(message) => {
-                print!("{message}");
-                ExitCode::SUCCESS
+        Some("package") => {
+            let target = package::ReleaseTarget::from_arg(value_arg(&args, "--target").as_deref());
+            let result = if args.iter().any(|arg| arg == "--mei") {
+                package::run_mei(&root, &target)
+            } else {
+                package::run(&root, &target)
+            };
+            match result {
+                Ok(message) => {
+                    print!("{message}");
+                    ExitCode::SUCCESS
+                }
+                Err(err) => report::internal_failure(&err),
             }
-            Err(err) => report::internal_failure(&err),
-        },
+        }
         // The npm channel is assembled out of a tag's own archives, so
         // it takes the tag and where they were downloaded to rather
         // than discovering either.
@@ -348,8 +353,8 @@ const TOOLS: [Tool; 17] = [
         gives: "the CycloneDX bill of materials",
     },
     Tool {
-        call: "package [--target <triple>]",
-        gives: "the release archive for this machine or for that triple",
+        call: "package [--target <triple>] [--mei]",
+        gives: "the sprawling or Mei release archive for this machine or that triple",
     },
     Tool {
         call: "repro [--full]",

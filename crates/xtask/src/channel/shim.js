@@ -30,10 +30,29 @@ const PLATFORMS = {
   "linux x64": { package: "@sprawling/sprawling-linux-x64-musl", binary: "sprawling" },
 };
 
+const MEI_PLATFORMS = {
+  "darwin arm64": { package: "@sprawling/mei-darwin-arm64", binary: "mei" },
+  "linux x64": { package: "@sprawling/mei-linux-x64-musl", binary: "mei" },
+};
+
 const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
 
+// Both root packages carry this same selector. Their own manifest, not
+// the current machine or a second generated script, chooses the product.
+const packageManifest = (() => {
+  try {
+    return require("../package.json");
+  } catch {
+    return {};
+  }
+})();
+const product =
+  packageManifest.name === "@sprawling/mei"
+    ? { command: "mei", root: packageManifest.name, platforms: MEI_PLATFORMS }
+    : { command: "sprawling", root: "sprawling", platforms: PLATFORMS };
+
 function die(message) {
-  process.stderr.write(`sprawling: ${message}\n`);
+  process.stderr.write(`${product.command}: ${message}\n`);
   process.exit(1);
 }
 
@@ -44,21 +63,16 @@ function die(message) {
 // directory above `bin/sprawling.js`. Where it cannot be read the name
 // is given alone, so a failure still reports everything it knows.
 function spec(name) {
-  try {
-    const manifest = require("../package.json");
-    return typeof manifest.version === "string" ? `${name}@${manifest.version}` : name;
-  } catch {
-    return name;
-  }
+  return typeof packageManifest.version === "string" ? `${name}@${packageManifest.version}` : name;
 }
 
 const key = `${process.platform} ${process.arch}`;
-const row = PLATFORMS[key];
+const row = product.platforms[key];
 if (row === undefined) {
   die(
-    `no binary is published for ${key}, so ${spec("sprawling")} has ` +
+    `no binary is published for ${key}, so ${spec(product.root)} has ` +
       `nothing to run here. What is published: ` +
-      `${Object.keys(PLATFORMS).join(", ")}. ` +
+      `${Object.keys(product.platforms).join(", ")}. ` +
       `Build from source, or see ${RELEASES}.`,
   );
 }

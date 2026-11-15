@@ -92,17 +92,20 @@ impl ReleaseTarget {
     /// # Errors
     /// When no platform row claims the archive this build would produce.
     fn binary_name(&self) -> Result<&'static str, XtaskError> {
+        Ok(self.platform()?.binary)
+    }
+
+    /// The release platform row this target names.
+    fn platform(&self) -> Result<&'static platform::Platform, XtaskError> {
         let suffix = format!("-{}.zip", self.label());
-        platform::with_suffix(&suffix)
-            .map(|row| row.binary)
-            .ok_or_else(|| XtaskError::Cmd {
-                cmd: "package".to_owned(),
-                msg: format!(
-                    "no platform this release publishes for ends an archive with `{suffix}`; \
-                     add the row to crates/xtask/src/platform.rs, and the matrix and install scripts \
-                     that restate it, in one change-set"
-                ),
-            })
+        platform::with_suffix(&suffix).ok_or_else(|| XtaskError::Cmd {
+            cmd: "package".to_owned(),
+            msg: format!(
+                "no platform this release publishes for ends an archive with `{suffix}`; \
+                 add the row to crates/xtask/src/platform.rs, and the matrix and install scripts \
+                 that restate it, in one change-set"
+            ),
+        })
     }
 }
 
@@ -168,13 +171,6 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
         workspace_package(root, "version")?,
         target.label()
     );
-    let out_dir = root.join("target").join("package");
-    std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
-        path: out_dir.display().to_string(),
-        source,
-    })?;
-    let archive = out_dir.join(format!("{stem}.zip"));
-
     let entries = contents::entries(
         root,
         &Executable {
@@ -182,8 +178,66 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
             path: &binary,
         },
     )?;
+    assemble(root, &stem, &entries)
+}
 
-    write_archive(&archive, &stem, &entries)?;
+/// Assemble Mei's standalone archive. Native Windows is deliberately
+/// outside this channel: Mei promises only its POSIX runtime boundary.
+pub(crate) fn run_mei(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskError> {
+    let row = target.platform()?;
+    if platform::mei_package(row).is_none() {
+        return Err(XtaskError::Cmd {
+            cmd: "package --mei".to_owned(),
+            msg: "Mei publishes no native Windows or otherwise unsupported archive; build it \
+                  for macOS arm64 or Linux x64 musl, or use it inside a POSIX/WSL environment"
+                .to_owned(),
+        });
+    }
+    let binary = target.release_dir(root).join(platform::MEI_BINARY);
+    if !binary.is_file() {
+        return Err(XtaskError::Cmd {
+            cmd: "package --mei".to_owned(),
+            msg: format!(
+                "no Mei release binary in {}; run `just dist-mei` first",
+                target.release_dir(root).display()
+            ),
+        });
+    }
+    let stem = format!(
+        "{}{}-{}",
+        platform::MEI_ARCHIVE_PREFIX,
+        workspace_package(root, "version")?,
+        target.label()
+    );
+    let entries = [
+        Entry {
+            name: platform::MEI_BINARY.to_owned(),
+            source: binary,
+            mode: 0o755,
+        },
+        Entry {
+            name: "README.md".to_owned(),
+            source: root.join("Mei/README.md"),
+            mode: 0o644,
+        },
+        Entry {
+            name: "LICENSE".to_owned(),
+            source: root.join("LICENSE"),
+            mode: 0o644,
+        },
+    ];
+    assemble(root, &stem, &entries)
+}
+
+/// Write one closed archive and report its bytes and entry count.
+fn assemble(root: &Path, stem: &str, entries: &[Entry]) -> Result<String, XtaskError> {
+    let out_dir = root.join("target").join("package");
+    std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
+        path: out_dir.display().to_string(),
+        source,
+    })?;
+    let archive = out_dir.join(format!("{stem}.zip"));
+    write_archive(&archive, stem, entries)?;
     let size = std::fs::metadata(&archive)
         .map(|meta| meta.len())
         .map_err(|source| XtaskError::Io {
@@ -279,7 +333,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 )]
 mod tests {
     use super::contents::Entry;
-    use super::{ReleaseTarget, cargo_target_dir, write_archive};
+    use super::{ReleaseTarget, cargo_target_dir, run_mei, write_archive};
 
     fn entry(name: &str, source: std::path::PathBuf) -> Entry {
         Entry {
@@ -400,6 +454,58 @@ mod tests {
         assert_eq!(
             std::fs::read(&first).unwrap(),
             std::fs::read(&second).unwrap()
+        );
+    }
+
+    #[test]
+    fn mei_archive_carries_its_posix_binary_guide_and_licence() {
+        let root =
+            std::env::temp_dir().join(format!("sprawling-mei-package-{}", std::process::id()));
+        if root.exists() {
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+        let triple = "x86_64-unknown-linux-musl";
+        let release = root.join("target").join(triple).join("release");
+        std::fs::create_dir_all(&release).unwrap();
+        std::fs::create_dir_all(root.join("Mei")).unwrap();
+        std::fs::write(
+            root.join("Cargo.toml"),
+            "[workspace.package]\nversion = '0.0.17'\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("Mei/README.md"), b"guide").unwrap();
+        std::fs::write(root.join("LICENSE"), b"licence").unwrap();
+        std::fs::write(release.join("mei"), b"Mei binary").unwrap();
+
+        let target = ReleaseTarget::Triple(triple.to_owned());
+        run_mei(&root, &target).unwrap();
+        let stem = format!("mei-0.0.17-{triple}");
+        let archive = root.join("target/package").join(format!("{stem}.zip"));
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(archive).unwrap()).unwrap();
+        let names: Vec<String> = (0..zip.len())
+            .map(|index| zip.by_index(index).unwrap().name().unwrap().into_owned())
+            .collect();
+        assert_eq!(
+            names,
+            [
+                format!("{stem}/mei"),
+                format!("{stem}/README.md"),
+                format!("{stem}/LICENSE")
+            ]
+        );
+        assert_eq!(zip.by_index(0).unwrap().unix_mode().unwrap() & 0o111, 0o111);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn mei_refuses_a_native_windows_archive_before_building_a_package() {
+        let target = ReleaseTarget::Triple("windows-x86_64".to_owned());
+        let refusal = run_mei(std::path::Path::new("unused"), &target)
+            .expect_err("Mei's POSIX boundary must reject a native Windows archive");
+        assert!(
+            refusal
+                .to_string()
+                .contains("no native Windows or otherwise unsupported archive")
         );
     }
 }

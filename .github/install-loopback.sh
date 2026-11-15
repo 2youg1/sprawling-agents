@@ -8,7 +8,9 @@
 # asking a release list - with the list and the archive served from
 # 127.0.0.1, then runs the binary the installer placed.
 #
-#     sh .github/install-loopback.sh <directory holding one archive>
+#     sh .github/install-loopback.sh <directory holding one sprawling archive>
+# A directory may also carry Mei's independent archives; they are not the
+# input to this sprawling installer check.
 #
 # Green means three things at once: install.sh exited 0, the file it
 # placed is byte for byte the `sprawling` inside this archive, and that
@@ -20,9 +22,9 @@ set -eu
 
 die() { printf 'install-loopback: %s\n' "$*" >&2; exit 1; }
 
-[ $# -eq 1 ] || die "usage: install-loopback.sh <directory holding one archive>"
-set -- "$1"/*.zip
-[ $# -eq 1 ] && [ -f "$1" ] || die "expected exactly one .zip in the directory, found: $*"
+[ $# -eq 1 ] || die "usage: install-loopback.sh <directory holding one sprawling archive>"
+set -- "$1"/sprawling-*.zip
+[ $# -eq 1 ] && [ -f "$1" ] || die "expected exactly one sprawling .zip in the directory, found: $*"
 archive=$1
 installer="$(cd "$(dirname "$0")/.." && pwd)/install.sh"
 

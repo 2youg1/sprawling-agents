@@ -7,9 +7,9 @@
 //!
 //! **The archives are the artefact, and this repackages them.** It reads
 //! the zips a tag published, takes the binary out of each, and writes
-//! one npm package per platform plus a root package that depends on all
-//! of them optionally. Nothing is compiled here: a binary that reached a
-//! person through npm and a binary that reached them through a download
+//! one npm package per platform plus a root per product that depends on
+//! its platform packages optionally. Nothing is compiled here: a binary
+//! that reached a person through npm and a binary that reached them through a download
 //! are the same bytes, or one of the two is unaccounted for.
 //!
 //! **Three rules this channel is built around.**
@@ -40,7 +40,10 @@ use std::io::Read as _;
 
 use std::path::{Path, PathBuf};
 
-use crate::platform::{PLATFORMS, Platform, ROOT_PACKAGE};
+use crate::platform::{
+    MEI_ARCHIVE_PREFIX, MEI_BINARY, MEI_ROOT_PACKAGE, PLATFORMS, Platform, ROOT_PACKAGE,
+    mei_package,
+};
 use crate::report::XtaskError;
 
 mod system;
@@ -50,6 +53,7 @@ mod system;
 /// already follows for the documents a city writes.
 const SHIM: &str = include_str!("channel/shim.js");
 const RUNTIME_ENTRY: &str = "sprawling-runtime";
+const MEI_RUNTIME_ENTRY: &str = "mei-runtime";
 const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
 /// One file's bytes, out of a zip that holds it at any depth.
@@ -145,6 +149,159 @@ fn manifest(stem: &Stem<'_>, name: &str, description: &str, extra: &str) -> Stri
     )
 }
 
+/// One platform binary and the npm package that carries it.
+struct BinaryPackage<'a> {
+    platform: &'a Platform,
+    name: &'a str,
+    binary: &'a str,
+    description: String,
+}
+
+/// Preserve one archive binary in its platform package, including the
+/// executable mode that npm's own metadata cannot carry.
+fn carry(
+    stem: &Stem<'_>,
+    archive: &Path,
+    package: &BinaryPackage<'_>,
+    out: &Path,
+) -> Result<(), XtaskError> {
+    let binary = extract(archive, package.binary)?;
+    // A scoped npm name writes one directory level more than a bare one.
+    let dir = out.join(package.name);
+    let path = dir.join("bin").join(package.binary);
+    if binary.mode & 0o111 == 0 {
+        return Err(XtaskError::Cmd {
+            cmd: "npm channel".to_owned(),
+            msg: format!("{} has no executable permission bits", archive.display()),
+        });
+    }
+    write(&path, &binary.bytes)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(binary.mode)).map_err(
+            |source| XtaskError::Io {
+                path: path.display().to_string(),
+                source,
+            },
+        )?;
+    }
+    let extra = format!(
+        "  \"os\": [\"{}\"],\n  \"cpu\": [\"{}\"],\n  \"files\": [\"bin\"]\n",
+        package.platform.os, package.platform.cpu
+    );
+    write(
+        &dir.join("package.json"),
+        manifest(stem, package.name, &package.description, &extra).as_bytes(),
+    )
+}
+
+/// Mei's own manifest owns the description shown by every npm package.
+fn mei_description(root: &Path) -> Result<String, XtaskError> {
+    let path = root.join("Mei/Cargo.toml");
+    let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    let parsed: toml::Value = toml::from_str(&text).map_err(|err| XtaskError::Doc {
+        file: path.display().to_string(),
+        msg: err.to_string(),
+    })?;
+    parsed
+        .get("package")
+        .and_then(|package| package.get("description"))
+        .and_then(toml::Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| XtaskError::Doc {
+            file: path.display().to_string(),
+            msg: "package.description is missing".to_owned(),
+        })
+}
+
+/// Assemble Mei's POSIX-only npm channel from its independent archives.
+fn write_mei_channel(
+    root: &Path,
+    stem: &Stem<'_>,
+    archives: &[PathBuf],
+    out: &Path,
+) -> Result<Vec<String>, XtaskError> {
+    let description = mei_description(root)?;
+    let mut carried: Vec<(&Platform, &'static str)> = Vec::new();
+    for archive in archives {
+        let name = archive
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .ok_or_else(|| XtaskError::Cmd {
+                cmd: "npm channel".to_owned(),
+                msg: format!("{} is not an archive file path", archive.display()),
+            })?;
+        if !name.starts_with(MEI_ARCHIVE_PREFIX) {
+            continue;
+        }
+        let row = PLATFORMS.iter().find(|row| name.ends_with(row.suffix));
+        let Some(row) = row else {
+            return Err(XtaskError::Cmd {
+                cmd: "npm channel".to_owned(),
+                msg: format!("{name} matches no platform this channel knows"),
+            });
+        };
+        let Some(package) = mei_package(row) else {
+            return Err(XtaskError::Cmd {
+                cmd: "npm channel".to_owned(),
+                msg: format!(
+                    "{name} is not a supported Mei archive; Mei publishes npm binaries \
+                     only for macOS arm64 and Linux x64 musl"
+                ),
+            });
+        };
+        carry(
+            stem,
+            archive,
+            &BinaryPackage {
+                platform: row,
+                name: package,
+                binary: MEI_BINARY,
+                description: format!("The Archetype:Mei binary for {} {}.", row.os, row.cpu),
+            },
+            out,
+        )?;
+        carried.push((row, package));
+    }
+    if carried.is_empty() {
+        return Err(XtaskError::Cmd {
+            cmd: "npm channel".to_owned(),
+            msg: "this tag holds no Mei release archive".to_owned(),
+        });
+    }
+
+    let optional = carried
+        .iter()
+        .map(|(_, package)| format!("    \"{package}\": \"{version}\"", version = stem.version))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let extra = format!(
+        "  \"bin\": {{ \"mei\": \"bin/mei.js\", \"{MEI_RUNTIME_ENTRY}\": \"bin/mei.cmd\" }},\n  \
+         \"files\": [\"bin\"],\n  \"optionalDependencies\": {{\n{optional}\n  }}\n"
+    );
+    let dir = out.join(MEI_ROOT_PACKAGE);
+    write(
+        &dir.join("package.json"),
+        manifest(stem, MEI_ROOT_PACKAGE, &description, &extra).as_bytes(),
+    )?;
+    write(
+        &dir.join("bin/mei.js"),
+        format!("#!/usr/bin/env {MEI_RUNTIME_ENTRY}\n{SHIM}").as_bytes(),
+    )?;
+    write(
+        &dir.join("bin/mei.cmd"),
+        LAUNCHER.replace("sprawling:", "mei:").as_bytes(),
+    )?;
+    Ok(carried
+        .into_iter()
+        .map(|(_, package)| package.to_owned())
+        .collect())
+}
+
 /// Assemble the channel from a directory of release archives.
 ///
 /// # Errors
@@ -192,6 +349,9 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
+        if name.starts_with(MEI_ARCHIVE_PREFIX) {
+            continue;
+        }
         let row = PLATFORMS.iter().find(|row| name.ends_with(row.suffix));
         let Some(row) = row else {
             return Err(XtaskError::Cmd {
@@ -216,37 +376,16 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             name,
             sha256,
         });
-        let binary = extract(archive, row.binary)?;
-        // A scoped npm name writes one directory level more than a bare
-        // one, which is why the publish step enumerates
-        // `target/npm/@sprawling/*/` rather than every child of `target/npm`.
-        let dir = out.join(row.package);
-        let path = dir.join("bin").join(row.binary);
-        if binary.mode & 0o111 == 0 {
-            return Err(XtaskError::Cmd {
-                cmd: "npm channel".to_owned(),
-                msg: format!("{} has no executable permission bits", archive.display()),
-            });
-        }
-        write(&path, &binary.bytes)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(binary.mode)).map_err(
-                |source| XtaskError::Io {
-                    path: path.display().to_string(),
-                    source,
-                },
-            )?;
-        }
-        let extra = format!(
-            "  \"os\": [\"{}\"],\n  \"cpu\": [\"{}\"],\n  \"files\": [\"bin\"]\n",
-            row.os, row.cpu
-        );
-        let description = format!("The sprawling binary for {} {}.", row.os, row.cpu);
-        write(
-            &dir.join("package.json"),
-            manifest(&stem, row.package, &description, &extra).as_bytes(),
+        carry(
+            &stem,
+            archive,
+            &BinaryPackage {
+                platform: row,
+                name: row.package,
+                binary: row.binary,
+                description: format!("The sprawling binary for {} {}.", row.os, row.cpu),
+            },
+            out,
         )?;
         carried.push(row);
     }
@@ -290,8 +429,10 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
         .map(|row| row.package)
         .collect::<Vec<_>>()
         .join(", ");
+    let mei_names = write_mei_channel(root, &stem, &archives, out)?.join(", ");
     Ok(format!(
-        "npm channel {version} written to {}: sprawling + {names}",
+        "npm channel {version} written to {}: sprawling + {names}; \
+         {MEI_ROOT_PACKAGE} + {mei_names}",
         out.display()
     ))
 }

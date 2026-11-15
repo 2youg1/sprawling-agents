@@ -67,6 +67,15 @@ pub(crate) struct Platform {
 /// and what `sprawling status --check` asks for its `latest` tag.
 pub(crate) const ROOT_PACKAGE: &str = "sprawling";
 
+/// Mei's scoped npm root. The display name Archetype:Mei is deliberately
+/// not a registry name: npm's bare `mei` name already belongs to somebody.
+pub(crate) const MEI_ROOT_PACKAGE: &str = "@sprawling/mei";
+
+/// The independent archive prefix and executable name shared by the
+/// packager, the npm channel and the shim's conformance check.
+pub(crate) const MEI_ARCHIVE_PREFIX: &str = "mei-";
+pub(crate) const MEI_BINARY: &str = "mei";
+
 /// Every platform this project ships a binary for.
 ///
 /// An archive with no row here is refused rather than skipped: the day a
@@ -120,6 +129,16 @@ pub(crate) const PLATFORMS: [Platform; 3] = [
 /// deciding a second time from the machine it happens to be running on.
 pub(crate) fn with_suffix(suffix: &str) -> Option<&'static Platform> {
     PLATFORMS.iter().find(|row| row.suffix == suffix)
+}
+
+/// Mei's package on a supported POSIX row, using the same platform
+/// identity as sprawling rather than another suffix or architecture table.
+pub(crate) fn mei_package(row: &Platform) -> Option<&'static str> {
+    match (row.os, row.cpu) {
+        ("darwin", "arm64") => Some("@sprawling/mei-darwin-arm64"),
+        ("linux", "x64") => Some("@sprawling/mei-linux-x64-musl"),
+        _ => None,
+    }
 }
 
 /// The workflow whose matrix builds one archive per row.
@@ -220,7 +239,15 @@ fn matrix_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// and both fields on one line would report every row of the table
 /// missing the moment the formatter widened one.
 fn shim(text: &str) -> Vec<(String, String, String)> {
-    let Some(body) = object_body(text, "PLATFORMS = {") else {
+    shim_table(text, "PLATFORMS = {")
+}
+
+fn mei_shim(text: &str) -> Vec<(String, String, String)> {
+    shim_table(text, "MEI_PLATFORMS = {")
+}
+
+fn shim_table(text: &str, header: &str) -> Vec<(String, String, String)> {
+    let Some(body) = object_body(text, header) else {
         return Vec::new();
     };
     entries(body).into_iter().filter_map(entry).collect()
@@ -306,7 +333,8 @@ fn field(text: &str, key: &str) -> Option<String> {
 }
 
 fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let held = shim(&walk::read_text(&root.join(SHIM))?);
+    let text = walk::read_text(&root.join(SHIM))?;
+    let held = shim(&text);
     let wanted: Vec<(String, String, String)> = PLATFORMS
         .iter()
         .map(|row| {
@@ -333,6 +361,48 @@ fn shim_rows(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 format!("`{}` resolves `{}`, which no platform claims", row.0, row.1),
             ));
         }
+    }
+
+    let held = mei_shim(&text);
+    let wanted: Vec<(String, String, String)> = PLATFORMS
+        .iter()
+        .filter_map(|row| {
+            mei_package(row).map(|package| {
+                (
+                    format!("{} {}", row.os, row.cpu),
+                    package.to_owned(),
+                    MEI_BINARY.to_owned(),
+                )
+            })
+        })
+        .collect();
+    for row in &wanted {
+        if !held.contains(row) {
+            out.push(disagrees(
+                SHIM,
+                format!(
+                    "no Mei entry maps `{}` to `{}` and `{}`",
+                    row.0, row.1, row.2
+                ),
+            ));
+        }
+    }
+    for row in &held {
+        if !wanted.contains(row) {
+            out.push(disagrees(
+                SHIM,
+                format!(
+                    "Mei maps `{}` to `{}`, which is not a supported POSIX package",
+                    row.0, row.1
+                ),
+            ));
+        }
+    }
+    if !text.contains(&format!("packageManifest.name === \"{MEI_ROOT_PACKAGE}\"")) {
+        out.push(disagrees(
+            SHIM,
+            format!("the product selector does not recognise `{MEI_ROOT_PACKAGE}`"),
+        ));
     }
     Ok(out)
 }

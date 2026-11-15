@@ -526,12 +526,12 @@ D38 **测试函数的总数不是一个事实，文档不引它。** 每加一�
 
 **五个家，只有两个之间有过任何约束。** `channel.rs` 的 `ROWS`、`crates/xtask/src/channel/shim.js` 的 `PLATFORMS`、`install.sh` 的后缀表、`install.ps1` 的后缀、`.github/workflows/release.yml` 的 `archive` 矩阵，说的都是同一件事：这个项目为哪些平台构建，每份归档叫什么名字。**已经分叉过**：`install.sh` 提供的 `-linux-x86_64.zip` 对应一个矩阵从不产出的归档，于是一台 Linux 机器被指去下载一个不存在的资产。
 
-**权威是 `crates/xtask/src/platform.rs` 的 `PLATFORMS`**，每行携七个拼法：归档后缀、runner 镜像、`--target`（主机构建为空串）、npm 包名、npm 的 `os`／`cpu`、归档里可执行文件的名字。`channel` 改用它，`Row` 这个第二个类型随之删除。
+**权威是 `crates/xtask/src/platform.rs` 的 `PLATFORMS`**，每行携七个拼法：归档后缀、runner 镜像、`--target`（主机构建为空串）、npm 包名、npm 的 `os`／`cpu`、归档里可执行文件的名字。`channel` 改用它，`Row` 这个第二个类型随之删除。Mei 的根名 `MEI_ROOT_PACKAGE`、归档前缀 `MEI_ARCHIVE_PREFIX`、二进制名 `MEI_BINARY` 与 `mei_package(row)` 也住在这里：后者从同一行的 `os`／`cpu` 给出 POSIX 平台包，Windows 返回 `None`，不另建平台表。
 
 **三条断言挂在 `artifact` 门下，不新建门。** 挂 `artifact` 而不挂 `release` 的理由是 §1 的门表早已把「发布档的形状：平台三元组、归档命名」写在 `artifact` 那一行——写进 `release` 会让同一个责任有两个家，并让那一行继续说一件不真的话。三条：
 
 1. **矩阵**：`release.yml` 的 `- os:`／`target:` 成对读出，与 `(runner, cargo_target)` 集合双向相等。
-2. **shim**：`crates/xtask/src/channel/shim.js` 的每个条目读成「键、包、可执行文件」，与 `("<os> <cpu>", package, binary)` 双向相等。读的是那个对象本身（按深度切条目、按引号忽略字符串里的括号），不是它的行：`bun fmt` 会把一行放不下的条目折成四行，按行读会在那一刻报整张表都缺。
+2. **shim**：`crates/xtask/src/channel/shim.js` 的 `PLATFORMS` 与 `MEI_PLATFORMS` 每个条目都读成「键、包、可执行文件」，分别与 `("<os> <cpu>", package, binary)` 及 `mei_package` 双向相等；产品选择器还必须认出 `MEI_ROOT_PACKAGE`。读的是对象本身（按深度切条目、按引号忽略字符串里的括号），不是它的行：`bun fmt` 会把一行放不下的条目折成四行，按行读会在那一刻报整张表都缺。
 3. **写全的后缀**：`release.yml`、`install.sh`、`install.ps1`、`crates/sprawling/Cargo.toml`（`[package.metadata.binstall]` 的各行）里每一个**写全**的归档后缀，必须是某一行的后缀。
 
 **只判写全的那些，插值拼出来的不判。** `"-${os}-${arch}.zip"` 不是一个可比对的拼法，猜它就会判错一份正确的脚本。这是漏报而非误报，也是赔得起的那一半：拼错的归档名是已经发生过的缺陷，而插值拼出来的那个由下载本身拒绝，并告诉读者这次发布实际带了什么。
@@ -543,22 +543,42 @@ D38 **测试函数的总数不是一个事实，文档不引它。** 每加一�
 
 /-! D31 `channel` 的主入口与运行时入口
 
-本节描述 `crates/xtask/src/channel.rs`、`crates/xtask/src/channel/shim.js`、
-`crates/xtask/src/channel/launcher.cmd` 的包接口，不是形式证明。
-`channel::run(root, tag, assets, out) -> Result<String, XtaskError>` 读取平台表与归档，
-将实际二进制字节交给平台包；Unix 的执行权限来自该 ZIP 成员，缺少执行位拒绝打包。
-根包描述读取工作区 description，不在打包器重写产品文案。
+本节描述 `crates/xtask/src/package.rs`、`crates/xtask/src/channel.rs`、
+`crates/xtask/src/channel/shim.js` 与 `crates/xtask/src/channel/launcher.cmd` 的包接口，
+不是形式证明。`channel::run(root, tag, assets, out) -> Result<String, XtaskError>` 读取平台表
+以及 `sprawling-*`、`mei-*` 两族归档，将实际二进制字节交给平台包；Unix 的执行权限来自
+ZIP 成员，缺少执行位拒绝打包。任一产品缺归档、Mei 出现原生 Windows 归档或平台不受支持
+都拒绝，不静默发布缺一块的根包。AUR 仍只从 `sprawling-*` 归档生成。
 
-根包主 bin 指向 `bin/sprawling.js`。同一 `channel::RUNTIME_ENTRY` 常量生成内部运行时
-bin 名和主脚本 shebang；运行时入口在已有 Bun 与 Node 中选择，不安装工具，缺少两者
-或缺少主脚本参数时退出失败。选择器是 shell/batch 混合脚本，Unix exec 所选运行时，
-Windows 传入完整参数并返回其退出码。主脚本只定位已装平台包，启动子进程，传递参数、
-退出状态和 Unix 终止信号。安装来源只由已有明确元数据与缓存目录辨认，运行时不是安装器。
+`cargo xtask package --mei [--target <triple>]` 组装 `mei-<version>-<label>.zip`，内含
+`mei`、`Mei/README.md` 与 `LICENSE`；不带 `--mei` 的既有入口与 sprawling 归档不变。
+Mei 归档只在 source／curated 构建的既有平台表 macOS arm64 与 Linux x64 musl 行生成，
+nightly 仍只有一份 sprawling 归档；不为 Mei 虚构原生 Windows 或额外架构。
+npm 根包是 `sprawling` 与 `@sprawling/mei`，Mei 平台包是
+`@sprawling/mei-darwin-arm64` 与 `@sprawling/mei-linux-x64-musl`；裸名 `mei` 在 npm
+和 crates.io 均已被占用，crate 名保持 `sprawling-mei`。产品展示名 Archetype:Mei
+不是注册表包名。
+
+根包描述读取工作区或 `Mei/Cargo.toml` 的 description，不在打包器另写产品文案。
+sprawling 根包主 bin 指向 `bin/sprawling.js`，Mei 根包主 bin 指向 `bin/mei.js`。
+同一 `channel::RUNTIME_ENTRY` 常量生成 sprawling 内部运行时 bin 名和主脚本 shebang；
+Mei 使用独立的 `MEI_RUNTIME_ENTRY`，避免两个根包争夺一个 bin 名。两个根包共享一份
+`SHIM`，它从自身 `package.json` 辨认产品与平台表，只定位已装平台包并启动子进程，
+传递参数、退出状态和 Unix 终止信号。运行时入口在已有 Bun 与 Node 中选择，不安装工具，
+缺少两者或缺少主脚本参数时退出失败。选择器是 shell/batch 混合脚本，Unix exec 所选运行时，
+Windows 传入完整参数并返回其退出码。安装来源只由已有明确元数据与缓存目录辨认，
+运行时不是安装器。
+
+发布顺序保持平台 npm 包、两个 npm 根包、crates.io：根包的可选依赖先存在，crates.io
+仍在其它渠道之后，因为其版本不可替换。首次出现的 npm 包与 crate 先由有权限的人完成
+首次发布并登记这一 workflow 的 trusted publisher；以后同一 Tag 的发布才由 OIDC 接管。
 
 参数与理由：Bun 与 npm 的 bin 链接行为不同，Node shebang 会在 JavaScript 回退执行之前
 先要求 Node，而无 shebang 的脚本不能直接供 `bunx` exec。内部运行时入口保留合法主
 shebang 和现有运行时选择，不要求二者同时安装。被否：只在 JavaScript 中检测 Bun；
-推断执行 JavaScript 的运行时就是安装器。若包管理器提供可移植的条件 bin，此二入口可重议。
+推断执行 JavaScript 的运行时就是安装器；为 Mei 复制第二份 shim；把 Mei 塞进 sprawling
+归档或 npm 根包；为了沿用三平台表而声称原生 Windows 支持。若包管理器提供可移植的
+条件 bin，此二入口可重议。
 -/
 
 /-! ### 8-20 `argument_count` 的豁免表自清理，与一个地址上的两个函数

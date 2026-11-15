@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{PLATFORMS, matrix, shim, spent_suffixes, suffixes};
+use super::{PLATFORMS, matrix, shim, shim_rows, spent_suffixes, suffixes};
 
 /// Two rows claiming one platform would make which binary a person
 /// gets depend on the order the assets were read in.
@@ -75,6 +75,36 @@ fn a_wrapped_entry_is_read_as_one_row() {
             ),
         ]
     );
+}
+
+/// The Mei copy is judged too: a scoped platform name that drifts from
+/// `mei_package` is a violation rather than a package nobody can resolve.
+#[test]
+fn a_mismatched_mei_shim_package_is_reported() {
+    let root = std::env::temp_dir().join(format!("sprawling-mei-shim-{}", std::process::id()));
+    if root.exists() {
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+    let dir = root.join("crates/xtask/src/channel");
+    std::fs::create_dir_all(&dir).unwrap();
+    let shim = dir.join("shim.js");
+    let valid = include_str!("../channel/shim.js");
+    std::fs::write(&shim, valid).unwrap();
+    assert!(shim_rows(&root).unwrap().is_empty());
+
+    std::fs::write(
+        &shim,
+        valid.replace("@sprawling/mei-darwin-arm64", "@sprawling/mei-darwin-x64"),
+    )
+    .unwrap();
+    let found = shim_rows(&root).unwrap();
+    assert!(
+        found
+            .iter()
+            .any(|row| row.violation.contains("no Mei entry maps")),
+        "{found:#?}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 /// A name written out in full is compared; one built by interpolation
