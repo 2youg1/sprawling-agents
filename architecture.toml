@@ -19,6 +19,8 @@ module = [
   { name = "mei::python", file = "Mei/src/python.rs", owns = "the persistent Python process and path-handle effect results", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
   { name = "mei::resume", file = "Mei/src/resume.rs", owns = "explicit complete JSONL message recovery and observation-metadata removal", shape = "adapter", since = "CS18", status = "built", spec = "Mei.spec.Session" },
   { name = "mei::error", file = "Mei/src/error.rs", owns = "Description/Cause/Resolution diagnostics and raw provider error bodies", shape = "value", since = "CS18", status = "built", spec = "Mei.Spec" },
+  { name = "mei::cli", file = "Mei/test/cli.rs", owns = "CLI argument and environment refusal regressions at the mei binary door", shape = "test", since = "CS18", status = "built", spec = "Mei.Spec" },
+  { name = "mei::cli::agent_loop", file = "Mei/test/agent_loop.rs", owns = "fake-gateway agent-loop, resume, and beginner e2e regressions through the mei binary", shape = "test", since = "CS19", status = "built", spec = "Mei.Spec" },
   { name = "calyx", file = "Calyx/src/lib.rs", owns = "the Calyx crate root: module registration only", shape = "adapter", since = "CS19", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::identity", file = "Calyx/src/identity.rs", owns = "the production terminal shell package identity", shape = "value", since = "CS19", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::clock", file = "Calyx/src/clock.rs", owns = "the wall-clock sample for the calyx binary assembly root", shape = "adapter", since = "CS19", status = "built", spec = "Calyx.Spec" },
