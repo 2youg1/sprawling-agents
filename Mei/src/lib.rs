@@ -9,6 +9,7 @@
 pub mod agent;
 pub mod error;
 pub mod python;
+pub mod resume;
 pub mod transport;
 
 pub use error::{Error, Result};
