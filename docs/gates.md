@@ -8,7 +8,7 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask header` | the MPL-2.0 notice, then the copyright line, atop every `.rs` file |
 | `xtask lexicon` | one name per concept, from the glossary |
 | `xtask modmap`, `xtask length` | production modules in the module map; Rust, TypeScript and Svelte source files within 500 lines; production functions within 200 lines and 4 parameters |
-| `xtask comments` | comment-bearing lines within 15% of nonblank lines after the exact MPL header, across Rust, TypeScript and Svelte sources |
+| `xtask comments` | comment-bearing lines within 10% of nonblank lines after the exact MPL header is stripped, across Rust, TypeScript and Svelte sources |
 | `xtask boundary` | white-box checks in Rust beside the code; stranger-entry checks in Lean under `crates/adversary/` |
 | `xtask artifact` | nothing written for a test is compiled into the binary a person downloads |
 | `xtask packaged` | files a publishable package compiles in production (`include!`, `include_str!`, `include_bytes!`) lie inside its directory or its build script's `OUT_DIR`, since crates.io carries nothing else |

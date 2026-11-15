@@ -9,16 +9,16 @@ use super::*;
 use crate::header::{self, Leader};
 
 #[test]
-fn the_boundary_is_fifteen_percent_and_one_more_comment_is_rejected() {
+fn the_boundary_is_ten_percent_and_one_more_comment_is_rejected() {
     let mut source = header::notice(Leader::Rust).join("\n");
     source.push('\n');
-    source.push_str(&"// necessary contract\n".repeat(15));
-    source.push_str(&"const VALUE: u8 = 1;\n".repeat(85));
+    source.push_str(&"// necessary contract\n".repeat(10));
+    source.push_str(&"const VALUE: u8 = 1;\n".repeat(90));
     let accepted = lexer::measure(&source, Language::Rust);
     assert_eq!(
         accepted,
         Reading {
-            comment_lines: 15,
+            comment_lines: 10,
             judged_lines: 100,
         }
     );
@@ -75,12 +75,64 @@ function f() { return /[/*]/; }
 }
 
 #[test]
+fn regex_after_paren_keeps_character_class_out_of_block_comments() {
+    let reading = lexer::measure("if (ready) /[/*]/.test(value);\n", Language::TypeScript);
+    assert_eq!(reading.comment_lines, 0, "{reading:?}");
+}
+
+#[test]
+fn division_after_increment_still_sees_a_trailing_comment() {
+    let reading = lexer::measure(
+        "const ratio = count++ / divisor; // note\n",
+        Language::TypeScript,
+    );
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
+}
+
+#[test]
 fn svelte_html_comments_count_but_script_strings_do_not() {
     let reading = lexer::measure(
         "<!-- note -->\n<script>const x = \"// no\";</script>\n<!-- {/* still html */} -->\n",
         Language::Svelte,
     );
     assert_eq!(reading.comment_lines, 2);
+}
+
+#[test]
+fn markup_urls_are_not_line_comments() {
+    let svelte = lexer::measure("<p>https://example.com</p>\n", Language::Svelte);
+    assert_eq!(svelte.comment_lines, 0, "{svelte:?}");
+    let tsx = lexer::measure(
+        "export function Page() { return <p>https://example.com</p>; }\n",
+        Language::TypeScript,
+    );
+    assert_eq!(tsx.comment_lines, 0, "{tsx:?}");
+}
+
+#[test]
+fn svelte_mpl_headers_are_excluded_in_every_leading_shape() {
+    let wrap =
+        "<!--\n".to_owned() + &header::notice(Leader::Rust).join("\n") + "\n-->\n<p>ok</p>\n";
+    assert_eq!(
+        lexer::measure(&wrap, Language::Svelte).comment_lines,
+        0,
+        "{wrap}"
+    );
+    let inline = format!("<!-- {} -->\n<p>ok</p>\n", header::NOTICE.join("\n     "));
+    assert_eq!(
+        lexer::measure(&inline, Language::Svelte).comment_lines,
+        0,
+        "{inline}"
+    );
+    let script = format!(
+        "<script lang=\"ts\">\n  {}\n  const x = 1;\n</script>\n",
+        header::notice(Leader::Rust).join("\n  ")
+    );
+    assert_eq!(
+        lexer::measure(&script, Language::Svelte).comment_lines,
+        0,
+        "{script}"
+    );
 }
 
 #[test]

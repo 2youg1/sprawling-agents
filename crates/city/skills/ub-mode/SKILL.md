@@ -67,7 +67,7 @@ Where a measurement would settle a review finding, clone and run whichever upstr
 
 When the same defect class recurs, **eliminate it through structure, types, or a check whose message names the repair**, rather than adding another instruction for agents to follow; verify a new check actually fails on the real past failure before trusting it.
 
-For refactoring, compare behaviour against the pin and judge whether a reader now traces fewer layers and less hidden state. The `length` gate caps Rust, TypeScript and Svelte files at 500 lines and the `comments` gate caps comment-bearing lines at 15%; both are refusal boundaries, not targets. Split along responsibilities and delete comments the code makes unnecessary. Revert a reshape that only moves complexity or adds indirection.
+For refactoring, compare behaviour against the pin and judge whether a reader now traces fewer layers and less hidden state. The `length` gate caps Rust, TypeScript and Svelte files at 500 lines and the `comments` gate caps comment-bearing lines at 10% after the MPL header is stripped; both are refusal boundaries, not targets. Split along responsibilities and delete comments the code makes unnecessary. Revert a reshape that only moves complexity or adds indirection.
 
 ## 5. Verify and deliver
 

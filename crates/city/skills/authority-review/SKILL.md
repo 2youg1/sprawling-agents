@@ -18,7 +18,7 @@ Read the complete diff and the authorities for each changed contract. The codeba
 
 ## Steps
 
-1. **Name the observable change.** State what a caller, agent or machine now does differently. If there is no observable difference, stop: this is not an authority conflict.
+1. **Name the conflict.** State the observable behaviour change, or the records that already disagree. Stop only when the diff changes neither an authority nor any pair of records that conflict.
 2. **Locate one authority.** Apply the order in `AGENTS.md`: the person's ruling, architecture for structure, the touched crate's SPEC for interfaces and decisions, then code and tests. Remove or rewrite contradictory lower-authority text in the same change. Two records at the same level that still disagree need the person's ruling; do not choose silently.
 3. **Bind each finding to evidence.** A behavioral claim needs a runnable reproduction, test, replay, property or formal check. A contract claim needs the exact authority line and the check that enforces it. Mark anything else unverified; do not turn a plausible concern into a repair task.
 4. **Leave a constraint.** When the same conflict can recur, encode the resolved rule in the owning type, API, generator, test or gate. Prose is only the part no mechanism can express. Do not add a waiver or a second local rule.

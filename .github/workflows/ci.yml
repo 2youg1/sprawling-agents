@@ -293,6 +293,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base="${{ github.event.pull_request.base.sha }}"
           elif [ "${{ github.event_name }}" = "push" ]; then
@@ -300,7 +301,14 @@ jobs:
           else
             base=$(git merge-base origin/main HEAD)
           fi
-          just gates-sources changed $(git diff --name-only "$base" HEAD)
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "gates-sources: base commit is missing; refusing an empty file scope" >&2
+            exit 2
+          fi
+          git cat-file -e "$base^{commit}"
+          nul="${RUNNER_TEMP:-/tmp}/gates-changed.nul"
+          git diff --name-only -z "$base" HEAD > "$nul"
+          GATES_CHANGED_NUL="$nul" just gates-sources changed
       - name: nightly publication decisions, without GitHub
         if: ${{ !cancelled() }}
         run: sh .github/workflows/test-nightly-release.sh

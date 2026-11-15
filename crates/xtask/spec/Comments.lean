@@ -13,7 +13,7 @@
 namespace Comments
 
 def fileLineLimit : Nat := 500
-def commentPercentLimit : Nat := 15
+def commentPercentLimit : Nat := 10
 
 structure Reading where
   fileLines : Nat
@@ -32,7 +32,7 @@ instance (reading : Reading) : Decidable (admits reading) := by
   infer_instance
 
 theorem exact_boundary_is_admitted :
-    admits { fileLines := 500, commentLines := 15, judgedLines := 100 } := by
+    admits { fileLines := 500, commentLines := 10, judgedLines := 100 } := by
   decide
 
 theorem empty_input_is_admitted :
@@ -44,7 +44,7 @@ theorem overlong_file_is_rejected :
   decide
 
 theorem excess_comments_are_rejected :
-    ¬admits { fileLines := 100, commentLines := 16, judgedLines := 100 } := by
+    ¬admits { fileLines := 100, commentLines := 11, judgedLines := 100 } := by
   decide
 
 theorem one_comment_can_fill_a_file :

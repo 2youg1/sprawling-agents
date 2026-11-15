@@ -210,6 +210,7 @@ fn main() -> ExitCode {
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
+        Some("comments") => report::finish("comments", comments::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("packaged") => report::finish("packaged", packaged::check(&root)),

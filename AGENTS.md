@@ -63,7 +63,7 @@ The workspace lint table owns the mechanical rules: warnings are errors, arithme
 
 ## Comments
 
-Write no comment by default. Keep one only for a legal notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry. Delete narration, obvious behaviour and workaround justification; rename or reshape the code, or encode the constraint in a type, test, lint or SPEC. `comments` caps comment-bearing lines at 15% of nonblank lines after the exact MPL header; this is a refusal boundary, never a target. `length` caps Rust, TypeScript and Svelte source files at 500 lines. A change that touches a file with existing violations in either gate clears every such violation in that file; untouched debt remains listed, never registered as an exemption.
+Write no comment by default. Keep one only for a legal notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry. Delete narration, obvious behaviour and workaround justification; rename or reshape the code, or encode the constraint in a type, test, lint or SPEC. `comments` caps comment-bearing lines at 10% of nonblank lines after the exact MPL header is stripped and never scanned; this is a refusal boundary, never a target. `length` caps Rust, TypeScript and Svelte source files at 500 lines. A change that touches a file with existing violations in either gate clears every such violation in that file; untouched debt remains listed, never registered as an exemption.
 
 </comments>
 

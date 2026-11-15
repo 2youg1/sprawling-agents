@@ -15,7 +15,7 @@ mod lexer;
 
 use lexer::{Language, Reading};
 
-pub(crate) const COMMENT_PERCENT_LIMIT: u128 = 15;
+pub(crate) const COMMENT_PERCENT_LIMIT: u128 = 10;
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     check_with(root, None)
@@ -45,7 +45,7 @@ fn check_with(
                 gate: "comments",
                 location: rel,
                 rule: format!(
-                    "comment-bearing lines are at most {COMMENT_PERCENT_LIMIT}% of nonblank lines after the MPL header"
+                    "comment-bearing lines are at most {COMMENT_PERCENT_LIMIT}% of nonblank lines after the MPL header is stripped"
                 ),
                 violation: format!(
                     "{} comment lines among {} judged lines ({}%)",

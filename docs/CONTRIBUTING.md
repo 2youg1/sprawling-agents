@@ -42,7 +42,7 @@ Before submission, apply [tier 1](verification.md#tier-1--while-iterating) to th
 
 Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state specifications and decision placement.
 
-Write no comment by default. Keep one only for an MPL notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry. Delete narration, obvious behaviour and workaround justification; rename or reshape the code, or encode the constraint in a type, test, lint or SPEC. The `comments` gate caps comment-bearing lines at 15% of nonblank lines after the exact MPL header; it is a ceiling, not a target. Write a reason once beside its enforcement and link to it elsewhere. A function still owns its `# Errors` section and its guarantee to a caller.
+Write no comment by default. Keep one only for an MPL notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry. Delete narration, obvious behaviour and workaround justification; rename or reshape the code, or encode the constraint in a type, test, lint or SPEC. The `comments` gate caps comment-bearing lines at 10% of nonblank lines after the exact MPL header is stripped; it is a ceiling, not a target. Write a reason once beside its enforcement and link to it elsewhere. A function still owns its `# Errors` section and its guarantee to a caller.
 
 A pull request description and the text around a review comment carry the same scope, uncertainty and verification as the change. Identifiers, commands, paths and diagnostics stay unchanged across versions, and shared evidence appears once.
 
