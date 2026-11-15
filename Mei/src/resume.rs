@@ -121,7 +121,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "test code")]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use super::*;
 
@@ -160,9 +160,22 @@ mod tests {
         ] {
             let path = dir.path().join(name);
             std::fs::write(&path, bytes).unwrap();
-            let error = read(&path).unwrap_err().to_string();
-            assert!(error.contains("E_MEI_SESSION"), "{name}: {error}");
-            assert!(error.contains(&path.display().to_string()), "{error}");
+            let expected_path = if matches!(name, "empty" | "partial") {
+                path.display().to_string()
+            } else {
+                format!("{}:1", path.display())
+            };
+            match read(&path).unwrap_err() {
+                Error::Diagnostic(diagnostic) => {
+                    assert_eq!(diagnostic.code, Code::Session, "{name}");
+                    assert_eq!(
+                        diagnostic.path.as_deref(),
+                        Some(expected_path.as_str()),
+                        "{name}"
+                    );
+                }
+                error @ Error::Body(_) => panic!("{name}: unexpected raw body: {error}"),
+            }
         }
     }
 }

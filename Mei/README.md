@@ -44,18 +44,19 @@ In Ubuntu, run:
 
 ```sh
 sudo apt update
-sudo apt install -y ca-certificates curl git python3 build-essential xz-utils
+sudo apt install -y ca-certificates curl git python3 build-essential xz-utils rsync
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 curl -fsSL https://usemagpie.ai/install.sh | sh -s -- --tui
-export PATH="$HOME/.local/bin:$PATH"
+exec "$SHELL" -l
 ```
 
-`sudo` may ask for the Ubuntu password. These steps install download and build tools, Git, Python, Rust, and magpie. Docker, Node.js, and a database are not needed.
+`sudo` may ask for the Ubuntu password. These steps install download and build tools, Git, Python, Rust, and magpie. The last command starts a fresh login shell so Ubuntu's default user command path takes effect. Docker, Node.js, and a database are not needed.
 
-Install the exact Zig version used by the terminal renderer. This block supports ordinary x86-64 and ARM64 laptops, verifies the official SHA-256, and prints `0.17.0` at the end:
+Install the exact Zig version used by the terminal renderer. This block supports ordinary x86-64 and ARM64 laptops and verifies the official SHA-256. Paste the whole block: its separate shell stops on the first failed download, check, extraction, link, or version command. Do not continue until it prints `0.17.0`:
 
 ```sh
+bash -e <<'EOF'
 case "$(uname -m)" in
   x86_64) ZIG_ARCH=x86_64; ZIG_SHA256=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 ;;
   aarch64) ZIG_ARCH=aarch64; ZIG_SHA256=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 ;;
@@ -65,9 +66,10 @@ cd /tmp
 curl -fSLO "https://ziglang.org/download/0.17.0/zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
 echo "$ZIG_SHA256  zig-$ZIG_ARCH-linux-0.17.0.tar.xz" | sha256sum -c -
 sudo tar -C /opt -xf "zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
-sudo ln -sf "/opt/zig-$ZIG_ARCH-linux-0.17.0/zig" /usr/local/bin/zig
+ln -sf "/opt/zig-$ZIG_ARCH-linux-0.17.0/zig" "$HOME/.cargo/bin/zig"
 cd ~
 zig version
+EOF
 ```
 
 Check the remaining tools:
@@ -108,7 +110,6 @@ In the second Ubuntu window:
 
 ```sh
 source "$HOME/.cargo/env"
-export PATH="$HOME/.local/bin:$PATH"
 cd ~
 git clone https://github.com/2youg1/sprawling-agents.git
 cd sprawling-agents
@@ -177,17 +178,32 @@ Its optional `--resume <jsonl>` flag is the process interface used by the consol
 
 ### 7. Start work on the first large project
 
-Use a **disposable project copy**. Assuming the copy is on the Windows Desktop, replace the username and folder below:
+Use a **disposable project copy**, never the only original. Replace `/mnt/c/path/to/ProjectCopy` with the copy's Ubuntu path; `/mnt/c` is the Windows C: drive as seen from Ubuntu. Then paste this whole block:
 
 ```sh
-mkdir -p ~/work
-cp -r "/mnt/c/Users/WindowsUser/Desktop/ProjectCopy" ~/work/my-project
+bash -e <<'EOF'
+PROJECT_COPY='/mnt/c/path/to/ProjectCopy'
+mkdir -p "$HOME/work/my-project"
+rsync -a \
+  --exclude='.env' --exclude='.env.*' \
+  --exclude='*.pem' --exclude='*.key' \
+  --exclude='id_rsa*' --exclude='id_ed25519*' \
+  --exclude='private/' --exclude='secrets/' \
+  "$PROJECT_COPY/" "$HOME/work/my-project/"
+find "$HOME/work/my-project" -type f \
+  \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
+     -o -name 'id_rsa*' -o -name 'id_ed25519*' \
+     -o -path '*/private/*' -o -path '*/secrets/*' \) -print
+EOF
+```
+
+The copy excludes common credential files and private directories, and `find` must print nothing. Inspect the rest of the copy too: filename patterns cannot recognise every private file. Only after confirming that the copy contains no credentials or private material, start Mei:
+
+```sh
 cd ~/work/my-project
 export HARNESS_MODEL='deepseek/deepseek-flash'
 MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
 ```
-
-`/mnt/c` is the Windows C: drive as seen from Ubuntu. Do not copy `.env` files, keys, or private material, and never operate on the only original.
 
 First ask for a read-only survey:
 
@@ -207,11 +223,20 @@ Verify the result yourself: in a Git project, run `git status --short` and `git 
 
 ### Reopen and troubleshoot
 
-After reopening Ubuntu, run `magpie serve` in one window. In another, repeat `source "$HOME/.cargo/env"`, `export PATH="$HOME/.local/bin:$PATH"`, and `export HARNESS_MODEL=…`, enter the project directory, and start `sprawling mei`. Use `/resume <path>` to continue a particular log.
+After reopening Ubuntu, run `magpie serve` in one window. In another, use the full binary paths and set `MEI_BIN` on the same command:
+
+```sh
+source "$HOME/.cargo/env"
+export HARNESS_MODEL='deepseek/deepseek-flash'
+cd ~/work/my-project
+MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
+```
+
+Use `/resume <path>` to continue a particular log.
 
 | Symptom | Repair |
 |---|---|
-| `cargo` or `magpie` not found | Repeat the `source` and `export PATH` lines above |
+| `cargo` or `magpie` not found | Run `exec "$SHELL" -l`, then repeat the `source` line above |
 | Zig refuses the build | `zig version` must print exactly `0.17.0` |
 | `E_MEI_CONFIG` / `HARNESS_MODEL` | Set the variable to an entry printed by `magpie models` |
 | `E_MEI_TRANSPORT` / connection failure | Keep `magpie serve` running in another window in the same Ubuntu environment |

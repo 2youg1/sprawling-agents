@@ -44,18 +44,19 @@ wsl --install -d Ubuntu
 
 ```sh
 sudo apt update
-sudo apt install -y ca-certificates curl git python3 build-essential xz-utils
+sudo apt install -y ca-certificates curl git python3 build-essential xz-utils rsync
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 curl -fsSL https://usemagpie.ai/install.sh | sh -s -- --tui
-export PATH="$HOME/.local/bin:$PATH"
+exec "$SHELL" -l
 ```
 
-`sudo` 可能要求输入刚创建的 Ubuntu 密码。上述步骤安装下载与构建工具、Git、Python、Rust 和 magpie，不需要 Docker、Node.js 或数据库。
+`sudo` 可能要求输入刚创建的 Ubuntu 密码。上述步骤安装下载与构建工具、Git、Python、Rust 和 magpie；最后一条启动新的登录 shell，让 Ubuntu 默认的用户命令路径生效。不需要 Docker、Node.js 或数据库。
 
-再安装终端渲染器要求的精确 Zig 版本。下面支持普通 x86-64 和 ARM64 笔记本，会核对官方 SHA-256，最后应打印 `0.17.0`：
+再安装终端渲染器要求的精确 Zig 版本。下面支持普通 x86-64 和 ARM64 笔记本，会核对官方 SHA-256。请粘贴整个代码块：独立 shell 会在下载、校验、解压、创建链接或版本检查首次失败时立即停止。看到 `0.17.0` 后再继续：
 
 ```sh
+bash -e <<'EOF'
 case "$(uname -m)" in
   x86_64) ZIG_ARCH=x86_64; ZIG_SHA256=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 ;;
   aarch64) ZIG_ARCH=aarch64; ZIG_SHA256=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 ;;
@@ -65,9 +66,10 @@ cd /tmp
 curl -fSLO "https://ziglang.org/download/0.17.0/zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
 echo "$ZIG_SHA256  zig-$ZIG_ARCH-linux-0.17.0.tar.xz" | sha256sum -c -
 sudo tar -C /opt -xf "zig-$ZIG_ARCH-linux-0.17.0.tar.xz"
-sudo ln -sf "/opt/zig-$ZIG_ARCH-linux-0.17.0/zig" /usr/local/bin/zig
+ln -sf "/opt/zig-$ZIG_ARCH-linux-0.17.0/zig" "$HOME/.cargo/bin/zig"
 cd ~
 zig version
+EOF
 ```
 
 检查其它工具：
@@ -108,7 +110,6 @@ magpie serve
 
 ```sh
 source "$HOME/.cargo/env"
-export PATH="$HOME/.local/bin:$PATH"
 cd ~
 git clone https://github.com/2youg1/sprawling-agents.git
 cd sprawling-agents
@@ -177,17 +178,32 @@ printf '介绍当前目录' | "$HOME/sprawling-agents/target/debug/mei"
 
 ### 7. 开始第一个大型项目
 
-先只复制一个**可以弄坏的项目副本**。假设副本在 Windows 桌面，替换下面路径中的用户名和文件夹名：
+先只复制一个**可以弄坏的项目副本**，不要直接操作唯一原件。把 `/mnt/c/path/to/ProjectCopy` 换成副本的 Ubuntu 路径；`/mnt/c` 是 Ubuntu 看到的 Windows C 盘。然后粘贴整个代码块：
 
 ```sh
-mkdir -p ~/work
-cp -r "/mnt/c/Users/Windows用户名/Desktop/项目副本" ~/work/my-project
+bash -e <<'EOF'
+PROJECT_COPY='/mnt/c/path/to/ProjectCopy'
+mkdir -p "$HOME/work/my-project"
+rsync -a \
+  --exclude='.env' --exclude='.env.*' \
+  --exclude='*.pem' --exclude='*.key' \
+  --exclude='id_rsa*' --exclude='id_ed25519*' \
+  --exclude='private/' --exclude='secrets/' \
+  "$PROJECT_COPY/" "$HOME/work/my-project/"
+find "$HOME/work/my-project" -type f \
+  \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
+     -o -name 'id_rsa*' -o -name 'id_ed25519*' \
+     -o -path '*/private/*' -o -path '*/secrets/*' \) -print
+EOF
+```
+
+复制过程会排除常见凭据文件和私人目录，`find` 必须没有任何输出。还要检查副本中的其它文件，因为文件名规则认不出所有私人资料。确认副本不含凭据或私人资料后，才能启动 Mei：
+
+```sh
 cd ~/work/my-project
 export HARNESS_MODEL='deepseek/deepseek-flash'
 MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
 ```
-
-`/mnt/c` 是 Ubuntu 看到的 Windows C 盘。不要复制 `.env`、密钥或私人资料，也不要直接操作唯一原件。
 
 先做只读调查：
 
@@ -207,11 +223,20 @@ MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target
 
 ### 下次打开与常见问题
 
-重开 Ubuntu 后，在一个窗口运行 `magpie serve`；另一个窗口重新执行 `source "$HOME/.cargo/env"`、`export PATH="$HOME/.local/bin:$PATH"` 和 `export HARNESS_MODEL=…`，进入项目目录并启动 `sprawling mei`。用 `/resume <路径>` 继续指定日志。
+重开 Ubuntu 后，在一个窗口运行 `magpie serve`；另一个窗口使用完整的二进制路径，并在同一条启动命令中设置 `MEI_BIN`：
+
+```sh
+source "$HOME/.cargo/env"
+export HARNESS_MODEL='deepseek/deepseek-flash'
+cd ~/work/my-project
+MEI_BIN="$HOME/sprawling-agents/target/debug/mei" "$HOME/sprawling-agents/target/debug/sprawling" mei
+```
+
+用 `/resume <路径>` 继续指定日志。
 
 | 现象 | 处理方法 |
 |---|---|
-| 找不到 `cargo` 或 `magpie` | 重新执行上面的 `source` 与 `export PATH` |
+| 找不到 `cargo` 或 `magpie` | 执行 `exec "$SHELL" -l`，再重复上面的 `source` 命令 |
 | Zig 拒绝构建 | `zig version` 必须恰好显示 `0.17.0` |
 | `E_MEI_CONFIG` / `HARNESS_MODEL` | 把变量设成 `magpie models` 列出的名字 |
 | `E_MEI_TRANSPORT` / 连接失败 | 确认 `magpie serve` 仍在同一 Ubuntu 环境的另一个窗口运行 |
@@ -272,4 +297,4 @@ lake build Mei.Spec Mei.spec.Agent Mei.spec.Session
 
 ### 已通过 magpie 观察到的行为
 
-真实 V1/V2 仅通过本机 magpie 的 `deepseek/deepseek-flash` 验证，不代表支持所有 Provider 的兼容格式：直接 Messages 请求返回 HTTP/1.0 与非流式 `end_turn`；计算任务完成 Python 调用并保留签名 thinking；另一任务通过 Python 读到文件标记。原始观察流只是本地调试记录，不是 Python 现场恢复或 Provider 无关夹具。
+真实 V1/V2 仅通过本地 magpie 的 `deepseek/deepseek-flash` 验证，不代表支持所有 Provider 的兼容格式：直接 Messages 请求返回 HTTP/1.0 与非流式 `end_turn`；计算任务完成 Python 调用并保留签名 thinking；另一任务通过 Python 读到文件标记。原始观察流只是本地调试记录，不是 Python 现场恢复或 Provider 无关夹具。

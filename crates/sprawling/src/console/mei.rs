@@ -6,7 +6,7 @@
 //! The Mei backend: display-local identity, one JSONL converter, replay,
 //! and the child process group (`crates/sprawling/spec/Console.lean` §8-174).
 
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus, Stdio};
 use std::sync::Arc;
@@ -30,17 +30,73 @@ fn session_failure(
     subject: impl Into<String>,
     path: impl Into<String>,
 ) -> String {
+    session_failure_with_recovery(
+        action,
+        subject,
+        path,
+        "use /resume <jsonl> with a complete log, or /new to create a different file",
+    )
+}
+
+fn session_failure_with_recovery(
+    action: &'static str,
+    subject: impl Into<String>,
+    path: impl Into<String>,
+    recovery: &'static str,
+) -> String {
     let path = path.into();
     AdapterFailure {
         code: "E_MEI_SESSION",
         action,
         rule: "a Mei session is one explicitly named, complete JSONL message log",
-        recovery: "use /resume <jsonl> with a complete log, or /new to create a different file",
+        recovery,
         subject: subject.into(),
         path: path.clone(),
         value: path,
     }
     .render()
+}
+
+trait SessionFile: Read + Write + Seek {
+    fn truncate(&mut self, length: u64) -> std::io::Result<()>;
+}
+
+impl SessionFile for std::fs::File {
+    fn truncate(&mut self, length: u64) -> std::io::Result<()> {
+        self.set_len(length)
+    }
+}
+
+struct AppendFailure {
+    error: std::io::Error,
+    rollback: Option<std::io::Error>,
+}
+
+fn append_contents<F: SessionFile>(file: &mut F, lines: &[String]) -> Result<(), AppendFailure> {
+    let original_len = file.seek(SeekFrom::End(0)).map_err(|error| AppendFailure {
+        error,
+        rollback: None,
+    })?;
+    let result = (|| -> std::io::Result<()> {
+        if original_len > 0 {
+            let mut last = [0_u8; 1];
+            file.seek(SeekFrom::End(-1))?;
+            file.read_exact(&mut last)?;
+            if last[0] != b'\n' {
+                file.write_all(b"\n")?;
+            }
+        }
+        for line in lines {
+            file.write_all(line.as_bytes())?;
+            file.write_all(b"\n")?;
+        }
+        file.flush()
+    })();
+    if let Err(error) = result {
+        let rollback = file.truncate(original_len).err();
+        return Err(AppendFailure { error, rollback });
+    }
+    Ok(())
 }
 
 /// The current explicitly visible JSONL. New files start empty; imported
@@ -108,13 +164,15 @@ impl MeiSession {
         self.resume.then_some(self.path.as_path())
     }
 
-    /// Publishes only a successfully finished segment. A write failure is
-    /// reported and never represented as a saved turn.
+    /// Publishes only a successfully finished segment. A failure leaves
+    /// memory unchanged and restores the original file length, or reports
+    /// both the write and rollback failures (`Console.lean` §8-174 D111).
     pub(crate) fn append(&mut self, lines: &[String]) -> Result<(), String> {
         if lines.is_empty() {
             return Ok(());
         }
         let mut file = std::fs::OpenOptions::new()
+            .read(true)
             .append(true)
             .open(&self.path)
             .map_err(|err| {
@@ -124,23 +182,24 @@ impl MeiSession {
                     self.path.display().to_string(),
                 )
             })?;
-        for line in lines {
-            file.write_all(line.as_bytes())
-                .and_then(|()| file.write_all(b"\n"))
-                .map_err(|err| {
-                    session_failure(
-                        "append a successful Mei segment",
-                        err.to_string(),
-                        self.path.display().to_string(),
-                    )
-                })?;
-        }
-        file.flush().map_err(|err| {
-            session_failure(
-                "flush a successful Mei segment",
-                err.to_string(),
-                self.path.display().to_string(),
-            )
+        append_contents(&mut file, lines).map_err(|failure| {
+            if let Some(rollback) = failure.rollback {
+                session_failure_with_recovery(
+                    "roll back a failed Mei segment append",
+                    format!(
+                        "{}; restoring the original log also failed: {rollback}",
+                        failure.error
+                    ),
+                    self.path.display().to_string(),
+                    "keep the damaged file for manual recovery, use /new for further work, and resume only a complete backup",
+                )
+            } else {
+                session_failure(
+                    "append a successful Mei segment",
+                    failure.error.to_string(),
+                    self.path.display().to_string(),
+                )
+            }
         })?;
         self.history.extend_from_slice(lines);
         self.resume = true;
@@ -427,6 +486,18 @@ pub(crate) struct MeiProcess {
 }
 
 impl MeiProcess {
+    #[cfg(test)]
+    pub(crate) fn finished_for_test() -> MeiProcess {
+        MeiProcess {
+            pid: 0,
+            signals: Signals {
+                done: Arc::new(AtomicBool::new(true)),
+                cancelled: Arc::new(AtomicBool::new(false)),
+            },
+            driver: None,
+        }
+    }
+
     pub(crate) fn spawn(
         prompt: &str,
         resume: Option<&Path>,
@@ -649,38 +720,18 @@ pub fn verb(replay: Option<&str>) -> std::process::ExitCode {
     clippy::indexing_slicing,
     reason = "test code"
 )]
+mod session_tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn new_session_files_are_unique_and_leave_the_old_bytes_alone() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut first = MeiSession::create_in(dir.path(), TimeMs::new(100)).unwrap();
-        first
-            .append(&[
-                "{\"role\":\"user\",\"content\":\"first\"}".to_owned(),
-                "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}"
-                    .to_owned(),
-            ])
-            .unwrap();
-        let first_path = first.path().to_path_buf();
-        let before = std::fs::read(&first_path).unwrap();
-        let second = MeiSession::create_in(dir.path(), TimeMs::new(100)).unwrap();
-        assert_ne!(first_path, second.path());
-        assert_eq!(std::fs::read(&first_path).unwrap(), before);
-        assert_eq!(std::fs::read(second.path()).unwrap(), b"");
-
-        let mut resumed = MeiSession::import(&first_path).unwrap();
-        assert_eq!(resumed.history(), first.history());
-        assert_eq!(resumed.resume_path(), Some(first_path.as_path()));
-        resumed
-            .append(&["{\"role\":\"user\",\"content\":\"next\"}".to_owned()])
-            .unwrap();
-        assert_eq!(
-            std::fs::read_to_string(first_path).unwrap().lines().count(),
-            3
-        );
-    }
 
     #[test]
     fn the_selected_jsonl_is_passed_to_the_process_interface() {

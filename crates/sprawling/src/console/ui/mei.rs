@@ -361,7 +361,7 @@ impl Ui {
                     self.print(vec![console_live::note(&error)]);
                 }
                 self.process = None;
-                let successful = !cancelled && result.is_ok();
+                let successful = !self.lost && !cancelled && result.is_ok();
                 if successful {
                     let pending = std::mem::take(&mut self.pending);
                     let saved = self
@@ -597,6 +597,37 @@ mod tests {
         assert_eq!(ui.session.as_ref().unwrap().path(), first.as_path());
         assert_eq!(ui.session.as_ref().unwrap().history().len(), 2);
         assert_eq!(std::fs::read(&second).unwrap(), b"");
+    }
+
+    #[test]
+    fn a_lost_terminal_never_saves_an_incompletely_drained_segment() {
+        let dir = tempfile::tempdir().unwrap();
+        let (to, from) = std::sync::mpsc::sync_channel(UI_DEPTH);
+        let mut ui = Ui::new(to.clone(), None);
+        ui.screen.cut();
+        ui.session_dir = dir.path().to_path_buf();
+        submit(&mut ui, "/new");
+        let path = ui.session.as_ref().unwrap().path().to_path_buf();
+        ui.process = Some(MeiProcess::finished_for_test());
+        assert!(
+            ui.show(Show::Mei(MeiEvent::Line(
+                "{\"role\":\"user\",\"content\":\"first\"}".to_owned()
+            )))
+            .is_none()
+        );
+        assert!(ui.show(Show::Lost).is_none());
+        to.send(Show::Mei(MeiEvent::Line(
+            "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}".to_owned(),
+        )))
+        .unwrap();
+        to.send(Show::Mei(MeiEvent::Finished {
+            result: Ok("done".to_owned()),
+            cancelled: false,
+        }))
+        .unwrap();
+        let _code = ui.give_back(&from, ExitCode::FAILURE);
+        assert_eq!(std::fs::read(path).unwrap(), b"");
+        assert!(ui.pending.is_empty());
     }
 
     #[test]
