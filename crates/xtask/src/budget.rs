@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Performance ratchet over `crates/xtask/budgets.toml`.
-//! Only rows marked `gated` with byte budgets are weighed. Artifact bytes
-//! and wall-clock readings are otherwise reported, not refused (xtask §8-25).
+//! Performance ratchet over `crates/xtask/budgets.toml` (xtask §8-25).
 
 use std::path::Path;
 
@@ -19,19 +17,11 @@ use carried::CLIENT_MARK;
 pub(crate) use carried::{carries_client, carries_engine};
 pub(crate) use weighing::{lockfile_packages, measure};
 
-/// The key a gated row states its budget under, in bytes.
 const BUDGET_KEY: &str = "budget_bytes";
-/// The key a gated row states its best recorded reading under, in bytes.
 const BEST_KEY: &str = "best_bytes";
-/// The key a gated row states how far a reading may drift back past its
-/// best, in bytes.
 const SLACK_KEY: &str = "slack_bytes";
-
-/// The release optimisation level the register's size reading was taken
-/// with. One word, and the reason the check above exists at all.
 const PROFILE: &str = "3";
 
-/// A gated row of the register, in bytes.
 struct Row {
     name: String,
     budget: u64,
@@ -39,12 +29,8 @@ struct Row {
     slack: u64,
 }
 
-/// Where the register lives, repo-relative: every gate that reads a row
-/// opens it here, and every message about a row names it.
 pub(crate) const REGISTER: &str = "crates/xtask/budgets.toml";
 
-/// The register, parsed. Shared with every gate that reads a row of it:
-/// two parsers would be two answers to "how big is it".
 pub(crate) fn register(root: &Path) -> Result<toml::Value, XtaskError> {
     let path = root.join(REGISTER);
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
@@ -61,10 +47,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let parsed = register(root)?;
 
     let mut violations = release_profile(root)?;
-    // The single-binary promise, checked as bytes: a release binary that
-    // exists must carry the client bundle's file table. The placeholder
-    // build (no `just build-web` beforehand) lacks the assets entry, and
-    // a binary like that must not look shippable.
     if let Some(binary) = binary_path(root, &ReleaseTarget::Host)
         && !carries_client(&binary)?
     {
@@ -81,10 +63,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }
     for row in gated_rows(&parsed) {
         let Some(measured) = measure(root, &row.name)? else {
-            // Nothing built to weigh. Silence rather than a violation:
-            // `just check` does not build a release binary or a wasm
-            // bundle, and a gate that demanded them would be a gate
-            // people learn to run with less.
             continue;
         };
         if measured > row.budget {
@@ -116,7 +94,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// Every row and its reading when available; an unmeasured row is never zero.
 pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     let parsed = register(root)?;
     let mut out = String::from("budget                 reading      best      budget\n");
@@ -145,9 +122,6 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
             .get("status")
             .and_then(toml::Value::as_str)
             .unwrap_or("");
-        // A budget stated in something other than bytes still belongs in
-        // the report: one that only the gate can see is one nobody
-        // remembers is there.
         let stated = value
             .get("budget_lines")
             .and_then(toml::Value::as_integer)
@@ -159,8 +133,6 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     Ok(out)
 }
 
-/// Reject a release profile different from the one that produced the
-/// register's binary-size reading. The root manifest records why `3` ships.
 fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let path = root.join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
@@ -175,8 +147,6 @@ fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .get("profile")
         .and_then(|profile| profile.get("release"))
         .and_then(|release| release.get("opt-level"));
-    // Both spellings a level can take, read the same way: `"z"` is a
-    // string and `3` is an integer, and neither is more correct as TOML.
     let said = match stated {
         Some(toml::Value::String(text)) => text.clone(),
         Some(other) => other.to_string(),
@@ -199,8 +169,6 @@ fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }])
 }
 
-/// The rows a machine can weigh: those marked gated that state a
-/// budget, a best reading and a slack in bytes.
 fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
     let Some(table) = parsed.as_table() else {
         return Vec::new();
@@ -258,9 +226,6 @@ mod tests {
         assert_eq!(rows[0].budget, 100);
     }
 
-    /// The package count is printed beside its row with its reading,
-    /// and no count, however large, is a finding (crates/xtask/Spec.lean
-    /// §8-25).
     #[test]
     fn a_package_count_is_reported_beside_its_row_and_refused_by_nothing() {
         let root = std::env::temp_dir().join(format!("xtask-budget-count-{}", std::process::id()));
@@ -302,9 +267,6 @@ mod tests {
         let text = std::fs::read_to_string(crate::root::this_checkout().join(REGISTER)).unwrap();
         let register: toml::Value = toml::from_str(&text).unwrap();
         let table = register.as_table().unwrap();
-        // Not a count written twice: the register is the only place
-        // that says how many budgets there are, and this asserts the
-        // shape every row must have rather than how many rows exist.
         assert!(!table.is_empty(), "the register names no budget at all");
         for (name, row) in table {
             assert!(

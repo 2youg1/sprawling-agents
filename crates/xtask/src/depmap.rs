@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Actual crate edges must stay within ARCHITECTURE.md's `depmap` block;
-//! `pub trait` belongs only to registered seams with a second adapter.
-//! `directions` applies the same rule between modules of one crate.
-//! `architecture` reads only the owning sections, never lookalike tables.
+//! Edges stay in ARCHITECTURE.md `depmap`; `pub trait` only at registered
+//! seams; `directions` for intra-crate edges.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -20,8 +18,6 @@ use architecture::PATH as ARCH;
 
 mod directions;
 
-/// Where the seams are declared, and where a `pub trait` may therefore
-/// live.
 const SEAM_SECTION: u32 = 4;
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -37,10 +33,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The ```depmap block of `text` drawn as a mermaid flowchart, fences
-/// included: one line per crate that allows no edge, one arrow per
-/// allowed edge, dependent to dependency. No edge is reduced away, since
-/// the one a reader looks up may be exactly the transitive one.
+/// Mermaid flowchart of the depmap block.
 ///
 /// # Errors
 /// When `text` holds no closed depmap block, as [`check`] refuses it.
@@ -101,14 +94,10 @@ pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String
     })
 }
 
-/// Seam files: the rows of the seam table, which are four data cells
-/// with a `crates/**.rs` path in the second.
+/// Seam-table paths from §4.
 ///
 /// # Errors
-/// When the seam section is not in the document. A gate whose authority
-/// has moved must say so: read as an empty list, every `pub trait` in
-/// the tree would be reported at once and the real finding — that the
-/// seam table is gone — would be one line in a hundred.
+/// When the seam section is missing from the document.
 fn seam_files(text: &str) -> Result<BTreeSet<String>, XtaskError> {
     let declared = architecture::section(text, SEAM_SECTION).ok_or_else(|| XtaskError::Doc {
         file: ARCH.to_owned(),
@@ -137,10 +126,6 @@ fn seams_in(declared: &[&str]) -> BTreeSet<String> {
     set
 }
 
-/// Every package of the product graph is in the block, and every edge it
-/// has to another workspace package is one the block allows. Both sides
-/// are compared by the name the block uses, the lib name, whatever the
-/// package is called and wherever it lives.
 fn check_edges(
     found: &[Member],
     allowed: &BTreeMap<String, BTreeSet<String>>,
@@ -164,8 +149,6 @@ fn check_edges(
             });
             continue;
         };
-        // Tests may use citysim and friends freely, so dev dependencies
-        // are not in `depends_on`; a registry package has no name here.
         let deps = member
             .depends_on
             .iter()
@@ -260,8 +243,6 @@ mod tests {
         assert_eq!(seams.len(), 1);
     }
 
-    /// The defect: a four-column table written anywhere else used to
-    /// widen the set of files allowed to declare a `pub trait`.
     #[test]
     fn a_table_outside_the_seam_section_declares_no_seam() {
         let text = format!(
@@ -279,8 +260,6 @@ mod tests {
         assert!(seam_files("## 2 Stack\n").is_err());
     }
 
-    /// The depmap block names libs, cargo names packages, and the edge between
-    /// the two packages is the one the block allows: nothing is missing.
     #[test]
     fn a_relocated_package_is_judged_by_its_lib_name() {
         let root = crate::root::fixture::relocated("depmap");

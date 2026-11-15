@@ -3,13 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Run every gate in a fixed order and aggregate the findings. Order is
-//! cheap-and-local first, git last; violations from all gates are rendered
-//! together so a builder sees the full list, not the first stumble.
-//!
-//! The array below is the only authority for which gates run and in what
-//! order; `COUNT` is its length parameter, one token away. `report` owns
-//! what a run's outcome reads like and what it exits with.
+//! Run every gate in roster order and aggregate findings. `GATES`/`COUNT`
+//! are the only authority for which gates run; `report` owns the exit.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -22,9 +17,7 @@ use crate::{
     wire_ts, wiring, wording,
 };
 
-/// How many gates run. The array below is typed by it, so the number and
-/// the list are one token apart and cannot disagree; `vocabulary` reads
-/// it so no document has to hold a copy.
+/// Roster length; types `GATES` so the count and the list cannot disagree.
 pub(crate) const COUNT: usize = 25;
 
 /// One gate: the name a person types, and the check it runs.
@@ -33,8 +26,7 @@ pub(crate) struct Gate {
     check: fn(&Path) -> Result<Vec<Violation>, XtaskError>,
 }
 
-/// Every gate, in the order a run reports them. The only roster: `--list`,
-/// usage and name selection all read it.
+/// Sole roster: `--list`, usage and name selection all read it.
 pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "header",
@@ -64,8 +56,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "artifact",
         check: artifact::check,
     },
-    // Beside `artifact`: both answer what a person downloads is built
-    // from, this one for the archive crates.io carries.
     Gate {
         name: "packaged",
         check: packaged::check,
@@ -90,8 +80,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "color",
         check: color::check,
     },
-    // Beside `color`: the same scan for the theme's other vocabulary, a
-    // transition's curve and duration.
     Gate {
         name: "motion",
         check: motion::check,
@@ -108,9 +96,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "wiring",
         check: wiring::check,
     },
-    // `wire-ts` renders the client's wire types in this process and
-    // compares one file; it sits beside `wiring` because both judge the
-    // same socket seam.
     Gate {
         name: "wire-ts",
         check: wire_ts::check,

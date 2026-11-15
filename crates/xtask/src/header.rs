@@ -4,11 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Require [`NOTICE`] exactly once at the top of every `.rs` and `.zig`.
-//! The first three rows are the MPL notice; the owner's copyright row is
-//! fourth. Its year is first publication, not the current year. Markdown
-//! keeps licence metadata in frontmatter and `crates/city/skills/LICENSES.md`.
-//! RefRain and kusanagi use the same shape with their own project names.
-//! A repeated notice marks a file assembled from two modules.
+//! Year is first publication. A repeated notice marks a file assembled
+//! from two modules.
 
 use std::path::Path;
 
@@ -138,9 +135,6 @@ mod tests {
         assert_eq!(repeated(&twice, &expected), Some(7));
     }
 
-    /// A Zig file is held to the same four rows as a Rust file, behind
-    /// the same `//`; the one without them is named and the others are
-    /// not.
     #[test]
     fn a_zig_file_without_the_header_is_named() {
         let root = std::env::temp_dir().join(format!("xtask-header-zig-{}", std::process::id()));

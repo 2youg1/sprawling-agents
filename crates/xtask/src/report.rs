@@ -3,13 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Violation shape and rendering. Mirrors the product's three-part refusal:
-//! the builder who trips a gate gets rule | violation | alternative,
-//! never a bare "failed" (crates/xtask/Spec.lean §10-8).
+//! Three-part refusal: rule | violation | alternative (xtask Spec §10-8).
 
 use std::process::ExitCode;
 
-/// One gate finding. `location` is a repo-relative path, `path:line`, or a commit id.
+/// One gate finding.
 #[derive(Debug)]
 pub(crate) struct Violation {
     pub(crate) gate: &'static str,
@@ -19,8 +17,7 @@ pub(crate) struct Violation {
     pub(crate) alternative: String,
 }
 
-/// Gate-internal failures. A broken gate exits 2 and says why; it never
-/// pretends to pass (exit 0) or to have judged (exit 1).
+/// Gate-internal failure; exits 2, never silent pass or false judgement.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum XtaskError {
     #[error("io on {path}: {source}")]
@@ -106,14 +103,8 @@ pub(crate) fn finish(gate: &'static str, result: Result<Vec<Violation>, XtaskErr
     }
 }
 
-/// Render a whole run: one line per gate, then every finding, then one
-/// exit code.
-///
-/// A gate that could not judge does **not** stop the walk. The gates are
-/// all evaluated before the first line is printed, so the ones after the
-/// failure are already holding their findings, and returning early threw
-/// those away — which made "not judged" and "clean" the same output on
-/// any machine without a tool one gate needs (xtask D2).
+/// Render a whole run. A gate that could not judge does not stop the
+/// walk (xtask D2): every gate is evaluated before the first line prints.
 pub(crate) fn finish_all(
     results: impl IntoIterator<Item = (&'static str, Result<Vec<Violation>, XtaskError>)>,
 ) -> ExitCode {
@@ -146,11 +137,7 @@ pub(crate) fn finish_all(
     outcome.code()
 }
 
-/// What one whole run concluded.
-///
-/// Ordered by severity, and the order is the point: exit 2 says the gate
-/// is broken, exit 1 says the tree is, and a run that hit both must say
-/// the first. Collapsing them lets a missing tool read as a clean tree.
+/// Run conclusion. Exit 2 (gate broken) outranks exit 1 (tree broken).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunOutcome {
     Green,
@@ -196,7 +183,6 @@ mod tests {
 
     #[test]
     fn a_broken_gate_outranks_a_violation() {
-        // A gate failing to run must not discard another gate's findings.
         assert_eq!(RunOutcome::of(1, 7), RunOutcome::Broken);
         assert_eq!(RunOutcome::of(1, 0), RunOutcome::Broken);
         assert_eq!(RunOutcome::of(0, 7), RunOutcome::Refused);

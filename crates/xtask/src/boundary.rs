@@ -3,12 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! White-box checks use Rust through crate public faces; stranger-entry
-//! checks use Lean in `crates/adversary/` (ARCHITECTURE.md V10).
-//! `CROSSINGS` names only surfaces this product raises, not every socket
-//! or process, so a test double does not become a false stranger.
-//! Only test code is scanned. `boundary-ok` covers one line and its prior
-//! line; `boundary.predating` is audited and must remove spent entries.
+//! Product-raised crossings only (ARCHITECTURE.md V10). Test code only;
+//! `boundary-ok` covers its line and the following; spent `predating` rows
+//! must be removed.
 
 use std::path::Path;
 
@@ -21,8 +18,7 @@ use crate::walk;
 
 const EXEMPT_MARK: &str = "boundary-ok:";
 
-/// Product-raised surfaces a check can reach only from outside.
-/// Generic socket and process APIs are deliberately absent.
+/// Product-raised surfaces; generic socket/process APIs are absent.
 const CROSSINGS: [(&str, &str); 5] = [
     (
         "CARGO_BIN_EXE",
@@ -46,21 +42,14 @@ const CROSSINGS: [(&str, &str); 5] = [
     ),
 ];
 
-/// Standalone fuzz sources, which are checks outside cargo's member list.
 const FUZZ: &str = "crates/fuzz/";
-
-/// This gate's own package; other tool packages are check-shaped.
 const GATES: &str = env!("CARGO_PKG_NAME");
 
-/// How much of one file is test code, decided by where it lives
-/// (crates/xtask/Spec.lean §8-39).
+/// Test-code extent by address (xtask Spec §8-39).
 #[derive(Debug, PartialEq, Eq)]
 enum Reading {
-    /// The whole file is test code by its address.
     Whole,
-    /// Only the items marked `#[cfg(test)]` are.
     Marked,
-    /// No package holds it, so it is nobody's check.
     Skipped,
 }
 
@@ -78,13 +67,7 @@ fn reading(rel: &str, found: &[Member]) -> Reading {
     }
 }
 
-/// Where test code hides inside a source file: the line span of every
-/// item marked `#[cfg(test)]`.
-///
-/// Found by parsing rather than by looking for the attribute and reading
-/// to the end of the file. A `#[cfg(test)] mod tests` is usually last and
-/// usually is the rest of the file, and a gate that assumed so would be
-/// wrong in exactly the files where it is not.
+/// Line spans of `#[cfg(test)]` items, from the parse tree.
 fn test_spans(text: &str, rel: &str) -> Result<Vec<(usize, usize)>, XtaskError> {
     let parsed = syn::parse_file(text).map_err(|err| XtaskError::Doc {
         file: rel.to_owned(),
@@ -136,7 +119,6 @@ fn marked_test(attrs: &[syn::Attribute]) -> bool {
     })
 }
 
-/// The register row naming the files that crossed before the rule did.
 const ROW: &str = "boundary";
 const PREDATING: &str = "predating";
 
@@ -180,9 +162,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.extend(found);
         }
     }
-    // A row naming a file that has stopped crossing is a licence nobody
-    // decided to keep granting, and it would silently re-admit the file
-    // if anybody put a socket back into it.
     for spent in excused.difference(&crossing) {
         violations.push(Violation {
             gate: "boundary",
@@ -197,7 +176,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The files that were already crossing when the rule was drawn.
 fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError> {
     let register = crate::budget::register(root)?;
     let Some(listed) = register
@@ -219,14 +197,10 @@ fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError
     Ok(out)
 }
 
-/// One file, and where in it the test code is: four values that always
-/// travel together and are never chosen independently.
 struct Sweep<'a> {
     rel: &'a str,
     text: &'a str,
-    /// Whether the whole file is test code by its address.
     whole: bool,
-    /// The line spans of `#[cfg(test)]` items, when it is not.
     spans: &'a [(usize, usize)],
 }
 
@@ -284,7 +258,6 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
 mod tests {
     use super::*;
 
-    /// A product package holding `rel`, at its first two segments.
     fn owner(rel: &str) -> Member {
         Member {
             package: "product".to_owned(),
@@ -310,9 +283,6 @@ mod tests {
         out
     }
 
-    /// The finding that corrected this gate. A test standing up a fake
-    /// provider and speaking HTTP to it is playing the outside world,
-    /// which is the opposite of reaching this product from outside.
     #[test]
     fn a_socket_to_a_double_the_test_raised_is_not_a_crossing() {
         let source = "\
@@ -326,8 +296,6 @@ mod tests {
         assert!(found("crates/accounting/src/worker/driving.rs", source).is_empty());
     }
 
-    /// Reaching the binary this repository builds is standing outside it,
-    /// and that check belongs to `crates/adversary/`.
     #[test]
     fn driving_the_built_binary_is_refused() {
         let source = "\
@@ -344,10 +312,6 @@ mod tests {
         assert!(out[0].location.ends_with(":6"), "{:?}", out[0].location);
     }
 
-    /// A whole file under `crates/*/tests/` is test code by its address,
-    /// with no attribute to find - and raising this product's own server
-    /// to speak HTTP at it is the crossing `enrolment.rs` made before it
-    /// drove the router in process.
     #[test]
     fn a_file_under_tests_is_test_code_by_where_it_lives() {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";
@@ -355,8 +319,6 @@ mod tests {
         assert!(found("crates/wire/src/server.rs", source).is_empty());
     }
 
-    /// The waiver is read on the line and on the line above, which is
-    /// how `lexicon` reads its own.
     #[test]
     fn a_waiver_on_the_line_or_the_line_above_is_honoured() {
         let source = "\
