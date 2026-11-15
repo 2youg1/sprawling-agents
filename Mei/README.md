@@ -6,6 +6,23 @@ Mei is an academic prototype asking how small an Agent Harness can be: a model r
 
 > **Safety first:** Mei has no sandbox, permission prompts, or undo button. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
 
+## Published packages
+
+On macOS arm64 or Linux x64, after configuring magpie and `HARNESS_MODEL` as shown below:
+
+```sh
+bunx @sprawling/mei -p 'Use Python to calculate 40 + 2'
+```
+
+Or install the Rust command from crates.io:
+
+```sh
+cargo install sprawling-mei --locked
+mei -p 'Use Python to calculate 40 + 2'
+```
+
+npm publishes no native Windows binary. On Windows, run either command inside WSL or another POSIX environment.
+
 ## From zero on a new Windows laptop
 
 This path assumes Windows 10/11, an internet connection, no repository, no Docker, no Linux, and no development tools. No prior Agent or programming experience is needed. You need administrator access and an API key for a model that supports tool calls; model use may cost money.

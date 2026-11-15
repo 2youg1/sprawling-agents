@@ -20,6 +20,35 @@ release notes and their commits.
 
 ---
 
+## v0.0.17-Alpha-261115
+
+**sprawling 0.0.17 mei**
+
+Alpha, cut on 2026-11-15 (UTC+8) as `v0.0.17-Alpha-261115`. The workspace manifest carries 0.0.17; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.16-Alpha-261110`. The wire and stored-data contracts do not change: WIRE_V stays 79, EVENT_LOG_V stays 2, and the configuration formats stay at format 1. A city written by 0.0.16 opens without a new migration. Stop the city and verify a restorable backup before updating.
+
+### Behaviour changes
+
+- **Archetype:Mei joins the workspace as an experimental, minimal Harness.** One mutable Anthropic Messages request, one serial feedback loop and one persistent Python interpreter per task make up the core. It has structured `E_MEI_*` diagnostics, bounded transport and interpreter cleanup, complete JSONL session recovery and no sandbox, permission UI, retries, compaction or native Windows support (#308, #309, #310).
+- **`sprawling mei` reuses the console for live tasks and read-only replay.** `/new` creates an independent JSONL conversation without touching the old one; `/resume <path>` explicitly imports a complete log; only successful segments append (#308, #310).
+- **The doctor recommends Sarasa Mono SC for Chinese and links every tool row to its release page** (#301).
+
+### Distribution
+
+- **Mei has independent release archives for macOS arm64 and Linux x64 musl.** Each carries the `mei` binary, its beginner guide and the licence; a native Windows archive is refused rather than claiming an unsupported runtime.
+- **npm gains `@sprawling/mei` and two platform packages**, while crates.io gains `sprawling-mei`. All are projected from the same tag and archives as the existing `sprawling` channel. Platform npm packages publish before the two roots, and crates.io remains last because its versions cannot be replaced. New names are bootstrapped once by a person and then trusted to `release.yml`.
+- **A curated tag carries five archives and attests all of them.** The release refuses to publish when either product is incomplete, and the sprawling loopback installer selects only its own archive.
+
+### Fixes and repository work
+
+- Mei's test gateway drains request bodies before answering, removing the non-200 race; output snapshots and TOML diagnostics are deterministic, and diagnostic-only history serialization leaves the success path (#309).
+- The release notes generator compares with the newest curated tag rather than a nightly, and the repository gains its code-change workflow and the shipped-skill licence notice (#305, #306).
+- Dependencies and actions move through the patch-and-minor group (#299, #303).
+
+### Known and unfixed
+
+- Mei is an academic POSIX prototype with no internal isolation. Use only disposable project copies and a separate, revocable, spending-limited API key; Windows use belongs in WSL or another POSIX environment.
+- Some refusals remain too broad and logs too sparse. Some workspace git conflicts can still stop a reply from being recorded.
+
 ## v0.0.16-Alpha-261110
 
 **sprawling 0.0.16 wonderer**

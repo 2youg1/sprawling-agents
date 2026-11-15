@@ -6,6 +6,23 @@ Mei 是一个研究“最小 Agent Harness 能有多小”的学术原型：把�
 
 > **先读安全提示：** Mei 没有沙箱、权限确认或撤销按钮。模型生成的 Python 能以当前账户权限读写文件、联网和执行命令。只把可丢失的项目副本交给它；使用单独、可撤销且设好消费上限的 API key。不要提供真实隐私、重要凭据或唯一一份项目。
 
+## 已发布的软件包
+
+在 macOS arm64 或 Linux x64 上，按下文配置好 magpie 与 `HARNESS_MODEL` 后：
+
+```sh
+bunx @sprawling/mei -p '请调用 Python 计算 40 + 2'
+```
+
+也可以从 crates.io 安装 Rust 命令：
+
+```sh
+cargo install sprawling-mei --locked
+mei -p '请调用 Python 计算 40 + 2'
+```
+
+npm 不提供原生 Windows 二进制。在 Windows 上，请在 WSL 或其它 POSIX 环境中运行上述命令。
+
 ## 从零开始：一台全新的 Windows 笔记本
 
 这条路线假设你只有一台能联网的 Windows 10/11 电脑，没有仓库、Docker、Linux 或开发工具，也没用过 Agent。你需要管理员权限，以及一家模型服务商的 API key；模型必须支持工具调用，调用可能收费。
