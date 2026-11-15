@@ -6,11 +6,11 @@
 //! The smallest non-streaming Anthropic HTTP adapter (`Mei/Spec.lean`
 //! §5, §8-§10). No proxy, TLS, compression, redirect, chunked or SSE.
 
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::error::{Code, Diagnostic, Error, Result, protocol};
 
@@ -24,13 +24,22 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// diagnostic instead of hanging the run.
 const IO_TIMEOUT: Duration = Duration::from_secs(600);
 
+/// How long a blocked read may stay silent before a `mei.obs` pulse line.
+const PULSE_INTERVAL: Duration = Duration::from_secs(5);
+
+/// Connect, IO, and pulse budgets that travel together on one client.
+struct Timeouts {
+    connect: Duration,
+    io: Duration,
+    pulse: Duration,
+}
+
 /// A resolved plain-HTTP Messages client. The API key is never logged.
 pub struct Client {
     authority: String,
     addresses: Vec<SocketAddr>,
     key: String,
-    connect_timeout: Duration,
-    io_timeout: Duration,
+    timeouts: Timeouts,
 }
 
 impl Client {
@@ -40,15 +49,18 @@ impl Client {
     /// Rejects every other URL shape, header-breaking keys, and authorities
     /// which cannot be resolved.
     pub fn new(base: &str, key: String) -> Result<Client> {
-        Client::with_timeouts(base, key, CONNECT_TIMEOUT, IO_TIMEOUT)
+        Client::with_timeouts(
+            base,
+            key,
+            Timeouts {
+                connect: CONNECT_TIMEOUT,
+                io: IO_TIMEOUT,
+                pulse: PULSE_INTERVAL,
+            },
+        )
     }
 
-    fn with_timeouts(
-        base: &str,
-        key: String,
-        connect_timeout: Duration,
-        io_timeout: Duration,
-    ) -> Result<Client> {
+    fn with_timeouts(base: &str, key: String, timeouts: Timeouts) -> Result<Client> {
         let authority = authority(base)?;
         if key.contains(['\r', '\n']) {
             return Err(Error::Diagnostic(Diagnostic::new(
@@ -87,17 +99,18 @@ impl Client {
             authority,
             addresses,
             key,
-            connect_timeout,
-            io_timeout,
+            timeouts,
         })
     }
 
     /// Sends one complete request and reads its complete response to EOF.
+    /// While the read is blocked past [`PULSE_INTERVAL`], writes one
+    /// `mei.obs` pulse line to `pulse` without changing the request.
     ///
     /// # Errors
     /// I/O, non-200, malformed HTTP, chunked transfer, and JSON failures are
     /// returned without a retry. Non-200 errors carry only the response body.
-    pub fn post(&self, request: &Value) -> Result<Value> {
+    pub fn post(&self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
         let body = serde_json::to_vec(request).map_err(|err| {
             protocol(
                 "serialize a Messages request",
@@ -105,10 +118,10 @@ impl Client {
                 "use JSON-compatible values in the request",
             )
         })?;
+        let path = format!("http://{}/v1/messages", self.authority);
         let mut stream = self.connect()?;
         stream
-            .set_read_timeout(Some(self.io_timeout))
-            .and_then(|()| stream.set_write_timeout(Some(self.io_timeout)))
+            .set_write_timeout(Some(self.timeouts.io))
             .map_err(|err| {
                 Error::Diagnostic(
                     Diagnostic::new(
@@ -117,7 +130,7 @@ impl Client {
                         err.to_string(),
                         "retry the request against the same gateway; no retry was attempted",
                     )
-                    .with_path(format!("http://{}/v1/messages", self.authority)),
+                    .with_path(path.clone()),
                 )
             })?;
         write!(
@@ -128,21 +141,15 @@ impl Client {
         ).and_then(|()| stream.write_all(&body)).and_then(|()| stream.flush()).map_err(|err| {
             Error::Diagnostic(
                 Diagnostic::new(Code::Transport, "write the Messages request", err.to_string(), "check the gateway connection; no retry was attempted")
-                    .with_path(format!("http://{}/v1/messages", self.authority)),
+                    .with_path(path.clone()),
             )
         })?;
-        let mut response = Vec::new();
-        stream.read_to_end(&mut response).map_err(|err| {
-            Error::Diagnostic(
-                Diagnostic::new(
-                    Code::Transport,
-                    "read the Messages response to EOF",
-                    err.to_string(),
-                    "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
-                )
-                .with_path(format!("http://{}/v1/messages", self.authority)),
-            )
-        })?;
+        let response = read_to_eof(
+            &mut stream,
+            &self.timeouts,
+            pulse,
+            &path,
+        )?;
         parse(&response)
     }
 
@@ -150,7 +157,7 @@ impl Client {
     fn connect(&self) -> Result<TcpStream> {
         let mut last = None;
         for address in &self.addresses {
-            match TcpStream::connect_timeout(address, self.connect_timeout) {
+            match TcpStream::connect_timeout(address, self.timeouts.connect) {
                 Ok(stream) => return Ok(stream),
                 Err(err) => last = Some(err),
             }
@@ -165,6 +172,115 @@ impl Client {
             .with_value(&self.authority),
         ))
     }
+}
+
+fn read_to_eof(
+    stream: &mut TcpStream,
+    timeouts: &Timeouts,
+    pulse: &mut dyn Write,
+    path: &str,
+) -> Result<Vec<u8>> {
+    let mut remaining = timeouts.io;
+    let mut response = Vec::new();
+    let mut chunk = [0_u8; 8192];
+    loop {
+        if remaining.is_zero() {
+            return Err(Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "read the Messages response to EOF",
+                    "the IO budget elapsed before EOF",
+                    "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
+                )
+                .with_path(path),
+            ));
+        }
+        let slice = remaining.min(timeouts.pulse);
+        stream.set_read_timeout(Some(slice)).map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "arm the Messages socket timeouts",
+                    err.to_string(),
+                    "retry the request against the same gateway; no retry was attempted",
+                )
+                .with_path(path),
+            )
+        })?;
+        match stream.read(&mut chunk) {
+            Ok(0) => return Ok(response),
+            Ok(count) => response.extend_from_slice(
+                chunk
+                    .get(..count)
+                    .ok_or_else(|| {
+                        Error::Diagnostic(
+                            Diagnostic::new(
+                                Code::Transport,
+                                "read the Messages response to EOF",
+                                "read returned a length past the buffer",
+                                "retry the request against the same gateway; no retry was attempted",
+                            )
+                            .with_path(path),
+                        )
+                    })?,
+            ),
+            Err(err)
+                if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
+            {
+                remaining = remaining.saturating_sub(slice);
+                if remaining.is_zero() {
+                    return Err(Error::Diagnostic(
+                        Diagnostic::new(
+                            Code::Transport,
+                            "read the Messages response to EOF",
+                            err.to_string(),
+                            "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
+                        )
+                        .with_path(path),
+                    ));
+                }
+                write_pulse(pulse, path)?;
+            }
+            Err(err) => {
+                return Err(Error::Diagnostic(
+                    Diagnostic::new(
+                        Code::Transport,
+                        "read the Messages response to EOF",
+                        err.to_string(),
+                        "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
+                    )
+                    .with_path(path),
+                ));
+            }
+        }
+    }
+}
+
+fn write_pulse(pulse: &mut dyn Write, path: &str) -> Result<()> {
+    serde_json::to_writer(&mut *pulse, &json!({"type": "mei.obs", "kind": "pulse"})).map_err(
+        |err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "write a mei.obs pulse",
+                    err.to_string(),
+                    "keep stderr writable during a blocked Messages read",
+                )
+                .with_path(path),
+            )
+        },
+    )?;
+    pulse.write_all(b"\n").and_then(|()| pulse.flush()).map_err(|err| {
+        Error::Diagnostic(
+            Diagnostic::new(
+                Code::Transport,
+                "write a mei.obs pulse",
+                err.to_string(),
+                "keep stderr writable during a blocked Messages read",
+            )
+            .with_path(path),
+        )
+    })
 }
 
 fn authority(base: &str) -> Result<String> {
@@ -259,141 +375,5 @@ fn parse(response: &[u8]) -> Result<Value> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use std::io::{BufRead, BufReader};
-    use std::thread;
-
-    use super::*;
-
-    fn server(response: &'static str) -> (String, thread::JoinHandle<String>) {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let handle = thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            let mut reader = BufReader::new(stream);
-            let mut request = String::new();
-            let mut length = 0;
-            loop {
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                if line == "\r\n" {
-                    break;
-                }
-                if let Some(value) = line.strip_prefix("Content-Length: ") {
-                    length = value.trim().parse::<usize>().unwrap();
-                }
-                request.push_str(&line);
-            }
-            let mut body = vec![0; length];
-            reader.read_exact(&mut body).unwrap();
-            request.push_str(&String::from_utf8_lossy(&body));
-            let mut stream = reader.into_inner();
-            stream.write_all(response.as_bytes()).unwrap();
-            stream.shutdown(std::net::Shutdown::Both).unwrap();
-            request
-        });
-        (format!("http://{address}"), handle)
-    }
-
-    #[test]
-    fn a_post_writes_one_non_streaming_request_and_reads_json_to_eof() {
-        let (base, handle) =
-            server("HTTP/1.0 200 OK\r\nContent-Length: 25\r\n\r\n{\"stop_reason\":\"end_turn\"}");
-        let client = Client::new(&base, "magpie".to_owned()).unwrap();
-        let answer = client
-            .post(&serde_json::json!({"model": "测试", "messages": []}))
-            .unwrap();
-        assert_eq!(answer["stop_reason"], "end_turn");
-        let request = handle.join().unwrap();
-        assert!(request.starts_with("POST /v1/messages HTTP/1.0\r\n"));
-        assert!(request.contains("Content-Length: 32\r\n"));
-        assert!(request.contains("x-api-key: magpie\r\n"));
-        assert!(request.contains("anthropic-version: 2023-06-01\r\n"));
-        assert!(!request.contains("Accept-Encoding"));
-        let body = request.get(request.find('{').unwrap()..).unwrap();
-        assert_eq!(
-            serde_json::from_str::<Value>(body).unwrap(),
-            serde_json::json!({"model": "测试", "messages": []})
-        );
-    }
-
-    #[test]
-    fn a_non_200_returns_the_body_without_wrapping_it() {
-        let (base, handle) = server("HTTP/1.0 429 Slow down\r\n\r\nrate limited");
-        let client = Client::new(&base, "magpie".to_owned()).unwrap();
-        assert_eq!(
-            client.post(&serde_json::json!({})),
-            Err(Error::Body("rate limited".to_owned()))
-        );
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn malformed_boundaries_and_chunking_are_named() {
-        let (base, handle) = server("not an HTTP response");
-        let client = Client::new(&base, "magpie".to_owned()).unwrap();
-        let error = client.post(&serde_json::json!({})).unwrap_err().to_string();
-        assert!(error.contains("boundary") && error.contains("not an HTTP response"));
-        handle.join().unwrap();
-        let (base, handle) =
-            server("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n");
-        let client = Client::new(&base, "magpie".to_owned()).unwrap();
-        assert!(
-            client
-                .post(&serde_json::json!({}))
-                .unwrap_err()
-                .to_string()
-                .contains("Transfer-Encoding")
-        );
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn url_and_key_validation_is_fail_closed() {
-        for base in [
-            "https://localhost:3425",
-            "http://localhost:3425/v1",
-            "http://user@localhost",
-            "http://localhost?q=1",
-            "http://",
-        ] {
-            assert!(Client::new(base, "magpie".to_owned()).is_err(), "{base}");
-        }
-        assert!(Client::new("http://127.0.0.1:3425/", "magpie".to_owned()).is_ok());
-        assert!(Client::new("http://127.0.0.1:3425", "bad\nkey".to_owned()).is_err());
-    }
-
-    #[test]
-    fn a_gateway_that_accepts_and_stalls_returns_instead_of_hanging() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let stalled = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut byte = [0_u8; 1];
-            // Never answer; hold the connection until the client gives up.
-            while let Ok(count) = stream.read(&mut byte) {
-                if count == 0 {
-                    break;
-                }
-            }
-        });
-        let client = Client::with_timeouts(
-            &format!("http://{address}"),
-            "magpie".to_owned(),
-            Duration::from_secs(2),
-            Duration::from_millis(200),
-        )
-        .unwrap();
-        let error = client.post(&serde_json::json!({})).unwrap_err().to_string();
-        assert!(error.contains("E_MEI_TRANSPORT"), "{error}");
-        assert!(error.contains("read the Messages response"), "{error}");
-        stalled.join().unwrap();
-    }
-}
+#[path = "transport_tests.rs"]
+mod tests;

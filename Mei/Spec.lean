@@ -6,13 +6,12 @@
 import Mei.spec.Agent
 import Mei.spec.Session
 
-/-! # Archetype:Mei 的规格
+/-! # Mei 的规格
 
-`Mei/` 是学术探索与二次开发原型 `Archetype:Mei`（简称 Mei），Cargo 包名
-`sprawling-mei`，库名和命令名 `mei`。它探索最极简 Agent Harness 的可行性：
-一个可变 Anthropic Messages 请求、一个串行反馈循环、一个有状态 Python 进程。
-它不是可直接投入使用的成品；Provider、shell、git 与隔离都需要调用者自行搭配和调试，
-主要用途是二次开发与技术讨论。
+`Mei/` 是极简 Agent Harness：一个可变 Anthropic Messages 请求、一个串行反馈循环、
+一个有状态 Python 进程。Cargo 包名 `sprawling-mei`，库名 `mei`，无头命令名 `mei`。
+终端居住面属于顶层生产包 `Calyx/`（非 Archetype）；Mei 核不含 TUI。
+指令 / MCP / Skills 的权威在 magpie；Agent 自去 skill 仓库。运行时不注入 `MEI.md`。
 -/
 
 /-! ## 1 需求分解
@@ -20,238 +19,176 @@ import Mei.spec.Session
 | 单元 | 责任 |
 |---|---|
 | `main` | 装配环境、参数、stdin/stdout、退出与解释器收口 |
-| `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write`，不认识 HTTP 或子进程 |
-| `transport` | 非流式 Anthropic Messages HTTP/1.0 客户端 |
-| `python` 与 `boot.py` | 持久 Python 3 解释器、私有控制帧、输出快照与超时反馈 |
-| `error` | 稳定错误码、失败动作、主题、违反规则与可执行恢复步骤 |
-| `MEI.md` | 唯一静态系统提示词，构建时注入；二次开发可直接修改后重建 |
-| `spec/Agent.lean` | 反馈顺序、整波预检、终止与保真的形式模型 |
-| `spec/Session.lean` | 完整日志恢复、`/new` 切断历史并增加文件代次的形式模型 |
+| `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write` |
+| `transport` | 非流式 Anthropic Messages HTTP/1.0；阻塞读时可写存活观测 |
+| `python` 与 `boot.py` | 持久 Python；每轮效应结果落盘；tool_result 永远是路径句柄 |
+| `error` | 人可见诊断：Description / Cause / Resolution |
+| `MEI.md` | 构建时静态系统提示；改之须重建；不作运行时注入面 |
+| `spec/Agent.lean` | 反馈顺序与整波预检的形式模型 |
+| `spec/Session.lean` | 完整日志恢复的形式模型 |
 
-核心有一次性运行与完整消息日志恢复，没有 Python 进程现场恢复、权限、成本、审查、专用文件工具、
-异步运行时、Provider 抽象、SSE、重试、压缩、长期记忆、Skills、MCP/ACP、图片输入或原生 Windows 支持。
-`/new` 与 `/resume <jsonl>` 只存在于现有 Sprawling CLI 的 Mei 后端；直接 `mei` 仍是单任务进程。
-隔离由外层容器、VM、bwrap 或专用用户承担；没有内部安全边界。
+禁止：第二本地工具、`MEI_TOOLS`、阈值截断/头尾窗、内置超时 alarm、核内 TUI、
+LLM compaction、验真门、运行时 AGENTS/Skills 注入、为弱模型准备的重试。
+交互斜杠与会话文件由 Calyx 拥有；无头 `mei` 仍可纯脚本使用。
 -/
 
 /-! ## 2 验收标准
 
-- `spec/Agent.lean` 证明：每次转移先追加 assistant；不合法工具波在执行前失败；
-  合法调用按 content 顺序得到同 ID 结果；`pause_turn` 只重发 assistant；异常 stop 不执行工具。
-- `agent::run` 可用脚本闭包走完直接回答、多轮工具、字符串 content、整波预检、
-  重复 ID、thinking 保真、pause、max_tokens、异常 stop 与执行失败，不需要真实模型。
-- TCP 工装验证请求方法、路径、HTTP/1.0、UTF-8 字节 Content-Length、固定 header、
-  响应 EOF、非 200 原文与 malformed 防御性诊断；没有 chunked、SSE、代理或重定向。
-- 真实 Python 进程验证变量保留、顺序调用、异常与 SystemExit、子进程 stdin EOF、
-  fd 输出捕获、非 UTF-8、空输出、大输出头尾截断、超时后继续、非法帧和解释器死亡。
-- 整波在任何副作用之前验证；解释器死亡后不伪造完整 user/tool-result 历史。
-- `spec/Session.lean` 证明：`/new` 清空历史并进入新文件代次，`/resume` 只恢复完整日志，
-  恢复剥去 stop 元数据且保持消息顺序。
-- stdout 只含最终 text blocks，不加换行；stderr 先写本次 user prompt，再写每条新加消息；
-  assistant 日志另带 `stop_reason`，恢复时剥去，其余行是普通错误。
-- live V1/V2（真实 magpie 非流式 EOF、非 Anthropic 模型工具调用与 thinking 回传）
-  必须实测后才能宣称支持；本地生产路径验证不替代这两项。
-- 实测记录：`curl --http1.0 -i -X POST http://127.0.0.1:3425/v1/messages` 在
-  `deepseek/deepseek-flash` 上返回 HTTP 200、`Content-Length` 与完整 JSON，验证 V1；
-  `HARNESS_EXTRA='{"thinking":{"type":"enabled","budget_tokens":1024}}' target/debug/mei`
-  在同一模型上完成 Python `print(40+2)`，工具结果为 `42\n`，最终 stdout 为 `42`，
-  后续请求接受带原 signature 的 thinking 块，验证 V2。其它模型及兼容格式不作外推。
+- `spec/Agent.lean` 与 `agent::run` 闭包测试：整波预检、顺序执行、thinking 保真、
+  pause、max_tokens、异常 stop、执行失败不伪造 tool_result。
+- TCP 工装：HTTP/1.0、EOF、非 200 原文、chunked 拒绝、停滞返回 `E_MEI_TRANSPORT`。
+- 真实 Python：变量跨调用保留；每次 `run` 的 tool_result 字符串是结果文件路径；
+  文件字节等于该次捕获的 stdout+stderr；空输出仍是路径（零字节文件）；
+  非法帧与解释器死亡为核错误；Windows 与 Unix 均可 spawn。
+- stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / usage）；
+  失败诊断为 Description/Cause/Resolution 的 toml 块。
+- stdout：最终 text，不加换行。
+- live V1/V2（magpie）须实测后宣称；范围以本节记录为准。
 -/
 
 /-! ## 3 假设与歧义
 
-- 参考环境是 POSIX：`SIGALRM`、`python3` 与 fd 语义属于边界，其他平台只保证能编译并明确拒绝运行。
-- 调用者提供隔离与凭证。Mei 继承调用者文件系统、网络和环境权限，不在带真实密钥或不可替代数据的环境运行。
-- 评审补充与原始封闭表的冲突按以下当前决定解决：`pause_turn` 继续；`MEI_TOOLS` 追加透明服务端工具；
-  非法控制帧使运行失败；`HARNESS` 未预设才回填；整波先预检；显式收口子进程。
-- `SIGALRM` 是 Harness 保留资源，每轮重设 handler 并在 `finally` 取消 alarm；但执行代码仍可捕获异常、
-  修改或忽略信号，C 调用也可能不返回，所以 250 秒只是 best-effort，不是硬截止。
-  取 250 秒是为了让模型代码等得起网络波动恢复（例如重插线缆后的重连），不是硬截止的替代。
-- “串行”只约束主循环发起的请求和调用。模型代码留下的线程和进程可并发，输出是调用结束时的快照。
-- `os.dup` 只防止常规 exec 型子进程继承私有控制 fd；裸 `fork` 的子孙仍可能继承它，不作更强的私有性承诺。
-- 递归子任务整体处于父 Python 调用的 best-effort 超时内。默认只读子进程 stdout；
-  模型主动打印捕获的 stderr 时，中间过程仍可进入父上下文。
+- 超时由外层进程管理；核内不设 `SIGALRM`。
+- 调用者提供隔离与凭证；Mei 继承调用者 FS/网络权限。
+- `pause_turn` 续跑；非法控制帧使运行失败；`HARNESS` 未预设才回填；整波先预检。
+- 串行只约束主循环的请求与调用；模型留下的线程可并发，结果以落盘文件为准。
+- 递归子进程共享 FS，不共享 messages 或 Python 命名空间。
 -/
 
 /-! ## 4 现状分析
 
-本 crate 从封闭设计新建，没有旧实现需要保持兼容。Rust 核心与 Sprawling TUI Mei 后端
-按照本规格实现。真实 magpie 与目标模型的 V1/V2 是独立验收门，脚本化工装不冒充这项事实；
-上述实测已覆盖一个非 Anthropic 模型，不声称覆盖其它 Provider 的兼容格式。
+核去掉输出窗与 POSIX-only 拒绝；删除 `MEI_TOOLS`。交互后端在 `Calyx/src/console`，
+入口为 `calyx` 二进制（npm：TTY 无 `-p` 时由 shim 启动）并通过 `MEI_BIN`／同目录
+`mei`／PATH 解析无头核。`@sprawling/mei` 归档同时携带无头核与 Calyx 面（含 Windows）。
+V1/V2 实测以 magpie + 已测模型为准，不外推。
 -/
 
 /-! ## 5 权威信源
 
-- User 的 Archetype:Mei 封闭设计及后续 ruling：顶层 `Mei/`、学术原型定位、`src/MEI.md`、端口约束；
-  本次追加 ruling 是在现有 `sprawling mei` CLI 提供 `/new` 与 `/resume <jsonl>`，不增加其它斜杠命令；
-  每次 `/new` 新建 JSONL，旧文件原地保留。
-- Anthropic Messages 与 client tools 官方文档，以及[官方 TypeScript SDK 声明](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/src/resources/messages/messages.ts)
-  （跟踪版本见 `docs/third-party.md` §1）：
-  `/v1/messages`、`tool_use`/`tool_result`、thinking 原样回传、string content、`pause_turn` 与透明服务端工具块。
-- [magpie reference](https://github.com/yetone/magpie/blob/main/docs/reference.md)（跟踪版本见 `docs/third-party.md` §1）：
-  默认网关 `127.0.0.1:3425`、任意 loopback key、`provider/model`、Anthropic Messages 转译。
-- [Python `signal` 官方文档](https://github.com/python/cpython/blob/main/Doc/library/signal.rst)（跟踪版本见 `docs/third-party.md` §1）：handler 延迟执行、
-  长 C 调用、主线程限制与 `alarm(0)` 取消语义。
-- Rust `std::process::Child` 官方文档：离开作用域不会自动 kill 或 wait，正常与错误路径都要显式收口。
+- User ruling：极简核；效应永远回路径；Calyx 为生产终端壳；无运行时注入；
+  诊断 Description/Cause/Resolution；Mei 不含壳（核进程不内嵌 TUI）；一次完成——
+  npm 以机制装配交互面。
+- Anthropic Messages / client tools；magpie reference（`docs/third-party.md` §1）。
+- Rust `std::process::Child`：须显式收口。
+- `Calyx/Spec.lean`：终端与斜杠；本文件不复制。
 -/
 
 /-! ## 6 命名统一
 
-Mei 的状态只有 `request: serde_json::Value`。没有 `Conversation`、`ChatRequest` 或 canonical message。
-`python` 是唯一本地客户端工具入口；`server_tool_use` 是 Provider 自己执行的透明块，不是第二个本地工具。
-`pause_turn` 是 Provider 暂停后续跑，不是取消、恢复或持久化。
+状态只有 `request: serde_json::Value`。`python` 是唯一本地客户端工具。
+tool_result 的 `content` 是结果文件路径字符串（句柄），不是输出正文。
+`pause_turn` 不是取消或持久化。观测行 `type=mei.obs` 不是 Messages role。
 -/
 
 /-! ## 7 模块边界
 
-`agent` 是决策；`transport`、`python` 是适配器；`resume` 只读完整 JSONL 消息；
-`main` 是唯一装配点；`error` 是诊断值。Sprawling CLI 拥有 `/new`、`/resume <jsonl>` 与当前会话日志文件。
-核心生产依赖只有 `serde_json`，不依赖 Sprawling 的 TUI、城市运行时、账本、gateway crate 或 `console_ffi`。
-依赖方向只有现有 Sprawling TUI 在进程边界适配 Mei，Mei 不知道消费者的类型。
+`agent` 决策；`transport` / `python` 适配；`resume` 读完整 JSONL；`main` 装配；
+`error` 诊断。生产依赖只有 `serde_json`。Calyx（及任何 Face 消费者）在进程边界
+spawn 无头 `mei`；Mei 不知道 Entry/Zig。
 
-`ANTHROPIC_BASE_URL` 是客户端出站地址，不是 Mei 的监听地址。Mei 与 Sprawling TUI 都不得绑定
-`2501` 或 `3425`；默认 3425 仅因 magpie 官方网关已在该地址监听，两个客户端可以安全地同时连接它。
+`ANTHROPIC_BASE_URL` 出站默认 `http://127.0.0.1:3425`；Mei 不监听 2501/3425。
 -/
 
 /-! ## 8 接口先行
 
 ```rust
-// agent.rs
 pub fn run(
     request: &mut Value,
-    post: impl FnMut(&Value) -> Result<Value>,
+    post: impl FnMut(&Value, &mut dyn Write) -> Result<Value>,
     exec: impl FnMut(&str) -> Result<String>,
     trace: &mut dyn Write,
 ) -> Result<String>;
 
-// transport.rs
 impl Client {
     pub fn new(base: &str, key: String) -> Result<Client>;
-    pub fn post(&self, request: &Value) -> Result<Value>;
+    pub fn post(&self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
 }
 
-// python.rs
 impl Py {
     pub fn spawn() -> Result<Py>;
-    pub fn run(&mut self, code: &str) -> Result<String>;
+    pub fn run(&mut self, code: &str) -> Result<String>; // Ok = path to result file
     pub fn close(&mut self) -> Result<()>;
     pub fn kill_and_wait(&mut self) -> Result<()>;
 }
 ```
 
-`Result` 的错误是 `error::Error`：`Diagnostic` 渲染一个 `toml` fenced block，
-含稳定 `code`（`error::Code` 枚举，一种规则一个变体，穷尽匹配不带兜底）、`action`、`subject`、
-`path`（适用时）、`value`（适用时）、`rule` 与 `recovery`；协议族错误的 path/value 指向失败字段
-（如 `messages[1].content[3].id`）及其取值。`Body` 仅用于非 200，原文写 stderr，不额外包装。
+stderr 观测行（穷尽；非 Messages role）：
 
-启动请求包含 `model`、`max_tokens = 16000`、`system`、`tools = [python]` 与一个 user prompt。
-`HARNESS_EXTRA` 是 object，启动时浅合并一次，然后重新写入 prompt messages；
-`stream = true` 与用 `HARNESS_EXTRA.tools` 覆盖唯一客户端工具都拒绝，分别提示关闭 stream、改用 `MEI_TOOLS`。
-`MEI_TOOLS` 是 array，按给定顺序追加在 python 后，Mei 不理解或修改这些声明。
-`HARNESS_MODEL` 必填；`ANTHROPIC_BASE_URL` 默认 `http://127.0.0.1:3425`，只接受 `http://authority` 与可选末尾 `/`；
-`ANTHROPIC_API_KEY` 默认 `magpie`；`HARNESS` 未预设才写为 `current_exe()`。
+- `{"type":"mei.obs","kind":"pulse"}` — 阻塞读满一个 pulse 间隔仍无字节时写一行
+- `{"type":"mei.obs","kind":"usage","usage": <response.usage>}` — 响应带 usage 时写一行
 
-一次性 CLI 接受 `mei -p PROMPT`、无 `-p` 时读取 stdin 全部内容，并可加
-`--resume <jsonl>` 在 prompt 前装入一份完整日志。无 `-p` 且 stdin 是 TTY 时仍立即拒绝；
-Mei 自身没有交互循环或斜杠命令。`-p` 缺值、重复/未知参数、缺模型、非法 JSON、
-空/畸形/未完整结束的恢复日志都在模型请求与 Python 启动之前失败。
-恢复只带入 role/content 与消息顺序；当前环境重新决定 model、system、tools 与网关，Python 重新启动。
-`--resume` 的路径从 `OsString` 直接进入 `PathBuf`，POSIX 非 UTF-8 路径不会触发 panic；flags 与
-`-p` prompt 需要 Unicode，转换失败以 `E_MEI_USAGE` 拒绝。恢复字段验证诊断的 `value` 保留实际
-role、content 或终端 stop_reason，完整性拒绝也指出最后一条为何不能闭合日志。
+`Diagnostic` 渲染 toml 块字段：`code`、`description`、`cause`、`resolution`，
+以及可选 `path` / `value`（写入 cause 叙事所需处）。内部仍可用 action/subject/recovery
+构造，对外版式固定为三段。`Body` 仅非 200 原文。
 
-发布不改变上述核心接口。crate 名是 `sprawling-mei`，npm 根包是 `@sprawling/mei`，安装后的命令
-均为 `mei`；独立归档为 `mei-<version>-<label>.zip`，只提供 macOS arm64 与 Linux x64 musl。
-npm 不提供原生 Windows 包，Windows 的使用路径仍是 POSIX/WSL。`cargo xtask package --mei`、
-npm 平台包与 trusted-publisher 顺序由 `crates/xtask/Spec.lean` D31 拥有，本节不复制其实现合同。
+启动请求：`model`、`max_tokens`（默认见 §14）、`system`、`tools = [python]`、messages。
+`HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
+无 `MEI_TOOLS`。`HARNESS_MODEL` 必填。
+
+无头语法：`mei [-p PROMPT] [--resume JSONL]`；无 `-p` 时非 TTY stdin 为 prompt。
+恢复只带 role/content；环境重定 model/system/tools/网关；Python 重启。
+
+发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
+交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归
+`crates/xtask/Spec.lean` D31。
 -/
 
 /-! ## 9 工作流程
 
 ```text
 A = post(R)
-trace 本次 user prompt                    -- 首个有效响应到达才写；已有历史不重复
-R.messages.push(assistant(A.content)); trace role/content/stop_reason
-if pause_turn: continue                         -- 不加 user
-if end_turn: return 顺序连接的 text blocks
-if stop != tool_use: fail                       -- max_tokens 也不执行
-Y = 预检全部客户端调用，再按 content 顺序执行
-R.messages.push(user(Y)); trace; continue
+可选 trace mei.obs usage / 阻塞中的 pulse
+trace 本次 user prompt（首个有效响应）
+R.messages.push(assistant); trace
+pause_turn → continue
+end_turn → return text
+tool_use → 预检 → exec 得路径 → user tool_result content=路径 → continue
+其它 stop → fail
 ```
 
-`server_tool_use` 与其结果块原样留在 assistant 历史，不产生本地 tool_result。
-每轮至多一个模型请求在途、至多一段由主循环发起的 Python 代码执行；只有主循环写 messages。
-没有 turn ceiling；模型不停止时由外部 Ctrl-C、kill 或进程管理结束。
-恢复读取逐行 JSON，首条必须是本次会话的 user prompt，末条必须是 `stop_reason=end_turn` 的 assistant；
-只把 role/content 送回 Messages。Sprawling CLI 在 `/new` 时用 `create_new` 建立新 JSONL 并打印完整路径；
-每次成功任务才把本段日志追加到当前文件，取消或失败不追加。`/resume` 显式选择已有文件，
-不搜索或维护最近会话；旧文件从不因 `/new` 删除或改写。
+取消 = 杀掉 harness 进程组。无 turn ceiling。
+会话斜杠与 JSONL 文件代次由 Calyx 合同拥有。
 -/
 
 /-! ## 10 实现逻辑
 
-- 请求 JSON 每次只序列化一次，`Content-Length` 按 UTF-8 字节数；发送 `Connection: close`，
-  不发送 `Accept-Encoding`。响应读至 EOF，只解析状态行、CRLF header/body 分界与 JSON body。
-  缺少分界时错误附前 200 字节；chunked 明确拒绝。传输对每个地址用 `CONNECT_TIMEOUT`（10 s）
-  连接预算、对读写用 `IO_TIMEOUT`（600 s）宽松预算：非流式响应可能合法思考数分钟，而接受后
-  停滞的网关必须返回 `E_MEI_TRANSPORT` 诊断且不重试，不能无限挂起脚本化调用。
-- assistant content 作为 JSON 值追加。读时 string 视为单 text block，写回仍是原 string；
-  其它未知块不建模。serde_json 默认数值语义是当前支持范围，不承诺任意高精度扩展数字的字节级保真。
-- `boot.py` 用二进制私有 fd 信道，每帧是一行 UTF-8 JSON string。先解码并检查帧类型，
-  再只捕获 `exec` 的 `BaseException`；非法帧退出解释器，使 Rust 运行失败。
-- fd 0 改 `/dev/null`，每轮 fd 1/2 指向当前二进制临时文件；Python 标准流明确 UTF-8 + replacement。
-- 输出经增量 UTF-8 decoder 分块读取，内存只保留解码块、头 8000 与尾 8000 字符。
-  超过 16000 字符时保留头尾并留下完整文件路径，否则删除临时文件。空输出为 `(no output)`。
-  快照经独立只读句柄按 `fstat` 固定上界读取：模型线程留在共享输出偏移上的后续追加只越过上界、
-  不能覆盖开头或延长快照。
-- `main` 成功时在 `CLOSE_GRACE`（5 s）内有界 wait 后关闭 stdin；模型留下的非 daemon 线程会阻止
-  Python 退出，超时后 kill 并 wait——强制清理是正常收口，不是运行失败（模型已给出最终答案）。
-  失败时 kill 并 wait；`Drop` 仅作最后兜底，不代替显式收口。宽限按 `CLOSE_POLL`（20 ms）轮询倍数计，
-  不采样时钟。
+- 传输：HTTP/1.0、Connection: close、读至 EOF；CONNECT 10s、IO 600s；
+  阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。
+- `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到临时文件；
+  结束后把**该文件路径**经控制信道回传；不截断、不内联正文、无 alarm。
+- 空输出：仍创建文件并回路径（可为 0 字节）。
+- `close`：5s 宽限后 kill+wait；成功收口的强制清理不是运行失败。
 -/
 
 /-! ## 11 边界枚举
 
-空 prompt、Unicode prompt、stdin EOF、重复/未知参数、恢复文件缺失/空/坏行/无初始 user/未完整结束、
-缺环境变量、非法 URL、非 200、缺 status line、缺 CRLF 分界、chunked、网关接受后停滞、connect 超预算、
-content 缺失或类型错误、空工具波、
-未知客户端工具、空 ID、重复 ID、max_tokens、pause_turn、refusal、解释器死亡、非法控制帧、
-SystemExit、非 UTF-8、空输出、16000/16001 字符边界、后台线程跨调用写入、后台写入与快照交错、
-收口时存活的非 daemon 线程、递归超时与 kill 后 wait 都必须有明确行为或测试。
+空/Unicode prompt、stdin EOF、重复参数、恢复残缺、缺模型、非法 URL、非 200、
+chunked、停滞、空工具波、未知客户端工具、重复 id、max_tokens、pause、
+解释器死亡、非法帧、非 UTF-8、空文件路径、收口非 daemon 线程、取消杀组。
 -/
 
 /-! ## 12 错误处理
 
-HTTP、Provider、上下文、协议与私有信道错误退出 1，不重试、不压缩、不恢复历史。
-Python traceback 和 best-effort timeout 是普通文本 tool_result，不加 `is_error`。
-工具波中死亡时，之前的副作用可能已经发生；不回滚，也不保证已有完整结果。
-非 200 正文原样写 stderr；其他诊断给出可执行的恢复步骤，不泄露 API key。
+核错误退出 1；不重试。Python traceback 在结果**文件**内，路径进 tool_result。
+非 200 正文原样 stderr。诊断不泄露 API key。
 -/
 
 /-! ## 13 依赖选型
 
-核心只继承 workspace 的 `serde_json`，复用已有 JSON Value、序列化与 `arbitrary_precision` 未开启时的明确语义；
-不引入 HTTP、CLI、TOML、异步或错误框架。选择 std `TcpStream`、`Command` 与闭包，
-是为了守住 P0 的最小控制面。被否：reqwest（HTTPS/代理/重定向超出边界）、clap（两个输入形式不需要）、
-trait Model/Tool（生产各只有一个实现，脚本闭包已是第二真实实现）。
-测试可用 workspace `tempfile`，不进入生产依赖。
+仅 `serde_json`；std TcpStream/Command/闭包。被否：reqwest、clap、Model/Tool trait。
 -/
 
 /-! ## 14 硬编码声明
 
-`max_tokens = 16000`、超时 250 秒（`boot.py` 的 `alarm`）、输出 16000 字符且头尾各 8000、
-空输出文本、连接预算 10 s 与读写预算 600 s（`transport.rs`）、收口宽限 5 s 与轮询 20 ms（`python.rs`）、
-默认网关 `http://127.0.0.1:3425`、默认 key `magpie`、`anthropic-version: 2023-06-01`
-各只有一处权威。`MEI.md` 是系统提示词唯一来源，修改它即可改变构建时的静态提示；
-不再为二次开发复制一份 TOML 配置。服务端工具的结果绕过 Python 输出上限并逐轮重传，
-调用者应自行在声明中限制 `max_uses`，Mei 不新增成本控制。
+`max_tokens` 默认 `65536`（可被 `HARNESS_EXTRA` 覆盖）、连接 10s、IO 600s、
+收口宽限 5s、poll 20ms、默认网关与 key、`anthropic-version: 2023-06-01`、
+pulse 间隔 5s、各一处权威。`MEI.md` 构建时注入。无输出字符窗、无 250s alarm。
 -/
 
 /-! ## 15 影响面
 
-新 crate 不影响现有 City 请求、账本或 provider。Sprawling TUI 只在 `console` 新增 Mei 后端，
-复用 `Entry`、live state、editor、screen、单写者终端、回滚和 OSC 7501。
-核心接口变化先改本文件与 `spec/Agent.lean`，再改实现和对应闭包/TCP/Python 测试。
+Calyx 依赖进程 Face；City 账本/wire 不变。接口变化先改本文件与 Agent/Session，
+再改实现与测试。
 -/
 
 /-! ## 16 测试与约束
@@ -263,48 +200,27 @@ lake build Mei.Spec Mei.spec.Agent Mei.spec.Session
 cargo test -p sprawling-mei --test cli
 ```
 
-Lean 证明只覆盖反馈模型，不是 Rust refinement proof。Rust 闭包测试检查控制路径，
-TCP/Python 测试检查真实适配器，CLI 测试检查 stdout/stderr 与退出码。POSIX-only 行为在 Unix lane 验证；
-Windows 仅验证可编译和明确拒绝运行。live V1/V2 的实测范围以 §2 的记录为准。
+Windows 与 Unix 均跑 Python 适配测试（路径句柄）。live V1/V2 以 §2 为准。
 -/
 
 /-! ## 17 文档关系
 
-`Mei/README.md` 与 `Mei/README.zh-CN.md` 分别是学术原型使用与二次开发的英文、中文入口；
-`architecture.toml` 注册模块；
-`docs/ARCHITECTURE.md` §3 注册无产品 crate 依赖的拓扑；`docs/third-party.md` 跟踪协议事实。
-`crates/sprawling/spec/Console.lean` §8-174 拥有 TUI 适配合同，本规格不复制它。
-修改协议、固定值、进程边界或验收声明时，同时重审上述对应权威。
+`Mei/README*.md`；`Calyx/Spec.lean`；`architecture.toml`；`docs/ARCHITECTURE.md`；
+`docs/third-party.md`。斜杠与 TUI 细节以 Calyx 为准。
 -/
 
-/-! D1 请求 JSON 是唯一状态，闭包替代单实现 trait：避免第二份会话表示与假想 seam；
-被否的是 canonical message 和 Model/Tool trait，以及为假想替代者预留的 seam。 -/
-/-! D2 非流式 HTTP/1.0 只读至 EOF：以重复传输和等待完整响应换取最小协议面；
-被否的是 reqwest/SSE/chunked/重试。 -/
-/-! D3 大输出用临时文件和增量解码保持 O(1) 额外内存（相对输出总量）：
-被否的是 `f.read()` 全量读入；磁盘总量仍不设上限。 -/
-/-! D4 TUI 只在 Sprawling 一侧适配，核心不知道 Entry/RunId/TimeMs/Live：
-被否的是为核心增加 TUI 事件类型。 -/
-/-! D5 `MEI_TOOLS` 透明追加与 `pause_turn` 续跑只认识协议所需的最小子集：
-被否的是 Provider 分支、服务端工具建模与截断其结果。 -/
-/-! D6 `MEI.md` 在构建时注入，不新增动态配置体系：二次开发直接修改源码资源；
-被否的是再引入 TOML 配置解析和第二份提示词。 -/
-/-! D7 `close()` 用 5 s 有界等待代替无限 wait，超时 kill 并回收：模型留下的非 daemon 线程原会让
-解释器永不退出、扣住最终答案；被否的是无限 wait（最终 stdout 被模型代码劫持）与把超时当运行失败
-（答案已完整，升级清理不该吞掉它）。 -/
-/-! D8 传输对每个地址设 10 s 连接预算、对读写设 600 s 宽松预算：非流式响应可能合法思考数分钟，
-接受后停滞的网关必须返回 `E_MEI_TRANSPORT` 且不重试；被否的是不设时限（脚本化调用无限挂起）与
-短时限（截断合法的长思考响应）。 -/
-/-! D9 User 常用的 `/new` 与 `/resume <jsonl>` 由现有 Sprawling CLI 提供，核心只增加完整消息日志恢复。
-每次 `/new` 新建独立 JSONL，旧文件原地保留；成功后才追加本段，恢复消息而不恢复 Python 现场。
-被否的是另写交互 UI、自动选择最近会话、会话数据库、Python 进程快照，以及把取消或失败的尾段追加进日志。 -/
-
-/-! D10 恢复参数与诊断保留调用者提供的事实：路径不经 UTF-8 往返，字段错误附实际值。
-理由是 POSIX 路径不要求 Unicode，而修复者需要看到被-rule 拒绝的 role/content/stop_reason；
-被否的是 `std::env::args()` 的隐式 panic，以及只留下 `value = None` 的验证诊断。 -/
-
-/-! D11 注册表身份与产品展示名分开：crate 使用 `sprawling-mei`，npm 使用 `@sprawling/mei`，
-命令与展示名保持 `mei` / Archetype:Mei。理由是 npm 新包不允许大写或冒号，且两个注册表的
-裸名 `mei` 均已被占用；被否的是占用他人的名字、把展示名强行当作注册表名，以及为迎合
-既有三平台发布表而提供原生 Windows 二进制。首次发布由人引导 trusted publisher，
-后续发布仍复用同一 Tag 的构建证据。 -/
+/-! D1 请求 JSON 唯一状态；闭包替代单实现 trait。 -/
+/-! D2 非流式 HTTP/1.0 读至 EOF；被否 reqwest/SSE/chunked/重试。 -/
+/-! D3 效应输出永远落盘并以路径为 tool_result；被否内联正文、阈值窗、头尾采样分支。 -/
+/-! D4 核不知 TUI；终端属 Calyx；被否核内 Entry 类型。 -/
+/-! D5 删除 `MEI_TOOLS`；透明服务端工具不由 Mei 声明；`pause_turn` 续跑。 -/
+/-! D6 `MEI.md` 仅构建时注入；运行时注入归 magpie。 -/
+/-! D7 `close` 5s 后 kill；被否无限 wait。 -/
+/-! D8 传输 10s/600s；被否无时限与过短时限。 -/
+/-! D9 会话斜杠与 JSONL 代次归 Calyx；核只提供 `--resume` 消息恢复。 -/
+/-! D10 恢复路径保留 OsString；诊断带实际 value。 -/
+/-! D11 crate `sprawling-mei`、npm `@sprawling/mei`；发布含 Windows；只发无头核；
+交互走 `sprawling mei`（Calyx）；被否核内嵌壳、根包装配 Calyx 进 `mei` 命令、为未来工具留槽。
+理由：Mei 不含壳；Calyx 同时服务城控制台，权威在 sprawling 依赖而非 Mei 安装面。 -/
+/-! D12 人可见诊断版式为 Description / Cause / Resolution。 -/
+/-! D13 无核内超时；超时外置。 -/

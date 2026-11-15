@@ -4,9 +4,9 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# bin::console::lifecycle
+# calyx::console::lifecycle
 
-规定 `crates/sprawling/src/console/lifecycle.rs`：一个服务中的进程从开城到退出走过的面，以及每一个事件在每一个面上做什么。本文件是 `crates/sprawling/Spec.lean` 的一个分部，接口与取舍写在 `crates/sprawling/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
+规定 `Calyx/src/console/lifecycle.rs`：一个服务中的进程从开城到退出走过的面，以及每一个事件在每一个面上做什么。本文件是 `crates/sprawling/Spec.lean` 的一个分部，接口与取舍写在 `crates/sprawling/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
 
 模型只有面与事件，没有 I/O：台子上的 `OnceLock<Closing>` 在这里是 `State.cause`，worker 写交接在这里是事件 `landed`，4 s 的时限到了是事件 `deadline`。
 
@@ -19,7 +19,7 @@
 * 时限一旦装上就一直装着，直到进程退出；时限到了，一定到达 `Gone`（`an_armed_deadline_stays_armed`、`an_armed_deadline_ends_the_process`）；
 * 终端的出口只在 `interrupt` 里切断：一条不从「drain 且切断」出发的轨迹永远到不了那里（`a_cut_terminal_interrupts`）。
 
-派生的检查：§5 的 `#eval` 打印每一个面与每一个事件的转移，`bin::console::lifecycle` 的测试逐行回放；实现一旦离开模型，那条测试变红。
+派生的检查：§5 的 `#eval` 打印每一个面与每一个事件的转移，`calyx::console::lifecycle` 的测试逐行回放；实现一旦离开模型，那条测试变红。
 -/
 
 namespace Sprawling.Console.Lifecycle
@@ -414,7 +414,7 @@ theorem a_cut_terminal_interrupts {s t : State} (trace : Reaches s t)
 
 /-! ## 5 转移向量
 
-每一行是「面 事件 下一个面 缘由」，名字是 Rust 的变体名；`bin::console::lifecycle` 的测试逐行回放这张表。 -/
+每一行是「面 事件 下一个面 缘由」，名字是 Rust 的变体名；`calyx::console::lifecycle` 的测试逐行回放这张表。 -/
 
 def Mode.code : Mode → String
   | .drain => "Drain"

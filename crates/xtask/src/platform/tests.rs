@@ -101,7 +101,7 @@ fn a_mismatched_mei_shim_package_is_reported() {
     assert!(
         found
             .iter()
-            .any(|row| row.violation.contains("no Mei entry maps")),
+            .any(|row| row.violation.contains("no Mei entry maps `darwin arm64`")),
         "{found:#?}"
     );
     std::fs::remove_dir_all(root).unwrap();

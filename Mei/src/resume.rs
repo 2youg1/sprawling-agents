@@ -61,6 +61,9 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
                 where_failed.clone(),
             )
         })?;
+        if value.get("type").and_then(Value::as_str) == Some("mei.obs") {
+            continue;
+        }
         let object = value.as_object().ok_or_else(|| {
             failure(
                 "validate a Mei resume log line",
@@ -154,7 +157,9 @@ mod tests {
         std::fs::write(
             &path,
             concat!(
+                "{\"type\":\"mei.obs\",\"kind\":\"usage\",\"usage\":{\"input_tokens\":1}}\n",
                 "{\"role\":\"user\",\"content\":\"first\"}\n",
+                "{\"type\":\"mei.obs\",\"kind\":\"pulse\"}\n",
                 "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"done\"}],\"stop_reason\":\"end_turn\"}\n"
             ),
         )

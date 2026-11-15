@@ -104,7 +104,7 @@ check-branch base="main":
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched crates/desktop/ffi && step desktop just check-desktop
-    touched crates/console_ffi && step console just check-console
+    touched Calyx/ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (crates/xtask/Spec.lean §8-43).
@@ -225,12 +225,12 @@ prereqs mode="check":
 # files a generator keeps.
 fmt:
     cargo fmt --all
-    zig fmt crates/console_ffi/zig
+    zig fmt Calyx/ffi/zig
     {{ if os() == "windows" { "zig fmt crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt
 
 # Both Zig leaves are formatted by `zig fmt`: the console's renderer on
-# every platform, where it is built (`crates/console_ffi/Spec.lean` D1),
+# every platform, where it is built (`Calyx/ffi/Spec.lean` D1),
 # and the desktop server's leaf on Windows, the one platform it is built
 # on (`crates/desktop/Spec.lean` section 8-12).
 #
@@ -238,7 +238,7 @@ fmt:
 # this phase first.
 fmt-check:
     cargo fmt --all --check
-    zig fmt --check crates/console_ffi/zig
+    zig fmt --check Calyx/ffi/zig
     {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt --check
 
@@ -595,9 +595,9 @@ check-desktop:
 
 # The console renderer's own Zig tests, which no cargo command runs; the
 # frames it draws are judged by `console_ffi`'s Rust tests through a
-# terminal emulator (`crates/console_ffi/Spec.lean`).
+# terminal emulator (`Calyx/ffi/Spec.lean`).
 check-console:
-    zig test -O ReleaseSafe crates/console_ffi/zig/leaf.zig --cache-dir target/zig-test
+    zig test -O ReleaseSafe Calyx/ffi/zig/leaf.zig --cache-dir target/zig-test
 
 # The Rust side's fuzz of crates/desktop/ffi's Zig leaf: its four buffer rules
 # against their Rust reference, for `rounds` drawn inputs from `seed`
@@ -927,9 +927,9 @@ dist target="": build-web
     cargo build --release -p sprawling --locked --timings {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
 
-# Mei's standalone POSIX binary; it embeds no client and needs no city SBOM.
+# Mei headless core plus Calyx interactive face; no city SBOM.
 dist-mei target="":
-    cargo build --release -p sprawling-mei --locked {{ if target == "" { "" } else { "--target " + target } }}
+    cargo build --release -p sprawling-mei -p sprawling-calyx --locked {{ if target == "" { "" } else { "--target " + target } }}
 
 # The release archive: the one file a person downloads, unpacks and runs.
 # `dist` first, because the archive is assembled out of its artifacts and
@@ -945,7 +945,7 @@ package target="": (dist target) (archive target)
 archive target="":
     cargo xtask package {{ if target == "" { "" } else { "--target " + target } }}
 
-# Mei's independent archive: binary, beginner guide and licence only.
+# Mei archive: headless mei, Calyx face, beginner guide, licence.
 archive-mei target="":
     cargo xtask package --mei {{ if target == "" { "" } else { "--target " + target } }}
 

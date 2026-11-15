@@ -2941,8 +2941,6 @@ name = "sprawling"
 version = "0.0.17"
 dependencies = [
  "axum",
- "base64 0.23.1",
- "chrono",
  "cpu-time",
  "crossterm",
  "flate2",
@@ -2959,15 +2957,14 @@ dependencies = [
  "sprawling-accounting",
  "sprawling-agent-protocols",
  "sprawling-browser",
+ "sprawling-calyx",
  "sprawling-child",
  "sprawling-city",
  "sprawling-collab",
- "sprawling-console-ffi",
  "sprawling-desktop",
  "sprawling-desktop-ffi",
  "sprawling-gateway",
  "sprawling-kernel",
- "sprawling-mei",
  "sprawling-remote-access",
  "sprawling-runtime",
  "sprawling-storage",
@@ -3047,6 +3044,30 @@ dependencies = [
  "serde",
  "serde_json",
  "sprawling-kernel",
+]
+
+[[package]]
+name = "sprawling-calyx"
+version = "0.0.17"
+dependencies = [
+ "base64 0.23.1",
+ "chrono",
+ "crossterm",
+ "getrandom 0.4.3",
+ "proptest",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sprawling-accounting",
+ "sprawling-child",
+ "sprawling-console-ffi",
+ "sprawling-kernel",
+ "sprawling-mei",
+ "sprawling-wire",
+ "tempfile",
+ "tokio",
+ "toml",
+ "win32job",
 ]
 
 [[package]]

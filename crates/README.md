@@ -11,6 +11,8 @@ Development-only packages and fixtures also live here; [Development tools](devel
 <!-- xtask:begin crate_table -->
 | Directory | Package | Lib | Owns | May depend on | SPEC |
 |---|---|---|---|---|---|
+| `Calyx` | `sprawling-calyx` | `calyx` | the production terminal shell: City and Mei console backends, and the Zig leaf that turns a scene into one frame | `accounting`, `child`, `console_ffi`, `kernel`, `wire` | `Calyx/Spec.lean` |
+| `Calyx/ffi` | `sprawling-console-ffi` | `console_ffi` | the production terminal shell: City and Mei console backends, and the Zig leaf that turns a scene into one frame | nothing | `Calyx/ffi/Spec.lean` |
 | `Mei` | `sprawling-mei` | `mei` | a standalone single-shot harness: one Messages request, one serial loop and one persistent Python interpreter | nothing | `Mei/Spec.lean` |
 | `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/Spec.lean` |
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `child`, `gateway`, `kernel` | `crates/agent_protocols/Spec.lean` |
@@ -18,7 +20,6 @@ Development-only packages and fixtures also live here; [Development tools](devel
 | `crates/child` | `sprawling-child` | `child` | the one constructor of a child process, and which environment keys a child never inherits | nothing | `crates/child/Spec.lean` |
 | `crates/city` | `sprawling-city` | `city` | space, identity, and the documents a building keeps | `kernel` | `crates/city/Spec.lean` |
 | `crates/collab` | `sprawling-collab` | `collab` | several residents in one building, without stepping on each other | `kernel`, `storage` | `crates/collab/Spec.lean` |
-| `crates/console_ffi` | `sprawling-console-ffi` | `console_ffi` | the console's renderer: a Zig leaf that turns a scene into the bytes of one terminal frame, behind one safe function | nothing | `crates/console_ffi/Spec.lean` |
 | `crates/desktop` | `sprawling-desktop` | `desktop` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | `agent_protocols`, `child`, `desktop_ffi`, `kernel` | `crates/desktop/Spec.lean` |
 | `crates/desktop/ffi` | `sprawling-desktop-ffi` | `desktop_ffi` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | `child` | `crates/desktop/ffi/Spec.lean` |
 | `crates/documents` | `sprawling-documents` | `documents` | the rules of a document a person reads and edits through a page: its version, its characters, its windows, and what one save changes | `kernel` | `crates/documents/Spec.lean` |
@@ -26,12 +27,12 @@ Development-only packages and fixtures also live here; [Development tools](devel
 | `crates/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `crates/kernel/Spec.lean` |
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `child`, `kernel` | `crates/remote_access/Spec.lean` |
 | `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `child`, `desktop_ffi`, `gateway`, `kernel`, `storage` | `crates/runtime/Spec.lean` |
-| `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `child`, `city`, `collab`, `console_ffi`, `desktop`, `desktop_ffi`, `gateway`, `kernel`, `remote_access`, `runtime`, `storage`, `wire` | `crates/sprawling/Spec.lean` |
+| `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `calyx`, `child`, `city`, `collab`, `desktop`, `desktop_ffi`, `gateway`, `kernel`, `remote_access`, `runtime`, `storage`, `wire` | `crates/sprawling/Spec.lean` |
 | `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `child`, `kernel` | `crates/storage/Spec.lean` |
 | `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/Spec.lean` |
 <!-- xtask:end -->
 
-Two crates have a lint table of their own, the desktop's FFI seam `crates/desktop/ffi` and the console's renderer `crates/console_ffi`, each the workspace's table with `unsafe_code` at `deny`, because the declaration of a crate's Zig leaf exports and each call into them relax the lint at that one item or statement; `LEAVES` in `crates/xtask/src/guard/wall.rs` names both, and `xtask guard` refuses any other crate that stops inheriting the workspace's table.
+Two crates have a lint table of their own, the desktop's FFI seam `crates/desktop/ffi` and the console's renderer `Calyx/ffi`, each the workspace's table with `unsafe_code` at `deny`, because the declaration of a crate's Zig leaf exports and each call into them relax the lint at that one item or statement; `LEAVES` in `crates/xtask/src/guard/wall.rs` names both, and `xtask guard` refuses any other crate that stops inheriting the workspace's table.
 
 ## Adding a crate
 

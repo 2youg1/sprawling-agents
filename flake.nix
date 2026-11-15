@@ -189,8 +189,8 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
-          # zig builds the console's renderer, `crates/console_ffi`, on every
-          # platform (`crates/console_ffi/Spec.lean` D1).
+          # zig builds Calyx's frame leaf, `Calyx/ffi`, on every platform
+          # (`Calyx/ffi/Spec.lean` D1).
           nativeBuildInputs = nativeDeps ++ [ bun pkgs.just zig ];
           # just and zig are commands this package's build calls, not its
           # builder: each one's nixpkgs setup hook claims every phase still

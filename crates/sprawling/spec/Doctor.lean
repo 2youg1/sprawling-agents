@@ -14,7 +14,7 @@
 /-!
 ## 8-146 构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
 
-`sprawling` 链接两片 Zig 叶子：控制台的渲染器 `crates/console_ffi`，在每个平台上编（`crates/console_ffi/Spec.lean` D1）；桌面 server 的 FFI 缝 `crates/desktop/ffi`，经 `crates/desktop/` 在 Windows 上编（`crates/desktop/Spec.lean` §8-12）。两个包的构建脚本都用 `zig build-lib`，所以在任何平台上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版；`crates/console_ffi/zig-version` 在仓库里必须与它相同，构建脚本比对两份。
+`sprawling` 链接两片 Zig 叶子：控制台的渲染器 `Calyx/ffi`，在每个平台上编（`Calyx/ffi/Spec.lean` D1）；桌面 server 的 FFI 缝 `crates/desktop/ffi`，经 `crates/desktop/` 在 Windows 上编（`crates/desktop/Spec.lean` §8-12）。两个包的构建脚本都用 `zig build-lib`，所以在任何平台上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版；`Calyx/ffi/zig-version` 在仓库里必须与它相同，构建脚本比对两份。
 
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
@@ -1026,7 +1026,7 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 
 /-! D11 Zig 是开发这份代码必需的工具（§8-146）
 
-控制台的渲染器是一片 Zig 叶子（`crates/console_ffi/Spec.lean` D1），在每个平台上构建时编译；桌面 server 没有准入安全接口的四组 Win32 调用经另一片（`crates/desktop/Spec.lean` D12），在 Windows 上编译。所以没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+控制台的渲染器是一片 Zig 叶子（`Calyx/ffi/Spec.lean` D1），在每个平台上构建时编译；桌面 server 没有准入安全接口的四组 Win32 调用经另一片（`crates/desktop/Spec.lean` D12），在 Windows 上编译。所以没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 -/
 
 /-! D12 不钉的构建照列 `lean` 与 `zig`，装不钉的版本（§8-162、§8-157）

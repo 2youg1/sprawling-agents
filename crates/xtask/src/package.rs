@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The deliverable: the one archive a person downloads, unpacks and runs.
-//!
-//! A release somebody assembled by hand is a release nobody can check.
-//! This assembles the same archive on every platform, out of artifacts the
-//! gates have already weighed, and refuses a binary that would reach a
-//! person half-built: one whose client is the page shell, which arrives as
-//! an empty browser window, and one with no execution engine, which
-//! answers every `python` call with a refusal naming a feature nobody
-//! downloading a release can turn on.
-//!
-//! What the archive carries is `contents`; this module is the packing.
-//!
-//! Entry timestamps are fixed rather than taken from the file system, so
-//! two builds of one tree produce the same archive bytes. The Windows
-//! archive of a release that signs is the exception, and deliberately so:
-//! when the repository names a signing policy, `release.yml` replaces the
-//! binary with the one the signing request returned before this packing
-//! runs, so that archive differs from a local rebuild of the same tree only
-//! in the signature it carries.
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -33,19 +14,12 @@ mod contents;
 
 use contents::{Entry, Executable};
 
-/// Which build an archive is assembled from. Exhaustive on purpose: the
-/// two questions a packager asks — where the binary landed, and what the
-/// archive is called — have one answer each per variant, and a boolean
-/// would have left the second one to the host it happened to run on.
 pub(crate) enum ReleaseTarget {
-    /// Built for this machine's own default target.
     Host,
-    /// Built with `--target <triple>`, which lands elsewhere in `target/`.
     Triple(String),
 }
 
 impl ReleaseTarget {
-    /// The triple named on the command line, or the host's own build.
     pub(crate) fn from_arg(triple: Option<&str>) -> Self {
         match triple {
             Some(named) if !named.is_empty() => Self::Triple(named.to_owned()),
@@ -53,10 +27,6 @@ impl ReleaseTarget {
         }
     }
 
-    /// What a person recognises in a list of assets. The host's two names
-    /// are what they always were; a build for anything else carries its
-    /// triple, because `linux-x86_64` says neither static nor musl and
-    /// would collide the day a gnu Linux artifact appears.
     fn label(&self) -> String {
         match self {
             Self::Host => format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH),
@@ -64,7 +34,6 @@ impl ReleaseTarget {
         }
     }
 
-    /// The directory `cargo build --release` puts the binary in.
     fn release_dir(&self, root: &Path) -> PathBuf {
         self.release_dir_in(&cargo_target_dir(
             root,
@@ -72,7 +41,6 @@ impl ReleaseTarget {
         ))
     }
 
-    /// Where the release build lands inside a given target directory.
     fn release_dir_in(&self, target: &Path) -> PathBuf {
         match self {
             Self::Host => target.join("release"),
@@ -80,22 +48,10 @@ impl ReleaseTarget {
         }
     }
 
-    /// What the executable is called on the system it will run on.
-    ///
-    /// Asked of the platform table rather than decided here: that table
-    /// is where every spelling of a platform lives, and it already holds
-    /// this one, so the packager reads the name instead of writing a
-    /// second rule about which systems suffix an executable. A target
-    /// the release publishes no archive for is refused, which is the
-    /// policy `platform` states for itself.
-    ///
-    /// # Errors
-    /// When no platform row claims the archive this build would produce.
     fn binary_name(&self) -> Result<&'static str, XtaskError> {
         Ok(self.platform()?.binary)
     }
 
-    /// The release platform row this target names.
     fn platform(&self) -> Result<&'static platform::Platform, XtaskError> {
         let suffix = format!("-{}.zip", self.label());
         platform::with_suffix(&suffix).ok_or_else(|| XtaskError::Cmd {
@@ -109,15 +65,6 @@ impl ReleaseTarget {
     }
 }
 
-/// Cargo's target directory: what `CARGO_TARGET_DIR` names when it is
-/// set, and the workspace's own `target/` otherwise. The variable's value
-/// is a parameter so the rule can be judged without touching the
-/// process environment.
-///
-/// A relative value is joined to the workspace root, while cargo resolves
-/// it against the directory it was started in; the two agree because
-/// every recipe that reaches this runs from the root, where `just` starts
-/// it. `build.target-dir` in a cargo config is not read.
 fn cargo_target_dir(root: &Path, named: Option<std::ffi::OsString>) -> PathBuf {
     match named.map(PathBuf::from) {
         Some(stated) if stated.as_os_str().is_empty() => root.join("target"),
@@ -126,9 +73,6 @@ fn cargo_target_dir(root: &Path, named: Option<std::ffi::OsString>) -> PathBuf {
     }
 }
 
-/// Where a release build of this target landed, or nothing when it has
-/// not been built. One statement of that path, because the packager
-/// assembles from it and the budget gate weighs it.
 pub(crate) fn binary_path(root: &Path, target: &ReleaseTarget) -> Option<PathBuf> {
     let dir = target.release_dir(root);
     for name in ["sprawling", "sprawling.exe"] {
@@ -181,24 +125,34 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
     assemble(root, &stem, &entries)
 }
 
-/// Assemble Mei's standalone archive. Native Windows is deliberately
-/// outside this channel: Mei promises only its POSIX runtime boundary.
 pub(crate) fn run_mei(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskError> {
     let row = target.platform()?;
-    if platform::mei_package(row).is_none() {
+    let Some(_) = platform::mei_package(row) else {
         return Err(XtaskError::Cmd {
             cmd: "package --mei".to_owned(),
-            msg: "Mei publishes no native Windows or otherwise unsupported archive; build it \
-                  for macOS arm64 or Linux x64 musl, or use it inside a POSIX/WSL environment"
+            msg: "Mei publishes no archive for this platform; build it for a row \
+                  `mei_package` names (Windows x64, macOS arm64, or Linux x64 musl)"
                 .to_owned(),
         });
-    }
-    let binary = target.release_dir(root).join(platform::MEI_BINARY);
+    };
+    let archive_name = platform::mei_binary(row);
+    let face_name = platform::calyx_binary(row);
+    let binary = target.release_dir(root).join(archive_name);
+    let face = target.release_dir(root).join(face_name);
     if !binary.is_file() {
         return Err(XtaskError::Cmd {
             cmd: "package --mei".to_owned(),
             msg: format!(
-                "no Mei release binary in {}; run `just dist-mei` first",
+                "no Mei release binary `{archive_name}` in {}; run `just dist-mei` first",
+                target.release_dir(root).display()
+            ),
+        });
+    }
+    if !face.is_file() {
+        return Err(XtaskError::Cmd {
+            cmd: "package --mei".to_owned(),
+            msg: format!(
+                "no Calyx release binary `{face_name}` in {}; run `just dist-mei` first",
                 target.release_dir(root).display()
             ),
         });
@@ -211,8 +165,13 @@ pub(crate) fn run_mei(root: &Path, target: &ReleaseTarget) -> Result<String, Xta
     );
     let entries = [
         Entry {
-            name: platform::MEI_BINARY.to_owned(),
+            name: archive_name.to_owned(),
             source: binary,
+            mode: 0o755,
+        },
+        Entry {
+            name: face_name.to_owned(),
+            source: face,
             mode: 0o755,
         },
         Entry {
@@ -229,7 +188,6 @@ pub(crate) fn run_mei(root: &Path, target: &ReleaseTarget) -> Result<String, Xta
     assemble(root, &stem, &entries)
 }
 
-/// Write one closed archive and report its bytes and entry count.
 fn assemble(root: &Path, stem: &str, entries: &[Entry]) -> Result<String, XtaskError> {
     let out_dir = root.join("target").join("package");
     std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
@@ -251,8 +209,6 @@ fn assemble(root: &Path, stem: &str, entries: &[Entry]) -> Result<String, XtaskE
     ))
 }
 
-/// Writes the archive with every entry under one directory, so unpacking
-/// it produces a folder rather than scattering files where it landed.
 fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), XtaskError> {
     let file = std::fs::File::create(archive).map_err(|source| XtaskError::Io {
         path: archive.display().to_string(),
@@ -291,12 +247,6 @@ fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), Xt
     Ok(())
 }
 
-/// One string of the root manifest's `[workspace.package]` - the
-/// version, the repository - read from the manifest that defines it
-/// rather than from this tool's own compiled-in copy.
-///
-/// # Errors
-/// When the manifest cannot be read or parsed, or does not state `key`.
 pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskError> {
     let path = root.join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
@@ -315,7 +265,6 @@ pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskE
         })
 }
 
-/// One string of a parsed root manifest's `[workspace.package]` table.
 pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<&'a str> {
     manifest
         .get("workspace")
@@ -325,187 +274,5 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use super::contents::Entry;
-    use super::{ReleaseTarget, cargo_target_dir, run_mei, write_archive};
-
-    fn entry(name: &str, source: std::path::PathBuf) -> Entry {
-        Entry {
-            name: name.to_owned(),
-            source,
-            mode: 0o644,
-        }
-    }
-
-    /// The two names that already exist must not move; a build for a
-    /// target other than this machine's default earns its triple in the
-    /// name, so a second Linux artifact cannot collide with the first.
-    #[test]
-    fn a_host_archive_keeps_its_name_and_a_target_archive_carries_its_triple() {
-        let host = ReleaseTarget::Host.label();
-        assert!(host.contains('-'), "host label: {host}");
-        assert!(!host.starts_with('-'), "host label: {host}");
-        let musl = ReleaseTarget::Triple("x86_64-unknown-linux-musl".to_owned());
-        assert_eq!(musl.label(), "x86_64-unknown-linux-musl");
-    }
-
-    /// A `--target` build lands under `<target>/<triple>/release`, and
-    /// the packager must look there rather than at the host's directory.
-    #[test]
-    fn a_target_build_is_looked_for_under_its_own_triple() {
-        let target = std::env::temp_dir().join("sprawling-triple");
-        let triple = "x86_64-unknown-linux-musl";
-        let dirs = [
-            ReleaseTarget::Triple(triple.to_owned()),
-            ReleaseTarget::Host,
-        ]
-        .map(|build| build.release_dir_in(&target));
-        assert_eq!(
-            dirs,
-            [target.join(triple).join("release"), target.join("release")]
-        );
-    }
-
-    /// A redirected target directory is where the release build landed;
-    /// `just mem` and `just package` go blind when it is ignored.
-    #[test]
-    fn the_target_dir_is_the_one_cargo_target_dir_names() {
-        let root = std::env::temp_dir().join("sprawling-root");
-        let lane = std::env::temp_dir().join("sprawling-lane");
-        let resolved = [
-            Some(lane.clone().into_os_string()),
-            Some("lane".into()),
-            Some("".into()),
-            None,
-        ]
-        .map(|named| cargo_target_dir(&root, named));
-        assert_eq!(
-            resolved,
-            [
-                lane,
-                root.join("lane"),
-                root.join("target"),
-                root.join("target")
-            ]
-        );
-    }
-
-    /// What the archive calls the executable follows the target it was
-    /// built for, never the machine that assembled it - and a target
-    /// this release publishes no archive for is refused rather than
-    /// guessed at.
-    #[test]
-    fn the_executable_name_follows_the_target_rather_than_the_host() {
-        let musl = ReleaseTarget::Triple("x86_64-unknown-linux-musl".to_owned());
-        assert_eq!(musl.binary_name().unwrap(), "sprawling");
-        let host = ReleaseTarget::Host;
-        assert!(
-            host.binary_name().unwrap().starts_with("sprawling"),
-            "this machine builds an archive the platform table does not claim"
-        );
-        let unpublished = ReleaseTarget::Triple("x86_64-pc-windows-gnu".to_owned());
-        assert!(unpublished.binary_name().is_err());
-    }
-
-    /// The archive nests under one directory: unpacking it into a folder
-    /// full of other things must not scatter six files across it.
-    #[test]
-    fn every_entry_sits_under_one_directory() {
-        let dir = std::env::temp_dir().join("sprawling-package-test");
-        std::fs::create_dir_all(&dir).unwrap();
-        let source = dir.join("payload.txt");
-        std::fs::write(&source, b"payload").unwrap();
-        let archive = dir.join("out.zip");
-        write_archive(
-            &archive,
-            "sprawling-9.9.9-test",
-            &[entry("QUICKSTART.md", source)],
-        )
-        .unwrap();
-
-        let bytes = std::fs::read(&archive).unwrap();
-        let listing = String::from_utf8_lossy(&bytes);
-        assert!(
-            listing.contains("sprawling-9.9.9-test/QUICKSTART.md"),
-            "entry is not under the archive's own directory"
-        );
-    }
-
-    /// Two runs over one tree produce one archive: a release that differs
-    /// from its own rebuild cannot be checked against its source.
-    #[test]
-    fn two_runs_over_the_same_files_produce_the_same_bytes() {
-        let dir = std::env::temp_dir().join("sprawling-package-repro");
-        std::fs::create_dir_all(&dir).unwrap();
-        let source = dir.join("payload.txt");
-        std::fs::write(&source, b"payload").unwrap();
-        let entries = [entry("QUICKSTART.md", source)];
-
-        let first = dir.join("first.zip");
-        let second = dir.join("second.zip");
-        write_archive(&first, "sprawling-9.9.9-test", &entries).unwrap();
-        write_archive(&second, "sprawling-9.9.9-test", &entries).unwrap();
-        assert_eq!(
-            std::fs::read(&first).unwrap(),
-            std::fs::read(&second).unwrap()
-        );
-    }
-
-    #[test]
-    fn mei_archive_carries_its_posix_binary_guide_and_licence() {
-        let root =
-            std::env::temp_dir().join(format!("sprawling-mei-package-{}", std::process::id()));
-        if root.exists() {
-            std::fs::remove_dir_all(&root).unwrap();
-        }
-        let triple = "x86_64-unknown-linux-musl";
-        let release = root.join("target").join(triple).join("release");
-        std::fs::create_dir_all(&release).unwrap();
-        std::fs::create_dir_all(root.join("Mei")).unwrap();
-        std::fs::write(
-            root.join("Cargo.toml"),
-            "[workspace.package]\nversion = '0.0.17'\n",
-        )
-        .unwrap();
-        std::fs::write(root.join("Mei/README.md"), b"guide").unwrap();
-        std::fs::write(root.join("LICENSE"), b"licence").unwrap();
-        std::fs::write(release.join("mei"), b"Mei binary").unwrap();
-
-        let target = ReleaseTarget::Triple(triple.to_owned());
-        run_mei(&root, &target).unwrap();
-        let stem = format!("mei-0.0.17-{triple}");
-        let archive = root.join("target/package").join(format!("{stem}.zip"));
-        let mut zip = zip::ZipArchive::new(std::fs::File::open(archive).unwrap()).unwrap();
-        let names: Vec<String> = (0..zip.len())
-            .map(|index| zip.by_index(index).unwrap().name().unwrap().into_owned())
-            .collect();
-        assert_eq!(
-            names,
-            [
-                format!("{stem}/mei"),
-                format!("{stem}/README.md"),
-                format!("{stem}/LICENSE")
-            ]
-        );
-        assert_eq!(zip.by_index(0).unwrap().unix_mode().unwrap() & 0o111, 0o111);
-        std::fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn mei_refuses_a_native_windows_archive_before_building_a_package() {
-        let target = ReleaseTarget::Triple("windows-x86_64".to_owned());
-        let refusal = run_mei(std::path::Path::new("unused"), &target)
-            .expect_err("Mei's POSIX boundary must reject a native Windows archive");
-        assert!(
-            refusal
-                .to_string()
-                .contains("no native Windows or otherwise unsupported archive")
-        );
-    }
-}
+#[path = "package_tests.rs"]
+mod tests;

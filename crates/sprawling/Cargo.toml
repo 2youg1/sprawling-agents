@@ -36,15 +36,8 @@ agent_protocols = { workspace = true }
 # port (crates/remote_access/Spec.lean §8-10).
 axum = { workspace = true, features = ["ws"] }
 crossterm = { workspace = true }
-# The console's renderer: the Zig leaf that draws each frame of the CLI
-# and the quiet host (`crates/console_ffi/Spec.lean`).
-console_ffi = { workspace = true }
-# The time of day the console's gutter writes, in this machine's zone
-# (`crates/sprawling/spec/Console.lean` §8-11).
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-# The one line a program status report carries is base64 of UTF-8, as
-# the protocol requires (`crates/sprawling/spec/Console/ProgramStatus.lean`).
-base64 = { workspace = true }
+# The terminal shell: frame leaf and City/Mei console backends (`Calyx/Spec.lean`).
+calyx = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }
 reqwest = { workspace = true }
@@ -142,8 +135,6 @@ winresource = { version = "0.1.31", default-features = false }
 [dev-dependencies]
 proptest.workspace = true
 tempfile.workspace = true
-# The console adapter is tested against the real core loop, without a production edge.
-mei.workspace = true
 
 [lints]
 workspace = true

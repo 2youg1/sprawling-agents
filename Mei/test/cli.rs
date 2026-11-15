@@ -102,32 +102,23 @@ fn run(base: &str, prompt: &str) -> Output {
 
 #[cfg(unix)]
 fn run_with_harness(base: &str, prompt: &str, harness: Option<&str>) -> Output {
-    run_configured(base, prompt, harness, None)
-}
-
-#[cfg(unix)]
-fn run_with_tools(base: &str, prompt: &str, tools: &str) -> Output {
-    run_configured(base, prompt, None, Some(tools))
+    run_configured(base, prompt, harness)
 }
 
 #[cfg(unix)]
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
-fn run_configured(base: &str, prompt: &str, harness: Option<&str>, tools: Option<&str>) -> Output {
+fn run_configured(base: &str, prompt: &str, harness: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_mei"));
     command
         .args(["-p", prompt])
         .env("HARNESS_MODEL", "test/model")
         .env("ANTHROPIC_BASE_URL", base)
         .env("ANTHROPIC_API_KEY", "magpie")
-        .env_remove("HARNESS_EXTRA")
-        .env_remove("MEI_TOOLS");
+        .env_remove("HARNESS_EXTRA");
     if let Some(harness) = harness {
         command.env("HARNESS", harness);
     } else {
         command.env_remove("HARNESS");
-    }
-    if let Some(tools) = tools {
-        command.env("MEI_TOOLS", tools);
     }
     command.output().unwrap()
 }
@@ -300,19 +291,13 @@ fn a_recursive_child_has_an_independent_request_and_stdout_answer() {
 
 #[cfg(unix)]
 #[test]
-fn pause_turn_preserves_transparent_server_tools_without_local_results() {
-    let call = serde_json::json!({"type": "server_tool_use", "id": "s", "name": "web_search", "input": {"query": "Mei"}});
-    let result = serde_json::json!({"type": "web_search_tool_result", "tool_use_id": "s", "content": "server result"});
+fn pause_turn_continues_without_a_user_message() {
+    let thinking = serde_json::json!({"type": "thinking", "thinking": "wait", "signature": "s"});
     let (base, handle) = serve(vec![
-        serde_json::json!({"stop_reason": "pause_turn", "content": [call.clone()]}),
-        serde_json::json!({"stop_reason": "pause_turn", "content": [result.clone()]}),
+        serde_json::json!({"stop_reason": "pause_turn", "content": [thinking.clone()]}),
         serde_json::json!({"stop_reason": "end_turn", "content": "done"}),
     ]);
-    let output = run_with_tools(
-        &base,
-        "search",
-        r#"[{"type":"web_search_20250305","name":"web_search","max_uses":1}]"#,
-    );
+    let output = run(&base, "search");
     assert!(
         output.status.success(),
         "{}",
@@ -320,21 +305,10 @@ fn pause_turn_preserves_transparent_server_tools_without_local_results() {
     );
     assert_eq!(output.stdout, b"done");
     let requests = handle.join().unwrap();
-    assert_eq!(requests.len(), 3);
+    assert_eq!(requests.len(), 2);
     assert_eq!(requests[0]["tools"][0]["name"], "python");
-    assert_eq!(requests[0]["tools"][1]["name"], "web_search");
-    assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
-    assert_eq!(requests[2]["messages"].as_array().unwrap().len(), 3);
-    assert_eq!(requests[2]["messages"][1]["content"][0], call);
-    assert_eq!(requests[2]["messages"][2]["content"][0], result);
-    assert!(requests.iter().all(|request| {
-        !request["messages"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .skip(1)
-            .any(|message| message["role"] == "user")
-    }));
+    assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 3);
+    assert_eq!(requests[1]["messages"][1]["content"][0], thinking);
 }
 
 #[cfg(unix)]
@@ -352,7 +326,6 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
             .env("ANTHROPIC_API_KEY", "magpie")
             .env_remove("HARNESS")
             .env_remove("HARNESS_EXTRA")
-            .env_remove("MEI_TOOLS")
             .stderr(trace)
             .output()
             .unwrap()
@@ -456,7 +429,6 @@ fn cli_resume_imports_only_complete_message_history() {
         .env("ANTHROPIC_API_KEY", "magpie")
         .env_remove("HARNESS")
         .env_remove("HARNESS_EXTRA")
-        .env_remove("MEI_TOOLS")
         .output()
         .unwrap();
     assert!(

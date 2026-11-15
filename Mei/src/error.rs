@@ -60,7 +60,7 @@ impl Code {
             Code::Session => {
                 "A resume log must contain complete Mei messages from the initial user prompt through an assistant end_turn"
             }
-            Code::Unsupported => "Mei requires POSIX process and signal semantics",
+            Code::Unsupported => "This Mei build does not support the current platform",
         }
     }
 }
@@ -145,18 +145,21 @@ fn toml_string(text: &str) -> String {
 
 impl Display for Diagnostic {
     fn fmt(&self, out: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(out, "```toml")?;
-        writeln!(out, "code = {}", toml_string(self.code.as_str()))?;
-        writeln!(out, "action = {}", toml_string(&self.action))?;
-        writeln!(out, "subject = {}", toml_string(&self.subject))?;
+        let description = format!("{}: {}", self.action, self.subject);
+        let mut cause = self.rule().to_owned();
         if let Some(path) = &self.path {
-            writeln!(out, "path = {}", toml_string(path))?;
+            cause.push_str("\npath = ");
+            cause.push_str(path);
         }
         if let Some(value) = &self.value {
-            writeln!(out, "value = {}", toml_string(value))?;
+            cause.push_str("\nvalue = ");
+            cause.push_str(value);
         }
-        writeln!(out, "rule = {}", toml_string(self.rule()))?;
-        writeln!(out, "recovery = {}", toml_string(&self.recovery))?;
+        writeln!(out, "```toml")?;
+        writeln!(out, "code = {}", toml_string(self.code.as_str()))?;
+        writeln!(out, "description = {}", toml_string(&description))?;
+        writeln!(out, "cause = {}", toml_string(&cause))?;
+        writeln!(out, "resolution = {}", toml_string(&self.recovery))?;
         write!(out, "```")
     }
 }
@@ -194,7 +197,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_diagnostic_is_one_actionable_toml_block() {
+    fn a_diagnostic_is_description_cause_resolution() {
         let error = protocol(
             "read response.content",
             "content is missing",
@@ -202,7 +205,7 @@ mod tests {
         );
         let shown = error.to_string();
         assert!(shown.starts_with("```toml\ncode = \"E_MEI_PROTOCOL\""));
-        for field in ["action", "subject", "rule", "recovery"] {
+        for field in ["description", "cause", "resolution"] {
             assert!(shown.contains(field), "{shown}");
         }
         assert!(shown.ends_with("```"));
@@ -218,7 +221,7 @@ mod tests {
         .with_value("quote \" \\ \t \u{1b} \0 \u{7f}");
         let shown = error.to_string();
         assert!(
-            shown.contains(r#"value = "quote \" \\ \t \u001B \u0000 \u007F""#),
+            shown.contains(r#"quote \" \\ \t \u001B \u0000 \u007F"#),
             "{shown}"
         );
     }

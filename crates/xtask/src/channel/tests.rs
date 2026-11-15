@@ -117,6 +117,14 @@ description = 'fixture description'
         )
         .unwrap();
         zip.write_all(b"Mei archive binary bytes").unwrap();
+        zip.start_file(
+            "archive/calyx",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Calyx archive binary bytes").unwrap();
         zip.finish().unwrap();
     }
     let out = fixture.join("npm");
@@ -165,6 +173,10 @@ description = 'fixture description'
             std::fs::read(out.join(package).join("bin/mei")).unwrap(),
             b"Mei archive binary bytes"
         );
+        assert_eq!(
+            std::fs::read(out.join(package).join("bin/calyx")).unwrap(),
+            b"Calyx archive binary bytes"
+        );
     }
     assert!(
         std::fs::read_to_string(mei_root.join("bin/mei.cmd"))
@@ -175,7 +187,7 @@ description = 'fixture description'
 }
 
 #[test]
-fn channel_requires_posix_mei_archives() {
+fn channel_requires_mei_archives_with_the_platform_binary_name() {
     use std::io::Write as _;
     let fixture =
         std::env::temp_dir().join(format!("sprawling-mei-channel-{}", std::process::id()));
@@ -192,7 +204,7 @@ fn channel_requires_posix_mei_archives() {
     .unwrap();
     std::fs::write(
         fixture.join("Mei/Cargo.toml"),
-        "[package]\ndescription = 'Archetype:Mei fixture'\n",
+        "[package]\ndescription = 'Mei fixture'\n",
     )
     .unwrap();
     let row = &PLATFORMS[0];
@@ -228,14 +240,17 @@ fn channel_requires_posix_mei_archives() {
     .unwrap();
     zip.write_all(b"mei").unwrap();
     zip.finish().unwrap();
-    let windows = super::run(
+    let wrong_name = super::run(
         &fixture,
         "v0.0.10-Alpha-261005",
         &assets,
-        &fixture.join("windows"),
+        &fixture.join("wrong-name"),
     )
-    .expect_err("Mei has no native Windows package");
-    assert!(windows.to_string().contains("not a supported Mei archive"));
+    .expect_err("a Windows Mei archive must hold mei.exe");
+    assert!(
+        wrong_name.to_string().contains("holds no file named mei.exe"),
+        "{wrong_name}"
+    );
     std::fs::remove_dir_all(fixture).unwrap();
 }
 
@@ -285,6 +300,14 @@ description = 'fixture'
         )
         .unwrap();
         zip.write_all(b"Mei binary").unwrap();
+        zip.start_file(
+            "application/calyx",
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"Calyx binary").unwrap();
         zip.finish().unwrap();
     }
     let out = fixture.join("out");
