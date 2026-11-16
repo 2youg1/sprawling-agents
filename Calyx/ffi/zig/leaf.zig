@@ -13,8 +13,9 @@
 // can lend a longer buffer and ask again.
 
 const std = @import("std");
-const part = @import("part.zig");
-const scene = @import("scene.zig");
+pub const part = @import("part.zig");
+pub const write = @import("write.zig");
+pub const scene = @import("scene.zig");
 const frame = @import("frame.zig");
 const quiet = @import("quiet.zig");
 
@@ -28,7 +29,7 @@ pub const Drawn = extern struct {
 /// the leaf carries no symbol lookup and builds the same on every target.
 pub const panic = std.debug.no_panic;
 
-export fn sprawling_console_draw(bytes: [*]const u8, len: usize, into: [*]u8, capacity: usize, drawn: *Drawn) u32 {
+pub fn sprawling_console_draw(bytes: [*]const u8, len: usize, into: [*]u8, capacity: usize, drawn: *Drawn) u32 {
     var out: std.Io.Writer = .fixed(into[0..capacity]);
     var r: scene.Reader = .{ .bytes = bytes[0..len] };
     const left = draw(&out, &r) catch |err| return @backingInt(switch (err) {
@@ -52,6 +53,7 @@ fn draw(out: *std.Io.Writer, r: *scene.Reader) frame.Error!frame.Left {
 
 test {
     _ = @import("scene.zig");
+    _ = write;
     _ = @import("text.zig");
     _ = @import("paint.zig");
     _ = @import("flow.zig");

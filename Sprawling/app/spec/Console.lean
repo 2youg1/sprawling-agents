@@ -8,7 +8,7 @@
 
 规定 `Calyx/src/console.rs` 与 `Calyx/src/console/`：服务中的那个终端（`calyx::console`）。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `Sprawling/app/spec/Console/Lifecycle.lean`，那里的转移向量由 `calyx::console::lifecycle` 的测试逐行回放；报告给终端的程序状态（OSC 7501）的模型在 `Sprawling/app/spec/Console/ProgramStatus.lean`，由 `calyx::console::program_status` 的测试回放；其余接口形状与取舍由 Rust 的类型与 `calyx::console::tests::helpers`、`calyx::console::tests::parsing`、`calyx::console::tests::terminal` 守住。
+这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `Sprawling/app/spec/Console/Lifecycle.lean`，那里的转移向量由 `calyx::console::lifecycle` 的测试逐行回放；报告给终端的程序状态（OSC 7501）的模型在 `Sprawling/app/spec/Console/ProgramStatus.lean`，由 `Calyx/shell/program_status.zig` 的测试回放；其余接口形状与取舍由 Rust 的类型与 `calyx::console::tests::helpers`、`calyx::console::tests::parsing`、`calyx::console::tests::terminal` 守住。
 -/
 
 /-!
@@ -65,7 +65,7 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **安静宿主（`QuietHost`）**：备用屏、raw 模式，恰好两行，作为一块放在屏幕正中：地址，与配对码（本地门给出时；没有就只有地址），外加至多一行临时行，在下方隔一行：远程门的确认码，或收口进度。监听超出这台电脑、城为这次 serve 现铸了 key 时（`Terminal.token`），key 跟在第二行的配对码后面：备用屏是它唯一出现的地方，CLI 里要看它就 `/web`。主屏、回滚、地址栏与行控制台都不出现 key，`/web` 印出的地址不带 `?token=`，浏览器经 open code 配对（`firstrun::open_paired`）。Enter 再开一次浏览器，Esc 回到 `Cli`，主屏的回滚原样都在。离开备用屏之前先擦掉它（`Clear(All)` 再 `LeaveAlternateScreen`），因为用户设置可以让备用屏进回滚；真正的保证是配对码寿命短。窗口标题写「sprawling · closing this window stops it」，标题里不放配对码。安静宿主不印事件流；它显示期间进转写的行留给 CLI（至多 512 行），人按 Esc 回来时一并写进回滚。
 
-**程序状态**（`calyx::console::program_status`，模型、性质与取舍见 `Console/ProgramStatus.lean` D77）：CLI 与安静宿主两个面以 Program Status Protocol（OSC 7501）向终端报告整座城一条根记录：有请求待批是 `blocked`，有 run 在跑是 `working`，都没有时由最后一个结束的 run 决定 `done`、`error` 或 `idle`。UI 线程在开控制台、换面、读到 `run_started`、`run_frozen`、`approval_requested`、`approval_resolved` 时问一次 `Query::Metrics`，与终端存着的那条相同就不写，交还终端之前写 `state=clear`。报告只带计数，记录里的字到不了终端。`SPRAWLING_PROGRAM_STATUS=never` 关掉它；`Headless` 没有终端，不报告。
+**程序状态**（`Calyx/shell/program_status.zig`，模型、性质与取舍见 `Console/ProgramStatus.lean` D77）：CLI 与安静宿主两个面以 Program Status Protocol（OSC 7501）向终端报告整座城一条根记录：有请求待批是 `blocked`，有 run 在跑是 `working`，都没有时由最后一个结束的 run 决定 `done`、`error` 或 `idle`。壳在开控制台、换面、读到 `run_started`、`run_frozen`、`approval_requested`、`approval_resolved` 时问一次 `Query::Metrics`（经宿主），与终端存着的那条相同就不写，交还终端之前写 `state=clear`。报告只带计数，记录里的字到不了终端。`SPRAWLING_PROGRAM_STATUS=never` 关掉它；`Headless` 没有终端，不报告。
 
 -/
 

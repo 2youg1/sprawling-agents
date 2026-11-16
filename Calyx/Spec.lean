@@ -34,9 +34,16 @@ Calyx 不实现模型环、不声明工具、不注入 AGENTS。
 - 城：`sprawling` 经宿主 ABI 进入同一套 Zig 壳；斜杠、远程钩子、生命周期与今日 Console 合同一致。
 - 无头 `mei -p`、`mei --resume` 与管道 stdin 不依赖 Calyx 进程。
 - `Calyx/src` 不得再含壳实现（输入/生命周期/编辑器/菜单/屏面编排/按键/Mei 交互面）；由
-  `cargo xtask residue` 的 Calyx 壳残留规则与 `zig build test`（`Calyx/`）守住。
+  Calyx 壳残留门禁与 `zig build test`（`Calyx/`）守住。
+- **兼容回归**（生产门）：Mei 交互与无头、城控制台斜杠/生命周期、帧叶 vt100 对照、生命周期 160 向量，
+  在切到 Zig 壳后仍绿；删 Rust 壳模块前先有可失败的特征化/等价检查。
+- **模糊测试**：对 argv/`--replay`、编辑器输入、termio 字节流、scene 写叶（含既有敌意字节）、
+  城宿主→壳事件载荷，在 `ReleaseSafe` 下跑种子循环（或同等 fuzz）；结果仅为良类型事件/状态或拒绝，
+  从不陷阱。
+- **压力 / 内存**：编辑器与屏面重绘在可检测泄漏的分配器下循环；C ABI 缓冲越界路径只答
+  BufferTooSmall；帧之间不累积泄漏。默认 `zig build test` 至少含一处 GPA/泄漏断言。
 - `cargo test -p sprawling-calyx --lib`、`cargo test -p sprawling-console-ffi --lib`、
-  以及受影响的 sprawling 装配测试绿色。
+  受影响的 sprawling 装配与 Mei 测试绿色。
 -/
 
 /-! ## 3 假设与歧义

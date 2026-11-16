@@ -142,27 +142,6 @@ impl Session {
         Next::Stay
     }
 
-    pub(crate) fn answer_waiting(
-        &mut self,
-        inside: &Inside,
-        verdict: kernel::Ruling,
-        say: &Say,
-    ) -> bool {
-        if self.seen.waiting.is_empty() {
-            return false;
-        }
-        self.answer(inside, None, verdict, say);
-        true
-    }
-
-    pub(crate) fn interrupt(&mut self, inside: &Inside, say: &Say) {
-        if let Some(run) = self.seen.run {
-            let idem = self.keys.next();
-            self.post(inside, wire::WireCommand::Cancel { run, idem }, say);
-            say(format!("  stopping the run in {}", self.room.as_str()));
-        }
-    }
-
     fn scope(&self, reach: Reach) -> wire::HaltScope {
         let building = self
             .room
