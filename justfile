@@ -93,7 +93,7 @@ check-branch base="main":
     gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments') || exit 2
     step guard cargo xtask gates guard --range "$mb..HEAD"
     step fmt just fmt-check
-    touched client && step build-web just build-web
+    touched RefRain && step build-web just build-web
     if [ -n "$packages" ]; then
         step clippy just clippy
         step tests just test --no-fail-fast --no-tests=warn -E "$(just branch-tests "$mb" $packages)"
@@ -102,7 +102,7 @@ check-branch base="main":
     step gates cargo xtask gates $gates --range "$mb..HEAD"
     step file-gates cargo xtask gates length comments --files "${changed[@]}"
     step deny just deny
-    touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
+    touched RefRain && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched Sprawling/desktop/ffi && step desktop just check-desktop
     touched Calyx/ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
