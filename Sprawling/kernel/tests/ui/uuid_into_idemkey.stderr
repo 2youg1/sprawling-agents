@@ -1,23 +1,23 @@
 error[E0277]: the trait bound `IdemKey: From<RunId>` is not satisfied
-  --> tests/ui/uuid_into_idemkey.rs:19:15
-   |
-19 |     minting::<kernel::IdemKey>();
-   |               ^^^^^^^^^^^^^^^ the trait `From<RunId>` is not implemented for `IdemKey`
-   |
+ --> tests/ui/uuid_into_idemkey.rs:8:15
+  |
+8 |     minting::<kernel::IdemKey>();
+  |               ^^^^^^^^^^^^^^^ the trait `From<RunId>` is not implemented for `IdemKey`
+  |
 note: required by a bound in `minting`
-  --> tests/ui/uuid_into_idemkey.rs:18:19
-   |
-18 |     fn minting<T: From<kernel::RunId> + From<uuid::Uuid>>() {}
-   |                   ^^^^^^^^^^^^^^^^^^^ required by this bound in `minting`
+ --> tests/ui/uuid_into_idemkey.rs:7:19
+  |
+7 |     fn minting<T: From<kernel::RunId> + From<uuid::Uuid>>() {}
+  |                   ^^^^^^^^^^^^^^^^^^^ required by this bound in `minting`
 
 error[E0277]: the trait bound `IdemKey: From<Uuid>` is not satisfied
-  --> tests/ui/uuid_into_idemkey.rs:19:15
-   |
-19 |     minting::<kernel::IdemKey>();
-   |               ^^^^^^^^^^^^^^^ the trait `From<Uuid>` is not implemented for `IdemKey`
-   |
+ --> tests/ui/uuid_into_idemkey.rs:8:15
+  |
+8 |     minting::<kernel::IdemKey>();
+  |               ^^^^^^^^^^^^^^^ the trait `From<Uuid>` is not implemented for `IdemKey`
+  |
 note: required by a bound in `minting`
-  --> tests/ui/uuid_into_idemkey.rs:18:41
-   |
-18 |     fn minting<T: From<kernel::RunId> + From<uuid::Uuid>>() {}
-   |                                         ^^^^^^^^^^^^^^^^ required by this bound in `minting`
+ --> tests/ui/uuid_into_idemkey.rs:7:41
+  |
+7 |     fn minting<T: From<kernel::RunId> + From<uuid::Uuid>>() {}
+  |                                         ^^^^^^^^^^^^^^^^ required by this bound in `minting`

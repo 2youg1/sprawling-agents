@@ -7,9 +7,9 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::reading::{MachineClass, row_line, spread_of};
 use kernel::{AxCode, AxError};
 use sprawling::monitor::spread::micros;
-use crate::reading::{MachineClass, row_line, spread_of};
 
 use super::concurrent::{VirtualCounter, keep_both};
 use super::{Arm, Identity, Measurement, Memory, Observation, Report, Sample};

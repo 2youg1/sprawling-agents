@@ -11,8 +11,7 @@ use serde_json::{Value, json};
 use crate::script::Step;
 
 use super::{
-    Episode, Setup, address, answered, answered_text, ensure, failed, notes,
-    started_under,
+    Episode, Setup, address, answered, answered_text, ensure, failed, notes, started_under,
 };
 
 const MARK: &str = "kiln-temperature-1280";

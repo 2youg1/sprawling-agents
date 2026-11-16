@@ -1,7 +1,7 @@
 error[E0599]: no method named `verified_by` found for struct `Pr<Open>` in the current scope
-  --> tests/ui/open_pr_has_no_verifier.rs:16:18
+  --> tests/ui/open_pr_has_no_verifier.rs:13:18
    |
-16 |     let _ = open.verified_by();
+13 |     let _ = open.verified_by();
    |                  ^^^^^^^^^^^
    |
 help: there is a method `verified` with a similar name, but with different arguments

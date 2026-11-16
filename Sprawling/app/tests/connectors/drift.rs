@@ -5,8 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use super::offering::{apps_reference, apps_rows, assert_only_namespace_count, catalog_drifts};
 use super::*;
-use super::offering::{apps_reference, assert_only_namespace_count, catalog_drifts, apps_rows};
 
 #[test]
 fn a_removed_tool_is_recorded_without_removing_its_pin() {

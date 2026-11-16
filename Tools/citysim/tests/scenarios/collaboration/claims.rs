@@ -15,17 +15,15 @@
 use std::sync::Arc;
 
 use kernel::layout::CityLayout;
-use kernel::{
-    Address, EventKind, EventRecord,
-};
+use kernel::{Address, EventKind, EventRecord};
 
 use super::board::{
-    Board, CHECKER, GLAZER, MAKER, NOTES, NOTES_BEFORE, POTTER, Planners,
-    room_of,
-    REDO, plan_lab, plan_trace,
+    Board, CHECKER, GLAZER, MAKER, NOTES, NOTES_BEFORE, POTTER, Planners, REDO, plan_lab,
+    plan_trace, room_of,
 };
-use super::ledger::{Lines, Mark, city, dispatch, frozen, quiet, raise, serve, serve_in_turn, started};
-
+use super::ledger::{
+    Lines, Mark, city, dispatch, frozen, quiet, raise, serve, serve_in_turn, started,
+};
 
 #[test]
 fn a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim() {

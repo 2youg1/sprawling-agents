@@ -109,7 +109,7 @@ esac
             format!(r#"#!/bin/bash
 set -eu -o pipefail
 export SPRAWLING_GUARD_RECORD="$2"
-'{executable}' --exact tools::exec::tests::container::guardian_process --ignored --nocapture --quiet | awk '/^ready$/ {{print; fflush()}}'
+'{executable}' --exact tools::exec::tests::container::guardian::guardian_process --ignored --nocapture --quiet | awk '/^ready$/ {{print; fflush()}}'
 touch '{exited}'
 "#),
         ).unwrap();

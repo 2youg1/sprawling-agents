@@ -13,16 +13,14 @@
 )]
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 
 use accounting::worker::{Closing, CommandDesk, RunWorker};
 use kernel::event::record::RunStarted;
 use kernel::layout::CityLayout;
-use kernel::{
-    Address, EventKind, EventRecord, IdemKey, RunId, Seq,
-};
+use kernel::{Address, EventKind, EventRecord, IdemKey, RunId, Seq};
 
 use super::roles::{Counted, hands, idem};
 

@@ -21,9 +21,8 @@ mod cold;
 mod concurrent;
 mod reporting;
 pub(crate) use cold::COLD_COMMAND;
-use reporting::{memory_observations, round_observations};
 use concurrent::memory_line;
-
+use reporting::{memory_observations, round_observations};
 
 /// Pilot counts for a baseline capture; a final comparison chooses precision
 /// from its pre-registered interval width instead of treating these as enough.

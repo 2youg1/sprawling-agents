@@ -273,7 +273,10 @@ mod tests {
     fn declaration<T: JsonSchema>() -> String {
         let schema = T::json_schema(&mut SchemaGenerator::default());
         let name = T::schema_name();
-        let description = schema.get("description").and_then(Value::as_str).unwrap();
+        assert!(
+            schema.get("description").and_then(Value::as_str).is_some(),
+            "{name}: schema description missing"
+        );
         let body = match (schema.get("pattern"), schema.get("enum")) {
             (Some(pattern), None) => format!(
                 "Schema.String.check(Schema.isPattern(new RegExp({pattern}, \"u\"))).pipe(Schema.brand(\"{name}\"))"
@@ -288,17 +291,26 @@ mod tests {
             (None, None) => format!("Schema.String.pipe(Schema.brand(\"{name}\"))"),
             other => panic!("{name}: no declaration shape for {other:?}"),
         };
-        format!("/**\n * {description}\n */\nexport const {name} = {body};\n")
+        format!("export const {name} = {body};")
     }
 
     #[test]
     fn the_committed_client_declares_every_hand_written_schema() {
-        let client = std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../client/src/wire.ts"
-        ))
-        .unwrap()
-        .replace("\r\n", "\n");
+        let wire_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../client/src/wire");
+        let mut client = String::new();
+        let mut entries: Vec<_> = std::fs::read_dir(wire_dir)
+            .unwrap_or_else(|why| panic!("read {wire_dir}: {why}"))
+            .map(|entry| entry.expect("wire dir entry").path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "ts"))
+            .collect();
+        entries.sort();
+        for path in entries {
+            client.push_str(
+                &std::fs::read_to_string(&path)
+                    .unwrap_or_else(|why| panic!("read {}: {why}", path.display()))
+                    .replace("\r\n", "\n"),
+            );
+        }
         for declared in [
             declaration::<AxCode>(),
             declaration::<Address>(),
@@ -312,7 +324,7 @@ mod tests {
         ] {
             assert!(
                 client.contains(&declared),
-                "client/src/wire.ts lacks\n{declared}"
+                "client/src/wire lacks\n{declared}"
             );
         }
     }

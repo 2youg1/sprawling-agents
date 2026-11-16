@@ -5,8 +5,8 @@
 
 use std::path::Path;
 
-use kernel::event::record::ToolAnswer;
 use kernel::RunId;
+use kernel::event::record::ToolAnswer;
 use serde_json::{Map, Value};
 
 use crate::city::History;

@@ -5,8 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use super::*;
 use super::drift::{Callers, Calling, Seen};
+use super::*;
 
 #[test]
 fn a_run_is_offered_the_tools_the_worker_was_handed() {
@@ -162,7 +162,9 @@ pub(crate) fn apps_reference(city_root: &std::path::Path) -> kernel::McpReferenc
         .unwrap()
 }
 
-pub(crate) fn catalog_drifts(city_root: &std::path::Path) -> Vec<kernel::event::record::CatalogDrift> {
+pub(crate) fn catalog_drifts(
+    city_root: &std::path::Path,
+) -> Vec<kernel::event::record::CatalogDrift> {
     storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
         .unwrap()
         .iter()

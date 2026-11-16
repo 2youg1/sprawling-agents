@@ -16,14 +16,8 @@ use std::sync::Arc;
 
 use kernel::EventKind;
 
-use super::ledger::{
-    city, dispatch, frozen, frozen_seq, raise, serve,
-    started,
-};
-use super::roles::{
-    CHILDREN, Child, Counts, ROUNDS, Roles, Send, Shared, Siblings,
-    play,
-};
+use super::ledger::{city, dispatch, frozen, frozen_seq, raise, serve, started};
+use super::roles::{CHILDREN, Child, Counts, ROUNDS, Roles, Send, Shared, Siblings, play};
 
 #[test]
 fn tp3_three_delegated_children_start_at_the_call_and_run_side_by_side() {

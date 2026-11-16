@@ -19,8 +19,7 @@ use std::time::Duration;
 
 use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, Model, ModelRequest,
-    ModelReturn, RunId,
+    Address, AxError, ContentBlock, EventKind, EventRecord, Model, ModelRequest, ModelReturn, RunId,
 };
 use serde_json::{Value, json};
 
@@ -45,7 +44,6 @@ pub(super) const PLAN: &str = "\
 |---|------|--------|-------|--------|----------|
 | 1 | fire the kiln | 1 |  | Not started |  |
 ";
-
 
 /// The marks the plan scenarios' runs wait on, and the ledger the lead
 /// reads to know a child has frozen.

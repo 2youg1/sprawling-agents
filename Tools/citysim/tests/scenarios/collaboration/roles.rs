@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use accounting::worker::hands::Hands;
 use kernel::{
-    AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
-    ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
+    AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest, ModelReturn,
+    Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
 };
 use serde_json::{Value, json};
 

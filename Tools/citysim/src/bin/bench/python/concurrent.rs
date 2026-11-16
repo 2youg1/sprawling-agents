@@ -6,16 +6,16 @@
 use std::sync::{Barrier, mpsc};
 use std::time::Duration;
 
+use runtime::{Sandbox as _, SandboxExit};
 use sprawling::monitor::spread::micros;
 use sprawling::monitor::tree::{Tree, TreeReading};
-use runtime::{Sandbox as _, SandboxExit};
 
-use crate::reading::MachineClass;
 use super::{
     CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, STATE_CLEAN,
     STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, raw_job,
     timed_outcome,
 };
+use crate::reading::MachineClass;
 
 pub(crate) fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
     check_state_isolation(prepared)?;
@@ -252,7 +252,10 @@ pub(super) fn monitor_memory(
 }
 
 /// Neither a measurement failure nor a cleanup failure erases the other.
-pub(crate) fn keep_both<T, U>(work: Result<T, String>, cleanup: Result<U, String>) -> Result<(T, U), String> {
+pub(crate) fn keep_both<T, U>(
+    work: Result<T, String>,
+    cleanup: Result<U, String>,
+) -> Result<(T, U), String> {
     match (work, cleanup) {
         (Ok(work), Ok(cleanup)) => Ok((work, cleanup)),
         (Err(work), Ok(_)) => Err(work),

@@ -63,7 +63,7 @@ fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
         let mut parent = Command::new(&executable)
             .args([
                 "--exact",
-                "tools::exec::tests::container::guardian_parent_process",
+                "tools::exec::tests::container::guardian::guardian_parent_process",
                 "--ignored",
                 "--nocapture",
             ])

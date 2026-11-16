@@ -1,12 +1,12 @@
 error[E0423]: cannot initialize a tuple struct which contains private fields
-  --> tests/ui/forge_done.rs:10:26
-   |
-10 |     let forged = kernel::Evidence(vec![]);
-   |                          ^^^^^^^^
-   |
-   = note: a struct named `kernel::Evidence` exists in another namespace
+ --> tests/ui/forge_done.rs:7:26
+  |
+7 |     let forged = kernel::Evidence(vec![]);
+  |                          ^^^^^^^^
+  |
+  = note: a struct named `kernel::Evidence` exists in another namespace
 note: constructor is not visible here due to private fields
-  --> src/completion.rs
-   |
-   | pub struct Evidence(Vec<EventRef>);
-   |                     ^^^^^^^^^^^^^ private field
+ --> src/completion.rs
+  |
+  | pub struct Evidence(Vec<EventRef>);
+  |                     ^^^^^^^^^^^^^ private field
