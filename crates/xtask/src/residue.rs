@@ -137,7 +137,7 @@ fn retired_residue(
     }
     for file in walk::files(root)? {
         let rel = walk::rel(root, &file);
-        if !is_active_config(&rel) {
+        if walk::in_isolation_zone(&rel) || !is_active_config(&rel) {
             continue;
         }
         let Ok(text) = std::fs::read_to_string(&file) else {
@@ -214,17 +214,11 @@ fn transition_row(rel: &str, line: &str, table: &Table, legacy: &LegacyPath) -> 
 fn line_names_legacy(line: &str, legacy: &str) -> bool {
     let needle = format!("{legacy}/");
     let needle_win = format!("{legacy}\\");
-    let path_hit = release::path_tokens(line).into_iter().any(|token| {
+    release::path_tokens(line).into_iter().any(|token| {
         let trimmed = token.trim_end_matches(['.', '-']);
         let rest = trimmed.strip_prefix("./").unwrap_or(trimmed);
         rest.starts_with(&needle) || rest.starts_with(&needle_win)
-    });
-    if path_hit {
-        return true;
-    }
-    let double = format!("\"{legacy}\"");
-    let single = format!("'{legacy}'");
-    line.contains(&double) || line.contains(&single)
+    })
 }
 
 #[cfg(test)]
@@ -326,6 +320,30 @@ status = "live"
     }
 
     #[test]
+    fn the_isolation_zone_is_outside_the_scan() {
+        let root = scratch("local");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(&root, "local/notes.toml", "old = \"crates/kernel\"\n");
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn a_quoted_label_that_is_not_a_path_is_not_residue() {
+        let root = scratch("label");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(
+            &root,
+            ".github/workflows/ci.yml",
+            "if: matrix.environment == 'crates'\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
     fn a_wrong_case_sibling_of_a_current_root_is_refused() {
         let root = scratch("case");
         fixture::write(&root, modmap::MAP, &minimal_table(false));
@@ -343,6 +361,7 @@ status = "live"
         assert!(line_names_legacy("members = [\"crates/kernel\"]", "crates"));
         assert!(!line_names_legacy("the crates themselves", "crates"));
         assert!(line_names_legacy("path = \"./crates/xtask\"", "crates"));
-        assert!(line_names_legacy("members = [\"crates\"]", "crates"));
+        assert!(!line_names_legacy("members = [\"crates\"]", "crates"));
+        assert!(!line_names_legacy("matrix.environment == 'client'", "client"));
     }
 }

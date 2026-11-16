@@ -33,7 +33,7 @@ Markdown 时的标签 `8-n`，别处引作 `crates/xtask/Spec.lean §8-n`。
 | modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应，测试模块无条目也可（D40）；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
-| residue | 产品根只从 `architecture.toml` 的 `[[product_root]]` 读；`[[legacy_path]]` 在 `status = "retired"` 后不得以根目录或活动配置（toml／yaml／nix／json／sh／ps1／just／justfile／`.github/`）残留；历史 `CHANGELOG.md` 不扫，`residue-ok:` 覆盖本行与下一行；`layout = "current"` 的根须在盘且拒绝错误大小写的同级目录（D45） |
+| residue | 产品根只从 `architecture.toml` 的 `[[product_root]]` 读；`[[legacy_path]]` 在 `status = "retired"` 后不得以根目录或活动配置（toml／yaml／nix／json／sh／ps1／just／justfile／`.github/`）里的路径记号（`crates/` 形，含 `./`）残留；隔离区 `local/`、历史 `CHANGELOG.md` 不扫，`residue-ok:` 覆盖本行与下一行；引号标签（如 CI 的 `'client'`）不算路径；`layout = "current"` 的根须在盘且拒绝错误大小写的同级目录（D45） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；`wording-ok:` 豁免它所在的块里的专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17、§8-38 与 §8-51 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
@@ -1408,7 +1408,7 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 
    D44 **文件门支持显式的变更文件作用域（人的定规）。** `length comments --files <path>...` 只判这些仓库相对路径；空清单判空，绝不回退全树，绝对路径、盘符与 `..` 以 `invalid-file-scope` 拒绝。只有这两道文件级门接受该参数，其他门入选时以 `unsupported-file-scope` 拒绝，因为局部读取不能冒充它们的整树结论。全量运行保留为迁移盘点；日常与 `check-branch`／CI 判变更文件，触及旧违规就必须清完。被否：①记录旧文件豁免表——第二份债务名册会漂移，而路径范围来自本次变更本身；②无路径时自动全扫——一次没有源码变更的提交会重新背上全部旧债。重开参数：其他门形成同等的局部判定契约，逐门增加，不共用一个假称全树的参数。
 
-D45 **产品根路径表是搬迁与残留门的唯一权威；旧路径在标记 retired 之前不判红。** `architecture.toml` 的 `[[product_root]]` 列出 `Sprawling`／`Tools`／`Calyx`／`RefRain`／`Mei` 五个根（路径大小写锁定），`layout` 区分今日已有与计划根，`transition` 记录改名前仍持有的目录（今日 `RefRain`←`client`）；`[[legacy_path]]` 记录 `crates`／`client`，`status = "live"` 时本门只校验表形与当前根的错误大小写同级目录，不因未搬迁布局变红；`status = "retired"` 后拒绝根目录残留与活动配置中的路径记号，历史 `CHANGELOG.md` 与 `residue-ok:` 行除外，表内定义该路径的行除外。`product_roots::path_of` 供后续搬迁与包叶名拼接成目录，禁止第二张路径对照表。被否：①在 CI／Nix／Lean 各自硬编码根——加产品要改多处；②迁完才加残留门——迁后无法证明「零残留」曾被机器拒绝过。重开参数：第二个过渡别名，或活动配置的文件类需要扩大。
+D45 **产品根路径表是搬迁与残留门的唯一权威；旧路径在标记 retired 之前不判红。** `architecture.toml` 的 `[[product_root]]` 列出 `Sprawling`／`Tools`／`Calyx`／`RefRain`／`Mei` 五个根（路径大小写锁定），`layout` 区分今日已有与计划根，`transition` 记录改名前仍持有的目录（今日 `RefRain`←`client`）；`[[legacy_path]]` 记录 `crates`／`client`，`status = "live"` 时本门只校验表形与当前根的错误大小写同级目录，不因未搬迁布局变红；`status = "retired"` 后拒绝根目录残留与活动配置中的路径记号（`crates/` 形），隔离区 `local/`、历史 `CHANGELOG.md` 与 `residue-ok:` 行除外，表内定义该路径的行除外；引号标签不算路径。`product_roots::path_of` 供后续搬迁与包叶名拼接成目录，禁止第二张路径对照表。被否：①在 CI／Nix／Lean 各自硬编码根——加产品要改多处；②迁完才加残留门——迁后无法证明「零残留」曾被机器拒绝过。重开参数：第二个过渡别名，或活动配置的文件类需要扩大。
 8. **报告**：三段式渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
 
 ### 两个设计
