@@ -2,7 +2,7 @@
 # repository states it.
 #
 # `npm` reads `client/node_modules` to judge every licence and `render`
-# opens `crates/sprawling/web-dist/index.html` to measure the page. Neither skips
+# opens `Sprawling/app/web-dist/index.html` to measure the page. Neither skips
 # when what it judges is absent: a gate that silently judged nothing let
 # one run report green on twelve gates while claiming fourteen, so both
 # refuse instead. A job that runs them therefore has to supply the tree
@@ -36,7 +36,7 @@ runs:
       id: bundle
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        path: crates/sprawling/web-dist
+        path: Sprawling/app/web-dist
         key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       if: steps.bundle.outputs.cache-hit != 'true'
@@ -46,7 +46,7 @@ runs:
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
     # 6-7 s, and a `bun install` with no cache at all took 7 s, so the
-    # entry bought nothing there (`crates/xtask/Spec.lean` D27).
+    # entry bought nothing there (`Tools/xtask/Spec.lean` D27).
     - name: bun's download directory on the work drive
       if: runner.os == 'Windows' && steps.bundle.outputs.cache-hit != 'true'
       shell: pwsh
@@ -72,5 +72,5 @@ runs:
     - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       if: inputs.want == 'bundle' && steps.bundle.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
       with:
-        path: crates/sprawling/web-dist
+        path: Sprawling/app/web-dist
         key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}

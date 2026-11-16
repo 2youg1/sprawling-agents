@@ -1,7 +1,7 @@
 # Real privacy writes on disposable Windows runners
-# (crates/sprawling/spec/Privacy.lean section 16).
+# (Sprawling/app/spec/Privacy.lean section 16).
 #
-# The ignored tests in crates/sprawling/tests/privacy_disposable.rs write
+# The ignored tests in Sprawling/app/tests/privacy_disposable.rs write
 # the registry, the user environment and scheduled tasks through the
 # built binary's privacy verbs, and refuse to run anywhere but here. The
 # step that runs them exports every registry key the controls write before
@@ -20,10 +20,10 @@ on:
   push:
     branches: ["s10/**"]
     paths:
-      - crates/sprawling/src/privacy/**
-      - crates/sprawling/spec/Privacy*
-      - crates/sprawling/spec/Privacy/**
-      - crates/sprawling/tests/privacy_disposable.rs
+      - Sprawling/app/src/privacy/**
+      - Sprawling/app/spec/Privacy*
+      - Sprawling/app/spec/Privacy/**
+      - Sprawling/app/tests/privacy_disposable.rs
       - .github/workflows/privacy-windows-acceptance.yml
       - .github/workflows/privacy-ui.mjs
       - .github/workflows/acceptance-focus.mjs

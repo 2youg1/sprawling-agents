@@ -11,7 +11,7 @@ import type { Laying } from "./replying";
 import type { Block, Laid } from "../wire";
 
 // Where the closure point falls is the city's rule and its tests
-// (`crates/documents/src/layout/tests.rs`); these pin the page's half:
+// (`Sprawling/documents/src/layout/tests.rs`); these pin the page's half:
 // which stretch goes out, and how an answer joins what is drawn.
 
 function bytes(text: string): number {

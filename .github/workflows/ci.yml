@@ -13,7 +13,7 @@
 #             both so branch protection keeps one name
 #   swap      every look under client/swap/ drawn in place of the shipped
 #             one, and judged by render as the shipped bundle is
-#   models    the Lean specifications under `crates/`
+#   models    the Lean specifications under `Sprawling/` and `Tools/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
 #   nix-eval  evaluation of the Nix package when one of its inputs moves
@@ -98,7 +98,7 @@ on:
   pull_request:
     # `edited` belongs to `title-judge.yml`, which judges the title
     # alone: a description edit re-runs one short job, not this matrix.
-    # The title is judged with the commits (crates/xtask/Spec.lean
+    # The title is judged with the commits (Tools/xtask/Spec.lean
     # §8-35) because a squash merge lands it on main as the subject.
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -141,7 +141,7 @@ jobs:
     # the job is skipped under its unexpanded matrix name. `test-build`
     # runs that way here, and `test-slice` reads its matrix from
     # `test-build.outputs.slices`, so `changes` stays a successful
-    # dependency on every path (`crates/xtask/Spec.lean` D27).
+    # dependency on every path (`Tools/xtask/Spec.lean` D27).
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -160,9 +160,9 @@ jobs:
         with:
           filters: |
             proof:
-              - 'crates/kernel/**'
-              - 'crates/xtask/src/proof.rs'
-              - 'crates/xtask/src/proof/**'
+              - 'Sprawling/kernel/**'
+              - 'Tools/xtask/src/proof.rs'
+              - 'Tools/xtask/src/proof/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
             nix:
@@ -174,16 +174,18 @@ jobs:
               - 'justfile'
               - 'client/package.json'
               - 'client/bun.lock'
-              - 'crates/sprawling/build.rs'
-              - 'crates/sprawling/Cargo.toml'
-              - 'crates/desktop/ffi/zig-version'
-              - 'crates/xtask/src/package/**'
-              - 'crates/xtask/src/bundle.rs'
+              - 'Sprawling/app/build.rs'
+              - 'Sprawling/app/Cargo.toml'
+              - 'Sprawling/desktop/ffi/zig-version'
+              - 'Tools/xtask/src/package/**'
+              - 'Tools/xtask/src/bundle.rs'
             # Rust product code, gates machinery, and the files that
             # change what the Rust half of `just check` compiles or judges.
             rust:
-              - 'crates/**'
-              - 'tools/**'
+              - 'Sprawling/**'
+              - 'Tools/**'
+              - 'Calyx/**'
+              - 'Mei/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
@@ -202,9 +204,11 @@ jobs:
               - 'bunfig.toml'
             # Either product face: kept for readers that still want one bit.
             code:
-              - 'crates/**'
+              - 'Sprawling/**'
+              - 'Tools/**'
+              - 'Calyx/**'
+              - 'Mei/**'
               - 'client/**'
-              - 'tools/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
@@ -262,7 +266,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with and formatted by
-      # (`crates/desktop/Spec.lean` section 8-12). The one job whose Zig
+      # (`Sprawling/desktop/Spec.lean` section 8-12). The one job whose Zig
       # cache pays: `just check-desktop` runs `zig test`.
       - uses: ./.github/actions/zig
         with:
@@ -282,7 +286,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           PYTHONUTF8: "1"
-        run: python crates/xtask/src/channel/validate_test.py
+        run: python Tools/xtask/src/channel/validate_test.py
       - name: fmt
         if: ${{ !cancelled() }}
         run: just fmt-check
@@ -314,13 +318,13 @@ jobs:
         run: sh .github/workflows/test-nightly-release.sh
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
-      # (crates/xtask/Spec.lean §8-35).
+      # (Tools/xtask/Spec.lean §8-35).
       - name: commit messages
         if: ${{ !cancelled() }}
         uses: ./.github/actions/commit-messages
       # The desktop server and its FFI seam are workspace members, so
       # clippy and the suite judge them; what is left is the Zig leaf's
-      # own tests, which no cargo command runs (`crates/desktop/Spec.lean`
+      # own tests, which no cargo command runs (`Sprawling/desktop/Spec.lean`
       # section 8-12).
       - name: the Zig leaf's own tests
         if: ${{ !cancelled() }}
@@ -333,7 +337,7 @@ jobs:
 
   # Bundle half of the gates: npm, render and budget. Its own runner so
   # the five render passes do not share four processors with zig test
-  # (crates/xtask/Spec.lean D27).
+  # (Tools/xtask/Spec.lean D27).
   gates-artifacts:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -369,7 +373,7 @@ jobs:
 
   # Every replacement look under client/swap/ drawn in place of the
   # shipped one, and the client still typechecks, keeps its wiring tests
-  # and passes render (crates/xtask/Spec.lean section 8-13).
+  # and passes render (Tools/xtask/Spec.lean section 8-13).
   #
   # A job of its own rather than a step of `gates-artifacts`: its render
   # opens the five passes again, and a render pass keeps two to three
@@ -400,7 +404,7 @@ jobs:
       - name: the swap test
         run: just swap
 
-  # The Lean specifications. The checker in `crates/adversary/` is not built here:
+  # The Lean specifications. The checker in `Tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
   models:
@@ -426,7 +430,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
+      # `sprawling` compiles it (`Sprawling/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       # Without this every run compiles the whole graph from zero, including
       # aws-lc-sys and libgit2, which are C. A key per job, because
@@ -457,7 +461,7 @@ jobs:
   # link.exe: the archive's linked binaries are whatever
   # `cargo nextest archive` lists for the tree (citysim's scenarios are
   # one binary; sprawling/wire top-level `tests/*.rs` files are still one
-  # each — `crates/xtask/Spec.lean` D27). On a warm cache the compile from
+  # each — `Tools/xtask/Spec.lean` D27). On a warm cache the compile from
   # the first workspace crate to the archive took 171 s and 194 s in two
   # runs against 201 s with link.exe. This archive is a test build that
   # nobody downloads; `release.yml` builds what ships with link.exe, so
@@ -483,7 +487,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
+      # `sprawling` compiles it (`Sprawling/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
@@ -533,7 +537,7 @@ jobs:
   # Disjoint slices, whose union is checked before the matrix starts.
   # A `compile` slice installs the toolchain and Zig; `plain` and `client`
   # only install nextest and just, because running an archive needs no
-  # rustc (`crates/xtask/Spec.lean` D27). The rest of the setup follows
+  # rustc (`Tools/xtask/Spec.lean` D27). The rest of the setup follows
   # the `environment` `just test-slice-plan` gives it.
   test-slice:
     name: test (${{ matrix.name }})
@@ -563,7 +567,7 @@ jobs:
         id: trybuild-scratch
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-${{ matrix.name }}-
       # xtask's npm gate has tests that read the installed client tree and
       # refuse when it is missing, which is what a bare runner has.
@@ -583,7 +587,7 @@ jobs:
         if: ${{ matrix.environment == 'compile' && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
 
   # The one verdict of the suite, under the name branch protection
   # requires. It reads the build and all slices, so a slice that
@@ -634,7 +638,7 @@ jobs:
         id: trybuild-scratch
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
         run: just check-core
@@ -642,7 +646,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
       # The Rust cache's save step cannot walk trybuild's scratch
       # (rust-cache#193), so the scratch leaves before that step runs.
       - name: clear the trybuild scratch before the cache is saved
@@ -709,7 +713,7 @@ jobs:
   # prints the roster, so a harness added to the kernel cannot be proved
   # locally and forgotten in CI. A harness over one concrete value, or one
   # that builds a `Vec`, a `String` or a `BTreeSet` whose loops CBMC cannot
-  # bound, is held by a `#[test]` or a proptest instead; `crates/kernel/Spec.lean`
+  # bound, is held by a `#[test]` or a proptest instead; `Sprawling/kernel/Spec.lean`
   # section 2 records which and why.
   proof:
     needs: changes
@@ -756,11 +760,11 @@ jobs:
         run: cargo kani --version
       # `cargo xtask proof`, which is the whole of `just proof`, spelled
       # out because the `proof` gate reads this job for exactly that
-      # command (crates/xtask/src/proof.rs).
+      # command (Tools/xtask/src/proof.rs).
       - name: the proofs
         run: cargo xtask proof
 
-  # D27 in crates/xtask/Spec.lean: a path-filtered skip is allowed for the
+  # D27 in Tools/xtask/Spec.lean: a path-filtered skip is allowed for the
   # optional heavy jobs; gates and supply must still succeed, and a
   # failure or cancel anywhere fails the tree. `changes` is on this list
   # so a red or broken filter job cannot skip the suite and still leave

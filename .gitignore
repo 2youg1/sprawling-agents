@@ -1,9 +1,9 @@
 /target
 /local
 # The client bundle `just build-web` writes into the package whose build
-# script embeds it; `crates/sprawling/Cargo.toml` lists it for the
+# script embeds it; `Sprawling/app/Cargo.toml` lists it for the
 # crates.io archive by name, since cargo leaves ignored files out.
-/crates/sprawling/web-dist/
+/Sprawling/app/web-dist/
 /.lake
 # `just mutants` writes its report and the previous run's beside the
 # workspace root.
@@ -12,7 +12,7 @@
 # `mlugg/setup-zig` points Zig's global cache at the workspace root, and
 # the leaf's build fills it with the system libraries it resolves. Build
 # output, like `target/`, and the same row `walk::SKIP_DIRS` carries so no
-# gate reads it (crates/xtask/Spec.lean §8).
+# gate reads it (Tools/xtask/Spec.lean §8).
 /.zig-cache/
 # svelte-check's generated transpiled project (editor tooling writes it);
 # it is build output, and ESLint's flat config lints
@@ -26,7 +26,7 @@
 # document that sends a reader there.
 #
 # The three city names are root-anchored: a city writes its own Roadmap,
-# Memo and Handoff, and `crates/city/templates/` ships the empty shells it
+# Memo and Handoff, and `Sprawling/city/templates/` ships the empty shells it
 # writes them from. Only a copy left at the root of this repository is a mistake.
 /Roadmap.md
 /Memo.md

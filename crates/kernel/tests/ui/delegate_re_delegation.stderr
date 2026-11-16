@@ -1,5 +1,0 @@
-error[E0599]: no method named `delegate` found for struct `kernel::Delegate` in the current scope
-  --> tests/ui/delegate_re_delegation.rs:12:29
-   |
-12 |     let _grandchild = child.delegate(kernel::DelegateKind::Ephemeral);
-   |                             ^^^^^^^^ method not found in `kernel::Delegate`

@@ -3,27 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What this device keeps of its pairing, in this origin's IndexedDB:
-// the city's key it pinned, the id the door gave it, and its own key.
-// IndexedDB rather than the preferences' rows because it stores a
-// `CryptoKey` as it is, so the Ed25519 half stays a key no script can
-// export (`crates/remote_access/Spec.lean` D1, D21). The seed is never
-// kept: it was shown once, at pairing.
-//
-// One record per origin, because a device's key belongs to the host
-// name it paired under, and a browser already keeps origins apart.
-
 import type { DeviceKey } from "./keys";
 
 export interface Device {
-  // The city's whole public key, pinned for every session.
   readonly city: Uint8Array<ArrayBuffer>;
-  // Its fingerprint, as the invitation named it: what a person compares
-  // with what the console prints.
+
   readonly fingerprint: Uint8Array<ArrayBuffer>;
   readonly id: Uint8Array<ArrayBuffer>;
   readonly key: DeviceKey;
-  // When the door paired it, in this browser's milliseconds.
+
   readonly at: number;
 }
 
@@ -61,7 +49,6 @@ function done<T>(request: IDBRequest<T>): Promise<T | null> {
   });
 }
 
-// The device this origin paired, or null for none (or no IndexedDB).
 export async function kept(): Promise<Device | null> {
   const base = await opened();
   if (base === null) return null;
@@ -70,7 +57,6 @@ export async function kept(): Promise<Device | null> {
   return isDevice(found) ? found : null;
 }
 
-// Whether the record was written.
 export async function keep(device: Device): Promise<boolean> {
   const base = await opened();
   if (base === null) return false;
@@ -81,8 +67,6 @@ export async function keep(device: Device): Promise<boolean> {
   return written !== null;
 }
 
-// Whether the record is gone. The city still holds the device until
-// `/remote revoke` on its console says otherwise.
 export async function forget(): Promise<boolean> {
   const base = await opened();
   if (base === null) return false;
@@ -91,8 +75,6 @@ export async function forget(): Promise<boolean> {
   return removed !== null;
 }
 
-// A record read back is whatever the store held; it is a device only if
-// every field has the shape this module wrote.
 function isDevice(value: unknown): value is Device {
   return (
     typeof value === "object" &&

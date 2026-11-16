@@ -1,0 +1,162 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::{ATTRIBUTE, EXCUSED, Harness};
+
+pub(super) fn module_base(rel: &str) -> Option<String> {
+    let stem = rel.strip_suffix(".rs")?;
+    match stem {
+        "lib" => Some(String::new()),
+        "main" => None,
+        _ => {
+            let trimmed = stem.strip_suffix("/mod").unwrap_or(stem);
+            Some(trimmed.replace('/', "::"))
+        }
+    }
+}
+
+pub(super) fn in_file(text: &str, package: &str, rel: &str, base: &str) -> Vec<Harness> {
+    let mut out = Vec::new();
+    let mut stack: Vec<(String, usize)> = Vec::new();
+    let mut depth = 0_usize;
+    let mut pending: Option<String> = None;
+    let mut in_block = false;
+    let mut armed: Option<(usize, Option<String>)> = None;
+    let mut marker: Option<String> = None;
+    for (index, raw) in text.lines().enumerate() {
+        let trimmed = raw.trim();
+        if trimmed == ATTRIBUTE {
+            armed = Some((index, marker.clone()));
+        }
+        marker = trimmed
+            .strip_prefix(EXCUSED)
+            .map(|reason| reason.trim().to_owned());
+        let code = strip(raw, &mut in_block);
+        if let Some(name) = declared_module(&code) {
+            pending = Some(name);
+        }
+        if let Some(name) = declared_fn(&code)
+            && let Some((line, excuse)) = armed.take()
+        {
+            let mut full = String::from(base);
+            for (segment, _) in &stack {
+                push_segment(&mut full, segment);
+            }
+            push_segment(&mut full, &name);
+            out.push(Harness {
+                package: package.to_owned(),
+                location: format!("{rel}:{}", line.saturating_add(1)),
+                name: full,
+                excuse,
+            });
+        }
+        for symbol in code.chars() {
+            match symbol {
+                '{' => {
+                    depth = depth.saturating_add(1);
+                    if let Some(name) = pending.take() {
+                        stack.push((name, depth));
+                    }
+                }
+                '}' => {
+                    if stack.last().is_some_and(|(_, at)| *at == depth) {
+                        stack.pop();
+                    }
+                    depth = depth.saturating_sub(1);
+                }
+                ';' => pending = None,
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+pub(super) fn push_segment(path: &mut String, segment: &str) {
+    if !path.is_empty() {
+        path.push_str("::");
+    }
+    path.push_str(segment);
+}
+
+pub(super) fn declared_module(code: &str) -> Option<String> {
+    identifier_after(code, "mod")
+}
+
+pub(super) fn declared_fn(code: &str) -> Option<String> {
+    identifier_after(code, "fn")
+}
+
+pub(super) fn identifier_after(code: &str, keyword: &str) -> Option<String> {
+    let mut rest = code;
+    loop {
+        let at = rest.find(keyword)?;
+        let before = rest.get(..at).and_then(|head| head.chars().next_back());
+        let after = rest.get(at.saturating_add(keyword.len())..)?;
+        let boundary = before.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+        if boundary && after.starts_with(' ') {
+            let name: String = after
+                .trim_start()
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            if !name.is_empty() {
+                return Some(name);
+            }
+        }
+        rest = after;
+    }
+}
+
+pub(super) fn strip(line: &str, in_block: &mut bool) -> String {
+    let mut out = String::new();
+    let mut chars = line.chars().peekable();
+    let mut in_string = false;
+    let mut escaped = false;
+    while let Some(symbol) = chars.next() {
+        if *in_block {
+            if symbol == '*' && chars.peek() == Some(&'/') {
+                chars.next();
+                *in_block = false;
+            }
+            continue;
+        }
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if symbol == '\\' {
+                escaped = true;
+            } else if symbol == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match symbol {
+            '/' if chars.peek() == Some(&'/') => break,
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next();
+                *in_block = true;
+            }
+            '"' => in_string = true,
+            '\'' => {
+                let mut ahead = chars.clone();
+                match ahead.next() {
+                    Some('\\') => {
+                        chars.next();
+                        chars.next();
+                        chars.next();
+                    }
+                    Some(_) if ahead.next() == Some('\'') => {
+                        chars.next();
+                        chars.next();
+                    }
+                    _ => {}
+                }
+            }
+            _ => out.push(symbol),
+        }
+    }
+    out
+}

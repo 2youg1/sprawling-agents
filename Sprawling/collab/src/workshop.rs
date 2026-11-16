@@ -1,0 +1,307 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+use kernel::{Address, AxCode, AxError, Locator, Version};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct NodeId(String);
+
+impl TryFrom<String> for NodeId {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<NodeId, AxError> {
+        NodeId::parse(&raw)
+    }
+}
+
+impl From<NodeId> for String {
+    fn from(id: NodeId) -> String {
+        id.0
+    }
+}
+
+impl NodeId {
+    pub fn parse(raw: &str) -> Result<NodeId, AxError> {
+        if raw.is_empty() || raw.chars().any(char::is_whitespace) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read a node id",
+                format!("{raw:?}"),
+            )
+            .with_recovery("use a non-empty id with no whitespace"));
+        }
+        Ok(NodeId(raw.to_owned()))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NodeContract {
+    id: NodeId,
+    goal: String,
+    depends_on: BTreeSet<NodeId>,
+    reads: Vec<(Locator, Version)>,
+    write_domain: Address,
+    owner: String,
+    done_check: String,
+    stop: String,
+}
+
+impl NodeContract {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the contract is eight fields by design; a builder would hide which are required"
+    )]
+    pub fn new(
+        id: NodeId,
+        goal: String,
+        depends_on: BTreeSet<NodeId>,
+        reads: Vec<(Locator, Version)>,
+        write_domain: Address,
+        owner: String,
+        done_check: String,
+        stop: String,
+    ) -> Result<NodeContract, AxError> {
+        for (field, value) in [
+            ("goal", &goal),
+            ("owner", &owner),
+            ("done_check", &done_check),
+            ("stop", &stop),
+        ] {
+            if value.trim().is_empty() {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "build a node contract",
+                    format!("{}: {field} is empty", id.as_str()),
+                )
+                .with_recovery(
+                    "state it; a node whose stop condition or done check is unwritten is one \
+                     somebody has to guess at, and they will guess differently",
+                ));
+            }
+        }
+        Ok(NodeContract {
+            id,
+            goal,
+            depends_on,
+            reads,
+            write_domain,
+            owner,
+            done_check,
+            stop,
+        })
+    }
+
+    #[must_use]
+    pub fn id(&self) -> &NodeId {
+        &self.id
+    }
+
+    #[must_use]
+    pub fn goal(&self) -> &str {
+        &self.goal
+    }
+
+    pub fn depends_on(&self) -> impl Iterator<Item = &NodeId> {
+        self.depends_on.iter()
+    }
+
+    #[must_use]
+    pub fn reads(&self) -> &[(Locator, Version)] {
+        &self.reads
+    }
+
+    #[must_use]
+    pub fn write_domain(&self) -> &Address {
+        &self.write_domain
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    #[must_use]
+    pub fn done_check(&self) -> &str {
+        &self.done_check
+    }
+
+    #[must_use]
+    pub fn stop(&self) -> &str {
+        &self.stop
+    }
+
+    #[must_use]
+    pub fn job_text(&self) -> String {
+        let mut text = format!(
+            "## Task\n\n{}\n\n## Goal\n\n{}\n\n## Done check\n\n{}\n\n## Stop\n\n{}\n",
+            self.goal, self.goal, self.done_check, self.stop
+        );
+        if !self.reads.is_empty() {
+            text.push_str("\n## Reads\n\n");
+            for (locator, version) in &self.reads {
+                text.push_str(&format!("- {locator} @ v{}\n", version.value()));
+            }
+        }
+        text.push_str(&format!(
+            "\n## Write domain\n\n- {}\n",
+            self.write_domain.as_str()
+        ));
+        text
+    }
+}
+
+#[derive(Debug)]
+pub struct LaidOut {
+    pub schedule: Vec<NodeId>,
+    pub handed: Vec<NodeId>,
+    pub waiting: Vec<NodeId>,
+}
+
+#[derive(Debug)]
+pub struct Workshop {
+    nodes: BTreeMap<NodeId, NodeContract>,
+}
+
+impl Workshop {
+    pub fn new(contracts: Vec<NodeContract>) -> Result<Workshop, AxError> {
+        let mut nodes = BTreeMap::new();
+        for contract in contracts {
+            if nodes.contains_key(contract.id()) {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "build a workshop",
+                    contract.id().as_str().to_owned(),
+                )
+                .with_recovery("two contracts claim one node id; rename one"));
+            }
+            nodes.insert(contract.id().clone(), contract);
+        }
+        let workshop = Workshop { nodes };
+        for contract in workshop.nodes.values() {
+            for dependency in contract.depends_on() {
+                if !workshop.nodes.contains_key(dependency) {
+                    return Err(AxError::failure(
+                        AxCode::InvalidArgs,
+                        "build a workshop",
+                        format!(
+                            "{} depends on {}, which is not in the graph",
+                            contract.id().as_str(),
+                            dependency.as_str()
+                        ),
+                    )
+                    .with_recovery("add that node, or drop the dependency"));
+                }
+            }
+        }
+
+        let order = workshop.order();
+        if order.len() != workshop.nodes.len() {
+            let stuck: Vec<String> = workshop
+                .nodes
+                .keys()
+                .filter(|id| !order.contains(id))
+                .map(|id| id.as_str().to_owned())
+                .collect();
+            return Err(AxError::failure(
+                AxCode::GoalConflict,
+                "build a workshop",
+                stuck.join(", "),
+            )
+            .with_recovery(
+                "these nodes wait on each other; break the cycle by deciding which one goes first",
+            ));
+        }
+        Ok(workshop)
+    }
+
+    #[must_use]
+    pub fn schedule(&self) -> Vec<NodeId> {
+        self.order()
+    }
+
+    #[must_use]
+    pub fn ready(&self, done: &BTreeSet<NodeId>) -> Vec<NodeId> {
+        self.nodes
+            .values()
+            .filter(|contract| !done.contains(contract.id()))
+            .filter(|contract| contract.depends_on().all(|need| done.contains(need)))
+            .map(|contract| contract.id().clone())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn contract(&self, id: &NodeId) -> Option<&NodeContract> {
+        self.nodes.get(id)
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    fn order(&self) -> Vec<NodeId> {
+        let mut remaining: BTreeMap<NodeId, usize> = self
+            .nodes
+            .values()
+            .map(|contract| (contract.id().clone(), contract.depends_on().count()))
+            .collect();
+        let mut queue: VecDeque<NodeId> = remaining
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(id, _)| id.clone())
+            .collect();
+        let mut out = Vec::new();
+        while let Some(id) = queue.pop_front() {
+            remaining.remove(&id);
+            out.push(id.clone());
+            let mut freed: Vec<NodeId> = Vec::new();
+            for (candidate, count) in &mut remaining {
+                if self
+                    .nodes
+                    .get(candidate)
+                    .is_some_and(|contract| contract.depends_on().any(|need| *need == id))
+                {
+                    *count = count.saturating_sub(1);
+                    if *count == 0 {
+                        freed.push(candidate.clone());
+                    }
+                }
+            }
+            for id in freed {
+                queue.push_back(id);
+            }
+        }
+        out
+    }
+}
+
+mod underway;
+
+pub(crate) use underway::Laid;
+pub use underway::Underway;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests;

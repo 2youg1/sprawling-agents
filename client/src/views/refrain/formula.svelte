@@ -4,12 +4,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
-
 <script lang="ts" module>
-  // A formula the city read between dollar signs and left undrawn
-  // (`crates/documents/Spec.lean` D22), drawn by KaTeX as MathML
-  // (client/Spec.lean §4-64a). The source comes with its delimiters: two
-  // dollar signs on each side is a display formula, one is inline.
   export interface Formula {
     readonly tex: string;
     readonly placed: "inline" | "display";
@@ -31,14 +26,6 @@
 </script>
 
 <script lang="ts">
-  // KaTeX arrives in a chunk of its own on the first formula a page
-  // draws. It builds the MathML as elements into the one node this
-  // component owns, never through `innerHTML` (4-26), and the browser's
-  // own MathML engine lays it out, so no KaTeX stylesheet or font ships.
-  // Until KaTeX answers, and wherever it refuses the source, the source
-  // stays as it was written, in the mono face, as every construct this
-  // page does not draw (appendix F: a command KaTeX does not know is
-  // shown, not guessed at).
   import { Result } from "effect";
 
   interface Props {
@@ -77,7 +64,6 @@
   });
 </script>
 
-<!-- One line, so no space is drawn between a formula and the comma after it. -->
 <span
   bind:this={host}
   class={drawn ? (formula?.placed === "display" ? "block overflow-x-auto" : "") : "hidden"}

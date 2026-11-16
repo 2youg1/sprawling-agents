@@ -1,0 +1,474 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::super::lease::{FileWork, WorktreeLease};
+use super::super::name::WorktreeName;
+use super::super::weight::measure;
+use super::Worktrees;
+use super::open_tree;
+use crate::error::StorageError;
+
+const LEASE_REASON: &str = "held by a sprawling run";
+
+pub(super) enum Standing {
+    Held,
+    Kept(git2::Worktree),
+    Absent,
+}
+
+impl Worktrees {
+    pub fn lift_abandoned_leases(
+        city_root: &std::path::Path,
+        _writer: &crate::JsonlLedger,
+    ) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
+            op,
+            detail: format!("{}: {err}", city_root.display()),
+        };
+        let repo = match git2::Repository::open(city_root) {
+            Ok(repo) => repo,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => return Err(refuse("open the city repository", err)),
+        };
+        let names = repo
+            .worktrees()
+            .map_err(|err| refuse("list worktrees", err))?;
+        for name in names.iter().flatten().flatten() {
+            let tree = repo
+                .find_worktree(name)
+                .map_err(|err| refuse("find a worktree", err))?;
+            let lock = tree
+                .is_locked()
+                .map_err(|err| refuse("read a worktree lock", err))?;
+            match lock {
+                git2::WorktreeLockStatus::Locked(_) => tree
+                    .unlock()
+                    .map_err(|err| refuse("unlock a worktree", err))?,
+                git2::WorktreeLockStatus::Unlocked => {}
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn standing(&self, name: &WorktreeName) -> Result<Standing, StorageError> {
+        let tree = match self.repo.find_worktree(name.as_str()) {
+            Ok(tree) => tree,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Standing::Absent),
+            Err(err) => {
+                return Err(StorageError::Worktree {
+                    op: "find a worktree",
+                    detail: format!("{}: {err}", name.as_str()),
+                });
+            }
+        };
+        if !tree.path().exists() {
+            self.forget(name.as_str())?;
+            return Ok(Standing::Absent);
+        }
+        let lock = tree.is_locked().map_err(|err| StorageError::Worktree {
+            op: "read a worktree lock",
+            detail: format!("{}: {err}", name.as_str()),
+        })?;
+        Ok(match lock {
+            git2::WorktreeLockStatus::Locked(_) => Standing::Held,
+            git2::WorktreeLockStatus::Unlocked => Standing::Kept(tree),
+        })
+    }
+
+    pub(super) fn reattach(
+        &self,
+        name: &WorktreeName,
+        tree: &git2::Worktree,
+        scopes: &[String],
+    ) -> Result<WorktreeLease, StorageError> {
+        self.follow_trunk(name)?;
+        let work = restore(tree, name.as_str(), scopes)?;
+        tree.lock(Some(LEASE_REASON))
+            .map_err(|err| StorageError::Worktree {
+                op: "lock a worktree",
+                detail: format!("{}: {err}", name.as_str()),
+            })?;
+        let weight = measure(tree.path())?;
+        Ok(WorktreeLease {
+            name: name.clone(),
+            path: tree.path().to_path_buf(),
+            disk: weight.bytes,
+            work: FileWork {
+                walked: weight.walked,
+                ..work
+            },
+        })
+    }
+
+    fn follow_trunk(&self, name: &WorktreeName) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
+            op,
+            detail: format!("{}: {err}", name.as_str()),
+        };
+        let mut branch = self
+            .repo
+            .find_branch(name.as_str(), git2::BranchType::Local)
+            .map_err(|err| refuse("find a node branch", err))?;
+        let tip = branch
+            .get()
+            .peel_to_commit()
+            .map_err(|err| refuse("read a node branch", err))?
+            .id();
+        let trunk = self
+            .repo
+            .head()
+            .and_then(|head| head.peel_to_commit())
+            .map_err(|err| refuse("read the city trunk", err))?
+            .id();
+        let behind = tip != trunk
+            && self
+                .repo
+                .graph_descendant_of(trunk, tip)
+                .map_err(|err| refuse("judge a fast-forward", err))?;
+        if behind {
+            branch
+                .get_mut()
+                .set_target(trunk, "follow the trunk")
+                .map_err(|err| refuse("move a node branch", err))?;
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn restore(
+    tree: &git2::Worktree,
+    branch: &str,
+    scopes: &[String],
+) -> Result<FileWork, StorageError> {
+    let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
+        op,
+        detail: format!("{branch}: {err}"),
+    };
+    let repo = open_tree(tree).map_err(|err| refuse("open a kept worktree", err))?;
+    let wanted = format!("refs/heads/{branch}");
+    let pointed = repo
+        .find_reference("HEAD")
+        .map_err(|err| refuse("read a kept worktree's HEAD", err))?;
+    if pointed.symbolic_target_bytes() != Some(wanted.as_bytes()) {
+        repo.reference_symbolic("HEAD", &wanted, true, "point the tree at its node's branch")
+            .map_err(|err| refuse("point a kept worktree at its branch", err))?;
+    }
+    let head = repo
+        .head()
+        .and_then(|head| head.peel_to_tree())
+        .map_err(|err| refuse("read a kept worktree's branch", err))?;
+    let mut index = repo
+        .index()
+        .map_err(|err| refuse("read a kept worktree's index", err))?;
+    if !index_writes_tree(&mut index, head.id())
+        .map_err(|err| refuse("compare a kept worktree's index", err))?
+    {
+        index
+            .read_tree(&head)
+            .and_then(|()| index.write())
+            .map_err(|err| refuse("reset a kept worktree's index", err))?;
+    }
+    let mut work = FileWork::default();
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout
+        .force()
+        .remove_untracked(true)
+        .notify_on(
+            git2::CheckoutNotificationType::UPDATED | git2::CheckoutNotificationType::UNTRACKED,
+        )
+        .notify(|kind, _, _, target, workdir| {
+            count_change(&mut work, kind, (target.is_some(), workdir.is_some()));
+            true
+        });
+    for spec in crate::checkpoint::scan::pathspec::of(scopes) {
+        checkout.path(spec);
+    }
+    repo.checkout_head(Some(&mut checkout))
+        .map_err(|err| refuse("reset a kept worktree", err))?;
+    drop(checkout);
+    Ok(work)
+}
+
+fn count_change(work: &mut FileWork, kind: git2::CheckoutNotificationType, present: (bool, bool)) {
+    let count = if kind.contains(git2::CheckoutNotificationType::UNTRACKED) {
+        &mut work.removed
+    } else {
+        match present {
+            (false, _) => &mut work.removed,
+            (true, false) => &mut work.created,
+            (true, true) => &mut work.rewritten,
+        }
+    };
+    *count = count.saturating_add(1);
+}
+
+fn index_writes_tree(index: &mut git2::Index, tree: git2::Oid) -> Result<bool, git2::Error> {
+    match index.write_tree() {
+        Ok(written) => Ok(written == tree),
+        Err(err) if err.code() == git2::ErrorCode::Unmerged => Ok(false),
+        Err(err) => Err(err),
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
+mod tests {
+    use super::super::super::lease::FileWork;
+    use super::super::Landing;
+    use super::super::tests::{bulk_city, city, entries, name, owner};
+    use crate::checkpoint::Checkpoint;
+    use kernel::TimeMs;
+    use std::path::Path;
+
+    fn read(path: &Path) -> String {
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn claiming_a_tree_costs_what_it_places_and_restores() {
+        for files in [32, 64] {
+            let dir = tempfile::tempdir().unwrap();
+            let trees = bulk_city(dir.path(), files);
+            let scope = ["bulk".to_owned()];
+            let city = entries(dir.path());
+
+            let placed = trees.claim(&name("node-1"), &scope).unwrap();
+            let tree = placed.path().to_path_buf();
+            assert_eq!(
+                placed.work(),
+                FileWork {
+                    created: files,
+                    rewritten: 0,
+                    removed: 0,
+                    walked: city,
+                },
+                "a placement at {files} files"
+            );
+
+            std::fs::write(tree.join("bulk").join("file-0000.txt"), b"changed by a run").unwrap();
+            std::fs::write(tree.join("bulk").join("stray.txt"), b"left by a run").unwrap();
+            trees.release(placed).unwrap();
+            let restored = trees.claim(&name("node-1"), &scope).unwrap();
+            assert_eq!(
+                restored.work(),
+                FileWork {
+                    created: 0,
+                    rewritten: 1,
+                    removed: 1,
+                    walked: entries(&tree),
+                },
+                "a reclaim after a run at {files} files"
+            );
+
+            trees.release(restored).unwrap();
+            let unchanged = trees.claim(&name("node-1"), &scope).unwrap();
+            assert_eq!(
+                unchanged.work(),
+                FileWork {
+                    walked: entries(&tree),
+                    ..FileWork::default()
+                },
+                "a reclaim with nothing to restore at {files} files"
+            );
+        }
+    }
+
+    #[test]
+    fn a_kept_tree_claimed_again_checks_out_only_its_scope_and_offers_only_that() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let city_docs = dir.path().join("docs").join("plan.md");
+        let land_city = |t: u64| {
+            Checkpoint::open(dir.path())
+                .unwrap()
+                .land(&[], TimeMs::new(t), &owner(), "checkpoint: city")
+                .unwrap()
+                .oid
+                .to_string()
+        };
+        std::fs::create_dir_all(city_docs.parent().unwrap()).unwrap();
+        std::fs::write(
+            &city_docs, b"v1
+",
+        )
+        .unwrap();
+        land_city(1_500);
+        let lab = ["lab".to_owned()];
+        trees
+            .release(trees.claim(&name("node-1"), &lab).unwrap())
+            .unwrap();
+        std::fs::write(
+            &city_docs, b"v2
+",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("lab").join("notes.md"),
+            b"second
+",
+        )
+        .unwrap();
+        let trunk = land_city(2_000);
+
+        let again = trees.claim(&name("node-1"), &lab).unwrap();
+        assert_eq!(
+            (
+                read(&again.path().join("lab").join("notes.md")),
+                read(&again.path().join("docs").join("plan.md"))
+            ),
+            (
+                "second
+"
+                .to_owned(),
+                "v1
+"
+                .to_owned()
+            ),
+            "the scope follows the trunk and nothing outside it is written"
+        );
+
+        std::fs::write(
+            again.path().join("lab").join("notes.md"),
+            b"from the node
+",
+        )
+        .unwrap();
+        Checkpoint::open(again.path())
+            .unwrap()
+            .land(&lab, TimeMs::new(3_000), &owner(), "offer: lab")
+            .unwrap();
+        let of = owner();
+        trees
+            .plan_merge(again.name())
+            .unwrap()
+            .apply(&Landing {
+                t: TimeMs::new(4_000),
+                of: &of,
+                subject: "merge: node-1",
+                reviewed_by_person: false,
+            })
+            .unwrap();
+        let repo = git2::Repository::open(dir.path()).unwrap();
+        let before = repo
+            .find_commit(git2::Oid::from_str(&trunk).unwrap())
+            .unwrap()
+            .tree()
+            .unwrap();
+        let after = repo.head().unwrap().peel_to_tree().unwrap();
+        let moved: Vec<String> = repo
+            .diff_tree_to_tree(Some(&before), Some(&after), None)
+            .unwrap()
+            .deltas()
+            .filter_map(|delta| delta.new_file().path().map(|p| p.display().to_string()))
+            .collect();
+        assert_eq!(
+            (moved, read(&city_docs)),
+            (
+                vec!["lab/notes.md".to_owned()],
+                "v2
+"
+                .to_owned()
+            ),
+            "the merge moves the scope alone"
+        );
+    }
+
+    #[test]
+    fn a_path_staged_outside_the_scope_does_not_ride_along_with_the_next_offer() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let lab = ["lab".to_owned()];
+        let first = trees.claim(&name("node-1"), &lab).unwrap();
+        let stray = first.path().join("docs").join("stray.md");
+        std::fs::create_dir_all(stray.parent().unwrap()).unwrap();
+        std::fs::write(&stray, b"not this node's").unwrap();
+        let staging = git2::Repository::open(first.path()).unwrap();
+        let mut index = staging.index().unwrap();
+        index.add_path(Path::new("docs/stray.md")).unwrap();
+        index.write().unwrap();
+        trees.release(first).unwrap();
+
+        let again = trees.claim(&name("node-1"), &lab).unwrap();
+        std::fs::write(again.path().join("lab").join("notes.md"), b"from the node").unwrap();
+        Checkpoint::open(again.path())
+            .unwrap()
+            .land(&lab, TimeMs::new(3_000), &owner(), "offer: lab")
+            .unwrap();
+        let offered = git2::Repository::open(again.path()).unwrap();
+        let head = offered.head().unwrap().peel_to_commit().unwrap();
+        let moved: Vec<String> = offered
+            .diff_tree_to_tree(
+                Some(&head.parent(0).unwrap().tree().unwrap()),
+                Some(&head.tree().unwrap()),
+                None,
+            )
+            .unwrap()
+            .deltas()
+            .filter_map(|delta| delta.new_file().path().map(|p| p.display().to_string()))
+            .collect();
+        assert_eq!(
+            moved,
+            vec!["lab/notes.md".to_owned()],
+            "the offer moves the scope alone"
+        );
+    }
+
+    #[test]
+    fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let lease = trees.claim(&name("node-1"), &[]).unwrap();
+        let path = lease.path().to_path_buf();
+        let notes = path.join("lab").join("notes.md");
+        let written = std::fs::metadata(&notes).unwrap().modified().unwrap();
+
+        trees.release(lease).unwrap();
+        assert!(notes.exists(), "a released tree keeps its files");
+        assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
+
+        let again = trees.claim(&name("node-1"), &[]).unwrap();
+
+        assert_eq!(
+            std::fs::canonicalize(again.path()).unwrap(),
+            std::fs::canonicalize(&path).unwrap()
+        );
+        assert_eq!(
+            std::fs::metadata(&notes).unwrap().modified().unwrap(),
+            written,
+            "a file the node's branch already holds is not written again"
+        );
+        assert!(dir.path().join("lab").join("notes.md").exists());
+    }
+
+    #[test]
+    fn a_kept_tree_with_nothing_unmerged_starts_from_the_trunk_as_it_now_stands() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        trees
+            .release(trees.claim(&name("node-1"), &[]).unwrap())
+            .unwrap();
+        std::fs::write(
+            dir.path().join("lab").join("notes.md"),
+            b"second
+    ",
+        )
+        .unwrap();
+        Checkpoint::open(dir.path())
+            .unwrap()
+            .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
+            .unwrap();
+
+        let again = trees.claim(&name("node-1"), &[]).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(again.path().join("lab").join("notes.md")).unwrap(),
+            "second
+    "
+        );
+    }
+}

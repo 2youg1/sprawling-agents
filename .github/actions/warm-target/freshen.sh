@@ -18,10 +18,10 @@
 set -euo pipefail
 mode=$1
 manifest=$2
-# Untracked inputs: the bundle crates/sprawling/build.rs embeds, built from
+# Untracked inputs: the bundle Sprawling/app/build.rs embeds, built from
 # client/ by the step before this one, and identical byte for byte when
 # client/ is.
-extra=crates/sprawling/web-dist
+extra=Sprawling/app/web-dist
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

@@ -45,8 +45,8 @@ function turnsOf(calling: boolean): readonly Turn[] {
     calls:
       calling && number === 2
         ? [
-            call(20, "read", "crates/city/city-SPEC.md"),
-            call(21, "edit", "crates/city/src/document.rs"),
+            call(20, "read", "Sprawling/city/city-SPEC.md"),
+            call(21, "edit", "Sprawling/city/src/document.rs"),
           ]
         : [],
     notes: [],

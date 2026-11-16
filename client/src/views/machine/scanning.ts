@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the machine page says about scanning in front of the city's
-// directory (`crates/wire/spec/Answer/Doctor.lean` D25): one line per
-// fact the city read, each a subject and what was found.
-//
-// Windows is the only platform with an answer: Defender's real-time
-// scanning and the Dev Drive question exist there alone, and macOS and
-// Linux answer `does_not_apply` because they run no system scanner in
-// front of every write. The page says that reason rather than hiding the
-// section, so a User on those platforms does not wonder whether the read
-// failed.
-
 import type { Key } from "../../core/lang";
 import type { DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold } from "../../wire";
 import type { Reason } from "../setup/dependencies";
@@ -64,8 +53,6 @@ function exclusionOf(exclusion: DoctorExclusion): Reason {
   return untoldOf(exclusion.untold.why);
 }
 
-// Why the city could not read one of the two: the command it ran is
-// named as the platform spells it, so a User can run it by hand.
 export function untoldOf(why: DoctorUntold): Reason {
   if (typeof why === "string") {
     switch (why) {

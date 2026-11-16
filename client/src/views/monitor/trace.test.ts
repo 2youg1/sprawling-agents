@@ -149,7 +149,7 @@ describe("a run's turns read as a terminal record and a code column", () => {
   });
 
   // The runtime writes `memory_ceiling` on a settled result and on each
-  // background row it brings (crates/runtime/src/tools/exec/outcome.rs);
+  // background row it brings (Sprawling/runtime/src/tools/exec/outcome.rs);
   // both are read, the background one with its handle.
   test("a command whose run reached the memory ceiling carries the report, and so does a background row", () => {
     const head = JSON.stringify({

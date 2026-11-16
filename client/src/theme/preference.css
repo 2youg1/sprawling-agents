@@ -40,7 +40,7 @@
 }
 
 /* The bundled faces' own features, as the person turned them on
- * (`crates/wire/spec/Preference.lean` D125).
+ * (`Sprawling/wire/spec/Preference.lean` D125).
  *
  * A switch is one word of `wire::TypeFeature` on the root element, and
  * each word either fills the slot the face spells that intent with or
@@ -107,7 +107,7 @@
 
 /* Running text stands where the person put it, and the strong steps of
  * the ladder stand two hundred above it, so the hierarchy the page is
- * built on holds at every posture (`crates/wire/spec/Preference.lean`
+ * built on holds at every posture (`Sprawling/wire/spec/Preference.lean`
  * D126). `regular` is the theme's own list, so it has no rule here, for
  * the reason `chroma` has none: the page's posture is the one the tokens
  * already state. */

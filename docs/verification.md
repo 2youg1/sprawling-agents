@@ -10,7 +10,7 @@ just prereqs                  # every other tool the loop needs, with the instal
 just check                    # the whole check: fmt, gates, Lean specifications, clippy, features, nextest, client
 ```
 
-`just check` opens with `just prereqs`, which reads the develop tier of the doctor's table (`crates/sprawling/src/doctor/table/prereqs.tsv`), so a missing tool is named at once. `build-web` runs inside `check` because the `render` and `npm` gates judge the built client.
+`just check` opens with `just prereqs`, which reads the develop tier of the doctor's table (`Sprawling/app/src/doctor/table/prereqs.tsv`), so a missing tool is named at once. `build-web` runs inside `check` because the `render` and `npm` gates judge the built client.
 
 | Command | What it does |
 |---|---|
@@ -25,7 +25,7 @@ just check                    # the whole check: fmt, gates, Lean specifications
 | `just fmt` | rustfmt, `zig fmt` and `bun fmt` (width and file list in `bunfig.toml`); `just fmt-check` runs them in check mode |
 | `just features` | the two feature combinations nothing else compiles: default features, and `wire` without `server` |
 | `just check-client` | the client's lint, `bun check`, typecheck and tests on the `build-web` bundle |
-| `just build-web` | the client bundle, into `crates/sprawling/web-dist` |
+| `just build-web` | the client bundle, into `Sprawling/app/web-dist` |
 | `just dist` | client, binary, bill of materials |
 | `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays |
 | `just provider <script> <record>` | a stand-in provider on a loopback port playing a wire script and recording every exchange; prints `SPRAWLING_PROVIDER=<url>` first |

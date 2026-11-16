@@ -1,0 +1,361 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::float_arithmetic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
+
+use super::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
+
+mod experiment;
+
+#[test]
+fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("market").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    for who in ["ito", "hana"] {
+        let room = dir.path().join("market").join(who);
+        std::fs::create_dir_all(&room).unwrap();
+        std::fs::write(
+            room.join(city::URBANITE_FILE),
+            format!("# URBANITE.md\n\nTrades in the market as {who}.\n"),
+        )
+        .unwrap();
+    }
+
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "cutting in",
+                "tu_1",
+                "signal",
+                serde_json::json!({
+                    "action": "send",
+                    "to": "market/hana",
+                    "kind": "steer",
+                    "text": "drop the glaze order, the kiln comes first",
+                }),
+            ),
+            completion("sent", None),
+            tool_completion("where do I stand", "tu_2", "status", serde_json::json!({})),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("market/ito").unwrap(),
+            task: "tell hana what matters first".to_owned(),
+            goal: "hana knows".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let asked = provider.bodies().join("\n");
+    assert!(
+        asked.contains(r#"<letter from=\"@market/ito\""#)
+            && asked.contains("drop the glaze order, the kiln comes first</letter>"),
+        "the steer lands at the end of a tool result, in a letter from the resident who sent it"
+    );
+    assert!(
+        !asked.contains("user: drop the glaze order"),
+        "only the person's entrance can render as the person"
+    );
+}
+
+#[test]
+fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    let refused = worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("gamma").unwrap(),
+            task: "say something".to_owned(),
+            goal: "an answer".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: Some(kernel::SessionName::parse("one").unwrap()),
+            effort: None,
+            model: None,
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        *refused.code(),
+        AxCode::ModelUnchosen,
+        "a city with nothing attached refuses a dispatch for having no model: {refused}"
+    );
+    assert!(
+        !dir.path().join("gamma").exists(),
+        "a refused dispatch raised a building nobody asked for"
+    );
+}
+
+#[test]
+fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: room.clone(),
+            task: "what do you make of this".to_owned(),
+            goal: String::new(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"talk"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    assert!(
+        !city::job_path(dir.path(), &room).exists(),
+        "a conversation writes no task file"
+    );
+    let asked = provider.bodies().join("\n");
+    assert!(
+        asked.contains("working with the User directly"),
+        "the prefix states the situation: {asked}"
+    );
+    assert!(
+        !asked.contains("Task: what do you make of this"),
+        "the person's line goes out as they wrote it, not as a form"
+    );
+}
+
+#[test]
+fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![completion("收到。", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("shop").unwrap(),
+            task: "[short] 给 price 加一个测试".to_owned(),
+            goal: "a test exists".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let first = provider
+        .bodies()
+        .into_iter()
+        .find(|body| body.contains("messages"));
+    assert!(
+        first.as_deref().is_some_and(
+            |body| body.contains("The task is in JOB.md above, handed down by the User.")
+        ),
+        "the first chat call is the run itself: {first:?}"
+    );
+    assert!(
+        dir.path().join("shop").join("short-price").is_dir(),
+        "the room is named from the task by rule"
+    );
+    assert!(
+        !dir.path().join("shop").join("收到。").exists(),
+        "a model's reply never becomes a room"
+    );
+}
+
+#[test]
+fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("market").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    let addr = Address::parse("market/ito").unwrap();
+    let room = dir.path().join("market").join("ito");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(
+        room.join(city::URBANITE_FILE),
+        "# URBANITE.md\n\nKeeps the market's books.\n",
+    )
+    .unwrap();
+    let own = city::config_path(dir.path(), &addr, city::Layer::Resident).unwrap();
+    std::fs::create_dir_all(own.parent().unwrap()).unwrap();
+    std::fs::write(&own, "[cache]\nkeep_warm = \"five_minute\"\n").unwrap();
+
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr,
+            task: "balance the books".to_owned(),
+            goal: "the books balance".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    assert!(
+        worker.warm_due().is_some(),
+        "the room's own layer asked for keep-warm, so its landed run's door is kept"
+    );
+}
+
+#[test]
+fn two_jobs_at_one_millisecond_get_two_run_ids() {
+    let addr = Address::parse("lab/room1").unwrap();
+    let now = kernel::TimeMs::new(1_700_000_000_000);
+    let job = |hex: &str| kernel::Locator::parse(&format!("file:lab/room1@{}", hex.repeat(20)));
+    let one = agreeing::run_id_for(&job("ab").unwrap(), &addr, now);
+    let two = agreeing::run_id_for(&job("cd").unwrap(), &addr, now);
+    assert_ne!(one, two);
+    assert_eq!(
+        one,
+        agreeing::run_id_for(&job("ab").unwrap(), &addr, now),
+        "the same three inputs name the same run, which is what replay rests on"
+    );
+    assert_ne!(
+        one,
+        RunId::from_bytes([0u8; 16]),
+        "a digest the old code could not print became the all-zero run"
+    );
+}
+
+#[test]
+fn a_dispatch_says_what_it_spent_before_the_drive() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+
+    let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = std::sync::Arc::clone(&written);
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::new(
+            runtime::diagnostics::Level::Trace,
+            Box::new(move |entry: runtime::diagnostics::Entry<'_>| {
+                sink.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push(runtime::diagnostics::render(entry));
+            }),
+        ),
+        Hands {
+            clock: std::sync::Arc::new(LeapingClock::from_now()),
+            ..crate::worker::fixture::hands()
+        },
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: Vec::new(),
+            named: Vec::new(),
+            tuning: wire::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
+            model: "m-local".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "write one line".to_owned(),
+            goal: "the line is written".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let lines = written
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let prepared: Vec<&String> = lines
+        .iter()
+        .filter(|line| line.contains("prepare_dispatch took"))
+        .collect();
+    let servers: Vec<&String> = lines
+        .iter()
+        .filter(|line| line.contains("mcp_tools took"))
+        .collect();
+    for line in prepared.iter().chain(servers.iter()) {
+        println!("{line}");
+    }
+    assert_eq!(
+        prepared.len(),
+        1,
+        "one dispatch reports its own preparation once: {lines:#?}"
+    );
+    assert_eq!(
+        servers.len(),
+        1,
+        "the servers phase reports separately, because a resident connection table would remove only that part: {lines:#?}"
+    );
+    let took = |line: &&String| {
+        line.split("took ")
+            .nth(1)
+            .and_then(|rest| rest.split(' ').next())
+            .and_then(|spent| spent.parse::<u64>().ok())
+    };
+    assert!(
+        prepared
+            .iter()
+            .chain(servers.iter())
+            .all(|line| took(line).is_some_and(|spent| spent < LeapingClock::LEAP_MS)),
+        "each span is read off the monotonic clock, not the city's: {prepared:#?} {servers:#?}"
+    );
+}

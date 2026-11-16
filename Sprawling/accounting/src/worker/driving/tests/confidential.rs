@@ -1,0 +1,230 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::float_arithmetic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+
+use super::super::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
+
+#[test]
+fn a_confidential_building_stops_the_run_before_a_remote_call() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    lay_rules(dir.path(), "vault", &shut_rules(""));
+
+    let endpoint = gateway::Endpoint::new(
+        gateway::EndpointConfig {
+            base_url: "http://127.0.0.1:1/v1/messages".to_owned(),
+            dialect: kernel::DialectKind::Anthropic,
+            model: "remote".to_owned(),
+            auth: gateway::AuthSpec::None,
+            extra_headers: Vec::new(),
+            overrides: Vec::new(),
+            timeout_ms: 1_000,
+            stream_idle_timeout_ms: None,
+            pricing: None,
+            proxying: kernel::Proxying::default(),
+        },
+        gateway::Redemption::without_images(Box::new(|_reference: &kernel::SecretRef| {
+            Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "resolve a credential",
+                "none configured",
+            )
+            .with_recovery("this test endpoint authenticates with nothing"))
+        })),
+    )
+    .unwrap();
+
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let _ = endpoint;
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = std::sync::Arc::clone(&seen);
+    worker.observe(Box::new(move |record: &EventRecord| {
+        sink.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push((record.kind(), serde_json::to_string(record.data()).unwrap()));
+    }));
+
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("vault/room1").unwrap(),
+            task: "read the private notes".to_owned(),
+            goal: "summarise them".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    let events = seen
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let denied = events
+        .iter()
+        .find(|(kind, _)| *kind == EventKind::GateDenied)
+        .expect("the refusal is written under its carrier");
+    assert!(denied.1.contains("local model"), "{}", denied.1);
+    assert!(
+        events.iter().any(|(kind, _)| *kind == EventKind::RunFrozen),
+        "a refused run still ends"
+    );
+    assert!(
+        !provider
+            .exchanges()
+            .iter()
+            .any(|head| head.starts_with("POST")),
+        "no chat call may leave a confidential building"
+    );
+}
+
+#[test]
+fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    lay_rules(dir.path(), "vault", &shut_rules(""));
+    let vault_room = dir.path().join("vault").join("room1");
+    std::fs::create_dir_all(&vault_room).unwrap();
+    std::fs::write(
+        vault_room.join("combination.md"),
+        "the dial reads 31-7-12\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "reading",
+                "tu_1",
+                "read",
+                serde_json::json!({ "file_path": "vault/room1/combination.md" }),
+            ),
+            tool_completion(
+                "searching",
+                "tu_2",
+                "search",
+                serde_json::json!({ "pattern": "the dial reads" }),
+            ),
+            completion("nothing to report", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "find the combination".to_owned(),
+            goal: "report it".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let bodies = provider.bodies();
+    let chats: Vec<&String> = bodies
+        .iter()
+        .filter(|body| body.contains("find the combination"))
+        .collect();
+    assert!(
+        chats.len() >= 3,
+        "both calls were answered, so the provider saw what they returned: {chats:?}"
+    );
+    assert!(
+        !chats.iter().any(|body| body.contains("31-7-12")),
+        "a confidential building's bytes reached another building's provider"
+    );
+    assert!(
+        chats
+            .last()
+            .is_some_and(|body| body.contains("E_GATE_DENIED")),
+        "the read was refused in words the model can act on, not lost"
+    );
+}
+#[test]
+fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let room = dir.path().join("lab").join("room1");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(room.join("kiln.md"), "firing notes\n").unwrap();
+    let line = delete_command("kiln.md");
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "clearing up",
+                "tu_1",
+                "exec",
+                serde_json::json!({
+                    "command": line,
+                    "where": "host",
+                }),
+            ),
+            completion("cleared", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "tidy the room".to_owned(),
+            goal: "remove the stale note".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    assert!(
+        !room.join("kiln.md").exists(),
+        "the command ran; if it did not, this test proves nothing"
+    );
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let history: String = verified
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect::<Vec<String>>()
+        .join("\n");
+    assert!(
+        history.contains("file_discarded"),
+        "a deletion no forecast saw is still written down: {history}"
+    );
+    assert!(
+        history.contains("restoration"),
+        "and it is written down with the way back"
+    );
+}
+
+fn delete_command(name: &str) -> String {
+    if cfg!(windows) {
+        format!("cmd /C del {name}")
+    } else {
+        format!("rm {name}")
+    }
+}

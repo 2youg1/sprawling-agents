@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The address grammar is `kernel::Address::parse`, stated as a pattern
-// in `kernel::schema` and carried into `wire.ts` by `cargo xtask
-// wire-ts`. This client no longer spells it; what it holds is that the
-// generated schema gives every spelling in `crates/fixtures/address.jsonl` the
-// verdict the Rust constructor gives it. That file is the one table both
-// test suites read, so a case added there is judged on both sides.
-
 import { describe, expect, test } from "bun:test";
 import { Option, Schema } from "effect";
 
@@ -26,7 +19,7 @@ const Spelling = Schema.fromJsonString(
 );
 
 const table = (
-  await Bun.file(new URL("../../../crates/fixtures/address.jsonl", import.meta.url)).text()
+  await Bun.file(new URL("../../../Tools/fixtures/address.jsonl", import.meta.url)).text()
 )
   .split("\n")
   .filter((line) => line.length > 0)
@@ -54,11 +47,6 @@ describe("run id", () => {
     expect(Option.getOrNull(readRunId(hyphenated))).toEqual(RunId.make(hyphenated));
   });
 
-  // `uuid::Uuid::parse_str` reads every one of these; `kernel::RunId::
-  // parse` reads none of them, because the city writes the hyphenated
-  // lower-case form and nothing else. A client grammar of its own
-  // accepted the first two, so a link this city would refuse opened a
-  // page here.
   test("refuses every spelling that is not the one the city writes", () => {
     for (const bad of [
       "",

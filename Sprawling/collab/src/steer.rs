@@ -1,0 +1,196 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::{AxCode, AxError, RunId};
+
+use crate::inbox::{SenderState, Signal};
+use kernel::event::record::SignalKind;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Steer {
+    text: String,
+}
+
+impl Steer {
+    pub fn from_person(text: &str) -> Result<Steer, AxError> {
+        Ok(Steer {
+            text: non_empty(text)?,
+        })
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LetterKind {
+    Steer,
+
+    Reply,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Letter {
+    from: String,
+    run: Option<RunId>,
+    kind: LetterKind,
+    sender: Option<SenderState>,
+    text: String,
+}
+
+impl Letter {
+    pub fn from_signal(signal: &Signal) -> Result<Letter, AxError> {
+        if signal.kind() != SignalKind::Steer {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read a signal as a steer",
+                signal.kind().as_str().to_owned(),
+            )
+            .with_recovery("only a steer-kind signal overtakes; deliver the rest to the inbox"));
+        }
+        let letter = Letter::reply(signal);
+        Ok(Letter {
+            text: non_empty(&letter.text)?,
+            kind: LetterKind::Steer,
+            ..letter
+        })
+    }
+
+    pub(crate) fn reply(signal: &Signal) -> Letter {
+        Letter {
+            from: signal.from().to_owned(),
+            run: signal.run(),
+            kind: LetterKind::Reply,
+            sender: signal.sender(),
+            text: signal
+                .payload()
+                .as_map()
+                .get("text")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_owned(),
+        }
+    }
+
+    #[must_use]
+    pub fn from(&self) -> &str {
+        &self.from
+    }
+
+    #[must_use]
+    pub fn run(&self) -> Option<RunId> {
+        self.run
+    }
+
+    #[must_use]
+    pub fn kind(&self) -> LetterKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn sender(&self) -> Option<SenderState> {
+        self.sender
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
+pub(crate) fn sender_note(state: SenderState) -> String {
+    format!(
+        "(the sender's run was {} when this arrived)",
+        state.as_str()
+    )
+}
+
+fn non_empty(text: &str) -> Result<String, AxError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "build a steer",
+            "empty text".to_owned(),
+        )
+        .with_recovery("say what should change; a steer with no words costs a turn"));
+    }
+    Ok(trimmed.to_owned())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use kernel::event::record::SignalId;
+    use kernel::{Address, Payload, TimeMs, Version};
+
+    fn signal(kind: SignalKind, text: &str) -> Signal {
+        let mut body = serde_json::Map::new();
+        body.insert(
+            "text".to_owned(),
+            serde_json::Value::String(text.to_owned()),
+        );
+        Signal::new(
+            SignalId::parse("s-1").unwrap(),
+            kind,
+            "lab/room1".to_owned(),
+            Address::parse("lab/room2").unwrap(),
+            Version::new(1),
+            Payload::new(body).unwrap(),
+            TimeMs::new(9),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_delivered_steer_lands_with_the_stamps_of_its_delivery() {
+        let run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
+        let signal = signal(SignalKind::Steer, " stop the kiln ")
+            .delivered(SenderState::Cancelled)
+            .sent_by(run);
+        let landed = Letter::from_signal(&signal).unwrap();
+        assert_eq!(
+            landed,
+            Letter {
+                from: "lab/room1".to_owned(),
+                run: Some(run),
+                kind: LetterKind::Steer,
+                sender: Some(SenderState::Cancelled),
+                text: "stop the kiln".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn an_ordinary_mention_does_not_get_to_interrupt() {
+        let err = Letter::from_signal(&signal(SignalKind::Mention, "have a look")).unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+        assert!(err.recovery().contains("inbox"));
+    }
+
+    #[test]
+    fn a_steer_with_nothing_in_it_is_refused_at_every_entrance() {
+        assert!(Steer::from_person("   ").is_err());
+        assert!(Letter::from_signal(&signal(SignalKind::Steer, "\n")).is_err());
+    }
+
+    #[test]
+    fn the_text_arrives_trimmed_because_the_window_shows_it_verbatim() {
+        assert_eq!(
+            Steer::from_person("  wrap up \n").unwrap().text(),
+            "wrap up"
+        );
+    }
+}

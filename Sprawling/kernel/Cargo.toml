@@ -1,0 +1,43 @@
+[package]
+name = "sprawling-kernel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+description = "Every decision of a sprawling city - addresses, events, gates, plans and errors - with nothing that touches a disk."
+
+[lib]
+name = "kernel"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+url.workspace = true
+blake3.workspace = true
+secrecy.workspace = true
+zeroize.workspace = true
+schemars = { workspace = true, optional = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+insta.workspace = true
+trybuild.workspace = true
+# The address and session-name grammars cross to the client as a
+# pattern, and `crate::schema`'s tests are the only place one is applied
+# to an input. Dev-only: no product code reads a regular expression.
+regex = "1"
+
+[features]
+conformance = []
+# The JSON Schema of every value that crosses the wire, derived from the
+# same declarations serde reads (`Sprawling/kernel/spec/Schema.lean` §8-45). Off by
+# default: the product binary never asks what its own frames look like.
+schema = ["dep:schemars"]

@@ -1,0 +1,136 @@
+[package]
+name = "sprawling"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+publish.workspace = true
+description.workspace = true
+keywords = ["agents", "llm", "harness", "ledger", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+# What `cargo package` puts in the archive crates.io serves. Listed rather
+# than left to git, because `web-dist/` - the client bundle the build
+# script embeds (`Sprawling/app/Spec.lean` §8-83) - is build output that
+# `.gitignore` names, and with no `include` cargo leaves every ignored file
+# out. Cargo adds the manifest and the lockfile itself.
+include = ["build.rs", "src/**", "web-dist/**"]
+
+[dependencies]
+accounting = { workspace = true }
+kernel = { workspace = true }
+# The name of the pairing token's environment key, defined once beside the
+# rule that keeps it out of every child process (`Sprawling/child/Spec.lean`).
+child = { workspace = true }
+storage = { workspace = true }
+runtime = { workspace = true }
+gateway = { workspace = true }
+wire = { workspace = true, features = ["server"] }
+city = { workspace = true }
+collab = { workspace = true }
+browser = { workspace = true }
+agent_protocols = { workspace = true }
+# The remote listener answers its two WebSocket paths and the page on one
+# port (Sprawling/remote_access/Spec.lean §8-10).
+axum = { workspace = true, features = ["ws"] }
+crossterm = { workspace = true }
+# The terminal shell: frame leaf and City/Mei console backends (`Calyx/Spec.lean`).
+calyx = { workspace = true }
+futures-util = { workspace = true }
+getrandom = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+# The monitor's counters (`Sprawling/app/Spec.lean` §8-94, §8-96): the machine's
+# memory and the volume only, not the default component, network and user
+# tables; this process is read through its own handle below, not through
+# the whole process table.
+sysinfo = { version = "0.39", default-features = false, features = ["system", "disk"] }
+cpu-time = "1"
+memory-stats = "1.2"
+tokio-tungstenite = { workspace = true }
+# A core thread raises itself above the commands it dispatches; the
+# crate's surface is safe, so no foreign call lives in this crate
+# (`Sprawling/app/Spec.lean` §8-93).
+thread-priority = "3.1"
+# The processor topology the placement plan reads, and the
+# power-throttling opt-out: no safe crate offers them, so they come
+# through the one FFI seam (`Sprawling/app/spec/Serving/Placement.lean`
+# D45). Its CPU set parser is safe Rust on every platform.
+desktop_ffi = { workspace = true }
+# The desktop server this binary runs as `sprawling desktop`, a child
+# the city starts for a building whose rules ask for the desktop
+# (`Sprawling/app/Spec.lean` §8-4d).
+desktop = { workspace = true }
+# The remote door this binary keeps and relays through, the QR code its
+# console prints an invitation as, and the device table it keeps on disk
+# (`Sprawling/app/Spec.lean` §8-139, §8-140).
+remote_access = { workspace = true }
+qrcodegen = { workspace = true }
+toml = { workspace = true }
+# The city key's fresh seed is cleared once the vault holds it
+# (`Sprawling/app/Spec.lean` §8-139).
+zeroize = { workspace = true }
+
+# The allocator the static Linux build runs on: musl's malloc serialises
+# every thread on one lock, and this binary allocates on all of them
+# (`Sprawling/app/spec/Serving/Memory.lean` D102). Only this target
+# differs; glibc, macOS's libmalloc and the Windows heap keep their own.
+[target.'cfg(target_env = "musl")'.dependencies]
+tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
+
+# The peak memory a command `sprawling gauge` measured reached, read
+# after it exits and before its handle closes (`Sprawling/app/Spec.lean` §8-129-4).
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
+# Windows self-uninstall releases the installed name before exit (Install.lean D53).
+self-replace = "=1.5.1"
+# Protected Windows installation path for the read-only privacy identity query.
+winreg = { workspace = true }
+
+[features]
+# The execution engine is on by default, so `cargo install sprawling`
+# builds the binary the release archives carry (`Sprawling/app/Spec.lean` §8-157).
+# Without it `AbsentSandbox` refuses tool execution in three parts and
+# its recovery says "install a build with the `wasm` feature" - this is
+# that feature; `--no-default-features` is the build without it, which
+# `just features` compiles.
+default = ["sandbox"]
+sandbox = ["runtime/wasm"]
+
+# Where `cargo binstall sprawling` fetches the archive release.yml built for
+# this target, so it installs the same binary as the download page instead of
+# compiling the `.crate` (`Sprawling/app/Spec.lean` §8-157). The archive
+# suffixes are the ones `Tools/xtask/src/platform.rs` lists. The tag is
+# written `v{ version }` here and replaced by the release's own tag when the
+# `crates` job publishes (D32); a glibc Linux host falls back to the musl row.
+[package.metadata.binstall]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-windows-x86_64.zip"
+bin-dir = "{ name }-{ version }-windows-x86_64/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-macos-aarch64.zip"
+bin-dir = "{ name }-{ version }-macos-aarch64/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-musl]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-x86_64-unknown-linux-musl.zip"
+bin-dir = "{ name }-{ version }-x86_64-unknown-linux-musl/{ bin }{ binary-ext }"
+
+[build-dependencies]
+flate2 = { workspace = true }
+# Product resources use Cargo's package metadata on every Windows build;
+# disabling TOML overrides preserves that authority (Spec.lean section 8-157).
+winresource = { version = "0.1.31", default-features = false }
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

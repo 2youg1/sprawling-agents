@@ -5,11 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The surfaces docs/frontend-method.md §4-43 names, each in the states a person can
-  // put it in: glass drawn and glass turned solid, over the same words so
-  // the difference is what shows through; every rounded box at the one
-  // corner exponent; and the appearance group, where glass and the blend
-  // tier's opacity are chosen.
   import type { Key } from "../../core/lang";
   import type { GlyphName } from "../parts/glyph";
 
@@ -19,11 +14,10 @@
     { glyph: "settings", name: "nav_settings" },
   ];
 
-  // What stands behind the keys: a page of words, which is the hardest
-  // thing glass has to keep apart from what it carries.
   const BEHIND = Array.from(
     { length: 9 },
-    (_, n) => `crates/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
+    (_, n) =>
+      `Sprawling/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
   );
 
   const CORNERS: readonly { readonly box: string; readonly size: string }[] = [

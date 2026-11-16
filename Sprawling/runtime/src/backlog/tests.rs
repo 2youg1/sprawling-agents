@@ -1,0 +1,254 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+
+use super::{Backlog, PlatformShares, Shares, platform_shares};
+
+#[test]
+fn two_backlogs_of_one_process_name_different_directories() {
+    let mine = Backlog::new();
+    let theirs = Backlog::new();
+    let first = mine.mint().unwrap();
+    assert_eq!(
+        first,
+        theirs.mint().unwrap(),
+        "the ids collide by design; the directories are what must not"
+    );
+    assert_ne!(mine.scratch.dir(first), theirs.scratch.dir(first));
+}
+
+#[test]
+fn a_clone_shares_the_directories_of_the_backlog_it_came_from() {
+    let mine = Backlog::new();
+    let id = mine.mint().unwrap();
+    assert_eq!(mine.clone().scratch.dir(id), mine.scratch.dir(id));
+}
+
+#[test]
+fn two_members_of_one_backlog_name_different_directories() {
+    let mine = Backlog::new();
+    assert_ne!(
+        mine.scratch.dir(mine.mint().unwrap()),
+        mine.scratch.dir(mine.mint().unwrap())
+    );
+}
+
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
+fn a_background_command(backlog: &Backlog, owner: kernel::RunId, seconds: u8) {
+    let mut slow = if cfg!(windows) {
+        let mut command = std::process::Command::new("ping");
+        command.args(["-n", &seconds.to_string(), "127.0.0.1"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sleep");
+        command.arg(seconds.to_string());
+        command
+    };
+    slow.current_dir(std::env::temp_dir());
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog.run(owner, &addr, "slow".to_owned(), slow).unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+}
+
+#[test]
+fn a_release_reaches_a_table_a_dead_thread_left_locked() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let ended = kernel::RunId::from_bytes([1; 16]);
+    a_background_command(&backlog, ended, 2);
+    let table = backlog.table.clone();
+    let died = std::thread::spawn(move || {
+        let _held = table.lock().unwrap();
+        panic!("the thread dies holding the table");
+    })
+    .join();
+    assert!(died.is_err() && backlog.table.is_poisoned());
+    assert_eq!(backlog.release(ended), 1);
+}
+
+#[test]
+fn a_release_terminates_what_the_ended_run_left_running() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let (ended, other) = (
+        kernel::RunId::from_bytes([1; 16]),
+        kernel::RunId::from_bytes([2; 16]),
+    );
+    a_background_command(&backlog, ended, 60);
+    backlog.release(ended);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    for _ in 0..250 {
+        assert!(backlog.harvest(other).unwrap().is_empty());
+        if backlog.standing(&addr).unwrap().is_empty() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("a released command is still running five seconds later");
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
+fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
+    let window = crate::PollBudget::new(40, 10);
+    let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = pieces.clone();
+    let backlog = Backlog::with_window(window).with_sink(super::Sink::new(move |chunk| {
+        seen.lock().unwrap().push(chunk)
+    }));
+
+    let mut talking = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "echo live& ping -n 11 127.0.0.1 >NUL"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "echo live; exec sleep 60"]);
+        command
+    };
+    talking.current_dir(std::env::temp_dir());
+    let owner = kernel::RunId::from_bytes([3; 16]);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(owner, &addr, "talking".to_owned(), talking)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+    let pieces = pieces.lock().unwrap();
+    assert!(pieces.iter().all(|piece| piece.run == owner
+        && piece.stream == super::Stream::Out
+        && piece.bytes.len() <= window.read_per_poll().div_ceil(2)));
+    let out: Vec<u8> = pieces
+        .iter()
+        .flat_map(|piece| piece.bytes.clone())
+        .collect();
+    assert!(
+        String::from_utf8_lossy(&out).starts_with("live"),
+        "the sink saw {out:?} before the window closed"
+    );
+    drop(pieces);
+    backlog.release(owner);
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
+fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
+    let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = pieces.clone();
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_sink(super::Sink::new(
+        move |chunk| seen.lock().unwrap().push(chunk),
+    ));
+    let mut talking = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args([
+            "/C",
+            "echo live& ping -n 2 127.0.0.1 >NUL& echo late& ping -n 3 127.0.0.1 >NUL",
+        ]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "echo live; sleep 1; echo late; sleep 2"]);
+        command
+    };
+    talking.current_dir(std::env::temp_dir());
+    let owner = kernel::RunId::from_bytes([4; 16]);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(owner, &addr, "talking".to_owned(), talking)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+    let late = || {
+        let out: Vec<u8> = pieces
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|piece| piece.bytes.clone())
+            .collect();
+        String::from_utf8_lossy(&out).contains("late")
+    };
+    for _ in 0..150 {
+        assert!(backlog.harvest(owner).unwrap().is_empty());
+        if late() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    backlog.release(owner);
+    assert!(
+        late(),
+        "harvest handed the sink {:?}",
+        pieces.lock().unwrap()
+    );
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
+fn a_run_owns_the_processes_its_commands_started() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let (mine, other) = (
+        kernel::RunId::from_bytes([3; 16]),
+        kernel::RunId::from_bytes([4; 16]),
+    );
+    let mut nested = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "ping -n 6 127.0.0.1 > NUL"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "sleep 5; true"]);
+        command
+    };
+    nested.current_dir(std::env::temp_dir());
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(mine, &addr, "nested".to_owned(), nested)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+
+    let followed = |seen: &(usize, u32)| {
+        if cfg!(windows) {
+            seen.0 >= 2 && seen.1 == 0
+        } else {
+            *seen == (1, 1)
+        }
+    };
+    let mut seen = (0, u32::MAX);
+    for _ in 0..250 {
+        let readings = backlog.processes().unwrap();
+        assert!(!readings.contains_key(&other));
+        seen = readings
+            .get(&mine)
+            .map_or((0, u32::MAX), |run| (run.pids.len(), run.unfollowed));
+        if followed(&seen) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(followed(&seen), "read {seen:?}");
+    backlog.release(mine);
+    assert!(!backlog.processes().unwrap().contains_key(&mine));
+}
+
+#[test]
+fn a_run_holds_the_shares_its_backlog_asks_for() {
+    let limit = std::num::NonZeroU64::new(8 << 30).unwrap();
+    for asked in [Shares::Unset, Shares::Cpu, Shares::CpuAndMemory { limit }] {
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_shares(asked);
+        let run = kernel::RunId::from_bytes([5; 16]);
+        a_background_command(&backlog, run, 3);
+        let held = backlog.processes().unwrap().get(&run).map(|run| run.share);
+        let delegated = platform_shares() == PlatformShares::CpuAndMemory;
+        let given = if cfg!(windows) || (cfg!(target_os = "linux") && delegated) {
+            asked
+        } else {
+            Shares::Unset
+        };
+        assert_eq!(held, Some(given), "asked {asked:?}");
+        backlog.release(run);
+    }
+}

@@ -1,0 +1,131 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::BTreeMap;
+
+use kernel::{AxCode, AxError, ErrorDraft, Payload, ToolCall, ToolDef, ToolName};
+use serde_json::{Map, Value};
+
+use super::Filed;
+use crate::tools::ToolTool;
+
+const ACTION: &str = "run a tool through `tool`";
+
+pub(super) fn resolve(
+    tools: &BTreeMap<String, Filed>,
+    call: &ToolCall,
+) -> Result<ToolCall, AxError> {
+    let given = call.args.as_map();
+    if given.get("op").and_then(Value::as_str) != Some(ToolTool::RUN) {
+        return Err(refused("this `tool` call is not a `run`")
+            .with_recovery("pass `op: \"run\"`, the tool's `name` and its `args` to run a tool"));
+    }
+    let Some(name) = given.get("name").and_then(Value::as_str) else {
+        return Err(refused("missing string argument `name`").with_recovery(
+            "pass `name`, the tool to run as `tool` `list` or `find` spells it, and \
+             `args`, an object of its arguments",
+        ));
+    };
+    if name == ToolTool::NAME {
+        return Err(refused("`tool` cannot run itself")
+            .with_recovery("name the tool you mean to run; `run` only stands for another tool"));
+    }
+    let Some(def) = tools.get(name).map(|filed| &filed.def) else {
+        return Err(refused(format!("no tool named `{name}` is admitted here"))
+            .with_nearby(
+                tools
+                    .keys()
+                    .filter(|known| known.contains(name) || name.contains(known.as_str()))
+                    .cloned()
+                    .collect(),
+            )
+            .with_recovery(
+                "`tool` `find` a few words of what you need: it answers with the names this \
+                 building admits",
+            ));
+    };
+    let args = match given.get("args") {
+        Some(Value::Object(args)) => args.clone(),
+        None => Map::new(),
+        Some(_) => {
+            return Err(refused(format!("`args` for `{name}` is not an object"))
+                .with_recovery(with_schema(def, "pass `args` as an object")));
+        }
+    };
+    if let Err(misfit) = fits(def.input_schema.as_map(), &args) {
+        return Err(refused(format!("`{name}`: {misfit}"))
+            .with_recovery(with_schema(def, "call it again with arguments that fit")));
+    }
+    Ok(ToolCall {
+        id: call.id.clone(),
+        name: ToolName::parse(name)?,
+        args: Payload::new(args)?,
+    })
+}
+
+fn refused(subject: impl Into<String>) -> ErrorDraft {
+    AxError::failure(AxCode::InvalidArgs, ACTION, subject)
+}
+
+fn with_schema(def: &ToolDef, what: &str) -> String {
+    let schema = serde_json::to_string(&def.input_schema)
+        .unwrap_or_else(|err| format!("(the schema did not print: {err})"));
+    format!("{what}; `{}` takes: {schema}", def.name)
+}
+
+pub(super) fn fits(schema: &Map<String, Value>, args: &Map<String, Value>) -> Result<(), String> {
+    let declared = schema.get("properties").and_then(Value::as_object);
+    if let Some(missing) = schema
+        .get("required")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .find(|key| !args.contains_key(*key))
+    {
+        return Err(format!("missing required argument `{missing}`"));
+    }
+    for (key, value) in args {
+        match declared.and_then(|properties| properties.get(key)) {
+            Some(property) => {
+                if let Some(wanted) = property.get("type")
+                    && !is_of(value, wanted)
+                {
+                    return Err(format!("argument `{key}` is not of type {wanted}"));
+                }
+            }
+            None => {
+                if schema.get("additionalProperties") == Some(&Value::Bool(false)) {
+                    return Err(format!("argument `{key}` is not one this tool takes"));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn is_of(value: &Value, wanted: &Value) -> bool {
+    match wanted {
+        Value::String(name) => is_named(value, name),
+        Value::Array(names) => names
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|name| is_named(value, name)),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::Object(_) => true,
+    }
+}
+
+fn is_named(value: &Value, name: &str) -> bool {
+    match name {
+        "string" => value.is_string(),
+        "integer" => value.is_i64() || value.is_u64(),
+        "number" => value.is_number(),
+        "boolean" => value.is_boolean(),
+        "array" => value.is_array(),
+        "object" => value.is_object(),
+        "null" => value.is_null(),
+        _ => true,
+    }
+}

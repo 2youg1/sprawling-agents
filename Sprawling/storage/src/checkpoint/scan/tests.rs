@@ -1,0 +1,436 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::super::provenance::{ModelChoice, Provenance};
+use super::*;
+use kernel::{Address, B3Hash, Effort, RunId};
+use std::path::Path;
+
+fn resident() -> Provenance {
+    Provenance::new(
+        RunId::parse("018f5b2a-0000-7000-8000-000000000001").unwrap(),
+        Address::parse("work/resident").unwrap(),
+        B3Hash::digest(b"a city"),
+        ModelChoice {
+            id: "test-model".to_owned(),
+            effort: Some(Effort::Medium),
+        },
+    )
+}
+fn write(root: &Path, rel: &str, body: &str) {
+    let path = root.join(rel);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    std::fs::write(path, body).unwrap();
+}
+
+#[test]
+fn a_staged_secret_refuses_the_commit_and_never_echoes_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/leak.env", &format!("KEY={token}"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let err = match checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident()) {
+        Err(err) => err,
+        Ok(_) => panic!("a staged secret must refuse the commit"),
+    };
+    let rendered = err.to_string();
+    assert!(rendered.contains("work/leak.env"), "{rendered}");
+    assert!(
+        rendered.contains("work/leak.env:1:") && rendered.contains("(anthropic)"),
+        "the refusal names the line and the reason: {rendered}"
+    );
+    assert!(
+        !rendered.contains(&token) && !rendered.contains("Zx9yQ2mK4pL7"),
+        "positions only, never the bytes: {rendered}"
+    );
+    let ax = err.into_ax();
+    assert_eq!(*ax.code(), kernel::AxCode::SecretEgress);
+}
+
+#[test]
+fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    let quoted = ["work/Zx9yQ2mK4pL7", "vB1n"].join("/");
+    write(tmp.path(), &quoted, "fixture\n");
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "a quoted path already in the staged tree must not block the wave: {outcome:?}"
+    );
+    assert!(!outcome.unwrap().as_map().contains_key("withheld"));
+
+    std::fs::remove_file(tmp.path().join(&quoted)).unwrap();
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} again.\n"),
+    );
+    let changed = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    let payload = changed.unwrap();
+    assert_eq!(payload.as_map()["withheld"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn a_quoted_path_with_an_extension_is_recognised_by_its_whole_spelling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let name = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    let quoted = format!("work/{name}.md");
+    write(tmp.path(), &quoted, "fixture\n");
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "the quoted file name is a path this index holds: {outcome:?}"
+    );
+    assert!(!outcome.unwrap().as_map().contains_key("withheld"));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_allowlist_entry_matches_only_a_path_the_index_spells_the_same_way() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/clean.md", "nothing here");
+    let allowed = [Address::parse("work/a/b.md").unwrap()]
+        .into_iter()
+        .collect();
+    let mut checkpoint = Checkpoint::open(tmp.path())
+        .unwrap()
+        .with_entropy_allowlist(allowed);
+    checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/a\\b.md", &format!("Example: {token}\n"));
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1, "{payload:?}");
+    assert_eq!(withheld[0]["path"], "work/a\\b.md");
+}
+
+#[test]
+fn a_reference_before_a_backslash_does_not_borrow_a_suffix_exemption() {
+    let tmp = tempfile::tempdir().unwrap();
+    let name = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    let path = format!("work/{name}.md");
+    write(tmp.path(), &path, "fixture\n");
+
+    let quoted = format!("other\\{path}");
+    write(
+        tmp.path(),
+        "work/SPEC.md",
+        &format!("Read {quoted} first.\n"),
+    );
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1, "{payload:?}");
+    assert_eq!(withheld[0]["path"], "work/SPEC.md");
+}
+
+#[test]
+fn a_refusal_reports_the_entropy_findings_it_also_met() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let known = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/leak.env", &format!("KEY={known}\n"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let refused = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap_err();
+    let StorageError::SecretEgress(report) = refused else {
+        panic!("a known shape refuses the commit: {refused:?}");
+    };
+    let reasons: Vec<&str> = report
+        .withheld
+        .iter()
+        .map(|finding| finding.reason.as_str())
+        .collect();
+    assert_eq!(reasons, vec!["anthropic", "high entropy"]);
+    assert!(!report.locations().contains(&token));
+}
+
+#[test]
+fn an_entropy_hit_is_committed_and_recorded_without_echoing_the_line() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident());
+    assert!(
+        outcome.is_ok(),
+        "an entropy-only hit must not block the wave: {outcome:?}"
+    );
+    let payload = outcome.unwrap();
+    let withheld = payload.as_map()["withheld"].as_array().unwrap();
+    assert_eq!(withheld.len(), 1);
+    assert_eq!(withheld[0]["path"], "work/SPEC.md");
+    assert_eq!(withheld[0]["line"], 1);
+    assert_eq!(withheld[0]["offset"], 9);
+    assert_eq!(withheld[0]["len"], token.len());
+    assert_eq!(withheld[0]["reason"], "high entropy");
+    assert!(!serde_json::to_string(&payload).unwrap().contains(&token));
+}
+
+#[test]
+fn an_entropy_allowlist_is_file_exact_and_never_exempts_a_known_shape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let token = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("Example: {token}\n"));
+    let allowed = [Address::parse("work/SPEC.md").unwrap()]
+        .into_iter()
+        .collect();
+    let mut checkpoint = Checkpoint::open(tmp.path())
+        .unwrap()
+        .with_entropy_allowlist(allowed);
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    assert!(!payload.as_map().contains_key("withheld"));
+
+    let known = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/SPEC.md", &format!("KEY={known}\n"));
+    let refused = checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    assert!(matches!(refused, Err(StorageError::SecretEgress(_))));
+}
+
+#[test]
+fn every_commit_the_city_makes_names_the_session_that_made_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/note.md", "a line");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let of = resident();
+    checkpoint
+        .ensure_base(&["work".to_owned()], TimeMs::new(1_000), &of)
+        .unwrap();
+
+    let repo = git2::Repository::open(tmp.path()).unwrap();
+    let commit = repo.head().unwrap().peel_to_commit().unwrap();
+    let message = commit.message().unwrap();
+    let trailers: Vec<String> = message
+        .lines()
+        .filter(|line| line.starts_with("Sprawling-"))
+        .map(str::to_owned)
+        .collect();
+    let city = kernel::B3Hash::digest(b"a city").to_string();
+    assert_eq!(
+        trailers,
+        vec![
+            format!("Sprawling-Run: {}", of.run()),
+            "Sprawling-Actor: work/resident".to_owned(),
+            "Sprawling-Model: test-model".to_owned(),
+            "Sprawling-Effort: medium".to_owned(),
+            format!("Sprawling-City: {city}"),
+        ]
+    );
+    assert!(message.starts_with("checkpoint: work\n\n"), "{message}");
+
+    let author = commit.author();
+    assert_eq!(author.name().unwrap(), "work/resident");
+    assert_eq!(
+        author.email().unwrap(),
+        format!("work/resident@{}.sprawling", city.get(..12).unwrap())
+    );
+}
+
+#[test]
+fn a_change_made_before_a_restart_is_still_read_after_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/clean.md", "nothing here");
+    let mut first = Checkpoint::open(tmp.path()).unwrap();
+    first
+        .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    first
+        .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    write(tmp.path(), "work/leak.env", &format!("KEY={token}"));
+    drop(first);
+    let mut second = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = second.wave_pre(&["work".to_owned()], TimeMs::new(2_000), &resident());
+    let err = match outcome {
+        Err(err) => err,
+        Ok(_) => panic!("the restart lost the scan of what changed before it"),
+    };
+    let rendered = err.to_string();
+    assert!(rendered.contains("work/leak.env"), "{rendered}");
+    assert!(!rendered.contains(&token), "positions only: {rendered}");
+}
+
+#[test]
+fn a_wave_whose_scope_crosses_a_link_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/notes.md", "a line");
+    write(tmp.path(), ".git/hooks/pre-run", "hook-body");
+    if !crate::alias::tests::place_link(
+        true,
+        &tmp.path().join(".git").join("hooks"),
+        &tmp.path().join("work").join("alias-dir"),
+    ) {
+        return;
+    }
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let err = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap_err();
+    assert_eq!(
+        *err.into_ax().code(),
+        kernel::AxCode::OutsideWriteDomain,
+        "the refusal names the write-domain rule"
+    );
+}
+
+#[test]
+fn a_head_that_cannot_be_read_refuses_the_checkpoint_instead_of_orphaning_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/note.md", "a line");
+    let mut first = Checkpoint::open(tmp.path()).unwrap();
+    first
+        .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    drop(first);
+    let branch = git2::Repository::open(tmp.path())
+        .unwrap()
+        .head()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+    std::fs::write(tmp.path().join(".git").join(&branch), "not an oid\n").unwrap();
+
+    let mut second = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = second.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    assert!(
+        matches!(
+            outcome,
+            Err(StorageError::Checkpoint {
+                op: "read HEAD",
+                ..
+            })
+        ),
+        "{outcome:?}"
+    );
+}
+
+fn lose_the_object_of(root: &Path, rel: &str) {
+    let id = git2::Repository::open(root)
+        .unwrap()
+        .index()
+        .unwrap()
+        .get_path(Path::new(rel), 0)
+        .unwrap()
+        .id
+        .to_string();
+    let (dir, file) = id.split_at(2);
+    std::fs::remove_file(root.join(".git").join("objects").join(dir).join(file)).unwrap();
+}
+
+#[test]
+fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
+    let first = tempfile::tempdir().unwrap();
+    write(first.path(), "work/a.md", "a");
+    let mut checkpoint = Checkpoint::open(first.path()).unwrap();
+    checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    lose_the_object_of(first.path(), "work/a.md");
+    let on_first = checkpoint.scan_staged(&["work".to_owned()]);
+
+    let later = tempfile::tempdir().unwrap();
+    write(later.path(), "work/a.md", "a");
+    let mut checkpoint = Checkpoint::open(later.path()).unwrap();
+    checkpoint
+        .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    write(later.path(), "work/b.md", "b");
+    checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    lose_the_object_of(later.path(), "work/b.md");
+    let on_later = checkpoint.scan_staged(&["work".to_owned()]);
+
+    let refused = |result: Result<Vec<CheckpointFinding>, StorageError>| matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file");
+    assert_eq!((refused(on_first), refused(on_later)), (true, true));
+}
+
+#[test]
+fn a_nested_repository_contributes_its_work_but_not_its_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/nested/README.md", "ordinary work");
+    git2::Repository::init(tmp.path().join("work/nested")).unwrap();
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+
+    let outcome = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .map(|payload| payload.as_map().clone());
+
+    assert!(
+        outcome.is_ok(),
+        "a nested repository must not refuse the wave: {outcome:?}"
+    );
+    assert_eq!(
+        outcome.unwrap()["files"],
+        serde_json::json!(["work/nested/README.md"])
+    );
+}
+
+#[test]
+fn a_file_deleted_inside_a_nested_repository_leaves_the_checkpoint() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/nested/README.md", "ordinary work");
+    write(tmp.path(), "work/nested/old.rs", "fn old() {}\n");
+    git2::Repository::init(tmp.path().join("work/nested")).unwrap();
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+
+    std::fs::remove_file(tmp.path().join("work/nested/old.rs")).unwrap();
+    let payload = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    assert_eq!(
+        payload.as_map()["files"],
+        serde_json::json!(["work/nested/old.rs"])
+    );
+}
+
+#[test]
+fn a_staging_file_beside_a_document_is_never_staged() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/Roadmap.md", "the document");
+    let document = kernel::layout::document_staging_name(std::ffi::OsStr::new("Roadmap.md"));
+    let document = format!("work/{}", document.to_string_lossy());
+    write(tmp.path(), &document, "half of the next version");
+    write(tmp.path(), "work/.edit.rs.part", "half of an edit");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+
+    let walked = checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    let named = checkpoint
+        .stage_scopes(&[document.clone(), "work/.edit.rs.part".to_owned()])
+        .unwrap();
+
+    assert_eq!(
+        (walked, named),
+        (vec!["work/Roadmap.md".to_owned()], Vec::<String>::new())
+    );
+}

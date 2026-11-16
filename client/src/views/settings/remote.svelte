@@ -2,22 +2,7 @@
      License, v. 2.0. If a copy of the MPL was not distributed with this
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
-
 <script lang="ts">
-  // The remote group (client/Spec.lean §4-57): the device's half of the remote
-  // door, and the door's own controls. Pairing and revoking stay at the
-  // city's console (`crates/remote_access/Spec.lean` D4), so this group
-  // pairs the browser it runs in when the address bar carries an
-  // invitation, locks the door behind it, and forgets it; on the city's
-  // own machine it says what the door is. Opening the door and
-  // replacing the city key are on the wire behind a code the console
-  // prints, and closing is on the wire unguarded (`remote_door.svelte`).
-  //
-  // The seed is drawn once the pairing has landed, never before: a seed
-  // shown for a pairing that then failed would be a key nobody pinned.
-  // It lives in this component's state until the person says it is
-  // written down, and is stored nowhere.
-
   import { onMount } from "svelte";
 
   import { encode } from "../../core/remote/base32";
@@ -33,9 +18,7 @@
   import RemoteState from "./remote_state.svelte";
 
   const u = ui();
-  // The doctor's custody line says how long the city's vault keeps a
-  // credential, which is what a restart does to a pairing; an answer the
-  // city does not hold yet leaves the step naming every platform.
+
   const doctor = u.conn.asking.ask(QUERIES.doctor);
   const keeps = $derived.by(() => {
     const now = $doctor;
@@ -64,10 +47,6 @@
       device === null ? { kind: "unpaired" } : { kind: "paired", device, told: null, busy: false };
   }
 
-  // What this page cannot do without, before a key is made: an https://
-  // origin, which is also the only place the door's paths are, and an
-  // IndexedDB to keep the key in. WebCrypto's curves are found out when
-  // the key is made.
   function lacking(): Lack | null {
     if (!window.isSecureContext || remoteUrl(window.location, "/remote/pair") === null)
       return "insecure";
@@ -110,7 +89,7 @@
     }
     const persisted =
       "storage" in navigator ? await navigator.storage.persist().catch(() => false) : false;
-    // The code is spent; it leaves the address bar and the history entry.
+
     history.replaceState(null, "", toFragment({ kind: "setup", group: "remote" }));
     standing = { kind: "seed", seed: encode(seed), device, persisted };
   }

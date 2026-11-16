@@ -1,0 +1,266 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+use std::time::Instant;
+
+use kernel::{AxCode, AxError, Proxying};
+
+use super::config::{Endpoint, EndpointConfig};
+use super::permit::{Gate, Gated};
+use super::redemption::Redemption;
+use crate::concurrency::MaxInFlight;
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Transport {
+    slot: Arc<OnceLock<reqwest::blocking::Client>>,
+
+    gate: Arc<Gate>,
+
+    #[cfg(test)]
+    detour: Option<Detour>,
+}
+
+impl Transport {
+    #[cfg(test)]
+    pub(crate) fn limit(&self) -> u32 {
+        self.gate.limit()
+    }
+
+    pub(crate) fn admitting(ceiling: MaxInFlight) -> Transport {
+        Transport {
+            gate: Arc::new(Gate::admitting(ceiling)),
+            ..Transport::default()
+        }
+    }
+
+    fn client(&self, shape: &ClientShape) -> Result<reqwest::blocking::Client, AxError> {
+        if let Some(client) = self.slot.get() {
+            return Ok(client.clone());
+        }
+        let built = self.build(shape)?;
+        Ok(self.slot.get_or_init(|| built).clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn detoured(
+        step: impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
+        + Send
+        + Sync
+        + 'static,
+    ) -> Transport {
+        Transport {
+            slot: Arc::default(),
+            gate: Arc::default(),
+            detour: Some(Detour(Arc::new(step))),
+        }
+    }
+
+    fn build(&self, shape: &ClientShape) -> Result<reqwest::blocking::Client, AxError> {
+        let builder = crate::client_for(shape.proxying, &shape.url)
+            .timeout(Duration::from_millis(shape.timeout_ms));
+        #[cfg(test)]
+        let builder = match &self.detour {
+            Some(Detour(step)) => step(builder),
+            None => builder,
+        };
+        builder.build().map_err(|err| {
+            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                .with_recovery(
+                    "check this endpoint's `base_url` and the proxy settings this \
+                     machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                )
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ClientShape {
+    pub(crate) url: String,
+    pub(crate) proxying: Proxying,
+    pub(crate) timeout_ms: u64,
+}
+
+impl ClientShape {
+    fn of(config: &EndpointConfig) -> ClientShape {
+        ClientShape {
+            url: config.base_url.clone(),
+            proxying: config.proxying,
+            timeout_ms: config.timeout_ms,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct WarmUp {
+    transport: Transport,
+    shape: ClientShape,
+    models_url: String,
+}
+
+impl WarmUp {
+    pub(crate) fn new(transport: Transport, shape: ClientShape, models_url: String) -> WarmUp {
+        WarmUp {
+            transport,
+            shape,
+            models_url,
+        }
+    }
+
+    pub fn open(self) {
+        let Ok(client) = self.transport.client(&self.shape) else {
+            return;
+        };
+        if let Ok(answer) = client.get(&self.models_url).send() {
+            drop(answer.bytes());
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone)]
+struct Detour(
+    Arc<dyn Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder + Send + Sync>,
+);
+
+#[cfg(test)]
+impl std::fmt::Debug for Detour {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Detour")
+    }
+}
+
+impl Endpoint {
+    pub(crate) fn over(
+        transport: &Transport,
+        config: EndpointConfig,
+        redemption: Redemption,
+    ) -> Result<Endpoint, AxError> {
+        Ok(Endpoint {
+            client: transport.client(&ClientShape::of(&config))?,
+            config,
+            redemption,
+            thinking: crate::provider::thinking::ThinkingOffer::UNKNOWN,
+        })
+    }
+
+    pub(crate) fn offering(self, thinking: crate::provider::thinking::ThinkingOffer) -> Endpoint {
+        Endpoint { thinking, ..self }
+    }
+
+    pub(crate) fn gated(self, transport: &Transport, monotonic: fn() -> Instant) -> Gated {
+        Gated::new(self, Arc::clone(&transport.gate), monotonic)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::arithmetic_side_effects,
+    clippy::print_stderr,
+    reason = "test code: an instrument samples its own clock and prints its reading"
+)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+    use crate::endpoint::fakes::{config, request};
+    use crate::endpoint::redemption::redemption;
+    use crate::reach::resolve::KeptOpen;
+
+    const HOST: &str = "api.anthropic.com";
+    const BASE: &str = "https://api.anthropic.com/v1/messages";
+    const MODELS: &str = "https://api.anthropic.com/v1/models";
+
+    #[test]
+    fn a_second_call_to_one_endpoint_goes_out_over_the_first_calls_connection() {
+        let stand_in = KeptOpen::listening(HOST);
+        let shared = Transport::detoured(stand_in.toward());
+        let other = Transport::detoured(stand_in.toward());
+        for transport in [&shared, &shared, &other] {
+            let mut endpoint = Endpoint::over(transport, config(BASE), redemption()).unwrap();
+            let refused = endpoint.call(&request()).unwrap_err();
+            assert_eq!(*refused.code(), AxCode::Provider, "{refused}");
+        }
+        let served = stand_in.served_on();
+        assert_eq!(
+            (served.len(), served[1] == served[0], served[2] == served[0]),
+            (3, true, false),
+            "connections that carried the three calls: {served:?}"
+        );
+    }
+
+    #[test]
+    fn a_warm_up_opens_the_connection_the_first_call_goes_out_over() {
+        let stand_in = KeptOpen::listening(HOST);
+        let transport = Transport::detoured(stand_in.toward());
+        let shape = ClientShape::of(&config(BASE));
+        WarmUp::new(transport.clone(), shape, MODELS.to_owned()).open();
+        let warmed = stand_in.served_on();
+        let mut endpoint = Endpoint::over(&transport, config(BASE), redemption()).unwrap();
+        let refused = endpoint.call(&request()).unwrap_err();
+        assert_eq!(*refused.code(), AxCode::Provider, "{refused}");
+        assert_eq!(
+            (warmed, stand_in.served_on()),
+            (vec![0], vec![0, 0]),
+            "connections that carried the warm-up, then the warm-up and the call"
+        );
+    }
+
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_first_call_connect() {
+        const ROUNDS: usize = 20;
+        let stand_in = KeptOpen::listening(HOST);
+        let named = std::env::var("SPRAWLING_CONNECT_PROBE").unwrap_or_default();
+        let urls: Vec<String> = if named.is_empty() {
+            vec![BASE.to_owned()]
+        } else {
+            named.split(',').map(str::to_owned).collect()
+        };
+        for url in urls {
+            let detoured = named.is_empty();
+            let mut first = Vec::new();
+            let mut second = Vec::new();
+            for _ in 0..ROUNDS {
+                let builder = crate::client_for(kernel::Proxying::default(), &url);
+                let builder = if detoured {
+                    stand_in.toward()(builder)
+                } else {
+                    builder
+                };
+                let client = builder.build().unwrap();
+                let asked = |client: &reqwest::blocking::Client| {
+                    let t0 = Instant::now();
+                    let answer = client.get(&url).send().unwrap();
+                    drop(answer.text().unwrap());
+                    t0.elapsed()
+                };
+                first.push(asked(&client));
+                second.push(asked(&client));
+            }
+            let gaps: Vec<Duration> = first
+                .iter()
+                .zip(&second)
+                .map(|(one, two)| one.saturating_sub(*two))
+                .collect();
+            let median = |samples: &[Duration]| {
+                let mut sorted = samples.to_vec();
+                sorted.sort();
+                sorted[sorted.len() / 2].as_micros()
+            };
+            eprintln!(
+                "connect url={url} rounds={ROUNDS} process_first_us={} first_p50_us={} second_p50_us={} gap_p50_us={}",
+                first[0].as_micros(),
+                median(&first),
+                median(&second),
+                median(&gaps)
+            );
+        }
+    }
+}

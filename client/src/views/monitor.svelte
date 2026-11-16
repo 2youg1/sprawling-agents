@@ -4,34 +4,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
-
 <script lang="ts" module>
-  // The performance panel: a row per counter, its latest reading, the
-  // p50 and p99 of the window it shows, and its bars beside them.
-  //
-  // **The panel is what makes the city sample.** `watch` is called when
-  // the panel opens and what it returns is called when it closes, so a
-  // city nobody is looking at reads no counter at all (`crates/sprawling/Spec.lean`
-  // §8-94).
-  //
-  // **A plot is as long as the panel is wide.** Each point is one bar
-  // `POINT_PX` wide, so the panel measures the width a plot has and asks
-  // for that many of the latest points; a narrow panel shows the last
-  // minute, a wide one all five.
-  //
-  // **The bars scale to their own window** (`core/monitor.ts`'s `plot`,
-  // D82 in `client/Spec.lean`): the lowest value of the window stands
-  // low and the highest at full height, with a band from the window's
-  // p50 to its p99 behind them, so a counter that moves by a few percent
-  // still shows its shape. Two plots' heights do not compare; the
-  // figures beside them do.
-
   import type { Sample } from "../wire";
 
-  // The beats a User picks from, in milliseconds: the city's default,
-  // finer ones for a short spike, and coarser ones for a long watch. The
-  // city takes any beat from 10 to 1000 ms (`wire::BeatMs`); this list
-  // is the page's offer, so changing it changes no rule.
   export const BEATS = ["50", "100", "250", "500", "1000"] as const;
   export type BeatChoice = (typeof BEATS)[number];
 
@@ -42,11 +17,9 @@
   export interface MonitorProps {
     readonly samples: readonly Sample[];
     readonly watch: () => () => void;
-    // Sets the city's sampling beat; absent where nothing is watched
-    // live, as in the gallery.
+
     readonly beat?: ((ms: number) => void) | undefined;
-    // The shell draws this panel as a page; the gallery draws it as one
-    // region among many, where it may not carry the page's heading.
+
     readonly rank?: "page" | "section" | undefined;
   }
 </script>
@@ -63,7 +36,6 @@
 
   const { lang } = ui();
 
-  // The width of one point of a plot, its bar and the gap after it.
   const POINT_PX = 3;
 
   let panel = $state(0);
@@ -73,10 +45,6 @@
   const points = $derived(Math.floor(panel / POINT_PX));
   const shown = $derived(rows(samples, points));
 
-  // A plot's bars as one path in a box `bars.length` wide and `FULL`
-  // high, one unit a point, so the browser stretches it to the plot.
-  // The newest point stands at the right edge, so a history shorter
-  // than the plot fills it from the right.
   function barsOf(plot: Plot, points: number): string {
     const first = points - plot.bars.length;
     return plot.bars
@@ -117,10 +85,6 @@
     {#if shown.length === 0}
       <p class="text-note text-text-faint">{say($lang, "monitor_waiting")}</p>
     {:else}
-      <!-- One counter a row, ruled like a table: its name over its band,
-         its latest reading set right on the figure column, then its
-         bars to the end of the line. Under 40rem the bars take a line
-         of their own. -->
       <ul>
         {#each shown as row (row.label)}
           {@const across = Math.max(points, row.plot.bars.length, 1)}
@@ -134,8 +98,7 @@
               >
             </span>
             <span class="figure text-right text-text">{row.reading}</span>
-            <!-- Every plot has the same room, so whichever measures it
-               last tells the panel how many points one line holds. -->
+
             <span class={PLOT} bind:clientWidth={panel}>
               <svg
                 aria-hidden="true"

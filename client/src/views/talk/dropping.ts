@@ -3,30 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Files dragged onto the box become paths in it. A browser does not tell
-// a page where a dropped file lives: a drag from a file manager that
-// carries `file://` URIs names the local paths itself, and those are
-// used as they are; any other drop sends each file to the city over the
-// page's own origin (`POST /drop`, `crates/wire/Spec.lean` §8-49), which keeps it
-// and answers with the absolute path it is at.
-
 import { bearing } from "../../core/socket";
 
-// What one file came to.
 export type Kept = { readonly kind: "path"; readonly path: string } | Refused;
 
-// A file the city did not keep, and the reason it gave; an empty reason
-// is a city the page did not reach.
 export interface Refused {
   readonly kind: "refused";
   readonly name: string;
   readonly said: string;
 }
 
-// The local paths a `text/uri-list` names. Lines starting `#` are
-// comments in that format; a URI that is not `file:` names nothing on
-// this machine and is left out. A Windows drive path loses the slash
-// the URI puts before its letter.
 export function localPaths(uriList: string): readonly string[] {
   return uriList
     .split(/\r?\n/)
@@ -40,16 +26,10 @@ export function localPaths(uriList: string): readonly string[] {
     });
 }
 
-// Paths as the box writes them: one space between, and a path with a
-// space in it quoted so it stays one path to whoever reads it.
 export function spelled(paths: readonly string[]): string {
   return paths.map((path) => (/\s/.test(path) ? `"${path}"` : path)).join(" ");
 }
 
-// Sends one file to the city and reads back where it was kept. A send
-// or an answer that broke off is a refusal with nothing said, which the
-// box words as the city not being reached, so a file never vanishes
-// from a drop without a line under the box.
 export async function keep(origin: string, token: string | null, file: File): Promise<Kept> {
   const answer = await fetch(`${origin}/drop?name=${encodeURIComponent(file.name)}`, {
     method: "POST",
@@ -61,8 +41,6 @@ export async function keep(origin: string, token: string | null, file: File): Pr
   return answer.ok ? { kind: "path", path: said } : { kind: "refused", name: file.name, said };
 }
 
-// What a drop carries: nothing this box takes, the paths a file manager
-// named, or files on their way to the city.
 export type Drop =
   | { readonly kind: "nothing" }
   | { readonly kind: "named"; readonly paths: readonly string[] }
@@ -77,8 +55,6 @@ export function dropped(carried: DataTransfer | null, origin: string, token: str
   return { kind: "sent", kept: Promise.all(files.map((file) => keep(origin, token, file))) };
 }
 
-// The words with the paths placed at `at`, with a space on either side
-// that the words around them did not already have.
 export function insertAt(words: string, at: number, paths: readonly string[]): string {
   if (paths.length === 0) return words;
   const before = words.slice(0, at);

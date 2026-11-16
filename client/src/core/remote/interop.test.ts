@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The page's half of the remote door against the bytes the Rust city
-// wrote (`crates/remote_access/Spec.lean` §8-12): the key derivation,
+// wrote (`Sprawling/remote_access/Spec.lean` §8-12): the key derivation,
 // the session keys, the seal, a Rust signature, and one handshake whose
 // first frame the page must open. The page also signs once, into
 // `signature-browser.txt`, which the Rust test verifies with the same
@@ -19,7 +19,7 @@ import { finish } from "./handshake";
 import { halves, keyFrom, sign, verifies } from "./keys";
 import { opener, payloadBytes, payloadOf, sealer } from "./seal";
 
-const DIR = new URL("../../../../crates/fixtures/remote-handshake/", import.meta.url);
+const DIR = new URL("../../../../Tools/fixtures/remote-handshake/", import.meta.url);
 
 type Fields = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 

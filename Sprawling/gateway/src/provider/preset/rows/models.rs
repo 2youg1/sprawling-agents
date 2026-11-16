@@ -1,0 +1,286 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::Effort;
+
+use crate::market::InputKinds;
+
+use super::super::{
+    CeilingField, ChatSpelling, EffortField, ModelPreset, PresetThinking, ReasoningReturn,
+    ToolPictureCarry,
+};
+
+pub(super) const LOW_TO_MAX: [Effort; 5] = [
+    Effort::Low,
+    Effort::Medium,
+    Effort::High,
+    Effort::XHigh,
+    Effort::Max,
+];
+
+pub(super) const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
+    ceiling: CeilingField::MaxCompletionTokens,
+    effort: EffortField::ThinkingToggle,
+    reasoning: ReasoningReturn::AsReasoningContent,
+    chat_tool_pictures: ToolPictureCarry::InToolContent,
+    responses_tool_pictures: ToolPictureCarry::InToolContent,
+};
+
+pub(super) const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
+    ceiling: CeilingField::MaxTokens,
+    effort: EffortField::ThinkingToggle,
+    reasoning: ReasoningReturn::AsReasoningContent,
+    chat_tool_pictures: ToolPictureCarry::FollowingUser,
+    responses_tool_pictures: ToolPictureCarry::FollowingUser,
+};
+
+pub(super) const ANTHROPIC_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "claude-fable-5-1",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-opus-5-5",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-sonnet-5-5",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-haiku-4-5",
+        context_tokens: 200_000,
+        max_output_tokens: 64_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-opus-4",
+        context_tokens: 200_000,
+        max_output_tokens: 32_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-sonnet-4",
+        context_tokens: 200_000,
+        max_output_tokens: 64_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-3-7-sonnet",
+        context_tokens: 200_000,
+        max_output_tokens: 64_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-3-5-haiku",
+        context_tokens: 200_000,
+        max_output_tokens: 8_192,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+];
+
+pub(super) const OPENAI_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "gpt-6.1-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+        }),
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-astra",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: None,
+            source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+        }),
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-luna",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+        }),
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-luna",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+        }),
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-terra",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+        }),
+        cache_min_tokens: None,
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+    },
+    ModelPreset {
+        id_prefix: "gpt-4.1",
+        context_tokens: 1_047_576,
+        max_output_tokens: 32_768,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.openai.com/docs/models/gpt-4.1",
+    },
+    ModelPreset {
+        id_prefix: "gpt-4o",
+        context_tokens: 128_000,
+        max_output_tokens: 16_384,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.openai.com/docs/models/gpt-4o",
+    },
+    ModelPreset {
+        id_prefix: "o3",
+        context_tokens: 200_000,
+        max_output_tokens: 100_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.openai.com/docs/models/o3",
+    },
+    ModelPreset {
+        id_prefix: "o4-mini",
+        context_tokens: 200_000,
+        max_output_tokens: 100_000,
+        input: InputKinds::TextImage,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://platform.openai.com/docs/models/o4-mini",
+    },
+];
+
+pub(super) const DEEPSEEK_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "deepseek-flash",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::TextImage,
+        image_max_side: std::num::NonZeroU32::new(8192),
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://api-docs.deepseek.com/api/create-chat-completion",
+    },
+    ModelPreset {
+        id_prefix: "deepseek-v4-flash",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::TextImage,
+        image_max_side: std::num::NonZeroU32::new(8192),
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://api-docs.deepseek.com/guides/vision",
+    },
+    ModelPreset {
+        id_prefix: "deepseek-v4-pro",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::Text,
+        image_max_side: None,
+        thinking: None,
+        cache_min_tokens: None,
+        source: "https://api-docs.deepseek.com/quick_start/pricing",
+    },
+];

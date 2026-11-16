@@ -130,7 +130,7 @@ stderr 观测行（穷尽；非 Messages role）：
 
 发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
 交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归
-`crates/xtask/Spec.lean` D31。
+`Tools/xtask/Spec.lean` D31。
 -/
 
 /-! ## 9 工作流程

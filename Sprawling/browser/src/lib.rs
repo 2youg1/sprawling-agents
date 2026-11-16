@@ -1,0 +1,32 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+mod act;
+mod devloop;
+mod diff;
+mod geometry;
+mod input;
+mod keyboard;
+mod own;
+mod port;
+mod profile;
+mod session;
+mod shot;
+mod snapshot;
+pub mod survey;
+mod verb;
+
+pub use act::{Action, Origin, Point, STEPS_MAX, frame_for, resolve_frame};
+pub use devloop::{DevLoop, LOOKS_MAX, Observation, QUIET_LOOKS, Step};
+pub use diff::{Difference, diff};
+pub use input::{Origin as ResolvedOrigin, shared_id_of};
+pub use keyboard::{Key, Modifier, NamedKey, key_frame};
+pub use own::{OwnListeners, page_address};
+pub use port::{BrowserPort, Frame, Reply};
+pub use profile::{PROFILES_DIR, Profile};
+pub use session::{ContextId, Recording, Session, SessionRequest};
+pub use shot::{Clip, Element, Rect, SHOT_MAX_EDGE_PX, Shot, ShotMaxEdge, ShotRequest};
+pub use snapshot::{Node, PageSnapshot};
+pub use verb::{Verb, complained, read_json};

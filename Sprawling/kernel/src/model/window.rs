@@ -1,0 +1,64 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::num::NonZeroU64;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "Window"))]
+pub struct Window(NonZeroU64);
+
+impl Window {
+    #[must_use]
+    pub const fn new(tokens: u64) -> Option<Window> {
+        match NonZeroU64::new(tokens) {
+            Some(tokens) => Some(Window(tokens)),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl std::fmt::Display for Window {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.get())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_window_of_zero_is_no_window_at_all() {
+        assert_eq!(Window::new(0), None);
+        assert_eq!(Window::new(200_000).unwrap().get(), 200_000);
+    }
+
+    #[test]
+    fn a_window_travels_as_the_bare_number_and_absence_as_null() {
+        let stated = serde_json::to_string(&Window::new(128_000)).unwrap();
+        assert_eq!(stated, "128000");
+        let absent = serde_json::to_string(&Option::<Window>::None).unwrap();
+        assert_eq!(absent, "null");
+        assert_eq!(
+            serde_json::from_str::<Option<Window>>("128000").unwrap(),
+            Window::new(128_000)
+        );
+    }
+
+    #[test]
+    fn zero_on_the_wire_is_refused_rather_than_read_as_absence() {
+        assert!(serde_json::from_str::<Window>("0").is_err());
+    }
+}

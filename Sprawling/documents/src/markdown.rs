@@ -1,0 +1,91 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+mod export;
+mod lowering;
+mod position;
+mod target;
+mod tree;
+
+pub use export::{EXPORT_BYTES_MAX, export};
+pub use tree::{Align, Block, Check, Construct, Inline, Laid, ListItem, Order, Preview};
+pub use tree::{ReplyState, Row, Spacing};
+
+use kernel::AxError;
+
+use crate::encoding::Encoding;
+use crate::format::Format;
+use crate::layout;
+use crate::span::{Span, offset};
+use crate::window::{Lifted, Window, cut};
+
+pub fn preview(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Preview, AxError> {
+    match encoding {
+        Encoding::Utf16Le | Encoding::Utf16Be => Ok(Preview::Unsupported { encoding }),
+        Encoding::Utf8 | Encoding::Utf8Bom => laid(encoding, lifted, viewport).map(Preview::Laid),
+    }
+}
+
+pub fn reply(text: &str, state: ReplyState) -> Result<Laid, AxError> {
+    let bytes = text.as_bytes();
+    let size = match state {
+        ReplyState::Settled => offset(bytes.len()),
+        ReplyState::Streaming => layout::closed(bytes),
+    };
+    laid(
+        Encoding::Utf8,
+        Lifted { at: 0, bytes, size },
+        Span::ordered(0, size),
+    )
+}
+
+fn laid(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Laid, AxError> {
+    let window = settled(cut(encoding, lifted, viewport)?, lifted.size);
+    let blocks = lowering::blocks(&window.text, window.span.start());
+    Ok(Laid {
+        span: window.span,
+        blocks,
+    })
+}
+
+fn settled(window: Window, size: u64) -> Window {
+    if window.span.end() >= size {
+        return window;
+    }
+    let ends = layout::blocks(Format::Markdown, window.text.as_bytes());
+    let Some(end) = ends
+        .iter()
+        .rev()
+        .nth(1)
+        .map(|block| block.end())
+        .filter(|end| *end > 0)
+    else {
+        return window;
+    };
+    let kept = usize::try_from(end)
+        .ok()
+        .and_then(|end| window.text.get(..end));
+    match kept {
+        Some(text) => Window {
+            span: Span::ordered(
+                window.span.start(),
+                window.span.start().saturating_add(offset(text.len())),
+            ),
+            text: text.to_owned(),
+        },
+        None => window,
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
+mod tests;

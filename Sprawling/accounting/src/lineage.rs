@@ -1,0 +1,155 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use kernel::event::record::{ApprovalResolved, RunForked, RunStarted};
+use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunLine {
+    pub run: RunId,
+
+    pub addr: Option<Address>,
+
+    pub session: Option<Seq>,
+
+    pub parent: Option<RunId>,
+
+    pub forked_at: Option<Seq>,
+
+    pub predecessor: Option<RunId>,
+    pub first_seq: Seq,
+    pub last_seq: Seq,
+    pub state: Option<storage::RunPhase>,
+
+    pub unanswered: usize,
+}
+
+impl RunLine {
+    pub fn to_json(&self) -> serde_json::Value {
+        let state = self.state.as_ref().map(|phase| match phase {
+            storage::RunPhase::Active => "active",
+            storage::RunPhase::Frozen => "frozen",
+        });
+        serde_json::json!({
+            "run": self.run.to_string(),
+            "addr": self.addr.as_ref().map(Address::as_str),
+            "session": self.session.map(|seq| seq.value()),
+            "parent": self.parent.map(|run| run.to_string()),
+            "forked_at": self.forked_at.map(|seq| seq.value()),
+            "predecessor": self.predecessor.map(|run| run.to_string()),
+            "first_seq": self.first_seq.value(),
+            "last_seq": self.last_seq.value(),
+            "state": state,
+            "unanswered": self.unanswered,
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct Lineage {
+    runs: BTreeMap<RunId, RunLine>,
+    stretches: BTreeMap<Address, Seq>,
+    asked_by: BTreeMap<String, RunId>,
+    hot: storage::HotView,
+}
+
+impl Lineage {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "two kinds carry lineage; every other kind only moves last_seq"
+    )]
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.hot
+            .apply(record)
+            .map_err(storage::StorageError::into_ax)?;
+        let seq = record.seq();
+        if record.kind() == EventKind::SessionOpened
+            && let Some(addr) = record.addr()
+        {
+            self.stretches.insert(addr.clone(), seq);
+        }
+
+        if record.kind() == EventKind::ApprovalResolved {
+            let answered = record.data().read::<ApprovalResolved>()?;
+            if let Some(asker) = self.asked_by.remove(answered.id.as_str())
+                && let Some(line) = self.runs.get_mut(&asker)
+            {
+                line.unanswered = line.unanswered.saturating_sub(1);
+            }
+        }
+        let run = record.run();
+        if run == RunId::CITY {
+            return Ok(());
+        }
+        let line = self.runs.entry(run).or_insert_with(|| RunLine {
+            run,
+            addr: None,
+            session: None,
+            parent: None,
+            forked_at: None,
+            predecessor: None,
+            first_seq: seq,
+            last_seq: seq,
+            state: None,
+            unanswered: 0,
+        });
+        line.last_seq = seq;
+        match record.kind() {
+            EventKind::RunStarted => {
+                let started = record.data().read::<RunStarted>()?;
+                line.addr = record.addr().cloned();
+                line.session = line
+                    .addr
+                    .as_ref()
+                    .and_then(|addr| self.stretches.get(addr).copied());
+                line.parent = line.parent.or(started.parent);
+                line.predecessor = started.predecessor;
+            }
+            EventKind::RunForked => {
+                let forked = record.data().read::<RunForked>()?;
+                line.parent = Some(forked.from);
+                line.forked_at = Some(forked.at_seq);
+            }
+            EventKind::ApprovalRequested => {
+                let asked = record.data().read::<ApprovalItem>()?;
+                if self
+                    .asked_by
+                    .insert(asked.id.as_str().to_owned(), run)
+                    .is_none()
+                {
+                    line.unanswered = line.unanswered.saturating_add(1);
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub fn lines(&self) -> impl Iterator<Item = RunLine> + '_ {
+        let mut lines: Vec<&RunLine> = self.runs.values().collect();
+        lines.sort_by_key(|line| line.first_seq);
+        lines.into_iter().map(|line| RunLine {
+            state: self.hot.get(&line.run).map(|hot| hot.phase),
+            ..line.clone()
+        })
+    }
+}
+
+pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError> {
+    let index =
+        storage::LedgerIndex::rebuild(ledger_dir).map_err(storage::StorageError::into_ax)?;
+    let mut reader = index.reader(ledger_dir);
+    let mut lineage = Lineage::default();
+    for seq in index.seqs() {
+        let line = reader
+            .line_at(seq)
+            .map_err(storage::StorageError::into_ax)?;
+        lineage.apply(&EventRecord::parse_line(&line)?)?;
+    }
+    Ok(lineage)
+}

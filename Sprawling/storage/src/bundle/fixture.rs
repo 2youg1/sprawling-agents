@@ -1,0 +1,42 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+
+use std::path::Path;
+
+use kernel::{EventDraft, EventKind, Ledger, Payload, RunId, TimeMs};
+
+use crate::jsonl::JsonlLedger;
+
+pub(crate) fn city_with(records: u64, root: &Path) {
+    let layout = kernel::layout::CityLayout::new(root);
+    let dir = layout.ledger();
+    let (mut ledger, _report) = JsonlLedger::open(&dir, TimeMs::new(1)).unwrap();
+    for step in 0..records {
+        ledger
+            .append(EventDraft {
+                run: RunId::CITY,
+                t: TimeMs::new(step.saturating_add(1)),
+                who: "owner".to_owned(),
+                addr: None,
+                kind: EventKind::CityInitialized,
+                data: Payload::empty(),
+                ig: false,
+            })
+            .unwrap();
+    }
+    std::fs::create_dir_all(root.join("lab")).unwrap();
+    std::fs::write(root.join("City.md"), b"# City.md\n").unwrap();
+    std::fs::write(root.join("lab").join("Roadmap.md"), b"# Roadmap\n").unwrap();
+    let cas = crate::Cas::open(&layout.cas()).unwrap();
+    drop(cas);
+}

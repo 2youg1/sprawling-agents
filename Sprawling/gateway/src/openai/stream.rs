@@ -1,0 +1,224 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::{AxError, Increment};
+use serde_json::{Value, json};
+
+use crate::endpoint::failure::{ProviderFailure, provider_err};
+use crate::mismatch::{settled_tool_arguments, stream_cut};
+
+pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Increment> {
+    let delta = map
+        .get("choices")?
+        .as_array()?
+        .first()?
+        .as_object()?
+        .get("delta")?
+        .as_object()?;
+    if let Some(text) = delta.get("content").and_then(Value::as_str)
+        && !text.is_empty()
+    {
+        return Some(Increment::Said(text.to_owned()));
+    }
+    reasoning_in(delta).map(Increment::Thought)
+}
+
+pub(crate) fn reasoning_in(held: &serde_json::Map<String, Value>) -> Option<String> {
+    for key in ["reasoning", "reasoning_content"] {
+        if let Some(text) = held.get(key).and_then(Value::as_str)
+            && !text.is_empty()
+        {
+            return Some(text.to_owned());
+        }
+    }
+    None
+}
+
+pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
+    let mut said = String::new();
+    let mut thought = String::new();
+    let mut calls: std::collections::BTreeMap<u64, (String, String, String)> =
+        std::collections::BTreeMap::new();
+    let mut finish = None;
+    let mut usage = None;
+    for frame in frames {
+        let Some(map) = frame.as_object() else {
+            continue;
+        };
+        if let Some(held) = map.get("usage")
+            && !held.is_null()
+        {
+            usage = Some(held.clone());
+        }
+
+        if let Some(error) = map.get("error").and_then(Value::as_object) {
+            let kind = ["code", "type"]
+                .into_iter()
+                .find_map(|key| error.get(key).and_then(Value::as_str))
+                .unwrap_or("an error without a type");
+            return Err(provider_err(
+                "read a streamed answer",
+                &ProviderFailure::Reported { kind },
+            ));
+        }
+        let Some(first) = map
+            .get("choices")
+            .and_then(Value::as_array)
+            .and_then(|choices| choices.first())
+            .and_then(Value::as_object)
+        else {
+            continue;
+        };
+        if let Some(held) = first.get("finish_reason").and_then(Value::as_str) {
+            finish = Some(held.to_owned());
+        }
+        let Some(delta) = first.get("delta").and_then(Value::as_object) else {
+            continue;
+        };
+        if let Some(text) = delta.get("content").and_then(Value::as_str) {
+            said.push_str(text);
+        }
+        if let Some(text) = reasoning_in(delta) {
+            thought.push_str(&text);
+        }
+        for call in delta
+            .get("tool_calls")
+            .and_then(Value::as_array)
+            .unwrap_or(&Vec::new())
+        {
+            let Some(one) = call.as_object() else {
+                continue;
+            };
+            let at = one.get("index").and_then(Value::as_u64).unwrap_or_default();
+            let held = calls.entry(at).or_default();
+
+            if let Some(id) = one.get("id").and_then(Value::as_str)
+                && !id.is_empty()
+            {
+                held.0 = id.to_owned();
+            }
+            let Some(function) = one.get("function").and_then(Value::as_object) else {
+                continue;
+            };
+            if let Some(name) = function.get("name").and_then(Value::as_str)
+                && !name.is_empty()
+            {
+                held.1 = name.to_owned();
+            }
+            if let Some(part) = function.get("arguments").and_then(Value::as_str) {
+                held.2.push_str(part);
+            }
+        }
+    }
+    let Some(finish) = finish else {
+        return Err(stream_cut(
+            "the stream ended without the chunk that says why the model stopped",
+        ));
+    };
+    let mut message = json!({ "role": "assistant", "content": said });
+
+    if !thought.is_empty()
+        && let Some(map) = message.as_object_mut()
+    {
+        map.insert("reasoning".to_owned(), Value::String(thought));
+    }
+    if !calls.is_empty()
+        && let Some(map) = message.as_object_mut()
+    {
+        let mut wired = Vec::new();
+        for (at, (id, name, arguments)) in calls {
+            settled_tool_arguments(&name, at, &arguments)?;
+            wired.push(json!({
+                "id": id,
+                "type": "function",
+                "function": { "name": name, "arguments": arguments },
+            }));
+        }
+        map.insert("tool_calls".to_owned(), Value::Array(wired));
+    }
+    Ok(json!({
+        "choices": [{ "message": message, "finish_reason": finish }],
+        "usage": usage.unwrap_or_else(|| json!({})),
+    }))
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::settled;
+    use serde_json::json;
+
+    #[test]
+    fn a_later_chunk_with_an_empty_name_or_id_does_not_erase_the_first() {
+        let frames = vec![
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "type": "function", "function": {"name": "read", "arguments": ""}}]}}]}),
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "", "type": "function", "function": {"name": "", "arguments": "{\"path\": "}}]}}]}),
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "", "type": "function", "function": {"arguments": "\"a.md\"}"}}]}}]}),
+            json!({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}),
+        ];
+        let settled = settled(&frames).unwrap();
+        let call = &settled["choices"][0]["message"]["tool_calls"][0];
+        assert_eq!(call["id"], "call_1");
+        assert_eq!(call["function"]["name"], "read");
+        assert_eq!(call["function"]["arguments"], "{\"path\": \"a.md\"}");
+    }
+
+    #[test]
+    fn tool_arguments_cut_mid_value_are_refused_not_emptied() {
+        let frames = vec![
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "type": "function", "function": {"name": "exec", "arguments": "{\"cmd\": \"rm "}}]}}]}),
+            json!({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}),
+        ];
+        let refused = settled(&frames).expect_err("half a tool call is not a tool call");
+        assert_eq!(refused.code(), &kernel::AxCode::Provider);
+        assert!(
+            refused.subject().contains("exec"),
+            "the refusal has to name the tool: {}",
+            refused.subject()
+        );
+    }
+
+    #[test]
+    fn an_error_chunk_mid_stream_is_the_failure_it_reports() {
+        let reported = |error: serde_json::Value| {
+            let frames = vec![
+                json!({"choices": [{"delta": {"content": "hal"}}]}),
+                json!({ "error": error }),
+            ];
+            let refused = settled(&frames).expect_err("an error chunk is not an answer");
+            (
+                refused.subject().to_owned(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone(),
+            )
+        };
+        assert_eq!(
+            [
+                reported(json!({"message": "m", "type": "server_error", "code": null})),
+                reported(
+                    json!({"message": "m", "type": "requests", "code": "rate_limit_exceeded"})
+                ),
+                reported(
+                    json!({"message": "m", "type": "insufficient_quota", "code": "insufficient_quota"})
+                ),
+            ],
+            [
+                ("the stream reported server_error".to_owned(), json!("yes")),
+                (
+                    "the stream reported rate_limit_exceeded".to_owned(),
+                    json!("yes")
+                ),
+                (
+                    "the stream reported insufficient_quota".to_owned(),
+                    json!("no")
+                ),
+            ]
+        );
+    }
+}

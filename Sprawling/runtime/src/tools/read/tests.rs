@@ -1,0 +1,482 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::interval::{Interval, LINE_CAP};
+use super::*;
+use crate::catalog::CatalogEntry;
+use kernel::{B3Hash, SkillItem, SkillManifest};
+
+mod doors;
+mod instruments;
+mod locators;
+mod looks;
+mod pictures;
+mod same_bytes;
+mod unchanged;
+
+fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
+    let catalog = Arc::new(Mutex::new(Catalog::new()));
+    let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
+    let tool = ReadTool::new(
+        root,
+        Arc::clone(&catalog),
+        everywhere,
+        &kernel::layout::CityLayout::new(root).cas(),
+    )
+    .unwrap()
+    .storing_pictures(storage::BlockOrigin {
+        run: kernel::RunId::from_bytes([7; 16]),
+        building: kernel::Address::parse("lab").unwrap(),
+    });
+    (tool, catalog)
+}
+
+pub(super) fn skill_manifest(root: &Path, files: &[(&str, &[u8])]) -> B3Hash {
+    let store = kernel::layout::CityLayout::new(root).cas();
+    let mut cas = storage::Cas::open(&store).unwrap();
+    let items = files
+        .iter()
+        .map(|(path, bytes)| {
+            let digest = cas.put(bytes).unwrap();
+            SkillItem::File {
+                path: (*path).to_owned(),
+                digest,
+            }
+        })
+        .collect::<Vec<_>>();
+    let manifest = SkillManifest::new(items).unwrap();
+    cas.put(&manifest.encode().unwrap()).unwrap()
+}
+
+fn call(path: &str) -> ToolCall {
+    let mut args = Map::new();
+    args.insert("file_path".to_owned(), Value::String(path.to_owned()));
+    ToolCall {
+        id: "call-1".to_owned(),
+        name: ToolName::parse("read").unwrap(),
+        args: Payload::new(args).unwrap(),
+    }
+}
+
+fn interval(path: &str, index: u64, limit: Option<u64>) -> ToolCall {
+    let mut args = Map::new();
+    args.insert("file_path".to_owned(), Value::String(path.to_owned()));
+    args.insert(
+        "offset".to_owned(),
+        Value::Number(index.checked_add(1).unwrap().into()),
+    );
+    if let Some(limit) = limit {
+        args.insert("limit".to_owned(), Value::Number(limit.into()));
+    }
+    ToolCall {
+        id: "call-1".to_owned(),
+        name: ToolName::parse("read").unwrap(),
+        args: Payload::new(args).unwrap(),
+    }
+}
+
+#[test]
+fn an_offset_is_a_line_number_counted_from_one() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab/lines.md"), "one\ntwo\nthree\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let from = |offset: u64| {
+        let mut args = Map::new();
+        args.insert(
+            "file_path".to_owned(),
+            Value::String("lab/lines.md".to_owned()),
+        );
+        args.insert("offset".to_owned(), Value::Number(offset.into()));
+        args.insert("limit".to_owned(), Value::Number(1.into()));
+        let call = ToolCall {
+            id: "call-1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::new(args).unwrap(),
+        };
+        let answered = tool.invoke(&call).unwrap();
+        let map = answered.result.as_map();
+        (
+            map["text"].as_str().unwrap().to_owned(),
+            map.get("offset").and_then(Value::as_u64),
+        )
+    };
+    assert_eq!(
+        [from(0), from(1), from(3)],
+        [
+            ("one\n".to_owned(), None),
+            ("one\n".to_owned(), None),
+            ("three\n".to_owned(), Some(2)),
+        ]
+    );
+}
+
+#[test]
+fn a_read_spelled_the_older_way_is_refused_with_the_name_it_takes() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab/Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let mut args = Map::new();
+    args.insert("path".to_owned(), Value::String("lab/Memo.md".to_owned()));
+    let err = tool
+        .invoke(&ToolCall {
+            id: "call-1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::new(args).unwrap(),
+        })
+        .unwrap_err();
+    assert_eq!(
+        (*err.code(), err.subject()),
+        (AxCode::InvalidArgs, "missing string argument `file_path`")
+    );
+}
+
+#[test]
+fn a_file_in_the_city_comes_back_with_its_own_length() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let outcome = tool.invoke(&call("lab/Memo.md")).unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(map["text"], "one decision\n");
+    assert_eq!(map["bytes"], 13);
+}
+
+#[test]
+fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
+    let dir = tempfile::tempdir().unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    for asked in [
+        ".sprawling/ledger/0001.jsonl",
+        "lab/.sprawling/RULES.toml",
+        ".sprawling/CONFIG.toml",
+    ] {
+        let err = tool.invoke(&call(asked)).unwrap_err();
+        assert_eq!(err.code(), &AxCode::GateDenied, "{asked} was allowed");
+        assert!(
+            !err.recovery().is_empty(),
+            "{asked} refused with no way out"
+        );
+    }
+}
+
+#[test]
+fn the_reading_room_hands_over_what_a_path_could_not_reach() {
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = skill_manifest(dir.path(), &[("SKILL.md", b"check the diff first\n")]);
+    let (tool, catalog) = tool(dir.path());
+    catalog
+        .lock()
+        .unwrap()
+        .admit_skill(CatalogEntry {
+            name: "review".to_owned(),
+            disclosure: "how this building reviews".to_owned(),
+            expansion: manifest.to_string(),
+            hash: Some(manifest),
+            document: "check the diff first\n".to_owned(),
+        })
+        .unwrap();
+
+    assert!(
+        tool.invoke(&call(".sprawling/library/review.md")).is_err(),
+        "the path is still closed"
+    );
+    let outcome = tool.invoke(&call("review")).unwrap();
+    assert_eq!(outcome.result.as_map()["text"], "check the diff first\n");
+}
+
+#[test]
+fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let (tool, catalog) = tool(dir.path());
+    catalog.lock().unwrap().set_mode(kernel::Mode::Work);
+
+    let mode = tool.invoke(&call("mode:work")).unwrap();
+    let said = mode.result.as_map()["text"].as_str().unwrap_or_default();
+    assert!(said.contains("Roadmap.md"), "the mode's discipline: {said}");
+
+    let dev = tool.invoke(&call("dev")).unwrap();
+    let said = dev.result.as_map()["text"].as_str().unwrap_or_default();
+    assert!(said.contains("-SPEC.md"), "the developer entry: {said}");
+    assert!(said.contains("wait for the User to dispatch it"));
+}
+
+#[test]
+fn a_missing_file_is_the_callers_mistake_not_the_disks() {
+    let dir = tempfile::tempdir().unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("lab/nowhere.md")).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+}
+
+#[test]
+fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+
+    let wide: String = (0..400)
+        .map(|n| format!("{n:04}{}\n", "x".repeat(1_019)))
+        .collect();
+    std::fs::write(dir.path().join("lab").join("Wide.md"), &wide).unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let first = tool.invoke(&call("lab/Wide.md")).unwrap();
+    let map = first.result.as_map();
+    let text = map["text"].as_str().unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    assert!(text.len() <= cap, "{} bytes came back", text.len());
+    assert!(
+        text.lines().count() < 400,
+        "the byte budget has to bind before the line cap does"
+    );
+    assert!(text.ends_with('\n'), "the cut lands on a line end");
+
+    let delivered = text.lines().count();
+    assert_eq!(map["next_offset"], serde_json::json!(delivered));
+    let rest = tool
+        .invoke(&interval(
+            "lab/Wide.md",
+            u64::try_from(delivered).unwrap(),
+            None,
+        ))
+        .unwrap();
+    let next = rest.result.as_map()["text"].as_str().unwrap();
+    assert!(
+        next.starts_with(&format!("{delivered:04}")),
+        "continuation starts at the first line the cut withheld"
+    );
+}
+
+#[test]
+fn a_single_line_past_the_budget_still_makes_progress() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let body = format!("{}\nsecond\n", "y".repeat(cap.saturating_mul(2)));
+    std::fs::write(dir.path().join("lab").join("OneLine.md"), &body).unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let answer = tool.invoke(&call("lab/OneLine.md")).unwrap();
+    let map = answer.result.as_map();
+    assert_eq!(map["text"].as_str().unwrap().lines().count(), 1);
+    assert_eq!(map["next_offset"], 1, "the caller can always move on");
+}
+
+#[test]
+fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let body: String = (0..700).map(|n| format!("line {n}\n")).collect();
+    std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let first = tool.invoke(&call("lab/Long.md")).unwrap();
+    let map = first.result.as_map();
+    let text = map["text"].as_str().unwrap();
+    assert_eq!(text.lines().count(), 512, "the cap is what came back");
+    assert!(text.starts_with("line 0\n"));
+    assert_eq!(map["total_lines"], 700);
+    assert_eq!(map["next_offset"], 512);
+
+    let rest = tool.invoke(&interval("lab/Long.md", 512, None)).unwrap();
+    let map = rest.result.as_map();
+    let text = map["text"].as_str().unwrap();
+    assert_eq!(text.lines().count(), 188);
+    assert!(text.starts_with("line 512\n"));
+    assert!(
+        !map.contains_key("next_offset"),
+        "the end of a file has nothing after it"
+    );
+}
+
+#[test]
+fn a_continuation_is_drawn_numbered_from_where_it_starts() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let body: String = (0..700).map(|n| format!("line {n}\n")).collect();
+    std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let rest = tool
+        .invoke(&interval("lab/Long.md", 515, Some(10)))
+        .unwrap();
+    let drawn = crate::rendering::shown(
+        crate::rendering::CURRENT,
+        &ToolName::parse(ReadTool::NAME).unwrap(),
+        &kernel::event::record::ToolAnswer::Answered {
+            result: rest.result,
+        },
+    )
+    .unwrap();
+
+    let first_lines: Vec<&str> = drawn
+        .lines()
+        .take(7)
+        .map(|line| line.split(", version").next().unwrap())
+        .collect();
+    assert_eq!(
+        first_lines,
+        [
+            "lab/Long.md lines 516-525 of 700, next 526",
+            "516|line 515",
+            "line 516",
+            "line 517",
+            "line 518",
+            "520|line 519",
+            "line 520",
+        ]
+    );
+}
+
+#[test]
+fn a_limit_over_the_cap_is_clamped_and_a_short_file_stays_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let body: String = (0..600).map(|n| format!("line {n}\n")).collect();
+    std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let capped = tool
+        .invoke(&interval("lab/Long.md", 0, Some(9_000)))
+        .unwrap();
+    let map = capped.result.as_map();
+    assert_eq!(map["text"].as_str().unwrap().lines().count(), 512);
+    assert_eq!(map["total_lines"], 600);
+
+    let whole = tool.invoke(&call("lab/Memo.md")).unwrap();
+    let map = whole.result.as_map();
+    assert_eq!(map["text"], "one decision\n");
+    assert_eq!(map["bytes"], 13);
+    assert!(!map.contains_key("next_offset"));
+}
+
+#[test]
+fn an_offset_past_the_end_answers_empty_with_the_total() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let outcome = tool.invoke(&interval("lab/Memo.md", 40, None)).unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(map["text"], "");
+    assert_eq!(map["total_lines"], 1);
+    assert!(!map.contains_key("next_offset"));
+}
+
+#[test]
+fn an_interval_that_cannot_be_counted_is_refused_rather_than_guessed() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    for bad in [
+        Value::String("12".to_owned()),
+        Value::Number((-3).into()),
+        Value::Number(0.into()),
+    ] {
+        let mut args = Map::new();
+        args.insert(
+            "file_path".to_owned(),
+            Value::String("lab/Memo.md".to_owned()),
+        );
+        args.insert("limit".to_owned(), bad.clone());
+        let err = tool
+            .invoke(&ToolCall {
+                id: "call-1".to_owned(),
+                name: ToolName::parse("read").unwrap(),
+                args: Payload::new(args).unwrap(),
+            })
+            .unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs, "limit {bad} was allowed");
+    }
+}
+
+#[cfg(feature = "conformance")]
+#[test]
+fn the_tool_refuses_another_tools_call_and_still_answers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut tool, _catalog) = tool(dir.path());
+    kernel::tool::conformance::assert_tool_conformance(&mut tool);
+}
+
+#[test]
+fn a_poisoned_catalog_refuses_rather_than_falls_through() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("review"), "a file named like the skill\n").unwrap();
+    let (tool, catalog) = tool(dir.path());
+    let poisoner = Arc::clone(&catalog);
+    let died = std::thread::spawn(move || {
+        let _held = poisoner.lock().unwrap();
+        panic!("the thread dies holding the catalog");
+    })
+    .join();
+    assert!(died.is_err());
+
+    let refused = tool.invoke(&call("review"));
+    assert!(
+        matches!(&refused, Err(err) if err.code() == &AxCode::StorageFatal),
+        "a poisoned catalog fell through to the path: {refused:?}"
+    );
+}
+
+#[test]
+fn a_miss_offers_the_nearest_directorys_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join(".sprawling")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "x\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("lab/notes/Memo.mb")).unwrap_err();
+    assert_eq!(err.nearby(), ["lab/Memo.md"]);
+    let above = tool.invoke(&call("ghost/Memo.md")).unwrap_err();
+    assert!(
+        above.nearby().is_empty(),
+        "a miss listed above the path it was admitted to: {:?}",
+        above.nearby()
+    );
+    assert!(!err.recovery().contains("exec"), "{}", err.recovery());
+}
+
+#[test]
+fn an_absolute_path_inside_the_city_is_read_as_its_address() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("hall").join("dropped")).unwrap();
+    std::fs::write(
+        dir.path().join("hall").join("dropped").join("plan.md"),
+        "the plan\n",
+    )
+    .unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let asked = dir.path().join("hall").join("dropped").join("plan.md");
+
+    let outcome = tool.invoke(&call(asked.to_str().unwrap())).unwrap();
+    assert_eq!(outcome.result.as_map()["text"], "the plan\n");
+}
+
+#[test]
+fn a_directory_is_answered_with_its_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = dir.path().join("hall").join("mayor");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(room.join("notes.md"), "x\n").unwrap();
+    std::fs::write(room.join("Handoff.md"), "y\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("hall/mayor")).unwrap_err();
+    assert_eq!(
+        (err.code(), err.nearby()),
+        (
+            &AxCode::InvalidArgs,
+            &[
+                "hall/mayor/Handoff.md".to_owned(),
+                "hall/mayor/notes.md".to_owned()
+            ][..]
+        )
+    );
+}

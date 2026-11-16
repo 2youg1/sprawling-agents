@@ -1,0 +1,61 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::image::{ImageRef, ImageType};
+use super::wire::{ChatMessage, ContentBlock, Role};
+use super::{Model, ModelRequest};
+use crate::locator::Locator;
+
+#[allow(
+    clippy::panic,
+    reason = "conformance suites assert by panicking; they are dev-only by feature"
+)]
+#[cfg(feature = "conformance")]
+pub fn assert_model_conformance<M: Model>(model: &mut M, benign: &ModelRequest) {
+    for round in 0..2u8 {
+        match model.call(benign) {
+            Ok(ret) => assert!(
+                ret.calls.len() != usize::MAX,
+                "round {round}: adapter returned a wave"
+            ),
+            Err(err) => assert!(
+                !err.code().as_str().is_empty(),
+                "round {round}: adapter returned a typed error"
+            ),
+        }
+    }
+    assert_seeing_a_picture_answers(model, benign);
+}
+
+#[allow(
+    clippy::panic,
+    reason = "conformance suites assert by panicking; they are dev-only by feature"
+)]
+#[cfg(feature = "conformance")]
+fn assert_seeing_a_picture_answers<M: Model>(model: &mut M, benign: &ModelRequest) {
+    let Ok(locator) = Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))) else {
+        panic!("the conformance picture's locator is spelled by this file");
+    };
+    let mut seeing = benign.clone();
+    seeing.chat.messages.to_mut().push(ChatMessage {
+        role: Role::User,
+        content: vec![ContentBlock::Image(ImageRef {
+            locator,
+            media_type: ImageType::Png,
+            width: 16,
+            height: 16,
+        })],
+    });
+    match model.call(&seeing) {
+        Ok(ret) => assert!(
+            ret.calls.len() != usize::MAX,
+            "seeing a picture: adapter returned a wave"
+        ),
+        Err(err) => assert!(
+            !err.code().as_str().is_empty(),
+            "seeing a picture: adapter returned a typed error"
+        ),
+    }
+}

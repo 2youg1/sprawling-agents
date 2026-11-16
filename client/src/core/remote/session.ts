@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The whole client speaking through the remote door (client/Spec.lean §4-64,
-// `crates/remote_access/Spec.lean` §8-10): a page opened from the remote
-// address, in an origin that kept a paired device, speaks the wire as
-// sealed payloads on `/remote/session`; any other page speaks to this
-// origin's `/ws`. Which line a connection takes is judged each time the
-// link connects, so a device paired on this very page speaks through
-// the door from the link's next attempt on.
-//
-// WebCrypto seals and opens asynchronously, and two calls may finish
-// out of turn, while the city opens frames by count. So the frames this
-// line sends are sealed one after another, each sent before the next is
-// sealed, and the frames it receives are opened one after another.
-
 import { plainDial, socketUrl } from "../line";
 import { renewing } from "../local/dial";
 import type { Credential } from "../local/entering";
@@ -26,9 +13,6 @@ import { kept } from "./device";
 import type { Session } from "./handshake";
 import { payloadBytes, payloadOf } from "./seal";
 
-// The line for each connection the link opens from `location`. A plain
-// line renews `credential` before each attempt, and `forgotten` is
-// called when the city no longer knows this browser's device key.
 export function dialFor(
   location: Pick<Location, "protocol" | "host">,
   credential: Credential,
@@ -40,8 +24,7 @@ export function dialFor(
   return (hearing) => {
     let line: Line | null = null;
     let dropped = false;
-    // Read through a call: the link may drop the line while the device
-    // record or the handshake is awaited.
+
     const gone = (): boolean => dropped;
     void kept().then(async (device) => {
       if (gone()) return;
@@ -75,13 +58,9 @@ export function dialFor(
   };
 }
 
-// A session the door admitted, as a line: open from the start, closed
-// once - when the city ends the connection, when a frame does not open
-// or is not a wire frame, when a frame will not seal, or when the link
-// closes it.
 export function talk(door: Door, session: Session, hearing: Hearing): Line {
   let open = true;
-  // Read through a call: `end` may run while a frame is awaited.
+
   const isOpen = (): boolean => open;
   let sending = Promise.resolve();
   const end = (): void => {

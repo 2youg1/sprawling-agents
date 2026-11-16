@@ -1,0 +1,240 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+
+use crate::budget::BudgetUse;
+use crate::error::{AxCode, AxError};
+use crate::event::{EventKind, EventRef};
+
+pub(crate) const CITABLE: [EventKind; 3] = [
+    EventKind::ToolResult,
+    EventKind::ModelReturned,
+    EventKind::HarnessAnswered,
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Evidence(Vec<EventRef>);
+
+impl Evidence {
+    pub fn new(refs: Vec<EventRef>) -> Result<Evidence, AxError> {
+        if refs.is_empty() {
+            return Err(AxError::failure(
+                AxCode::EvidenceMissing,
+                "construct evidence",
+                "empty ref list",
+            )
+            .with_recovery(format!("cite at least one {} event", citable_words()?)));
+        }
+        if let Some(bad) = refs.iter().find(|r| !CITABLE.contains(&r.kind())) {
+            return Err(AxError::failure(
+                AxCode::EvidenceMissing,
+                "construct evidence",
+                format!("ref kind {:?}", bad.kind()),
+            )
+            .with_recovery(format!("evidence kinds are {} only", citable_words()?)));
+        }
+        Ok(Evidence(refs))
+    }
+
+    pub fn refs(&self) -> &[EventRef] {
+        &self.0
+    }
+}
+
+pub(crate) fn citable_words() -> Result<String, AxError> {
+    let words = CITABLE
+        .iter()
+        .map(|kind| {
+            serde_json::to_value(kind)
+                .map(|word| word.to_string())
+                .map_err(|err| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "spell a citable event kind",
+                        format!("{kind:?}"),
+                    )
+                    .with_recovery(format!(
+                        "JSON refused this event kind ({err}); cite an event whose kind \
+                         `sprawling replay` prints"
+                    ))
+                })
+        })
+        .collect::<Result<Vec<String>, AxError>>()?;
+    Ok(words.join(", "))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Completion {
+    Done(Evidence),
+    Limit,
+    Cancelled,
+}
+
+impl Completion {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Completion::Done(_) => "done",
+            Completion::Limit => "limit",
+            Completion::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn extend_payload(&self, map: &mut Map<String, Value>) -> Result<(), AxError> {
+        map.insert(
+            "completion".to_owned(),
+            Value::String(self.name().to_owned()),
+        );
+        if let Completion::Done(evidence) = self {
+            let mut cited = Vec::new();
+            for r in evidence.refs() {
+                let mut entry = Map::new();
+                entry.insert("seq".to_owned(), Value::Number(r.seq().value().into()));
+                entry.insert(
+                    "kind".to_owned(),
+                    serde_json::to_value(r.kind()).map_err(|err| {
+                        AxError::failure(
+                            AxCode::InvalidArgs,
+                            "encode evidence",
+                            format!("event kind at seq {}", r.seq().value()),
+                        )
+                        .with_recovery(format!(
+                            "JSON refused this event kind ({err}); cite an event whose kind \
+                             `sprawling replay --seq {}` prints",
+                            r.seq().value()
+                        ))
+                    })?,
+                );
+                cited.push(Value::Object(entry));
+            }
+            map.insert("evidence".to_owned(), Value::Array(cited));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PlannedProgress {
+    pub done: u32,
+    pub blocked: u32,
+    pub total: u32,
+
+    pub done_ppb: u64,
+
+    pub blocked_ppb: u64,
+}
+
+impl PlannedProgress {
+    pub fn ratio(&self) -> (u32, u32) {
+        (self.done, self.total)
+    }
+
+    pub fn weighted(&self) -> (u64, u64) {
+        (self.done_ppb, crate::share::WHOLE_PPB)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UnplannedProgress {
+    pub steps: u32,
+    pub budget: BudgetUse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Progress {
+    Planned(PlannedProgress),
+    Unplanned(UnplannedProgress),
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use crate::event::{EventDraft, EventRecord, Payload, RunId, Seq, TimeMs};
+    use crate::ledger::GENESIS_PREV;
+
+    fn evidence_ref(kind: EventKind) -> EventRef {
+        let draft = EventDraft {
+            run: RunId::CITY,
+            t: TimeMs::new(0),
+            who: "city".into(),
+            addr: None,
+            kind,
+            data: Payload::empty(),
+            ig: false,
+        };
+        EventRecord::from_draft(draft, Seq::FIRST, GENESIS_PREV).to_ref()
+    }
+
+    #[test]
+    fn empty_or_wrong_kind_evidence_cannot_be_built() {
+        assert_eq!(
+            Evidence::new(vec![]).unwrap_err().code(),
+            &AxCode::EvidenceMissing
+        );
+        let err = Evidence::new(vec![evidence_ref(EventKind::RunStarted)]).unwrap_err();
+        assert_eq!(err.code(), &AxCode::EvidenceMissing);
+    }
+
+    #[test]
+    fn a_harness_answer_is_evidence() {
+        assert!(Evidence::new(vec![evidence_ref(EventKind::HarnessAnswered)]).is_ok());
+        let err = Evidence::new(vec![evidence_ref(EventKind::HarnessReported)]).unwrap_err();
+        assert_eq!(err.code(), &AxCode::EvidenceMissing);
+        let recovery = err.recovery();
+        let at = |word: &str| recovery.find(word).unwrap();
+        assert!(at("tool_result") < at("model_returned"));
+        assert!(at("model_returned") < at("harness_answered"));
+    }
+
+    #[test]
+    fn done_payload_cites_its_evidence() {
+        let done =
+            Completion::Done(Evidence::new(vec![evidence_ref(EventKind::ModelReturned)]).unwrap());
+        let mut map = Map::new();
+        done.extend_payload(&mut map).unwrap();
+        assert_eq!(map["completion"], "done");
+        assert_eq!(map["evidence"][0]["kind"], "model_returned");
+        let mut map = Map::new();
+        Completion::Limit.extend_payload(&mut map).unwrap();
+        assert_eq!(map["completion"], "limit");
+        assert!(!map.contains_key("evidence"));
+    }
+
+    #[test]
+    fn only_planned_progress_owns_a_ratio() {
+        let planned = PlannedProgress {
+            done: 3,
+            blocked: 1,
+            total: 9,
+            done_ppb: 250_000_000,
+            blocked_ppb: 0,
+        };
+        assert_eq!(planned.ratio(), (3, 9));
+        assert_eq!(
+            planned.weighted(),
+            (250_000_000, crate::share::WHOLE_PPB),
+            "a quarter of the plan behind three of nine rows: the two \
+             figures are not the same reading"
+        );
+
+        let unplanned = UnplannedProgress {
+            steps: 12,
+            budget: BudgetUse::default(),
+        };
+        assert_eq!(unplanned.steps, 12);
+    }
+}

@@ -59,4 +59,4 @@ This file is the index of the documents below. The Chinese project landing page 
 
 One file here is part of the product rather than a document about it: [`dist/QUICKSTART.md`](dist/QUICKSTART.md) is copied into every release archive, so a change to it is a change to what a person runs.
 
-The documents a city writes for its residents live beside the code that writes them, in [`crates/city/templates/`](../crates/city/templates/): they are compiled into the binary, the city writes `City.md` when it is raised and the templates into its buildings, and [`README.md`](../crates/city/templates/README.md) there lists them.
+The documents a city writes for its residents live beside the code that writes them, in [`Sprawling/city/templates/`](../Sprawling/city/templates/): they are compiled into the binary, the city writes `City.md` when it is raised and the templates into its buildings, and [`README.md`](../Sprawling/city/templates/README.md) there lists them.

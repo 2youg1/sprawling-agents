@@ -1,0 +1,192 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::{AxError, B3Hash};
+
+use super::catalog::Catalog;
+use super::entry::{AgentEntry, AgentId, Consented};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Official {
+    pub word: &'static str,
+
+    pub registry_id: &'static str,
+
+    pub set_up: &'static [SetUpDir],
+
+    pub docs: &'static str,
+}
+
+pub const OFFICIAL: [Official; 5] = [
+    Official {
+        word: "claude_code",
+        registry_id: "claude-acp",
+        set_up: &[SetUpDir {
+            variable: Some("CLAUDE_CONFIG_DIR"),
+            under_home: &[".claude"],
+            source: "https://code.claude.com/docs/en/settings",
+        }],
+        docs: "https://code.claude.com/docs/en/authentication",
+    },
+    Official {
+        word: "codex",
+        registry_id: "codex-acp",
+        set_up: &[SetUpDir {
+            variable: Some("CODEX_HOME"),
+            under_home: &[".codex"],
+            source: "https://developers.openai.com/codex/auth",
+        }],
+        docs: "https://developers.openai.com/codex/auth",
+    },
+    Official {
+        word: "grok_build",
+        registry_id: "grok-build",
+        set_up: &[SetUpDir {
+            variable: Some("GROK_HOME"),
+            under_home: &[".grok"],
+            source: "https://docs.x.ai/build/settings/reference",
+        }],
+        docs: "https://docs.x.ai/build/overview",
+    },
+    Official {
+        word: "kimi_code",
+        registry_id: "kimi",
+        set_up: &[SetUpDir {
+            variable: Some("KIMI_CODE_HOME"),
+            under_home: &[".kimi-code"],
+            source: "https://moonshotai.github.io/kimi-code/en/configuration/data-locations",
+        }],
+        docs: "https://www.kimi.com/en/help/kimi-code/membership-guide",
+    },
+    Official {
+        word: "pi",
+        registry_id: "pi-acp",
+        set_up: &[SetUpDir {
+            variable: Some("PI_CODING_AGENT_DIR"),
+            under_home: &[".pi", "agent"],
+            source: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md",
+        }],
+        docs: "https://github.com/svkozak/pi-acp",
+    },
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SetUpDir {
+    pub variable: Option<&'static str>,
+
+    pub under_home: &'static [&'static str],
+
+    pub source: &'static str,
+}
+
+impl SetUpDir {
+    #[must_use]
+    pub fn on(
+        &self,
+        home: Option<&std::path::Path>,
+        variable: Option<std::ffi::OsString>,
+    ) -> Option<std::path::PathBuf> {
+        match variable.filter(|value| !value.is_empty()) {
+            Some(moved) => Some(std::path::PathBuf::from(moved)),
+            None => home.map(|home| {
+                self.under_home
+                    .iter()
+                    .fold(home.to_path_buf(), |path, part| path.join(part))
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Roster {
+    rows: Vec<(AgentEntry, Option<B3Hash>)>,
+    catalog: Catalog,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unseated {
+    Unknown,
+
+    Refused(AxError),
+}
+
+impl Roster {
+    #[must_use]
+    pub fn new(rows: Vec<(AgentEntry, Option<B3Hash>)>, catalog: Catalog) -> Roster {
+        Roster { rows, catalog }
+    }
+
+    #[must_use]
+    pub fn builtin(&self, official: &Official) -> Option<AgentEntry> {
+        let row = self.catalog.find(official.registry_id)?;
+        Some(AgentEntry {
+            id: AgentId::official(official.word),
+            ..row.clone()
+        })
+    }
+
+    pub fn seat(&self, word: &str) -> Result<Consented, Unseated> {
+        if let Some((entry, digest)) = self
+            .rows
+            .iter()
+            .find(|(entry, _)| entry.id.as_str() == word)
+        {
+            return match digest {
+                Some(digest) => Consented::given(entry.clone(), digest).map_err(Unseated::Refused),
+                None => Ok(Consented::written_by_hand(entry.clone())),
+            };
+        }
+        OFFICIAL
+            .iter()
+            .find(|official| official.word == word)
+            .and_then(|official| self.builtin(official))
+            .map(Consented::written_by_hand)
+            .ok_or(Unseated::Unknown)
+    }
+
+    #[must_use]
+    pub fn words(&self) -> Vec<String> {
+        self.rows
+            .iter()
+            .map(|(entry, _)| entry.id.as_str().to_owned())
+            .chain(OFFICIAL.iter().map(|official| official.word.to_owned()))
+            .collect()
+    }
+
+    pub fn rows(&self) -> impl Iterator<Item = &AgentEntry> {
+        self.rows.iter().map(|(entry, _)| entry)
+    }
+
+    #[must_use]
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_set_up_directory_is_moved_by_its_variable_and_otherwise_under_home() {
+        let row = OFFICIAL[4].set_up[0];
+        let home = std::path::Path::new("home");
+        assert_eq!(
+            [
+                row.on(Some(home), None),
+                row.on(Some(home), Some("".into())),
+                row.on(Some(home), Some("moved".into())),
+                row.on(None, None),
+            ],
+            [
+                Some(home.join(".pi").join("agent")),
+                Some(home.join(".pi").join("agent")),
+                Some(std::path::PathBuf::from("moved")),
+                None,
+            ]
+        );
+    }
+}

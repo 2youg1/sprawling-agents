@@ -1,0 +1,231 @@
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
+
+/-!
+# city::spine_files
+
+规定 `spine_files`、`spine_files::blank`、`spine_files::hall`、`handoff_form`、`defaults`（`Sprawling/city/src/` 下同名的文件）。一栋楼开局有哪几份文档、一件活的 JOB.md 落在哪、交接表单怎么读，城写下的模板，以及哪几份文档的默认文本归二进制。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::spine_files::tests` 守住。
+-/
+
+/-!
+### 8-5 city::spine_files（形状 6 数据面＋落盘动作）
+
+```rust
+pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
+pub const CITY_FILE: &str = "City.md";
+pub const MEMO_FILE: &str = "Memo.md";
+pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;      // 红测要点名它
+pub const AGENTS_FILE: &str = "AGENTS.md";                        // 项目自带的约定；城不写也不拥有
+
+pub struct JobBrief<'a> { pub from: &'a str, pub task: &'a str, pub goal: &'a str }   // from = kernel::event::Who::handed_down_by（D21）
+pub enum RunBrief { Job { text: String }, Principal }          // 穷尽两臂
+pub(crate) fn lay_out(building_root: &Path, addr: &Address) -> Result<(), AxError>;  // 唯一调用方是 building::create
+pub fn job_path(city_root: &Path, addr: &Address) -> PathBuf;
+pub fn roadmap_path(city_root: &Path, building_addr: &Address) -> PathBuf;
+pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxError>;
+pub fn write_job(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Result<String, AxError>;
+pub fn write_brief(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Result<RunBrief, AxError>;
+pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf;           // 交接住房间（§8-24）
+pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxError>;
+pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError>;   // 删掉文件，不写空白表单；本就不在不算失败
+pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxError>;  // 唯一调用方是 room::open
+pub struct HandoffSections { pub overall: Option<String>, pub progress: Option<String>, pub context: Option<String>, pub next_step: Option<String> }
+pub fn handoff_sections(text: &str) -> HandoffSections;           // city::handoff_form
+pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;   // 第一份是 city_prompt_path
+pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError>;   // <building>/.sprawling/City.md 在就是它（是什么都算在，读不出由读者拒绝），确认不在才是 <city>/City.md；查不了在不在时 E_STORAGE_FATAL
+```
+
+- **楼级三份由 `lay_out` 写，交接住房间**：`lay_out` 写 Roadmap／Memo／`SPEC.md`；`Handoff.md` 由 `room::open` 经 `lay_out_handoff` 铺在房间里（§8-24）；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
+- **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
+- **模板的占位行不进新楼的 Roadmap**：`Sprawling/city/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
+- **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。**人那句话在表单里只出现一次**：标题只写 `# JOB.md`，任务正文只进 `<task>` 节——标题再插一遍，一段粘贴每次请求就多付一遍。
+- **JOB.md 写明是谁交下的这件活**（D21）：`<from>` 一节写 `JobBrief.from`，即 `kernel::event::Who::handed_down_by` 给的 "the User"、"the city" 或 "@room, run …"；`<task>` 与 `<goal>` 的正文里 `&`、`<`、`>` 一律转义成 `&amp;`、`&lt;`、`&gt;`，于是正文关不掉它所在的节。转义之后正文里不可能再出现 `<fill-…>` 占位符，三个占位符依次 `replace` 即可，不必再防「正文被二次扫描」。
+- **机器只填它知道的段**：Task／Goal 两段有事实就写；Background／Delivery 无事实则不写——写一个 `(未知)` 占位，只是让模型每回合读一遍没信息的行。
+- **一次会话的 brief 只有两种，且由本次派活决定**：说得出 Goal 的就写 `JOB.md`（`RunBrief::Job`），说不出的就不写（`RunBrief::Principal`）。**依据选 Goal 而不选「盘上有没有 JOB.md」**：一个房间里上周留下的任务书仍在盘上，它可以被读，但不得冒充一次没人派任务的会话的 brief。Goal 是那份表单里唯一不可替代的一栏（什么时候停），它空着就等于告诉 Agent「停不停没定义」。
+- **`handoff` 不把空白表单当交接件**：一张没填过的 `Handoff.md` 与一张填过的占同样的 prefix 字节而一个字的信息也不带。识别靠模板自己的括号提示行。
+- **「读不了」不并进 `None`**：`None` 只说「没有值得带走的东西」（不在，或空白表单），读不了则以 `E_STORAGE_FATAL` 上报并带路径——与同模块的 `roadmap` 同形。下一次会话正是从这份文件装配的，静默省略等于告诉它上一次没留下任何东西。
+- **计划的路径与读法归本模块**：`roadmap_path` 与 `roadmap` 落在这里，因为 `ROADMAP_FILE` 在这里——在别处拼 `city_root/<addr>/Roadmap.md` 就是第二份「计划在哪里」的权威，它会在真正那份搬家后继续跑得好好的。
+- **「还没有」与「读不了」是两件事**：`roadmap` 仅对 `ErrorKind::NotFound` 答空串——一栋还没铺计划的楼确实没有计划；其余任何理由一律以 `E_STORAGE_FATAL` 上报并带上路径。这与同 crate 的 `archive::index` 已有的契约同形（目录不在→`Ok(空)`，真失败→`Err`），不新立一种读法。
+- **交接表单的读法归本模块**：`handoff_sections` 把 `<overall>`、`<current-progress>`、`<context>`、`<next-step>` 四节各读成一段正文；一节缺席、或只剩模板的括号提示行，即 `None`。括号提示行的判断与 `is_blank_form` 共用 `blank::is_guidance` 一处，因为「这一行是不是模板自己的话」只能有一个答案。`<must-read>` 节不读：它是写给下一个 Agent 的散文而不是 Locator，装配层把整份文件入 CAS，作为 must-read 的一条。被否决的备选：在装配层按标签切字符串——那是模板格式的第二个读者，模板改一个标签它就静默读到空。
+- **`City.md` 两层**：`city_prompt_path` 是「哪份 `City.md` 管这栋楼」唯一的答案，`norms` 与装配层的 City 段都读它；放在哪里、为什么替换而不拼接，见 D31。
+- **规范类 must-read 由 `norms` 给路径，不给 Locator**：Locator 需要 CAS 或 git oid，而 city 不认识落盘物（拓扑上也依赖不到 storage）。本模块答「哪几份是规范」，装配层把它们入 CAS 变成 Locator。这也是 must-read 最大失败模式的解：不让模型凭记忆重抄规范清单。
+-/
+
+/-!
+### 8-41 城写下的模板住在 city 自己的包里（`Sprawling/city/templates/`、`city::defaults::Shipped`，形状 6 数据面）
+
+```rust
+// city::spine_files
+pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // City.md 的默认文本；唯一的读者是 defaults::Shipped::City
+// 其余模板仍是本模块与 building::template 的私有常量，各自 include_str!("../templates/<文件>") 或 ("../../templates/<文件>")
+```
+
+- **一个目录装城写下的全部第一批字节**：`Sprawling/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
+- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`Sprawling/app/Spec.lean` §8-157）。`packaged` 门判这一条（Tools/xtask/Spec.lean §8-49）。
+- **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-43），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时若临时换上内置文本，模型读到的就不是人能打开的那份文件（D29）。
+- **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
+
+**验收**：`cargo xtask gates packaged` 对 city 与 accounting 为绿；§8-3、§8-5、§8-15、§8-20 现有的模板测试照旧通过（它们读的是同一串字节）。
+-/
+
+/-!
+### 8-43 city::defaults（形状 6 数据面＋落盘动作）
+
+```rust
+pub enum Shipped { City, Mayor, Clerk }                      // 默认文本归二进制的三份文档；穷尽
+impl Shipped {
+    pub const ALL: [Shipped; 3];
+    pub fn text(self) -> &'static str;                       // 本构建的默认文本
+    pub fn path(self, city_root: &Path) -> PathBuf;          // 城根的 City.md；保留子树里的 MAYOR.md、CLERK.md（Governed::path）
+}
+pub enum CopyStanding { Absent, Current, Earlier, Edited }   // 一份副本相对默认的身份；穷尽
+pub fn standing(doc: Shipped, copy: Option<&[u8]>) -> CopyStanding;
+pub struct Edited { pub doc: Shipped, pub path: PathBuf }    // 人改过、保留不动的一份
+pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
+```
+
+- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；文件不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`Sprawling/city/templates/`，以及更早住在仓库 docs 目录下的 City.md 与模板），开发构建立过的城也认得出来。
+- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::edit_against`，以判定时读到的字节为底，整份落盘；读与写之间人的编辑器存过这份文件时以 `E_VERSION_CONFLICT` 不写，这份副本照 `Edited` 留下并列进返回值，因为那次保存是人的），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `RunWorker::holding`（`Sprawling/accounting/src/worker/lifetime.rs`）里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
+- **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `no_default_lists_itself_as_earlier` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
+- **失败**：`E_STORAGE_FATAL` 带路径，读不了或写不了任何一份时；改过的副本不是失败。
+
+**验收**：`cargo nextest run -p sprawling-city -E 'test(defaults)'`。
+-/
+
+/-!
+### 8-44 city::prompt_documents（形状 1 判定＋落盘动作）
+
+```rust
+pub enum PromptDocument {                                     // 页面能写的、在保留子树或城根的提示文档；穷尽
+    Shipped(Shipped),                                         // 城根的 City.md、MAYOR.md、CLERK.md
+    BuildingCity { building: Address },                       // <楼>/.sprawling/City.md（D31）
+    ModelNote { building: Option<Address>, provider: String, model: String },
+                                                              // [<楼>/].sprawling/models/<provider>/<model>.md
+}
+impl PromptDocument {
+    pub fn of(at: &Address) -> Option<PromptDocument>;        // 一个地址是不是其中一份；名单只在这里
+    pub fn at(&self) -> Result<Address, AxError>;
+    pub fn path(&self, city_root: &Path) -> Result<PathBuf, AxError>;
+}
+pub fn model_note_at(building: Option<&Address>, provider: &str, model: &str) -> Option<Address>;
+pub fn model_notes(city_root: &Path, building: Option<&Address>) -> Result<Vec<(String, String)>, AxError>;
+pub enum PromptStep { Own, Inherit, Restore }
+pub struct PromptWritten { pub bytes: usize, pub removed: bool }
+pub fn put_prompt(city_root: &Path, doc: &PromptDocument, base: B3Hash, step: PromptStep)
+    -> Result<PromptWritten, AxError>;
+// defaults
+pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, AxError>;
+```
+
+- **名单只有一处**：`PromptDocument::of` 判一个地址是不是页面能写的提示文档。`PutRange` 读它放行保留子树里的这几份，`PutPrompt` 读它决定每一步对哪一份成立；两处若各写一张表，就会有一份只能逐字改、不能恢复的文档。`PREFERENCES.md` 不在名单上：它不进任何前缀，设置页的那扇门照旧管它。房间的 `URBANITE.md` 与各级 `AGENTS.md` 不在保留子树里，本来就经 `PutRange` 写，也不在名单上。
+- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`Sprawling/app/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。**模型 id 可以带 `/`**（`vendor/model` 这样经网关转发的 id 很常见），这时提示落在 provider 目录下的子目录里；`model_notes` 走进 provider 目录下的每一层子目录，`PromptDocument::of` 把 provider 之后的各段连起来读成同一个 id，所以冻结时读到的每一份，页面都列得出、改得了。验收：`prompt_documents::tests::a_model_id_with_a_slash_is_one_note_the_list_reads_back`。**链接照冻结的读法跟随**：冻结经 `std::fs::read` 读提示，跟随 provider 目录、子目录与文件上的链接，所以 `model_notes` 也跟随它们；只跟一边的话，页面会漏掉一份每个 run 都收到的提示。保留子树是人与城写的地方，模型写不进去，链接是人放的；列出它指向的提示不比冻结多读任何字节。指回本次下行途中某个目录的链接不再走第二遍（按解析后的路径判），所以环不会让列举不停；指向不存在之处的链接不列，冻结读它也是「不在」。验收（链接只在 unix 上能由测试建出）：`prompt_documents::tests::linked_notes_are_listed_as_the_freeze_reads_them`。
+- **三步各对哪几份成立**：`Own` 对 `BuildingCity` 与 `ModelNote` 成立，文件已在就拒；起手的字节是远一层那份（楼的 `City.md` 抄城根的，楼的模型提示抄城的那份，城没有就是空的）。`Inherit` 对 `BuildingCity` 与 `ModelNote` 成立，删掉文件，远的一层重新管。`Restore` 只对 `Shipped` 成立，经 `defaults::restore` 写回本版默认、保留 `MAYOR.md` 的身份区，所以默认文本仍只由 `defaults` 一个模块写（§8-43）。其余组合以 `E_INVALID_ARGS` 拒，恢复里说出这一份能做哪几步。
+- **以 `base` 为底**：三步都在 `document` 的锁里先读文件，哈希不等于 `base`（不在读作空字节）时以 `E_VERSION_CONFLICT` 拒、什么都不改，因为人在页面上确认的是他看到的那一版。
+- **失败**：读不了、写不了、删不掉是 `E_STORAGE_FATAL` 带路径。
+- 验收：`cargo nextest run -p sprawling-city -E 'test(prompt_documents)'`。
+-/
+
+/-! D33 页面能写的提示文档是 city 的一张名单，整份动作也在 city
+
+**决定**：页面能写哪几份保留子树里的提示文档、对每一份能做哪几步整份动作，由 `city::prompt_documents` 一处决定（§8-44）；accounting 的 `PutRange` 与 `PutPrompt` 都读它。写回默认仍经 `defaults`。
+
+**理由**：保留子树的意义是居民的写域够不到它，城自己的门要放行其中几份，就要有一张写在一处的名单，否则两扇门迟早放行不同的文件。整份动作要在 `document` 的锁里比对 `base`，这把锁与文件布局都在 city。
+
+**被否**：①在 accounting 的保存处按路径前缀放行——那是第二个「哪个文件是提示文档」的拼法，而模型提示的路径今天就只在冻结那里拼过一次；②给每份文档一条专门的命令——五种文档、三步，表会长在线上，而它们的规则只差在哪一步成立。
+
+**重开参数**：保留子树里出现第四种人要从页面写的文件时，它进这张名单，而不是另开一扇门。
+-/
+
+/-! D29 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认
+
+**决定**：`City.md`、`MAYOR.md`、`CLERK.md` 的默认文本由二进制持有（§8-43）。城里的副本与某个已发布版本逐字节相同，就视为人没改过，开城时写成本构建的默认；改过的原样保留，开城时在 diagnostics 里点名；不在的铺下。
+
+**理由**：模板原本只在立城时复制一次，二进制改了文字也到不了旧城，旧城会继续教已删的参数与工具。前移写在盘上而不是在装配前缀时临时替换，因为人打开的那份文件必须就是模型读到的字节。与已发布版本逐字节相同的副本，内容能从摘要表与仓库历史复原，所以前移不需要备份。
+
+**被否**：①装配前缀时按判定把旧副本换成默认，盘上不动——人看到的与模型收到的不再是同一串字节；②按“最像哪一版”的模糊比对判定——会把人改过的副本当作未改而覆盖；③城里不再放副本、只在人想覆盖时才建文件——人没有一份能打开、能照着改的文本，这要等 PANELS 的编辑器显示二进制默认之后再议。
+
+**重开参数**：副本的前移要与配置文件一起走 `format` 迁移阶梯与集中备份时，`follow_defaults` 登记为阶梯的一步。
+-/
+
+/-! D30 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
+
+**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；`<seen>` 与 `<plan>` 都在二进制文本里。Mayor 的 `<plan>` 说计划怎么写，并按 `edit` 与 `plan` 现行的参数教这两个工具；参数的权威在工具（`Sprawling/runtime/spec/Tools.lean` §8-14 的 `edit`，`Sprawling/collab/Spec.lean` 的 `collab::claim_tool`），改参数的那个改动同时改这一段，因为二进制之外没有别的写者会替它改。
+
+**理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D29 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
+
+**被否**：①全部纪律仍接在人设之后——程序性的说明与禁令混在一段，人设里的风格要求排在程序之前，读起来像程序服从人设；②`<plan>` 留在模板里——改了 `plan`、`edit` 的参数，旧城的副本照旧教已删的参数。
+
+**重开参数**：人要能改 Mayor 的程序（而不只是人设）时，程序变成一份带默认文本的覆盖文件，走 D29。
+-/
+
+/-! D31 楼级 `City.md` 放在楼的保留区，近者替换远者
+
+**决定**：一栋楼自己的 `City.md` 在 `<building>/.sprawling/City.md`（`policy::governed` 给的保留区，与 `RULES.toml` 同处）。它在时这栋楼的 run 只读它，城根的 `<city>/City.md` 不读；它不在时读城根那份。`city_prompt_path` 是唯一的判定处。
+
+**理由**：楼根常是人的 git 仓库，楼根的文件名属于这个项目：放在那里的 `City.md` 会被项目的协作者与他们的工具当成项目文件，也在居民的写域里。保留区是 sprawling 在这个仓库里自己的名字空间，没有写域够得到它，居民改不了自己被告知的话；它进不进楼的版本历史由 `Gitignore` 一节的放行表决定，今天放行表不含 `City.md`，所以它不进楼的版本历史。替换而不拼接，因为两份回答的是同一个问题——在这里工作的 agent 该被告知这座城怎么工作——楼改写了答案，就是说城的那份在这里不成立。
+
+**被否**：①放楼根 `<building>/City.md`，与城根同形——进了人的仓库，居民的写域也够得到它；②楼级那份进 Building 段、城的那份照留 City 段——两份都送，模型读到两个互相矛盾的「这座城怎么工作」。
+
+**重开参数**：楼的保留区进了某个写域时，或人要求楼级只追加几条而不改写整份时。要让楼级 `City.md` 随楼的仓库走，是在 `Gitignore` 的放行表加一行，不改这条决定。
+-/
+
+/-!
+### 8-24 Handoff 住房间
+
+> 权威在 `Sprawling/runtime/Spec.lean` §8-33；本节只记 city 这一侧。
+
+`handoff_path(city_root, room)`、`handoff(city_root, room)` 与 `clear_handoff(city_root, room)` 的第二个参数是**房间地址**：`<city>/<room>/Handoff.md`，装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与空白表单的读法一致。`clear_handoff` 删掉文件而不是写回空白表单：空白表单与没有文件都读成 `None`，写一份只会让两种盘上状态说同一件事（`Sprawling/app/Spec.lean` §8-82 的新会话）。
+-/
+
+/-!
+### 模板的写法：格式标注的是「该多小心」（`Sprawling/city/templates/`）
+
+**格式不是允许与否的门禁，是谨慎程度的标记**，而且不设门禁把它变红：想清楚了照样改。据此三类：
+
+1. **机器要解析的 → 结构化**。`RULES.toml` 是现成范例（未知键拒识，于是拼错是一条消息而不是一个永远没到的许可）；`Roadmap.md` 的六列表格同理，`kernel::spine` 解析它，`plan` 是唯一写者。
+2. **Agent 要写、写坏不影响运转的 → Markdown 外壳 + XML 小标题**。标签独占一行、正文不嵌套、未填的节内容只有括号行——**只标上下限并说明用途**，不做严谨标记语言，正则就能取。结构化字段放标签属性（如 `<finding id="1.1" area="view" stage="S3">`），自由散文放标签内容，于是定位引用、表格、列表都放得下且无转义问题。适用：`SPEC.md`、`URBANITE.md`、`Handoff.md`、`JOB.md`、`Roadmap.md` 的各节。
+3. **`Memo.md` 完全自由**。它是「有东西要记、却没有别的规范可依」时的记事本，记法由写的人按需要选；有自己规范的东西走自己的文档（计划进 `Roadmap.md`，项目要站得住的决策进 `SPEC.md`）。
+
+**没有备忘判形**：一个自由记事本不该被判 Malformed，所以 `kernel::spine` 不对 `Memo.md` 的节做强制。
+
+**进度条只有一份数据：任务表。** 它是派生值，由脚本唯一写者重画，每格一个任务、顺序即落地顺序，半格表达进行中——不落盘手写，于是「表与条对不上」这件事构造上不可能。`blank.rs::is_blank_form` 的判空从行前缀（跳 `#`、`>`、括号行）改成看标签边界，于是一条以 `(` 开头的正文不再被误判为空。
+
+**人设与纪律不同居**：`MAYOR.md`／`CLERK.md` 的人设留 Markdown（人随便写，想让市长学谁说话都行），纪律（工具清单、怎么写计划、谁读得到什么、绝不做什么）编译进 `spine_files::hall`，与 `EPHEMERAL_SEGMENT` 同型——人设覆盖不到它，这正是「插得进去但毁不掉」。纪律分人设之前与人设之后两段（D30）。
+-/
+
+/-! D18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`
+
+**决定**：城写下的模板与 `City.md` 住在 `Sprawling/city/templates/`（§8-41）；`City.md` 的默认文本由 `city::defaults::Shipped::City` 交出，写到城里的只有 `follow_defaults`。
+
+**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（`Sprawling/app/Spec.lean` §8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
+
+**被否**：①模板放在 `docs/` 下给人读，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②模板放在 `docs/` 下，city 里放一个指向它的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
+
+**重开参数**：模板要给 city 之外的读者在运行期按文件读（而不只是编译进二进制），那时它们的位置成为一个运行期的事实，要另议。
+-/
+
+/-! D21 JOB.md 用 `<from>` 写明交活的人，任务与目标转义后放进各自的节
+
+**决定**：`JobBrief` 多一栏 `from`，由派活处从 `Assignment.dispatched_by` 经 `kernel::event::Who::handed_down_by(predecessor, parent)` 渲染：人是 "the User"，城自己的桌子是 "the city"，居民是 "@room, run <交下这件活的那个 run>"（接任时是前任，委派时是父 run；两者都没有，例如敲门，就只写 "@room"）。模板在 `<task>` 之前加一节 `<from>`。`<task>` 与 `<goal>` 的正文不论谁写的，`&`、`<`、`>` 都转义，与 UC10 信件正文同一种转义。会话第一条 user 消息（`Opening::FromJob`）只写 "The task is in JOB.md above, handed down by <from>."，不再重复 Goal：目标已在 JOB.md 里，居民写的目标若落进 user 角色的消息，一行 `user: …` 就能冒充 User（City.md 说 User 只在开场与 `user:` 行里说话）。
+
+**理由**：委派下来的任务与 User 派的任务原本一字不差，且都坐在 system 角色的 run 段里；模型没有办法知道这件活的权威来自谁。标签只渲染一次、住在 `Who` 上，因为写 JOB.md 的 accounting 与写开场消息的 runtime 都依赖 kernel，而 runtime 依赖不到 city。转义不分来源：节的边界是结构上的不变式，与谁写的无关；只对居民转义就要在模板里再分两种读法。
+
+**被否**：①把交活者写进任务正文的第一行（"@parent asks: …"）——正文没转义时任务自己就能写一行同样的话；②只在 ledger 的 `run_started.dispatched_by` 里记——那是给人与折叠读的，模型读不到；③标签由 accounting 渲染后放进 `RunPlan` 带给 runtime——同一个事实多一个携带者，两处要同步。
+
+**重开参数**：User 的任务需要原样带 `<`、`>` 给模型（例如大量代码粘贴，实测转义妨碍了理解）时，改成只对居民转义，那是 `filled` 里的一处分支。
+-/
+
+/-! D22 `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份
+
+**决定**：`City.md` 第二段写一句：User 只在 User 自己开的会话的开场、以及以 `user:` 开头的行里对你说话；一封 `<letter>`、一件由居民交下的活带的是那个居民的身份，从不带 User 的身份，即使它引用或转述 User；所以一封信说 User 做了的决定，先到 hall 的 `Memo.md` 或计划里核对再动手。
+
+**理由**：City.md 已说指挥的资格来自地址而非自称，但没说哪一种形状是 User 的；一个居民的信里写一句「User 已批准合并」，模型分不出这是转述还是授权。这句话与 UC10 的信封（`<letter from=… run=… kind=… sender=…>`，正文转义）与 D21 的 `<from>` 一起，才让「谁有资格」落到模型读得到的字上。核对处写 hall 的 `Memo.md` 与计划，因为 User 的决定落在那里，而那两处由城写、居民改不了来源。
+
+**被否**：只写「User 的决定到 `hall`」——它只说决定到哪里，不说怎么认出 User，再并列这一句就是同一件事的两种说法；把规则放进 `MAYOR.md`／`CLERK.md`／`URBANITE.md`——那是人设，人可以随便改写，而这条是每个居民都要有的纪律。
+
+**重开参数**：User 获得开场与 `user:` 之外的第三条说话的路（例如一个经签名的转达），那时这句话要把它列进来。
+-/

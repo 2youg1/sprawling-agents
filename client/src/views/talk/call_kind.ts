@@ -3,26 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The word a tool line opens with: what kind of thing the call did, read
-// off what the tool was registered as (`Call.render`, then `Call.effect`,
-// both from `kernel::ToolMeta` through the `tool_called` line), never off
-// the tool's name. A tool added tomorrow is drawn by its registration the
-// day it lands; a table of names here would be a second registry that
-// learns of it later (client/Spec.lean §4-26).
-//
-// **The drawing intent comes first** because it is the more specific of
-// the two: a terminal is an `exec` whatever boundary it crosses, and a
-// diff is an `edit`. A call whose line carried neither - a tool the bench
-// did not know, a line written before the keys existed - is named by the
-// tool itself, which is the one honest word left.
-
 import { Option, Schema } from "effect";
 
 import type { Key } from "../../core/lang";
 import type { Call, Landing } from "../../wire";
 
-// What the subject cell of a line says. A send and a delegation read
-// their own arguments (client D85); every other call reads its subject.
 export type CallLine =
   | { readonly kind: "subject"; readonly subject: string }
   | {
@@ -56,14 +41,11 @@ export function kindOf(call: Call): CallKind {
   if ("write" in effect) return { kind: "registered", word: "talk_kind_write" };
   if ("connector" in effect) return { kind: "registered", word: "talk_kind_connector" };
   if ("attach_user_browser" in effect) return { kind: "registered", word: "talk_kind_browser" };
-  // A boundary the kernel adds fails to compile here until it has a word.
+
   const unnamed: never = effect;
   return unnamed;
 }
 
-// The subject cell. Arguments cut by the window, or not readable as the
-// tool's own grammar, fall back to the recorded subject: the line keeps
-// what the Ledger says rather than a guess at the missing half.
 export function lineOf(call: Call): CallLine {
   const fallback: CallLine = { kind: "subject", subject: call.subject ?? "" };
   if (call.render === "signal") {
@@ -89,12 +71,6 @@ export function lineOf(call: Call): CallLine {
   return fallback;
 }
 
-// What the result cell says. A send whose letter's landing the city
-// recorded reads that landing (wire D42, client D90), even while a sync
-// send still waits for its reply: the letter is delivered by then.
-// Otherwise, once the tool answered, what the tool itself reported - a
-// Ledger older than the landing line, or a landing outside the window.
-// `null` while the call runs and for every other tool.
 export function outcomeOf(call: Call): Key | null {
   const landing =
     call.render === "signal" && call.outcome !== "failed" ? (call.landing ?? null) : null;
@@ -117,7 +93,6 @@ const LANDED: Readonly<Record<Landing, Key>> = {
   knocked: "talk_landed_knocked",
 };
 
-// The signal tool's own argument grammar (crates/collab/src/signal_tool.rs).
 // wording-ok: an argument value the tool reads, never shown to a reader
 const Pull = Schema.Struct({ action: Schema.Literal("pull") });
 // wording-ok: an argument value the tool reads, never shown to a reader
@@ -127,22 +102,11 @@ const Asked = Schema.Struct({
   text: Schema.String,
 });
 const Handed = Schema.Struct({ room: Schema.String, task: Schema.String });
-// The two fields of an `AxError` the line reads, and no more: a code this
-// build does not know yet is still a refusal, and its heading shows the
-// missing key as every notice does (`parts/notice_title.ts`).
+
 const Refused = Schema.Struct({ code: Schema.String, subject: Schema.String });
 const Sent = Schema.Struct({ delivered: Schema.Boolean, waiting: Schema.optional(Schema.String) });
 const Started = Schema.Struct({ room: Schema.String, starts: Schema.String });
 
-// Why a failed call failed, as its line can say it in a few words
-// (client/Spec.lean §4-44): the city's refusal when the result is one
-// (the Ledger keeps a failed call's `error` as the `AxError` the tool
-// returned), else the first line the tool wrote, else nothing beyond
-// "failed". A refusal cut by the window is no longer JSON and is read as
-// the tool's words, so the line still says something true. The tool's
-// words stop at `SAID_CHARS`, because they also fill the line's hint, and
-// a tool that answers with one line of a page's length would otherwise
-// raise a hint that covers the thread; the right side keeps the whole.
 export type Failure =
   | { readonly kind: "refused"; readonly code: string; readonly subject: string }
   | { readonly kind: "said"; readonly text: string }

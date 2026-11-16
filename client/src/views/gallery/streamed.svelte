@@ -116,12 +116,12 @@
         head: FENCED,
         files: [
           {
-            path: "crates/kernel/src/gate/cluster.rs",
+            path: "Sprawling/kernel/src/gate/cluster.rs",
             how: "modified",
             lines: { counted: { added: 8, removed: 11 } },
           },
           {
-            path: "crates/kernel/src/gate/seen.rs",
+            path: "Sprawling/kernel/src/gate/seen.rs",
             how: "modified",
             lines: { counted: { added: 2, removed: 0 } },
           },

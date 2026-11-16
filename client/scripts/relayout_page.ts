@@ -3,33 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The page half of the relayout probe (`relayout.ts` builds and runs
-// it). A reply is fed in four-character tokens into two shapes of a
-// live turn, and after each token the probe forces layout and reads
-// the clock:
-//   raw   - the whole text in one pre-wrapped node, laid out as blocks
-//           only when the record takes over;
-//   block - the blocks that have closed drawn as blocks, the open tail
-//           as text (what `talk/saying.svelte` draws).
-// The page reads no Markdown: the city does (client/Spec.lean §4-26), and
-// this probe prices layout, not reading. The reply is fixed, and its
-// blocks are the stretches between its blank lines - it has no blank
-// line inside a code block - so a block closes where the blank line
-// after it arrives, which is the city's closure point for this reply
-// (`crates/documents/Spec.lean` D31) but for its heading, which the
-// city closes one line earlier. Each block is drawn with the element
-// `refrain/laid.svelte` gives its kind. The two shapes run interleaved,
-// so a slow moment lands on both.
-
 const TOKEN = 4;
 const ROUNDS = 7;
 
 const SECTION = [
   "Reading the city first, then the plan it asks for.",
   "",
-  "- `crates/kernel` holds the **Ledger** and every rule on it",
-  "- `crates/runtime` drives a turn",
-  "- `crates/sprawling` wires the two together",
+  "- `Sprawling/kernel` holds the **Ledger** and every rule on it",
+  "- `Sprawling/runtime` drives a turn",
+  "- `Sprawling/app` wires the two together",
   "",
   "| step | what | where |",
   "|---|---|---|",
@@ -57,9 +39,6 @@ function element(tag: string, text: string): HTMLElement {
   return node;
 }
 
-// The element `refrain/laid.svelte` gives a block, told by how its
-// source begins - enough for this reply, whose every block is one of
-// these five.
 function drawBlock(source: string): HTMLElement {
   const lines = source.split("\n");
   if (source.startsWith("- ")) {
@@ -80,7 +59,6 @@ function drawBlock(source: string): HTMLElement {
   return element("p", source.replace(/^#+ /u, ""));
 }
 
-// The blocks of the stretch before `end`, which ends on a blank line.
 function blocksBefore(text: string, end: number): string[] {
   return text
     .slice(0, end)
@@ -88,8 +66,6 @@ function blocksBefore(text: string, end: number): string[] {
     .filter((each) => each.trim() !== "");
 }
 
-// Where the blocks that can no longer change end: just past the last
-// blank line that has arrived.
 function closedIn(text: string): number {
   const blank = text.lastIndexOf("\n\n");
   return blank < 0 ? 0 : blank + 2;
@@ -131,8 +107,6 @@ function blockTurn(root: HTMLElement): Turn {
     feed(text) {
       const closed = closedIn(text);
       if (closed !== laidLength) {
-        // `saying.svelte` appends the blocks each answer brings and
-        // leaves the DOM of a block it already drew untouched.
         laid.append(...blocksBefore(text, closed).slice(laid.childElementCount).map(drawBlock));
         laidLength = closed;
       }

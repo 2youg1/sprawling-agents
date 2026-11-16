@@ -54,7 +54,7 @@ jobs:
       # the root workspace (D27). A drifted parser API still fails here
       # before the sanitizer campaign spends its minutes.
       - name: compile the fuzz targets without running them
-        run: cargo check --manifest-path crates/fuzz/Cargo.toml --all-targets
+        run: cargo check --manifest-path Tools/fuzz/Cargo.toml --all-targets
       # Three things this loop had to learn, each from a red night.
       #
       # `--target` is not optional. cargo-fuzz defaults it to the triple
@@ -78,10 +78,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          targets=$(cargo +nightly fuzz list --fuzz-dir crates/fuzz)
+          targets=$(cargo +nightly fuzz list --fuzz-dir Tools/fuzz)
           test -n "$targets"
           for target in $targets; do
-            timeout 20m cargo +nightly fuzz run "$target" --fuzz-dir crates/fuzz \
+            timeout 20m cargo +nightly fuzz run "$target" --fuzz-dir Tools/fuzz \
               --target x86_64-unknown-linux-gnu -- -max_total_time=60
           done
 

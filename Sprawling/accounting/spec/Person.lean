@@ -1,0 +1,56 @@
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
+
+/-!
+# accounting::person
+
+规定 `Sprawling/accounting/src/person.rs`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::person` 旁的测试守住。
+-/
+
+/-!
+### 8-8 accounting::person：这个人自己的那一层（形状 4 适配器）
+
+```rust
+pub fn read() -> Result<PreferencesAnswer, AxError>;       // Query::Preferences 的全部
+pub fn put(patch: PreferencePatch) -> Result<(), AxError>; // Command::PutPreferences 的全部
+pub enum CorePriority { Raised, Normal }                   // 人的设置；Normal 即「关掉高优先级」
+pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
+pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `Sprawling/app/spec/Serving/Placement.lean` D41、D47、D103
+pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不认识的拼写或非字符串值报 ConfigInvalid
+pub fn city() -> Result<Option<PathBuf>, AxError>;         // 顶层 city；不是绝对路径即 ConfigInvalid
+pub fn settle_city(city: &Path) -> Result<(), AxError>;    // 写顶层 city（先取绝对路径）；别的节与键留下，注释与排版不留，与 [ui] 同一条读-改-写
+pub enum MachineMemory { Auto, Bytes(u64) }               // 顶层 memory：机器预算怎样定
+pub fn machine_memory() -> Result<MachineMemory, AxError>; // 缺省 Auto；既不是 "auto" 也不是非负整数即 ConfigInvalid
+```
+
+- **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
+- **`[ui]` 一节就是 `PreferencesAnswer` 除 `core` 外的序列化**（`Sprawling/wire/Spec.lean` §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
+- **别的节与键留下，注释与排版不留**：写是一次读-改-写，把解析后的整份再序列化回去，经 `city::edit_document`（`Sprawling/city/Spec.lean` §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **顶层 `city` 是没指名城时打开的那一座**（`Sprawling/app/spec/Firstrun.lean` §8-8 的三级优先里的第二级）：值必须是绝对路径，相对路径拒（`E_CONFIG_INVALID`）——个人配置所在目录、进程的工作目录、家目录都可以当基准，猜一个就会有人的城落在另一处；按配置文件所在目录解析还会把城放进 `~/.sprawling/` 这个机器状态目录。第一屏建城或接管文件夹之后由 `settle_city` 写入；`sprawling up <path>` 是一次性的覆盖，不写。上一版只读 `[ui]` 与 `[core]`，顶层的 `city` 不会让它拒这份文件。
+- **顶层 `memory` 是重活共用的机器预算**（`Sprawling/runtime/spec/Reserve.lean` D104）：`"auto"` 或不写，由城按物理内存算（`Sprawling/app/spec/Serving/Memory.lean` §8-173「整台机器」）；一个非负整数是字节数，0 即一次只放行一件重活。它与 `[core] memory_bytes` 是两个数：后者是每个 run 的上限，前者是这些上限加起来不得超过的总数。放在顶层而不放进 `[core]`，是因为上一版的 `[core]` 拒不认识的键，而顶层的键它不读，所以写了 `memory` 的文件仍能被上一版打开，不必为它把 `format` 提一级。
+- **`format` 先判**：读整份之前先过 `city::admit_format`（`Sprawling/city/Spec.lean` §8-42，city D28），比本 build 新的文件拒并点名升级；未动的文件不添 `format`。
+- **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
+- **不入账**：偏好不属于城的历史，UI 偏好不改变 run 的输入，core 性能配置在 serving 起动时采用。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`Tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
+- **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
+
+**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`、`each_placement_spelling_reads_as_its_arm`（`accounting::person::tests`）。
+- **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `Sprawling/app/spec/Serving/Placement.lean` D47，实际兑现归 `Sprawling/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D103。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
+- **`CorePriority` 的文法归 wire，本模块重导出它**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`Sprawling/app/Spec.lean` §8-93），它从这里取值。
+-/
+
+/-! D56 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
+
+`CorePreferences { placement, priority, memory_bytes: Option<NonZeroU64> }` 同时供
+文件读者、PreferencesAnswer 的 `core` 字段和性能组使用；没有 memory_bytes 即不限。
+`CorePlacement` 的 serde 拼写归 wire；accounting 重导出该类型，不再自己解释四个字符串。
+`CorePriority`、`CorePlacement` 与 `RunMemory` 补丁各改一个键，空 RunMemory 删除该键，
+其余节与 core 的其余键保持不变。`[ui]` 写出前移除答案的 `core` 字段，
+所以 UI 不复制性能设置的权威。零与无法解析的配置报 E_CONFIG_INVALID，不覆写文件。
+配置读回由 disposable tempfile 回归检查，真实 User 的文件不进入测试。
+设置在下一次 serving 起动采用；当前 run 的 Shares 不因 UI 修改而改变。
+
+-/

@@ -33,7 +33,7 @@ describe("choosing a model", () => {
 });
 
 // The two session verbs carry what the menu chose and nothing it did not
-// (crates/wire/spec/Answer/Sessions.lean D27).
+// (Sprawling/wire/spec/Answer/Sessions.lean D27).
 describe("the session menu's two verbs", () => {
   const room = Address.make("lab/bench");
 
@@ -59,7 +59,7 @@ describe("the session menu's two verbs", () => {
 });
 
 // The privacy page reads its result back under the idem it sent, so the
-// idem handed back is the one inside the frame (crates/wire/spec/Privacy.lean §8-89).
+// idem handed back is the one inside the frame (Sprawling/wire/spec/Privacy.lean §8-89).
 describe("a privacy operation", () => {
   test("hands back the idem its frame carries", () => {
     const action = {

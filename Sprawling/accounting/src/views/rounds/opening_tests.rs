@@ -1,0 +1,148 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+
+use kernel::Ledger;
+use wire::{B3Hash, EventKind, Payload, RunId, TimeMs};
+
+const NAMED_CAT: &[u8] = br#"{"person":null,"imported_from":null,"about":"","mayor":"Cat"}"#;
+
+fn rounds_of(
+    dir: &std::path::Path,
+    run: RunId,
+    started: serde_json::Value,
+    stored: &[&[u8]],
+) -> wire::RoundsAnswer {
+    let report = crate::worker::fixture::init_city(dir).unwrap();
+    let mut store = storage::Cas::open(&kernel::layout::CityLayout::new(dir).cas()).unwrap();
+    for bytes in stored {
+        store.put(bytes).unwrap();
+    }
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+        .unwrap()
+        .0;
+    let drafts = [
+        (EventKind::RunStarted, started, TimeMs::new(10)),
+        (
+            EventKind::WorktreeOpened,
+            serde_json::json!({ "name": "hall-mayor", "disk_bytes": 4096 }),
+            TimeMs::new(10),
+        ),
+        (
+            EventKind::ModelCalled,
+            serde_json::json!({ "segments": [], "model": "m" }),
+            TimeMs::new(11),
+        ),
+        (
+            EventKind::RunFrozen,
+            serde_json::json!({ "completion": "done", "evidence": [] }),
+            TimeMs::new(12),
+        ),
+    ];
+    for (kind, data, t) in drafts {
+        ledger
+            .append(kernel::EventDraft {
+                run,
+                t,
+                who: "city".to_owned(),
+                addr: Some(kernel::Address::parse("hall/mayor").unwrap()),
+                kind,
+                data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+                ig: false,
+            })
+            .unwrap();
+    }
+    drop(ledger);
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let wire::Answer::Rounds(answer) = views.answer(&wire::Query::Rounds { run }) else {
+        panic!("Rounds answers with rounds");
+    };
+    *answer
+}
+
+#[test]
+fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
+    let dir = tempfile::tempdir().unwrap();
+    let answer = rounds_of(
+        dir.path(),
+        RunId::from_bytes([8u8; 16]),
+        serde_json::json!({
+            "task": "plan the week",
+            "goal": "a roadmap",
+            "job": "file:hall/mayor@0123456789abcdef0123456789abcdef01234567",
+            "dispatched_by": "person",
+            "policy": { "mode": "work", "write": "create", "admit": "tested",
+                        "landing": "experiment" },
+            "naming": B3Hash::digest(NAMED_CAT).to_string(),
+            "effort": "high",
+        }),
+        &[NAMED_CAT],
+    );
+    assert_eq!(
+        answer.opening,
+        Some(wire::Opening {
+            task: "plan the week".to_owned(),
+            goal: "a roadmap".to_owned(),
+            at: TimeMs::new(10),
+            dispatched_by: Some(kernel::event::Who::Person),
+            policy: Some(kernel::RunPolicy {
+                mode: kernel::Mode::Work,
+                write: kernel::WriteLimit::Create,
+                admit: kernel::AdmissionRequirement::Tested,
+                landing: kernel::LandingPolicy::Experiment,
+            }),
+            effort: Some(kernel::Effort::High),
+            generation: None,
+            names: Some(wire::FrozenNames {
+                mayor: Some("Cat".to_owned()),
+            }),
+            parent: None,
+        }),
+        "the opening carries what run_started records, and the names its version holds"
+    );
+    assert_eq!(answer.worktree.as_deref(), Some("hall-mayor"));
+    let closing = answer.closing.expect("the window held run_frozen");
+    assert_eq!(closing.completion, "done");
+    assert_eq!(closing.at, TimeMs::new(12));
+}
+
+#[test]
+fn a_naming_the_store_lost_answers_no_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let answer = rounds_of(
+        dir.path(),
+        RunId::from_bytes([9u8; 16]),
+        serde_json::json!({ "task": "t", "naming": B3Hash::digest(NAMED_CAT).to_string() }),
+        &[],
+    );
+    let opening = answer.opening.expect("the window held run_started");
+    assert_eq!((opening.names, opening.effort), (None, None));
+}
+
+#[test]
+fn a_delegated_childs_opening_names_its_parent_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = RunId::from_bytes([3u8; 16]);
+    let answer = rounds_of(
+        dir.path(),
+        RunId::from_bytes([4u8; 16]),
+        serde_json::json!({ "task": "t", "parent": parent.to_string() }),
+        &[],
+    );
+    let opening =
+        serde_json::to_value(answer.opening.expect("the window held run_started")).unwrap();
+    assert_eq!(
+        opening.get("parent"),
+        Some(&serde_json::json!(parent.to_string())),
+        "the child's opening names the run that dispatched it"
+    );
+}

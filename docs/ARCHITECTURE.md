@@ -25,7 +25,7 @@
 ## 1 What runs
 
 One process serves one page, and the page is inside the binary rather than
-beside it: `crates/sprawling/build.rs` compresses `crates/sprawling/web-dist` and emits
+beside it: `Sprawling/app/build.rs` compresses `Sprawling/app/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
 directory left to lose. The page is `client/`: Svelte and Effect, bundled by
 Vite and driven by bun (§2).
@@ -66,7 +66,7 @@ shipped one happens to be written in is a replaceable fact.
 
 The figure draws the units and how they are wired, and nothing about what
 each is for. That is stated once, in the `[family.*]` table of
-`architecture.toml`, which `crates/README.md` renders as its crate table
+`architecture.toml`, which `Sprawling/README.md` renders as its crate table
 (`cargo xtask docnum`); a second hand-kept list of duties here would drift
 from it. The figure leaves out `kernel`, because every unit depends on it
 and nothing it holds is reached from outside the process, and the three
@@ -78,7 +78,7 @@ caller overrides it. The value is not repeated here: every verb's default and
 the first-run screen read that one constant, and `README.md` sends a person
 to the address the console prints rather than spelling it, so the address a
 person is told and the address the server binds cannot be spelled two ways
-(`crates/sprawling/Spec.lean` §8-2b).
+(`Sprawling/app/Spec.lean` §8-2b).
 
 ## 2 The stack, and what each choice costs
 
@@ -92,10 +92,10 @@ every week.
 |---|---|---|
 | Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types. `unsafe_code` is `forbid` in the workspace lint table, and only the two FFI crates, `desktop_ffi` and `console_ffi`, lower it to `deny` so that each call into their Zig leaf can lift it alone (*Hardening* in §10). Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio`, only in `wire` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
-| Inbound WebSocket | `axum` with its `ws` feature (`crates/wire/Cargo.toml`; `crates/sprawling/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
-| Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`crates/wire/Spec.lean` §8-41). |
+| Inbound WebSocket | `axum` with its `ws` feature (`Sprawling/wire/Cargo.toml`; `Sprawling/app/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
+| Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`Sprawling/wire/Spec.lean` §8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. The TLS backend is aws-lc-rs, installed once by `gateway::reach::tls`. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `crates/xtask/src/npm.rs`, each admitted under `client/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `client/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -126,7 +126,7 @@ once. A **platform leaf** — Win32 calls with no admitted safe interface,
 where the alternative is `unsafe` Rust — enters without conditions 1 to
 3, which measure speed it does not claim, and holds 4 to 6, with its
 boundary properties proved in Lean and each `extern` call named in its
-SPEC (AGENTS.md, Rust; the desktop's leaf is `crates/desktop/Spec.lean` section
+SPEC (AGENTS.md, Rust; the desktop's leaf is `Sprawling/desktop/Spec.lean` section
 8-12):
 
 1. the hot spot has a production caller, and `just bench` or citysim
@@ -197,14 +197,14 @@ The `mei` row is empty on purpose. Mei is a headless harness under the top-level
 The `child` row is empty on purpose: `child::command` is the one place a
 child process is configured (detached from the city's console, in its own
 process group, the city's secrets removed from its environment), so every
-unit that starts one may name it and it names nothing (`crates/child/Spec.lean`).
+unit that starts one may name it and it names nothing (`Sprawling/child/Spec.lean`).
 
-The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
+The `desktop_ffi` row is the desktop server's FFI seam (`Sprawling/desktop/ffi`),
 one of the two members whose lint table is their own: it is the workspace's table with
 `unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
-that one statement (`crates/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
+that one statement (`Sprawling/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
 processor topology, the power-throttling opt-out and a job's CPU weight and
-memory limit, which no safe crate offers (`crates/desktop/ffi/Spec.lean` D4). `desktop` reads `kernel`
+memory limit, which no safe crate offers (`Sprawling/desktop/ffi/Spec.lean` D4). `desktop` reads `kernel`
 and `agent_protocols` for four facts the city defines, the error codes, the
 image quality domain, the MCP revision and the effect-unknown key, and for
 nothing else.
@@ -222,12 +222,12 @@ machine authority for the direction of the edges that matter there, also
 read by `cargo xtask depmap`. Each line names a module and the paths its
 production code never names; tests may still build a fixture through the
 assembly point. `bin::assembly` knows every concrete type, so the modules
-it assembles never name it back (`crates/sprawling/Spec.lean` §8-92).
+it assembles never name it back (`Sprawling/app/Spec.lean` §8-92).
 
 ```directions
-crates/accounting/src/views: crate::worker
-crates/sprawling/src/doctor: crate::assembly, accounting::worker
-crates/sprawling/src/serving: crate::assembly, accounting::worker
+Sprawling/accounting/src/views: crate::worker
+Sprawling/app/src/doctor: crate::assembly, accounting::worker
+Sprawling/app/src/serving: crate::assembly, accounting::worker
 ```
 
 What each unit owns is stated in `architecture.toml`, for the reason §1
@@ -240,7 +240,7 @@ And splitting into crates buys compiler-enforced layering, not reuse.
 Every package is published to crates.io, but only because
 `cargo install sprawling` builds the binary from the registry and
 crates.io requires each of its dependencies to be there
-(`crates/sprawling/spec/Doctor.lean` §8-157); the packages are the parts
+(`Sprawling/app/spec/Doctor.lean` §8-157); the packages are the parts
 of one binary, not libraries offered to other projects.
 
 **Three kinds of edge**, and telling them apart is what makes the
@@ -295,19 +295,19 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 
 | Seam | Declared in | Production adapter | Second adapter |
 |---|---|---|---|
-| `kernel::ledger` | crates/kernel/src/ledger.rs | memory: jsonl segments with tail recovery | citysim: in-memory Ledger |
-| `kernel::tool` | crates/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
-| `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
-| `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
-| `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
-| `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
-| `remote_access::route` | crates/remote_access/src/route.rs | `route::cloudflare`: a locally managed Cloudflare named tunnel; `route::command`: a command the person wrote | `route::scripted`: a fixed address, and the order it was opened and closed in |
-| `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, HTTP, or SSE | `ScriptedOutbound` for offline replay |
-| `accounting::models` | crates/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
-| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `crates/sprawling/tests/clock.rs` |
-| `accounting::connectors` | crates/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
-| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner, handed in through `Hands.machine` | the scripted machine in `crates/sprawling/tests/machine.rs` |
-| `accounting::views::snapshot::start` | crates/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from |
+| `kernel::ledger` | Sprawling/kernel/src/ledger.rs | memory: jsonl segments with tail recovery | citysim: in-memory Ledger |
+| `kernel::tool` | Sprawling/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
+| `kernel::model` | Sprawling/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
+| `runtime::sandbox` | Sprawling/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
+| `runtime::turn::wave` | Sprawling/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
+| `browser::port` | Sprawling/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
+| `remote_access::route` | Sprawling/remote_access/src/route.rs | `route::cloudflare`: a locally managed Cloudflare named tunnel; `route::command`: a command the person wrote | `route::scripted`: a fixed address, and the order it was opened and closed in |
+| `agent_protocols::mcp` | Sprawling/agent_protocols/src/mcp/outbound.rs | stdio child process, HTTP, or SSE | `ScriptedOutbound` for offline replay |
+| `accounting::models` | Sprawling/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `Sprawling/app/tests/model_factory.rs` |
+| `accounting::clock` | Sprawling/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `Sprawling/app/tests/clock.rs` |
+| `accounting::connectors` | Sprawling/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `Sprawling/app/tests/connectors/offering.rs` |
+| `accounting::machine` | Sprawling/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner, handed in through `Hands.machine` | the scripted machine in `Sprawling/app/tests/machine.rs` |
+| `accounting::views::snapshot::start` | Sprawling/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a
@@ -361,7 +361,7 @@ than any diagram of boxes.
    never lands ahead of what the run held. A turn therefore pays one
    barrier plus one per write, seq stays the order of appending, and a
    power cut at any line leaves a prefix with no write ahead of its intent
-   (runtime D24 and D36, `crates/runtime/spec/Turn/Durability.lean`).
+   (runtime D24 and D36, `Sprawling/runtime/spec/Turn/Durability.lean`).
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
    and `city::resident`. Assembling it is itself an event, and the result
@@ -380,7 +380,7 @@ than any diagram of boxes.
    exception; a history that must change is stopped and forked from an
    earlier point instead. The one protocol exception is a tool wave after
    an empty reply, whose results reopen the last user message rather than
-   create adjacent user messages (`crates/runtime/spec/Conversation.lean`
+   create adjacent user messages (`Sprawling/runtime/spec/Conversation.lean`
    §8-47). Subject to that exception, the four system segments and the
    sent conversation give a provider the longest prefix this content can
    reuse; provider capacity and cache lifetime still decide whether a hit
@@ -400,7 +400,7 @@ than any diagram of boxes.
    tool keeps the mode-based default. A run lists, finds, details and
    runs a dormant tool through `tool`, and records its whole resolved
    table, `off` included, in `prompt_assembled.tools` (the truncation
-   lock, `crates/runtime/Spec.lean` §8-60, D111).
+   lock, `Sprawling/runtime/Spec.lean` §8-60, D111).
    `accounting::views::catalog` reads that recorded table against the
    configuration on disk for the building page instead of assembling a
    fresh catalog, which could start a server or a browser just to answer
@@ -424,13 +424,13 @@ than any diagram of boxes.
    order under its `max_in_flight`, and `gateway::concurrency` narrows that
    number after a 429 until the provider's `Retry-After` instant has
    passed. The driving pool sets no lane count, so this provider queue is
-   the city's one concurrency limit (`crates/gateway/Spec.lean` §8-6,
-   `crates/sprawling/Spec.lean` D34). Each endpoint keeps one HTTP client,
+   the city's one concurrency limit (`Sprawling/gateway/Spec.lean` §8-6,
+   `Sprawling/app/Spec.lean` D34). Each endpoint keeps one HTTP client,
    so its connections stay open between calls, and a request to
    `api.openai.com` carries the conversation's id as `prompt_cache_key`,
    so the provider can route the turns of one conversation to one cache
    (gateway D25). The city opens no connection before the first call and
-   speaks no WebSocket to a provider; `crates/gateway/Spec.lean` §3 names
+   speaks no WebSocket to a provider; `Sprawling/gateway/Spec.lean` §3 names
    the evidence that would add either.
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts
    model output through the same secret scan as everything else, so a key a
@@ -460,7 +460,7 @@ than any diagram of boxes.
     that wakes writes every record already queued for it, each as its own
     `Event` frame, and flushes once, so a burst costs one flush rather than
     one per record; frames keep their shape and their `seq` order
-    (`crates/wire/spec/Server/Socket.lean` §8-47h, wire D45). The client
+    (`Sprawling/wire/spec/Server/Socket.lean` §8-47h, wire D45). The client
     folds the event into what it believes, so the same fold runs on both
     sides of the wire.
 13. **A signal reaches whoever it names, working or not, when it is sent.**
@@ -498,7 +498,7 @@ than any diagram of boxes.
     person's own entrance renders as `user`, the city's own words as
     `city`, and a resident's words as a letter. A delegated child's JOB.md
     names who handed its task down (city D21). (collab D7–D11,
-    `crates/collab/spec/Delivery.lean`.)
+    `Sprawling/collab/spec/Delivery.lean`.)
 
 When the process dies mid-call, `sprawling resume` verifies the chain,
 closes tool calls whose outcome was lost as *unknown* rather than as
@@ -522,8 +522,8 @@ the run through `runtime::run::harness`, the one author of that order. The
 harness reaches none of the city's tools, so a run frozen done is offered
 for review as a request the city opens, and the merge stays the one way
 its writes reach the building. Recording a report after the act is the
-weak form of step 4 that `crates/sprawling/Spec.lean` §8-4e records and
-`crates/agent_protocols/spec/Harness/Session.lean` proves.
+weak form of step 4 that `Sprawling/app/Spec.lean` §8-4e records and
+`Sprawling/agent_protocols/spec/Harness/Session.lean` proves.
 
 ### When it does not go through
 
@@ -641,7 +641,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->79<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->80<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -684,23 +684,23 @@ the part worth knowing before starting, not after.
 
 | To change this | Go here | Held by |
 |---|---|---|
-| a new event kind, or a payload | `kernel::event` + `crates/kernel/spec/Event/Kind.lean` | the kind set is closed; `storage` fixtures compare bytes across platforms |
-| a new `Command` or `Query` frame | `wire::frames` + `crates/wire/Spec.lean` | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire D1); every `Query` must be answered or it does not compile |
+| a new event kind, or a payload | `kernel::event` + `Sprawling/kernel/spec/Event/Kind.lean` | the kind set is closed; `storage` fixtures compare bytes across platforms |
+| a new `Command` or `Query` frame | `wire::frames` + `Sprawling/wire/Spec.lean` | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire D1); every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
-| how a provider is spoken to | `gateway::dialect` + `crates/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
+| how a provider is spoken to | `gateway::dialect` + `Sprawling/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
 | a known provider host | `gateway::provider::preset` | a table with data and no branches, each row citing its source |
-| which thinking levels a model is offered | `gateway::provider::thinking` + `crates/gateway/spec/Provider/Thinking.lean` | one ladder of sources, person, then upstream, then the vendor's documents, then unknown; the one default is `kernel::consts_policy::DEFAULT_EFFORT` |
+| which thinking levels a model is offered | `gateway::provider::thinking` + `Sprawling/gateway/spec/Provider/Thinking.lean` | one ladder of sources, person, then upstream, then the vendor's documents, then unknown; the one default is `kernel::consts_policy::DEFAULT_EFFORT` |
 | whether two endpoints serve the same model | `gateway::provider::identity` | the upstream's own canonical id, or the id lowercased with any organisation prefix removed; two entries are one model only when the strings are equal |
-| an ACP agent the city can run, or how one starts | `agent_protocols::harness` + `crates/agent_protocols/Spec.lean` §8-19 | nothing starts before the person consents to the exact launch specification, whose digest the city recomputes; the built-in entries come from the registry snapshot committed with its `Date` and `ETag`, and `docs/third-party.md` §1 watches the format it is read with |
-| what a harness run may do in a room | `accounting::worker::driving::harness` + `crates/sprawling/spec/Accounting/Worker.lean` §8-4e | `runtime::run::harness` is the one author of the order a harness run writes; `crates/agent_protocols/spec/Harness/Session.lean` proves it |
-| who may use the local listener | `wire::reception` + `crates/wire/Spec.lean` | one exhaustive entry decision per request, Host, then Origin, then Fetch Metadata, before any credential is read; `ListenerOrigins` is computed once from the bound address, and the remote listener's from its loopback port and the route's public address, judged by the same decision (wire D56) |
-| how the city starts a child process | the `child` crate | its one constructor sets the platform flags and removes the city's credentials from the environment; every spawn point of the served city calls it, the browser `/web` opens included, except the supervising parent's child, the one exception `crates/child/Spec.lean` names; `clippy.toml` refuses `std::process::Command::new` everywhere else, so a spawn point that is not the city's child (`gauge`, a developer tool, a build script, a test fixture) carries an `expect` whose reason names its class (child D4) |
+| an ACP agent the city can run, or how one starts | `agent_protocols::harness` + `Sprawling/agent_protocols/Spec.lean` §8-19 | nothing starts before the person consents to the exact launch specification, whose digest the city recomputes; the built-in entries come from the registry snapshot committed with its `Date` and `ETag`, and `docs/third-party.md` §1 watches the format it is read with |
+| what a harness run may do in a room | `accounting::worker::driving::harness` + `Sprawling/app/spec/Accounting/Worker.lean` §8-4e | `runtime::run::harness` is the one author of the order a harness run writes; `Sprawling/agent_protocols/spec/Harness/Session.lean` proves it |
+| who may use the local listener | `wire::reception` + `Sprawling/wire/Spec.lean` | one exhaustive entry decision per request, Host, then Origin, then Fetch Metadata, before any credential is read; `ListenerOrigins` is computed once from the bound address, and the remote listener's from its loopback port and the route's public address, judged by the same decision (wire D56) |
+| how the city starts a child process | the `child` crate | its one constructor sets the platform flags and removes the city's credentials from the environment; every spawn point of the served city calls it, the browser `/web` opens included, except the supervising parent's child, the one exception `Sprawling/child/Spec.lean` names; `clippy.toml` refuses `std::process::Command::new` everywhere else, so a spawn point that is not the city's child (`gauge`, a developer tool, a build script, a test fixture) carries an `expect` whose reason names its class (child D4) |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
 | where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
-| what a building may do | `city::policy` (`RULES.toml`) + `crates/city/Spec.lean` | a run's write domain is what its building declares |
-| the documents a building is raised with | `crates/city/templates/` + `city::building::template` | compiled in with `include_str!`, so a moved template breaks the build; laying out a confidential building is refused when the line its template flips is gone |
-| how a host command is confined | `runtime::tools::exec::confinement` + `crates/runtime/spec/Tools/Exec.lean` | every arm states all five guarantees, so a new axis is a compile error in each arm |
-| the Windows desktop a resident may drive | `crates/desktop` + `crates/desktop/Spec.lean` | `unsafe` only in `crates/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
+| what a building may do | `city::policy` (`RULES.toml`) + `Sprawling/city/Spec.lean` | a run's write domain is what its building declares |
+| the documents a building is raised with | `Sprawling/city/templates/` + `city::building::template` | compiled in with `include_str!`, so a moved template breaks the build; laying out a confidential building is refused when the line its template flips is gone |
+| how a host command is confined | `runtime::tools::exec::confinement` + `Sprawling/runtime/spec/Tools/Exec.lean` | every arm states all five guarantees, so a new axis is a compile error in each arm |
+| the Windows desktop a resident may drive | `Sprawling/desktop` + `Sprawling/desktop/Spec.lean` | `unsafe` only in `Sprawling/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
@@ -708,7 +708,7 @@ the part worth knowing before starting, not after.
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
-| a gate itself | `crates/xtask/` + `crates/xtask/Spec.lean` | a red gate is resolved by fixing the code, narrowing its precise scope, or deleting it; never by adding an exception |
+| a gate itself | `Tools/xtask/` + `Tools/xtask/Spec.lean` | a red gate is resolved by fixing the code, narrowing its precise scope, or deleting it; never by adding an exception |
 | how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
 
 Two documents sit beside this one rather than inside it: operating a
@@ -741,7 +741,7 @@ stripped to nothing and the thick end stays pure. `runtime::watchdog`,
 
 Each of these is a type, not a slogan. "Unrepresentable" is itself a claim
 that needs testing, so six of them have a compile-failure counterexample
-under `crates/*/tests/ui`; `EventRef`, `UnplannedProgress` and the plan
+under `Sprawling/*/tests/ui`; `EventRef`, `UnplannedProgress` and the plan
 node's `Held` have none yet, and rest on their types alone.
 
 - `EventRef` has no public constructor and no serde ⇒ **a forged event reference cannot be spelled**.
@@ -790,7 +790,7 @@ there is no random source in the simulator today to seed.
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess, and the key a client attaches to a command it sends (rule 7) | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
-| 7 | A run's outward action derives its `IdemKey` from `(run, seq, normalised action)` — never from a clock or a random number — because resume and replay must derive the same key again. A command's key is the client's: the browser, the console and `sprawling call` draw it from entropy once per press or line and resend it unchanged on a retry, since no run exists yet to derive it from, and a key derived from the words would make the same task sent twice one task | property tests; `crates/kernel/spec/Idem.lean` §8-6 |
+| 7 | A run's outward action derives its `IdemKey` from `(run, seq, normalised action)` — never from a clock or a random number — because resume and replay must derive the same key again. A command's key is the client's: the browser, the console and `sprawling call` draw it from entropy once per press or line and resend it unchanged on a retry, since no run exists yet to derive it from, and a key derived from the words would make the same task sent twice one task | property tests; `Sprawling/kernel/spec/Idem.lean` §8-6 |
 
 Rules 1 and 6 together give a checkable property: **the same event sequence
 replays byte-for-byte identically on any machine.** The property covers the
@@ -803,10 +803,10 @@ production except where a test module relaxes it locally: no `unwrap`,
 `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
 denied; `unsafe_code` is forbidden in every workspace crate but two. The
-desktop server's FFI seam (`crates/desktop/ffi`) and the console's renderer
+desktop server's FFI seam (`Sprawling/desktop/ffi`) and the console's renderer
 (`Calyx/ffi`) each carry the workspace's table with `unsafe_code`
 at `deny`, and hold one `unsafe` block per call into their Zig leaf, each
-with the precondition that makes it sound (`crates/desktop/Spec.lean`
+with the precondition that makes it sound (`Sprawling/desktop/Spec.lean`
 section 8-12 and D14, `Calyx/ffi/Spec.lean` D1); `xtask guard`
 holds both tables to the workspace's, key by key. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
@@ -851,7 +851,7 @@ The existing boundaries show what each pin covers:
 
 `Cas::get` verifies the whole object; `get_range` and `size` trust
 the stored object. A caller that needs the address proved takes the full read
-(`crates/storage/spec/Cas.lean` §8-3, §8-36).
+(`Sprawling/storage/spec/Cas.lean` §8-3, §8-36).
 
 A filesystem alias is not a content pin. A door states which alias kinds it
 meets and uses a recorded handling: refuse, resolve and judge again, follow
@@ -860,13 +860,13 @@ needs its own row and reason in the same change.
 
 | Door | Handling and scope | Authority |
 |---|---|---|
-| `storage::alias::WriteTarget` | Refuses symlinks, junctions and hard-linked regular files. `at` checks the name and ancestors; `within` checks below its root. The value records the check at that instant; landing owns the later effect. | `crates/storage/spec/Alias.lean` §8-25, §8-32 |
-| `city::library::install::precheck` | Refuses symbolic links throughout a package and opens its items through directory handles without following links; Windows also refuses every reparse point. Regular hard-linked source files are read into the snapshot. | `crates/city/spec/Library/Install.lean` §8-28 |
-| `runtime::tools::chosen_path` | For model-chosen read/search paths, resolves symlinks and junctions and judges the real address; read and BoundReader check the opened file again. Search skips linked directories. Hard links have no unique original path to resolve. | `crates/runtime/spec/Tools/ChosenPath.lean` §8-30-1 |
-| `runtime::tools::exec::confinement::placing::copy` | Follows source links and copies content. It does not follow links in the copy; differing entries are removed before replacement, equal files may be kept, and the depth bound ends cycles. | `crates/runtime/spec/Tools/Exec.lean` §8-13-2, D10 |
-| `accounting::views::finding` | Does not list or descend into symlinks; regular hard-linked files remain ordinary candidates. | `crates/wire/spec/Answer/Find.lean` §8-82 |
-| `storage::worktree::weight::measure` | Skips symlinks during the measurement walk. Regular hard-linked files are counted per directory entry. | `crates/storage/spec/Worktree.lean` §8-31; `crates/storage/src/worktree/weight.rs` |
-| `accounting::playback::landing` | `Exports` refuses aliases below the city root. The person's `Chosen` output resolves its parent, then judges the resolved target. Both use a staged hard link for no-clobber landing and remove the stage; failed removal is an explicit error. | `crates/accounting/spec/Playback/Check.lean` §8-13, D25 |
+| `storage::alias::WriteTarget` | Refuses symlinks, junctions and hard-linked regular files. `at` checks the name and ancestors; `within` checks below its root. The value records the check at that instant; landing owns the later effect. | `Sprawling/storage/spec/Alias.lean` §8-25, §8-32 |
+| `city::library::install::precheck` | Refuses symbolic links throughout a package and opens its items through directory handles without following links; Windows also refuses every reparse point. Regular hard-linked source files are read into the snapshot. | `Sprawling/city/spec/Library/Install.lean` §8-28 |
+| `runtime::tools::chosen_path` | For model-chosen read/search paths, resolves symlinks and junctions and judges the real address; read and BoundReader check the opened file again. Search skips linked directories. Hard links have no unique original path to resolve. | `Sprawling/runtime/spec/Tools/ChosenPath.lean` §8-30-1 |
+| `runtime::tools::exec::confinement::placing::copy` | Follows source links and copies content. It does not follow links in the copy; differing entries are removed before replacement, equal files may be kept, and the depth bound ends cycles. | `Sprawling/runtime/spec/Tools/Exec.lean` §8-13-2, D10 |
+| `accounting::views::finding` | Does not list or descend into symlinks; regular hard-linked files remain ordinary candidates. | `Sprawling/wire/spec/Answer/Find.lean` §8-82 |
+| `storage::worktree::weight::measure` | Skips symlinks during the measurement walk. Regular hard-linked files are counted per directory entry. | `Sprawling/storage/spec/Worktree.lean` §8-31; `Sprawling/storage/src/worktree/weight.rs` |
+| `accounting::playback::landing` | `Exports` refuses aliases below the city root. The person's `Chosen` output resolves its parent, then judges the resolved target. Both use a staged hard link for no-clobber landing and remove the stage; failed removal is an explicit error. | `Sprawling/accounting/spec/Playback/Check.lean` §8-13, D25 |
 
 An alias the city creates for its own mechanics declares its owner, reader
 boundary and lifetime. It cannot stand in for an isolated copy, and failed
@@ -913,14 +913,14 @@ Object (`runtime::backlog::jobs`), and a harness resident's own process.
 Placement is the policy that decides which cores the hot threads prefer
 and how much of the machine the children may take. It gives hints and
 soft preferences; the operating system's scheduler decides, and the city
-never sets hard affinity by default (`crates/sprawling/spec/Serving/Placement.lean`
+never sets hard affinity by default (`Sprawling/app/spec/Serving/Placement.lean`
 D41).
 
 **The topology is read, never assumed.** `bin::serving::placement::reading`
 reads, on each platform, every logical processor's efficiency class, its
 physical core, its last-level cache group, its processor group and whether
 this process may use it. Windows reads `GetSystemCpuSetInformation` through
-the Zig leaf in `crates/desktop/ffi`, which only makes the call and fills a
+the Zig leaf in `Sprawling/desktop/ffi`, which only makes the call and fills a
 buffer Rust lends it; safe Rust (`desktop_ffi::cpu_set`) parses the records,
 and the usable set is the reading thread's group affinity, which already
 counts a Job Object's limit. Linux reads `Cpus_allowed_list`, the hybrid
@@ -954,7 +954,7 @@ code is written, not a platform call.
 
 On Linux, when the harness's own cgroup is delegated, each run also gets
 a child cgroup with `cpu.weight` 100; without delegation the `nice` above
-is the only share (`crates/runtime/spec/Tools/Exec.lean` D29 and D33).
+is the only share (`Sprawling/runtime/spec/Tools/Exec.lean` D29 and D33).
 No run has a memory ceiling by default, and none is derived from the
 machine's memory. A run's commands get one only when the User enters a
 number of bytes in `[core] memory_bytes` and chooses `"soft_shares"`;
@@ -962,7 +962,7 @@ all commands of one run share it, a Windows Job Object or a delegated
 Linux cgroup enforces it, and macOS has no mechanism that can. When a
 command reaches the ceiling, or the ceiling could not be applied or read
 back, the command's result says so instead of the failure passing
-silently (`crates/runtime/spec/Tools/Exec.lean` D95).
+silently (`Sprawling/runtime/spec/Tools/Exec.lean` D95).
 
 **One setting turns it off, and the doctor says what it did.** The
 User's configuration `[core] placement` takes `"soft"`, the default;
@@ -981,18 +981,18 @@ naming the classes it read, whether hot threads prefer the top class or
 are left to the operating system, how runs share the processors, and an
 entered ceiling that does not apply.
 
-**Where it is proved.** `crates/sprawling/spec/Serving/Placement/Plan.lean`
+**Where it is proved.** `Sprawling/app/spec/Serving/Placement/Plan.lean`
 proves the plan's rules over every topology (a planned processor is usable,
 never of the slowest class, one per physical core, independent of the
 reading order, absent for one class or an inconsistent reading), and
-`crates/sprawling/spec/Serving/Placement.lean` proves the seat table over
+`Sprawling/app/spec/Serving/Placement.lean` proves the seat table over
 every trace of starts and exits. The derived checks sit beside the code:
 a proptest over generated topologies and a table of processor families in
-`crates/sprawling/src/serving/placement/plan/tests.rs`, the
+`Sprawling/app/src/serving/placement/plan/tests.rs`, the
 `GetSystemCpuSetInformation` records of a real hybrid laptop part, kept
 as a fixture that the tests of `placement::reading` parse on every
 platform, and an exhaustive walk of small seat traces in
-`crates/sprawling/src/serving/placement/tests.rs`.
+`Sprawling/app/src/serving/placement/tests.rs`.
 
 **No reading exists yet.** The benefit under load is unmeasured: the
 four-arm comparison the specification plans (nothing, soft placement, soft
@@ -1022,29 +1022,29 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
 | V2 unit and property | a function wrong across a class of inputs | `#[test]` functions beside the code they judge, properties before examples |
-| V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `crates/fuzz/fuzz_targets` |
-| V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
+| V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `Sprawling/browser/Spec.lean`) |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `Tools/fuzz/fuzz_targets` |
+| V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `Sprawling/` and `Tools/`, proved by `just models` in every `just check` |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->10<!-- xtask:end --> scenario files, failures replayed from their script |
-| V7 mutation | tests that do not bite | `cargo-mutants` over the modules the `mutation_files` rows of `crates/xtask/budgets.toml` name, by `just mutants` locally and `on-demand.yml -f job=mutants-modules` on a runner |
-| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `crates/fixtures/` |
+| V7 mutation | tests that do not bite | `cargo-mutants` over the modules the `mutation_files` rows of `Tools/xtask/budgets.toml` name, by `just mutants` locally and `on-demand.yml -f job=mutants-modules` on a runner |
+| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `Tools/fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
-| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `crates/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
+| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `Tools/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
 **V10 is deliberately not a gate.** §1 says the wire
-is the whole API and that a second client writes against it; `crates/adversary/`
+is the whole API and that a second client writes against it; `Tools/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
 `just adversary` and by a schedule, never by `just check`,
 which builds none of the checker: what `just models` reads there is the
-checker's own specification, `crates/adversary/Spec.lean` and its parts,
+checker's own specification, `Tools/adversary/Spec.lean` and its parts,
 proved like any crate's, and where Lean is absent `just adversary` prints
 one line and succeeds.
 What it buys that V2 cannot is quantification over traces: V2 proves that
 the paths we thought of hold, and V10 asks whether the door's stable error
 codes survive any prefix, one halt, and any suffix. What it has found, and
 what each finding cost to fix, is recorded in
-`crates/adversary/Spec.lean` section 4 — beside the mechanism rather than
+`Tools/adversary/Spec.lean` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
 **Three gaps, named rather than hidden.** V9 needs a real city served by a
@@ -1059,7 +1059,7 @@ under a minute each. A harness that builds a `Vec`, a `String` or a
 `BTreeSet` gives CBMC loops it cannot bound, and one over symbolic
 non-linear arithmetic gives the solver work that grows with the data it
 walks, so propositions of those two shapes are held by a `#[test]` or a
-proptest instead (`crates/kernel/Spec.lean` §2). No harness carries the
+proptest instead (`Sprawling/kernel/Spec.lean` §2). No harness carries the
 `// not-proved:` marker today; the marker, and the reader in
 `cargo xtask proof` that honours it, stay for the next harness that cannot
 be proved yet.
@@ -1067,7 +1067,7 @@ be proved yet.
 ### Specifications in Lean
 
 Every crate's specification is written in Lean, by the method in
-`crates/city/skills/sdd`, in the layout below, and so are the
+`Sprawling/city/skills/sdd`, in the layout below, and so are the
 specifications of the checker, the simulator, the gates and the client.
 
 **One package, at the repository root.** `lakefile.toml`, `lean-toolchain`
@@ -1077,8 +1077,8 @@ so every import is this tree's or the toolchain's own. The package has
 four targets. The library `Spec` holds every product and development-tool
 specification, including the checker's own, and the browser client's;
 `just models` builds it inside `just check`. The library `Sprawling`
-(`crates/adversary/src`) and the executables `adversary` and `acceptance`
-(`crates/adversary/test`) are the checker, which only `just adversary`,
+(`Tools/adversary/src`) and the executables `adversary` and `acceptance`
+(`Tools/adversary/test`) are the checker, which only `just adversary`,
 `just acceptance` and the nightly schedule build. `Spec` reaches each
 specification through its explicit `<dir>.Spec` glob, plus `<dir>.spec.+`
 when the specification has parts, with `<dir>` its path in dotted form.
@@ -1092,13 +1092,14 @@ interfaces, decisions and interaction contracts; how a screen looks is
 described in English in `docs/frontend-method.md`, under the labels the
 code cites.
 
-**Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:
-the seventeen numbered section comments `crates/city/skills/sdd` lists, and the imports
-of its parts. A part is `crates/<dir>/spec/<Path>.lean`, where `<Path>` is
+**Where a specification lives.** A crate's entry is `<root>/<dir>/Spec.lean`
+under `Sprawling/` or `Tools/` (or a top-level product root such as `Calyx/`):
+the seventeen numbered section comments `Sprawling/city/skills/sdd` lists, and the imports
+of its parts. A part is `<root>/<dir>/spec/<Path>.lean`, where `<Path>` is
 the Rust module path below `src/` with every segment in UpperCamelCase:
 `storage::jsonl::barrier` is specified by
-`crates/storage/spec/Jsonl/Barrier.lean`, whose module is
-`crates.storage.spec.Jsonl.Barrier` and whose namespace is
+`Sprawling/storage/spec/Jsonl/Barrier.lean`, whose module is
+`Sprawling.storage.spec.Jsonl.Barrier` and whose namespace is
 `Storage.Jsonl.Barrier`. Upper case keeps a Lean keyword such as `open` out
 of a module name. A property that spans modules is named after the module
 that holds it, and the others cite that part. The Rust module's rustdoc
@@ -1107,7 +1108,7 @@ names its part, and the part names the Rust module.
 **One effective specification per crate.** A crate holds exactly one
 specification: its `Spec.lean`. No Markdown `<lib>-SPEC.md` remains in the
 tree; the `spec` gate still accepts one as a package's only specification,
-and refuses a package that holds both or neither (`crates/xtask/Spec.lean`
+and refuses a package that holds both or neither (`Tools/xtask/Spec.lean`
 §8-42).
 
 **Imports follow §3.** A part imports the toolchain's libraries and the
@@ -1130,15 +1131,15 @@ Declaration names are English and come from the glossary.
 
 **Anchors, and what the gates read.** Each row of `architecture.toml`
 names the part that specifies the module
-by its module name, `spec = "crates.browser.spec.Act"`, or
-`crates.browser.Spec` where the entry itself does, and `specalign` holds
+by its module name, `spec = "Sprawling.browser.spec.Act"`, or
+`Sprawling.browser.Spec` where the entry itself does, and `specalign` holds
 that name to a file inside the same crate. The gates read a
 specification as text, in a few restricted shapes, and never run Lean:
 one constructor per line in an `inductive`, one arm per line in a `def`,
 the `import` lines, and the words left once comments and strings are
 blanked. A Lean name and the Rust name it stands for are spelled the
 same, so a gate compares one spelling rather than converting between two.
-`crates/xtask/Spec.lean` §8-42 and §8-43 say which gate reads
+`Tools/xtask/Spec.lean` §8-42 and §8-43 say which gate reads
 which shape; the `spec` gate holds a crate to one effective
 specification, the checker and the specifications to their imports, and
 every `.lean` to no `sorry`, `admit` or `axiom`.
@@ -1150,7 +1151,7 @@ before size: a bigger binary that answers faster is the better binary.
 Wall-clock figures are measured, reported with the machine
 that produced them, and never gated: a slow runner is not a defect, and a
 gate that says it is teaches people to ignore gates. **The full register is
-`crates/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
+`Tools/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
 it, and the readings below are written here by `cargo xtask docnum` rather
 than typed. Every duration in the register is a whole number of
 microseconds, named by its `_us` field.
@@ -1175,7 +1176,7 @@ for the next serve (sprawling D48, wire D46). Windows reads `PagefileUsage`, Lin
 `Private_Clean` plus `Private_Dirty` from `/proc/self/smaps_rollup` (or
 `RssAnon` without it), and macOS the virtual size, named as such, because
 no safe interface reaches its physical footprint yet
-(`crates/sprawling/spec/Serving/Memory.lean` D43). Each set of readings names its tree,
+(`Sprawling/app/spec/Serving/Memory.lean` D43). Each set of readings names its tree,
 toolchain, feature set, target platform, fixture digest, binary, machine
 class and load (idle, N concurrent runs, a build in the background); the
 criterion is written before the reading, rounds of the two arms interleave,
@@ -1194,23 +1195,23 @@ and names the recipe that retakes it.
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_us -->5,000<!-- xtask:end --> µs, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_us -->20,000<!-- xtask:end --> µs | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_us -->436,676<!-- xtask:end --> µs for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_us -->1,000<!-- xtask:end --> µs | `[prefix_assembly]`, with its machine class | no |
-| Runs driving at once | no lane count: a prepared run gets a lane at once, and `accounting::worker::pool` asks only for memory (`crates/sprawling/Spec.lean` D34) | one thread per run, one accounting thread taking every write, and each endpoint's `max_in_flight` permits (`gateway::concurrency`) | no: the one concurrency limit is the endpoint's, not a measurement |
+| Runs driving at once | no lane count: a prepared run gets a lane at once, and `accounting::worker::pool` asks only for memory (`Sprawling/app/Spec.lean` D34) | one thread per run, one accounting thread taking every write, and each endpoint's `max_in_flight` permits (`gateway::concurrency`) | no: the one concurrency limit is the endpoint's, not a measurement |
 | Mutation score of each module a `mutation_files` row names | ≥90%, each row's `minimum_percent` | by `just mutants-score` over the outcomes of `just mutants-modules` | by that command, not by `just check` |
-| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `crates/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
+| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `Tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
 The four load scenarios — multi-run parallel, large-ledger fold,
 large-worktree placement, and long-session streaming forward — are re-measured
 by `just bench`, one reading line per scenario and sub-metric, every line
 carrying its machine class. Multi-run parallel is read by
 `instrument_relay_round_trip`, which drives the accounting loop the city runs
-(`crates/sprawling/Spec.lean` §8-84); its readings and their machine class sit in
-`crates/xtask/budgets.toml` `[relay_round_trip]`. The other three are
+(`Sprawling/app/Spec.lean` §8-84); its readings and their machine class sit in
+`Tools/xtask/budgets.toml` `[relay_round_trip]`. The other three are
 citysim's bench scenarios. The large-ledger fold has a register row, quoted
 below; the large-worktree placement and long-session forwarding readings are
 printed by `just bench` and have no register row, so no figure for them is
 quoted here. The two
 latency tiers and the ratchet that governs these readings live in
-`crates/xtask/budgets.toml` `[local_latency]`; a reading under the registered load
+`Tools/xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
@@ -1233,7 +1234,7 @@ model time back and buys nothing from the Ledger.
 
 **What stays in memory.** The Ledger and the content store are on disk,
 so the process holds working sets only, and
-`crates/sprawling/spec/Serving/Memory.lean` lists each one with its owner,
+`Sprawling/app/spec/Serving/Memory.lean` lists each one with its owner,
 what bounds it today and what it grows with. A cache that may grow is
 budgeted in bytes, not in entries, because one entry can be a few hundred
 bytes or several MiB (sprawling D42); `storage::Resident` is that cache,
@@ -1276,8 +1277,8 @@ yet.
   top-level product directories (`Sprawling/`, `Tools/`, `Calyx/`,
   `RefRain/`, `Mei/`); later moves derive paths from it, and
   `cargo xtask residue` refuses a legacy path once marked `retired`.
-  During transition the table may list planned roots beside the paths
-  the tree still holds (`crates/`, `client/`).
+  After the crates split, `Sprawling/` and `Tools/` are current and
+  `crates/` is retired; `client/` remains live until RefRain R0.
 - **Adding an entry is the registration step**: it lands in the same change
   as the file, before the file is written.
 - **Removing an entry requires a ruling**, recorded as a `Verdict:` trailer
@@ -1405,18 +1406,18 @@ sequenceDiagram
     S-->>W: the event, folded into the Snapshot
 ```
 
-`crates/wire/src/server/socket.rs` (`session`),
-`crates/wire/src/reception/admission.rs` (`decide_admission`),
-`crates/accounting/src/worker/desk.rs` (`post`),
-`crates/accounting/src/worker/relay.rs` (`Wake`),
-`crates/sprawling/src/assembly/attending.rs` (`attend`),
-`crates/accounting/src/worker/dispatching/agreeing.rs` (`agree_to_work`),
-`crates/accounting/src/worker/pool.rs`,
-`crates/runtime/src/run/lifecycle.rs`,
-`crates/accounting/src/worker/driving/harness.rs` (`drive_harness`),
-`crates/runtime/src/run/harness.rs`,
-`crates/storage/src/jsonl/append.rs` (`append_all`),
-`crates/sprawling/src/serving/folding.rs`, `client/src/core/socket.ts`.
+`Sprawling/wire/src/server/socket.rs` (`session`),
+`Sprawling/wire/src/reception/admission.rs` (`decide_admission`),
+`Sprawling/accounting/src/worker/desk.rs` (`post`),
+`Sprawling/accounting/src/worker/relay.rs` (`Wake`),
+`Sprawling/app/src/assembly/attending.rs` (`attend`),
+`Sprawling/accounting/src/worker/dispatching/agreeing.rs` (`agree_to_work`),
+`Sprawling/accounting/src/worker/pool.rs`,
+`Sprawling/runtime/src/run/lifecycle.rs`,
+`Sprawling/accounting/src/worker/driving/harness.rs` (`drive_harness`),
+`Sprawling/runtime/src/run/harness.rs`,
+`Sprawling/storage/src/jsonl/append.rs` (`append_all`),
+`Sprawling/app/src/serving/folding.rs`, `client/src/core/socket.ts`.
 
 ### 13.3 A turn, and where a cancel is heard
 
@@ -1436,10 +1437,10 @@ stateDiagram-v2
     Frozen --> [*]: run_frozen with its Completion
 ```
 
-`crates/runtime/src/turn.rs` (the four phase types),
-`crates/runtime/src/run.rs` (`SafePoint`),
-`crates/runtime/src/run/lifecycle.rs` (`dispatch`, `advance`, `freeze`),
-`crates/kernel/src/completion.rs` (`Completion`: `Done`, `Limit`,
+`Sprawling/runtime/src/turn.rs` (the four phase types),
+`Sprawling/runtime/src/run.rs` (`SafePoint`),
+`Sprawling/runtime/src/run/lifecycle.rs` (`dispatch`, `advance`, `freeze`),
+`Sprawling/kernel/src/completion.rs` (`Completion`: `Done`, `Limit`,
 `Cancelled`).
 
 ### 13.4 The accounting thread
@@ -1466,13 +1467,13 @@ flowchart TD
     committed -->|"what is queued, one flush"| sn[socket n]
 ```
 
-`crates/accounting/src/worker/relay.rs` (`Wake`),
-`crates/accounting/src/worker/dispatching/heavy_landing.rs` (the lane's half of a landing),
-`crates/accounting/src/worker/errand.rs` (`Errands`: a provider request off this thread),
-`crates/sprawling/src/assembly/attending.rs` (`attend`),
-`crates/storage/src/jsonl/append.rs`,
-`crates/sprawling/src/serving/folding.rs` (`spawn_folding`),
-`crates/wire/src/server/socket.rs`.
+`Sprawling/accounting/src/worker/relay.rs` (`Wake`),
+`Sprawling/accounting/src/worker/dispatching/heavy_landing.rs` (the lane's half of a landing),
+`Sprawling/accounting/src/worker/errand.rs` (`Errands`: a provider request off this thread),
+`Sprawling/app/src/assembly/attending.rs` (`attend`),
+`Sprawling/storage/src/jsonl/append.rs`,
+`Sprawling/app/src/serving/folding.rs` (`spawn_folding`),
+`Sprawling/wire/src/server/socket.rs`.
 
 ### 13.5 Opening a city
 
@@ -1495,19 +1496,19 @@ sequenceDiagram
     M->>M: banner, then serve
 ```
 
-`crates/sprawling/src/assembly/listening.rs` (`listen`, the one
-definition of this order, `crates/sprawling/Spec.lean` §8-88),
-`crates/accounting/src/views/snapshot/start.rs`,
-`crates/sprawling/src/assembly/attending.rs` (`spawn_worker`),
-`crates/storage/src/jsonl.rs` (`open`),
-`crates/sprawling/src/assembly/chain_watch.rs`,
-`crates/storage/src/chain_audit.rs` (`prove_chain`, `ChainHalt`),
-`crates/storage/src/verified_prefix.rs` (`crates/sprawling/Spec.lean` §8-122, §8-144).
+`Sprawling/app/src/assembly/listening.rs` (`listen`, the one
+definition of this order, `Sprawling/app/Spec.lean` §8-88),
+`Sprawling/accounting/src/views/snapshot/start.rs`,
+`Sprawling/app/src/assembly/attending.rs` (`spawn_worker`),
+`Sprawling/storage/src/jsonl.rs` (`open`),
+`Sprawling/app/src/assembly/chain_watch.rs`,
+`Sprawling/storage/src/chain_audit.rs` (`prove_chain`, `ChainHalt`),
+`Sprawling/storage/src/verified_prefix.rs` (`Sprawling/app/Spec.lean` §8-122, §8-144).
 The last segment's prefix the previous proof recorded is proved by its
 digest, so tail recovery checks line by line only what was written after
-that proof (`crates/storage/Spec.lean` §8-34). The proof reads and hashes up to
+that proof (`Sprawling/storage/Spec.lean` §8-34). The proof reads and hashes up to
 eight segments side by side and walks the chain through them in order
-(`crates/storage/Spec.lean` §8-37).
+(`Sprawling/storage/Spec.lean` §8-37).
 Until the proof is whole the writer refuses every append with
 `E_HISTORY_UNPROVEN`, so the page answers queries from the snapshots
 while commands wait for a history that has been walked.
@@ -1541,12 +1542,12 @@ sequenceDiagram
     L->>R: tool_called and tool_result in call order
 ```
 
-`crates/gateway/src/endpoint/stream.rs`,
-`crates/runtime/src/turn/speculation.rs` (`Generating`),
-`crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
-`crates/runtime/src/run/checkpoint.rs`, `crates/storage/src/checkpoint.rs`;
+`Sprawling/gateway/src/endpoint/stream.rs`,
+`Sprawling/runtime/src/turn/speculation.rs` (`Generating`),
+`Sprawling/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
+`Sprawling/runtime/src/run/checkpoint.rs`, `Sprawling/storage/src/checkpoint.rs`;
 what may start early and in which order results reach the Ledger is
-`crates/runtime/spec/Turn/Speculation.lean`.
+`Sprawling/runtime/spec/Turn/Speculation.lean`.
 
 ### 13.7 A run's life
 
@@ -1575,14 +1576,14 @@ cut say: done only on an end of turn that said something, limit when the
 building's ceiling cut it, cancelled when a halt did. A run whose
 process died is frozen by the next `resume`: cancelled, with
 `cause: process_died` on the line, written as its resident.
-`crates/accounting/src/worker/dispatching/agreeing.rs`,
-`crates/accounting/src/worker/pool.rs`, `crates/runtime/src/run.rs`
-(`drive`), `crates/runtime/src/run/harness.rs`,
-`crates/kernel/src/completion.rs`,
-`crates/accounting/src/worker/freezing.rs`,
-`crates/accounting/src/worker/genesis.rs`,
-`crates/accounting/src/worker/genesis/lost.rs`,
-`crates/collab/src/reply_wait.rs`.
+`Sprawling/accounting/src/worker/dispatching/agreeing.rs`,
+`Sprawling/accounting/src/worker/pool.rs`, `Sprawling/runtime/src/run.rs`
+(`drive`), `Sprawling/runtime/src/run/harness.rs`,
+`Sprawling/kernel/src/completion.rs`,
+`Sprawling/accounting/src/worker/freezing.rs`,
+`Sprawling/accounting/src/worker/genesis.rs`,
+`Sprawling/accounting/src/worker/genesis/lost.rs`,
+`Sprawling/collab/src/reply_wait.rs`.
 
 ### 13.8 The client's fold
 

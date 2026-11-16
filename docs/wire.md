@@ -128,8 +128,8 @@ The ones whose arguments need saying:
 
 `select_model` also accepts `input`, an optional statement of the model's
 accepted input kinds. Omit it to use the catalogue and preset fallback;
-[the command definition](../crates/wire/src/command/kind.rs) and
-[InputKinds](../crates/kernel/src/event/record/endpoint.rs) define the field
+[the command definition](../Sprawling/wire/src/command/kind.rs) and
+[InputKinds](../Sprawling/kernel/src/event/record/endpoint.rs) define the field
 and its values.
 
 An `idem` is `idem1-` followed by 32 lowercase hexadecimal characters. Mint
@@ -150,7 +150,7 @@ under it:
 Queries, every one the city answers (<!-- xtask:begin query_frames -->64<!-- xtask:end --> in all):
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `agent_catalog`, `parse_agent_spec`, `devices`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `find`, `document`, `proposals`, `open_proposals`, `range`, `versions`, `bytes`, `export`, `preview`, `reply`, `commits`, `doctor`, `prefix`, `prompt_shape`, `content`, `skills`, `template`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `privacy`, `preferences`, `config`, `run_costs`, `upstream_version`, `skill_usage`, `mcp_usage`, `usage_export`, `shells`, `model_figures`, `layers`, `catalog`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `endpoint_view`, `known_hosts`, `agent_catalog`, `devices`, `identity`, `automation`, `guide`, `governance`, `open_proposals`, `doctor`, `toolkits`, `newest_release`, `privacy`, `preferences`, `shells`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `parse_agent_spec`, `building_view`, `github_login`, `rounds`, `evidence`, `cost_of`, `listing`, `find`, `document`, `proposals`, `range`, `versions`, `bytes`, `export`, `preview`, `reply`, `commits`, `prefix`, `prompt_shape`, `content`, `skills`, `template`, `git_status`, `mcp_health`, `config`, `run_costs`, `upstream_version`, `skill_usage`, `mcp_usage`, `usage_export`, `model_figures`, `layers`, `catalog`
 <!-- xtask:end -->
 
 Four answers concern ACP agents, paired browsers and model identity. `agent_catalog` gives the ACP agents detected on this machine, the catalog bundled with the release with the date and ETag of its snapshot, and the agents this city has added, each with where it came from, its version and whether that version is pinned. An added agent's `login_state` is always `unasked` and its `seated_in` always empty, and an offer's `login` list is always empty, because the city reads none of them before an agent has answered `initialize`. `parse_agent_spec {text}` turns one pasted command line, a Zed or JetBrains `agent_servers` block, or a registry `agent.json` into one offer with the digest `add_agent` needs; it splits on whitespace and double quotes, interprets no shell syntax, and refuses `|`, `&`, `;`, `<` and `>`. `devices` lists the paired browsers. In `endpoint_view`, each model carries `canonical`, its identity across providers, which is equal for two entries only when they are the same model, and `thinking`, the levels that provider offers for it, its default and the source of those facts: the person, the upstream, the vendor's documentation, or unknown. `thinking.levels` never contains `none`, because turning thinking off is not offered as a level.
@@ -166,9 +166,9 @@ name the active runs and a recent or top-billed few; `run_view` and
 `{"monitor":"watch"}` watches the city's counters;
 `{"monitor":"watch_summary"}` watches the summary alone. Readings follow the
 city's current sampling beat, as defined by
-[the sampler](../crates/sprawling/src/monitor/sampler.rs).
+[the sampler](../Sprawling/app/src/monitor/sampler.rs).
 `{"monitor":{"beat":250}}` sets and remembers the city's sampling interval
-in milliseconds; [BeatMs](../crates/wire/src/frames/monitor.rs) defines its
+in milliseconds; [BeatMs](../Sprawling/wire/src/frames/monitor.rs) defines its
 valid range and initial default. `{"monitor":"release"}` or closing the
 connection stops that connection's watch.
 

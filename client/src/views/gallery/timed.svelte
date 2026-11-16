@@ -43,7 +43,7 @@
       const span = n === 17 ? 140_000 : 4_000 + Math.floor(next() * 30_000);
       const calls: Call[] = Array.from({ length: n % 4 === 3 ? 0 : callsEach }, (_, c) => ({
         tool: ["read", "search", "edit", "exec"][c % 4] ?? "read",
-        subject: `crates/city/src/part_${String((n * 7 + c) % 97)}.rs`,
+        subject: `Sprawling/city/src/part_${String((n * 7 + c) % 97)}.rs`,
         arguments: null,
         outcome: (n + c) % 23 === 0 ? "failed" : "answered",
         at: Seq.make(n * 100 + c),

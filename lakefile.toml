@@ -7,7 +7,7 @@ defaultTargets = ["Spec"]
 # traces. A scheduled checker that resolved a package graph before it could run
 # would go red for reasons belonging to a registry rather than to this product,
 # and a red that means nothing is worse than no run.
-# crates/adversary/Spec.lean section 13 records what that costs.
+# Tools/adversary/Spec.lean section 13 records what that costs.
 
 [leanOptions]
 # A warning left standing is a finding nobody read.
@@ -27,66 +27,66 @@ globs = [
   "Mei.Spec",
   "Mei.spec.+",
   "Calyx.Spec",
-  "crates.accounting.Spec",
-  "crates.accounting.spec.+",
-  "crates.adversary.Spec",
-  "crates.adversary.spec.+",
-  "crates.agent_protocols.Spec",
-  "crates.agent_protocols.spec.+",
-  "crates.benchstat.Spec",
-  "crates.benchstat.spec.+",
-  "crates.browser.Spec",
-  "crates.browser.spec.+",
-  "crates.child.Spec",
-  "crates.city.Spec",
-  "crates.city.spec.+",
-  "crates.citysim.Spec",
-  "crates.citysim.spec.+",
-  "crates.collab.Spec",
-  "crates.collab.spec.+",
+  "Sprawling.accounting.Spec",
+  "Sprawling.accounting.spec.+",
+  "Tools.adversary.Spec",
+  "Tools.adversary.spec.+",
+  "Sprawling.agent_protocols.Spec",
+  "Sprawling.agent_protocols.spec.+",
+  "Tools.benchstat.Spec",
+  "Tools.benchstat.spec.+",
+  "Sprawling.browser.Spec",
+  "Sprawling.browser.spec.+",
+  "Sprawling.child.Spec",
+  "Sprawling.city.Spec",
+  "Sprawling.city.spec.+",
+  "Tools.citysim.Spec",
+  "Tools.citysim.spec.+",
+  "Sprawling.collab.Spec",
+  "Sprawling.collab.spec.+",
   "Calyx.ffi.Spec",
-  "crates.desktop.Spec",
-  "crates.desktop.spec.+",
-  "crates.desktop.ffi.Spec",
-  "crates.documents.Spec",
-  "crates.documents.spec.+",
-  "crates.gateway.Spec",
-  "crates.gateway.spec.+",
-  "crates.kernel.Spec",
-  "crates.kernel.spec.+",
-  "crates.remote_access.Spec",
-  "crates.remote_access.spec.+",
-  "crates.runtime.Spec",
-  "crates.runtime.spec.+",
-  "crates.sprawling.Spec",
-  "crates.sprawling.spec.+",
-  "crates.storage.Spec",
-  "crates.storage.spec.+",
-  "crates.wire.Spec",
-  "crates.wire.spec.+",
-  "crates.xtask.Spec",
-  "crates.xtask.spec.+",
+  "Sprawling.desktop.Spec",
+  "Sprawling.desktop.spec.+",
+  "Sprawling.desktop.ffi.Spec",
+  "Sprawling.documents.Spec",
+  "Sprawling.documents.spec.+",
+  "Sprawling.gateway.Spec",
+  "Sprawling.gateway.spec.+",
+  "Sprawling.kernel.Spec",
+  "Sprawling.kernel.spec.+",
+  "Sprawling.remote_access.Spec",
+  "Sprawling.remote_access.spec.+",
+  "Sprawling.runtime.Spec",
+  "Sprawling.runtime.spec.+",
+  "Sprawling.app.Spec",
+  "Sprawling.app.spec.+",
+  "Sprawling.storage.Spec",
+  "Sprawling.storage.spec.+",
+  "Sprawling.wire.Spec",
+  "Sprawling.wire.spec.+",
+  "Tools.xtask.Spec",
+  "Tools.xtask.spec.+",
   "client.Spec",
   "client.spec.+",
 ]
 
-# The adversarial checker (crates/adversary/Spec.lean). It imports no
+# The adversarial checker (Tools/adversary/Spec.lean). It imports no
 # specification: it judges the binary from outside and must not import a
 # restatement of the rules it is judging.
 [[lean_lib]]
 name = "Sprawling"
-srcDir = "crates/adversary/src"
+srcDir = "Tools/adversary/src"
 
 [[lean_exe]]
 name = "adversary"
 root = "Main"
-srcDir = "crates/adversary/test"
+srcDir = "Tools/adversary/test"
 # The served cities are read by a task each. Lean's IO tasks need real threads
 # behind them: a reader blocked on a pipe would otherwise hold the whole
 # runtime, and the city it was draining fills its buffer and stops answering.
 supportInterpreter = true
 
-# The acceptance world (crates/adversary/Spec.lean section 9): the walk
+# The acceptance world (Tools/adversary/Spec.lean section 9): the walk
 # a stranger takes with a release archive's binary, against the stand-in
 # provider `just acceptance` starts beside it. An executable of its own because
 # it is never part of `just adversary`: it needs an archive and a provider
@@ -94,7 +94,7 @@ supportInterpreter = true
 [[lean_exe]]
 name = "acceptance"
 root = "Acceptance"
-srcDir = "crates/adversary/test"
+srcDir = "Tools/adversary/test"
 # The same reason as `adversary`: the walk waits on a dispatch in a task of
 # its own while it watches the history, and that task needs a real thread.
 supportInterpreter = true

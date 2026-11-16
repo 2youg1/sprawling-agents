@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The answers a made-up city hands the fixtures, written once here.
-//
-// The provider section is read by three fixtures - the table on the
-// settings page, the model column of the selector over the composer,
-// and the shared controls that sort and correct a table - so the rows
-// are written once here. A second spelling of the same three model ids
-// would be three facts with two homes, and the first time somebody
-// corrected one of them the two screens would disagree about what this
-// provider serves. The notices and the talk rows below carry one
-// refusal and one conversation past several drawings of it for the
-// same reason.
-
 import type { Key } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
 import type {
@@ -28,11 +16,6 @@ import type {
 import { ApprovalId, Ceiling, Locator, ServerLabel, TimeMs, Window } from "../../wire";
 import { UNTUNED } from "./configured";
 
-// The three model ids, each written once. Every list below names them
-// through these, so a fixture cannot describe a model the endpoint does
-// not serve.
-// One catalogue row as a probe that read the provider's own list would
-// have left it: the id, and whatever that list stated beside it.
 function facts(id: string, context: number | null, ceiling: number | null): ModelFactsSummary {
   return {
     id,
@@ -59,18 +42,12 @@ const NUCLEUS = "openai/gpt-nucleus-6";
 const MUSE = "meta/muse-spark-1.3-contributor";
 const SORA = "openai/sora-2";
 
-// One row of the model table a provider's probe answers with, in the
-// shape §3.4 asks for: an id, what it can read, and what it may write -
-// the last of which a person corrects when the probe could not read it.
 export interface ModelRow {
   readonly id: string;
   readonly context: string;
   readonly ceiling: string;
 }
 
-// The row every fixture treats as the chosen one, named rather than
-// reached by its position: a list somebody reorders must not silently
-// change which model a screen reports as picked.
 export const CHOSEN: ModelRow = { id: FABLE, context: "204800", ceiling: "64000" };
 
 export const MODELS: readonly ModelRow[] = [
@@ -79,11 +56,6 @@ export const MODELS: readonly ModelRow[] = [
   { id: NUCLEUS, context: "400000", ceiling: "" },
 ];
 
-// What one provider's probe answered, as a person meets it: three text
-// models across three vendors, and one the text-only switch hides.
-// Two rows state their own ceilings and prices, one states nothing but a
-// name, and one is marked as video by the provider rather than by its
-// spelling - which is the whole range this table has to render.
 export const PROBED: readonly ModelFact[] = [
   {
     id: FABLE,
@@ -119,14 +91,8 @@ export const PROBED: readonly ModelFact[] = [
   },
 ];
 
-// An id a person typed beside the list, which the endpoint does not
-// list.
 export const TYPED = "house/hidden-1";
 
-// What the city answers for the probed rows and the typed one when the
-// table asks what an untouched box registers (`Query::ModelFigures`):
-// every kind a box can say - a figure with the rung that stated it, the
-// provider's own default ceiling, and a window no rung knows.
 export const FIGURED: readonly FiguresLine[] = [
   {
     id: FABLE,
@@ -149,9 +115,6 @@ export const FIGURED: readonly FiguresLine[] = [
   },
 ];
 
-// Two attached providers, one with a key filed for it and one without,
-// which is the difference the endpoint list exists to show. The first
-// lists two accounts, one whose key is stored and one whose is not.
 export const ENDPOINTS: EndpointsAnswer = {
   chosen: [{ endpoint: "example", model: CHOSEN.id, tag: "main" }],
   endpoints: [
@@ -191,37 +154,23 @@ export const ENDPOINTS: EndpointsAnswer = {
   ],
 };
 
-// One refusal as the notices fixtures draw it: the three sentences the
-// city wrote, when it arrived, and how many times the same one did.
-// `code` is typed as the wire's closed set, because the recovery verbs
-// a notice offers come from the one table that maps codes to them.
 export interface NoticeLine {
   readonly code: AxCode;
-  // As the city wrote them: what failed, what it was against, and what
-  // the person can do next. Never translated, never reworded here.
+
   readonly action: string;
   readonly subject: string;
   readonly recovery: string;
-  // A clock string, already formatted by the caller's own clock.
+
   readonly at: string;
-  // One is a single refusal; past one the notice shows the count.
+
   readonly count: number;
 }
 
-// A day of refusals under one heading. The heading is a `lang.json`
-// key, so the day is named in the reader's language: today, yesterday,
-// and the day whose only name is that it is earlier than those.
 export interface NoticeDay {
   readonly heading: Key;
   readonly rows: readonly NoticeLine[];
 }
 
-// Twelve refusals across three days, newest day first. The subjects
-// span three rooms and two runs, so the rows have something to merge
-// on - a code that repeats under one subject - and something not to.
-// The frozen-model refusal carries the sentence the runtime writes as
-// its subject (`crates/runtime/src/turn/report.rs`), because a subject
-// that is not a room is the case the notice's ways out must survive.
 export const NOTICE_DAYS: readonly NoticeDay[] = [
   {
     heading: "notices_today",
@@ -437,9 +386,6 @@ export const EARLIER_SEGMENT: readonly Utterance[] = [
   { speaker: "person", text: "Pin the engineering ones for the next run." },
 ];
 
-// The fork picker's two columns: the turns of the mother run, and what
-// one of those turns did. The ids key the picker's rows and nothing
-// else reads them.
 export interface TurnLine {
   readonly id: string;
   readonly turn: string;
@@ -454,7 +400,7 @@ export const TURNS: readonly TurnLine[] = [
 
 export interface CallLine {
   readonly id: string;
-  // As one line of the picker's right column: the call and its subject.
+
   readonly what: string;
   readonly at: string;
 }
@@ -466,18 +412,6 @@ export const CALLS: readonly CallLine[] = [
   { id: "call-4", what: "exec: cargo nextest", at: "11:44" },
 ];
 
-// The questions this city is holding for the person, as the cards and
-// the mailbox key's badge read them. `ONE_QUESTION` is named rather than
-// reached by its position in the list, because the badge and the cards
-// are two readings of the same waiting question and a reordered list
-// must not make them disagree about which one that is; the mailbox
-// fixture reads it too.
-//
-// A card says how long ago its question was raised, measured on the
-// clock the gallery runs on, which is the wall clock; so `at` places a
-// question that many minutes into the last ten, in the order the list
-// gives, rather than at that many milliseconds after 1970, which a card
-// reads as fifty-odd years of waiting.
 const RAISED_FROM = Date.now() - 10 * 60_000;
 
 function question(
@@ -510,10 +444,6 @@ export const ONE_QUESTION: ApprovalItem = question(
   false,
 );
 
-// Three things a person can be asked, in the three shapes the cards
-// take: one on its own, several identical ones answered together, and
-// one raised by a run that began with somebody else's words - which is
-// never grouped with anything.
 export const WAITING: readonly ApprovalItem[] = [
   ONE_QUESTION,
   question("ai_2", "lab/west", "edit: the building's own rules", ["question", "rules"], 2, false),

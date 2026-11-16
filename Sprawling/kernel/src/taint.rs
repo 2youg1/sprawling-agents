@@ -1,0 +1,194 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct TaintSource(String);
+
+impl TaintSource {
+    pub fn new(label: impl Into<String>) -> Option<TaintSource> {
+        let label = label.into();
+        if label.is_empty() {
+            None
+        } else {
+            Some(TaintSource(label))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaintSet(BTreeSet<TaintSource>);
+
+impl TaintSet {
+    pub fn empty() -> TaintSet {
+        TaintSet(BTreeSet::new())
+    }
+
+    pub fn of(source: TaintSource) -> TaintSet {
+        let mut set = BTreeSet::new();
+        set.insert(source);
+        TaintSet(set)
+    }
+
+    pub fn union(&self, other: &TaintSet) -> TaintSet {
+        TaintSet(self.0.union(&other.0).cloned().collect())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn contains(&self, source: &TaintSource) -> bool {
+        self.0.contains(source)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn sources(&self) -> impl Iterator<Item = &TaintSource> {
+        self.0.iter()
+    }
+}
+
+impl std::fmt::Display for TaintSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.iter().enumerate().try_for_each(|(at, source)| {
+            let comma = if at == 0 { "" } else { ", " };
+            write!(f, "{comma}{}", source.as_str())
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tainted<T> {
+    value: T,
+    taint: TaintSet,
+}
+
+impl<T> Tainted<T> {
+    pub fn new(value: T, source: TaintSource) -> Tainted<T> {
+        Tainted {
+            value,
+            taint: TaintSet::of(source),
+        }
+    }
+
+    pub fn peek(&self) -> &T {
+        &self.value
+    }
+
+    pub fn taint(&self) -> &TaintSet {
+        &self.taint
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(&T) -> U) -> Tainted<U> {
+        Tainted {
+            value: f(&self.value),
+            taint: self.taint,
+        }
+    }
+
+    pub fn join<U, V>(self, other: Tainted<U>, f: impl FnOnce(&T, &U) -> V) -> Tainted<V> {
+        Tainted {
+            value: f(&self.value, &other.value),
+            taint: self.taint.union(&other.taint),
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn source(label: &str) -> TaintSource {
+        TaintSource::new(label).unwrap()
+    }
+
+    #[test]
+    fn empty_label_is_not_a_source() {
+        assert!(TaintSource::new("").is_none());
+    }
+
+    #[test]
+    fn map_keeps_the_full_set_and_join_unions() {
+        let web = Tainted::new("body".to_owned(), source("web:example.com"));
+        let derived = web.map(|s| s.len());
+        assert_eq!(derived.taint().len(), 1);
+        let upload = Tainted::new(3usize, source("file:upload"));
+        let joined = derived.join(upload, |a, b| a.saturating_add(*b));
+        assert_eq!(*joined.peek(), 7);
+        assert!(joined.taint().contains(&source("web:example.com")));
+        assert!(joined.taint().contains(&source("file:upload")));
+    }
+
+    #[test]
+    fn peek_lends_without_moving() {
+        let tainted = Tainted::new(vec![1u8, 2], source("mail:inbound"));
+        assert_eq!(tainted.peek().len(), 2);
+
+        assert_eq!(tainted.taint().len(), 1);
+    }
+
+    proptest! {
+
+        #[test]
+        fn a_set_holds_and_names_exactly_its_sources(
+            labels in proptest::collection::btree_set("[a-z]{1,6}", 0..5),
+            stranger in "[A-Z]{1,6}",
+        ) {
+            let set = labels
+                .iter()
+                .map(|label| TaintSet::of(source(label)))
+                .fold(TaintSet::empty(), |all, one| all.union(&one));
+            let named: Vec<&str> = set.sources().map(TaintSource::as_str).collect();
+            let expected: Vec<&str> = labels.iter().map(String::as_str).collect();
+            prop_assert_eq!(&named, &expected);
+            prop_assert_eq!((set.len(), set.is_empty()), (labels.len(), labels.is_empty()));
+            prop_assert!(!set.contains(&source(&stranger)));
+            prop_assert_eq!(set.to_string(), expected.join(", "));
+        }
+
+        #[test]
+        fn join_output_contains_both_inputs(labels_a in proptest::collection::vec("[a-z]{1,8}", 1..4),
+                                            labels_b in proptest::collection::vec("[a-z]{1,8}", 1..4)) {
+            let mut a = Tainted::new(0u32, source(&format!("a:{}", labels_a[0])));
+            for label in &labels_a[1..] {
+                let extra = Tainted::new(1u32, source(&format!("a:{label}")));
+                a = a.join(extra, |x, y| x.saturating_add(*y));
+            }
+            let mut b = Tainted::new(0u32, source(&format!("b:{}", labels_b[0])));
+            for label in &labels_b[1..] {
+                let extra = Tainted::new(1u32, source(&format!("b:{label}")));
+                b = b.join(extra, |x, y| x.saturating_add(*y));
+            }
+            let a_set = a.taint().clone();
+            let b_set = b.taint().clone();
+            let joined = a.join(b, |x, y| x.saturating_add(*y));
+            for s in a_set.sources() {
+                prop_assert!(joined.taint().contains(s));
+            }
+            for s in b_set.sources() {
+                prop_assert!(joined.taint().contains(s));
+            }
+            prop_assert_eq!(joined.taint().len(), a_set.union(&b_set).len());
+        }
+    }
+}

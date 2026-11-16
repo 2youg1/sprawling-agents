@@ -1,0 +1,315 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::*;
+
+#[test]
+fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
+    use citysim::ScriptModel as Model;
+    use kernel::DialectKind;
+    use runtime::{EditTool, StatusSnapshot, StatusTool};
+
+    let city = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(city.path().join("sim/lobby/room1")).unwrap();
+    let target = city.path().join("sim/lobby/room1/notes.md");
+    std::fs::write(&target, "status: draft\n").unwrap();
+
+    let domain = WriteDomain::new(vec![Address::parse("sim/lobby/room1").unwrap()]).unwrap();
+    let mut bench = ToolBench::new(domain.clone());
+
+    let seen = runtime::ReadStamps::default();
+    bench
+        .register(Box::new(
+            EditTool::new(
+                city.path(),
+                Address::parse("sim/lobby/room1").unwrap(),
+                domain,
+                runtime::EditDesk {
+                    policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
+                    seen: seen.clone(),
+                    locks: runtime::PathLocks::default(),
+                },
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    bench
+        .register(Box::new(
+            runtime::ReadTool::new(
+                city.path(),
+                std::sync::Arc::new(std::sync::Mutex::new(runtime::Catalog::new())),
+                std::sync::Arc::new(|_: &Address| kernel::ReadVerdict::Open),
+                std::path::Path::new("no-store"),
+            )
+            .unwrap()
+            .noting(seen),
+        ))
+        .unwrap();
+    bench
+        .register(Box::new(
+            StatusTool::new(StatusSnapshot {
+                who: "worker@sim.1".to_owned(),
+                addr: Address::parse("sim/lobby/room1").unwrap(),
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
+                ctx_limit: kernel::Tokens::new(8000),
+                trust: "trusted".to_owned(),
+                write_domain: "sim/lobby/room1".to_owned(),
+                locks: Vec::new(),
+                worktree: std::path::PathBuf::from("sim/lobby/room1"),
+                signals_pending: 0,
+                provider_mode: runtime::ProviderMode::Normal,
+                neighbours: 0,
+            })
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let model = Model::from_wire(
+        DialectKind::Anthropic,
+        vec![
+            serde_json::json!({
+                "content": [
+                    { "type": "tool_use", "id": "c1", "name": "status", "input": {} },
+                    { "type": "tool_use", "id": "c0", "name": "read", "input": {
+                        "file_path": "sim/lobby/room1/notes.md",
+                    }},
+                ],
+                "stop_reason": "tool_use",
+                "usage": { "input_tokens": 20, "output_tokens": 8 },
+            }),
+            serde_json::json!({
+                "content": [
+                    { "type": "text", "text": "marking it done" },
+                    { "type": "tool_use", "id": "c2", "name": "edit", "input": {
+                        "file_path": "sim/lobby/room1/notes.md",
+                        "old_string": "draft",
+                        "new_string": "final",
+                    }},
+                ],
+                "stop_reason": "tool_use",
+                "usage": { "input_tokens": 40, "output_tokens": 20 },
+            }),
+            serde_json::json!({
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+                "usage": { "input_tokens": 60, "output_tokens": 4 },
+            }),
+        ],
+    )
+    .unwrap();
+
+    let scenario = Scenario {
+        run: RunId::parse("0198f6a2-7c4a-7bbb-9d1e-00000000031e").unwrap(),
+        who: "worker@sim.1".into(),
+        addr: Address::parse("sim/lobby/room1").unwrap(),
+        task: "mark the note final".into(),
+        goal: "one edit, verified".into(),
+        job_md: "# JOB\nEdit notes.md.".into(),
+        model,
+        bench,
+
+        config: FrozenConfig {
+            clock_stamp: ClockStampGranularity::Minute,
+            clock_zones: Vec::new(),
+            sandbox: kernel::SandboxLimits::default(),
+            mcp: Vec::new(),
+            mcp_references: Vec::new(),
+            skill_pins: std::collections::BTreeMap::new(),
+            effort: None,
+            second_threshold: None,
+            search: kernel::config::SearchConfiguration::Default,
+            catalog: kernel::config::CatalogExposure::default(),
+        },
+
+        checkpoint: Some((
+            storage::Checkpoint::open(city.path()).unwrap(),
+            vec!["sim/lobby/room1".to_owned()],
+        )),
+        cancel: None,
+        steer: None,
+        sieve: None,
+    };
+    let report = run_scenario(scenario).unwrap();
+
+    assert_eq!(report.completion, "done");
+
+    assert_eq!(
+        std::fs::read_to_string(&target).unwrap(),
+        "status: final\n",
+        "the tool wrote through to disk"
+    );
+
+    runtime::replay::verify_lines(report.lines.clone()).unwrap();
+
+    let ks = kinds(&report.lines);
+    assert_eq!(ks.first().map(String::as_str), Some("checkpoint_committed"));
+    assert_eq!(ks.last().map(String::as_str), Some("run_frozen"));
+    assert_eq!(
+        ks.iter().filter(|k| k.as_str() == "tool_result").count(),
+        3,
+        "status and read, then edit: {ks:?}"
+    );
+
+    for (i, kind) in ks.iter().enumerate() {
+        if kind == "tool_called" {
+            let checkpoint = ks
+                .get(..i)
+                .and_then(|before| before.iter().rposition(|k| k == "checkpoint_committed"));
+            let model_returned = ks
+                .get(..i)
+                .and_then(|before| before.iter().rposition(|k| k == "model_returned"));
+            assert!(
+                checkpoint > model_returned,
+                "the checkpoint must go up after the model asked and before the tool ran: {ks:?}"
+            );
+        }
+    }
+
+    let stamped = report
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|v| v["kind"] == "tool_result")
+        .any(|v| v.to_string().contains("1970-01-01"));
+    assert!(stamped, "a clock line rode the envelope");
+}
+
+#[test]
+fn s3_14_the_run_is_byte_identical_when_replayed() {
+    let first = run_scenario(scenario(None)).unwrap();
+    let second = run_scenario(scenario(None)).unwrap();
+    assert_eq!(first.lines, second.lines);
+}
+
+#[test]
+fn two_reads_in_one_wave_are_two_calls() {
+    fn args(path: &str) -> Payload {
+        let mut map = serde_json::Map::new();
+        map.insert("path".to_owned(), serde_json::Value::String(path.into()));
+        Payload::new(map).unwrap()
+    }
+    fn probe_at(id: &str, path: &str) -> ToolCall {
+        ToolCall {
+            id: id.to_owned(),
+            name: ToolName::parse("probe").unwrap(),
+            args: args(path),
+        }
+    }
+
+    let report = run_scenario(Scenario {
+        model: ScriptModel::new(vec![
+            ModelReturn {
+                usage: None,
+                stop: None,
+                billed_usd_micros: None,
+                message: Payload::empty(),
+                calls: vec![
+                    probe_at("call-1", "alpha.md"),
+                    probe_at("call-2", "beta.md"),
+                ],
+            },
+            concluding("both probes answered").unwrap(),
+        ]),
+        bench: bench_with(vec![Box::new(ScriptTool::new(
+            probe_meta(),
+            vec![
+                Ok(ToolOutcome {
+                    result: args("first"),
+                    attachments: Vec::new(),
+                }),
+                Ok(ToolOutcome {
+                    result: args("second"),
+                    attachments: Vec::new(),
+                }),
+            ],
+        ))]),
+        ..scenario(None)
+    })
+    .unwrap();
+
+    let results: Vec<serde_json::Value> = report
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|value| value["kind"] == "tool_result")
+        .map(|value| value["data"].clone())
+        .collect();
+    assert_eq!(results.len(), 2, "both calls answer: {results:?}");
+    for (n, result) in results.iter().enumerate() {
+        assert!(
+            result.get("error").is_none(),
+            "call {n} came back as an error: {result}"
+        );
+        assert!(
+            result.get("result").is_some(),
+            "call {n} came back without a result: {result}"
+        );
+    }
+}
+
+#[test]
+fn two_runs_interleaved_on_one_ledger_replay_byte_identically() {
+    fn other_room() -> Scenario {
+        let mut second = scenario(None);
+        second.run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000100").unwrap();
+        second.who = "worker@sim.2".into();
+        second.task = "close the minimal loop again".into();
+        second
+    }
+    fn both() -> Vec<Vec<u8>> {
+        let mut ledger = citysim::MemLedger::new();
+        citysim::run_scenario_on(&mut ledger, scenario(None)).unwrap();
+        let report = citysim::run_scenario_on(&mut ledger, other_room()).unwrap();
+        report.lines
+    }
+
+    let once = both();
+    let twice = both();
+    assert_eq!(once, twice, "one ledger, two runs, the same bytes");
+
+    let runs: std::collections::BTreeSet<String> = once
+        .iter()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_slice(line).unwrap();
+            value["run"].as_str().unwrap().to_owned()
+        })
+        .collect();
+    for run in [
+        "0198f6a2-7c4a-7bbb-9d1e-0000000000ff",
+        "0198f6a2-7c4a-7bbb-9d1e-000000000100",
+    ] {
+        assert!(
+            runs.contains(run),
+            "both runs wrote into the one history: {runs:?}"
+        );
+    }
+
+    citysim::check_chain(once).unwrap();
+}
+
+#[test]
+fn a_reply_that_says_nothing_freezes_as_limit_rather_than_done() {
+    let mut sc = scenario(None);
+    sc.model = ScriptModel::from_wire(
+        kernel::DialectKind::Anthropic,
+        vec![serde_json::json!({
+            "content": [],
+            "stop_reason": "max_tokens",
+            "usage": { "input_tokens": 5038, "output_tokens": 16 },
+        })],
+    )
+    .unwrap();
+    sc.bench = bench_with(Vec::new());
+    let report = run_scenario(sc).unwrap();
+    assert_eq!(report.completion, "limit");
+    let frozen: serde_json::Value = serde_json::from_slice(report.lines.last().unwrap()).unwrap();
+    assert_eq!(frozen["kind"], "run_frozen");
+    assert_eq!(frozen["data"]["completion"], "limit");
+    assert!(
+        frozen["data"].get("evidence").is_none(),
+        "a run that said nothing cites nothing: {frozen}"
+    );
+}

@@ -1,0 +1,330 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use super::super::*;
+use crate::worker::fixture::*;
+
+#[test]
+fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbour() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let building = dir.path().join("lab");
+    std::fs::create_dir_all(building.join("room1")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+
+    let plan = building.join(city::ROADMAP_FILE);
+    let _ = std::fs::remove_file(&plan);
+    std::fs::create_dir_all(&plan).unwrap();
+
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("nothing to do", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let outcome = worker.handle(wire::Command::Dispatch {
+        addr: Address::parse("lab/room1").unwrap(),
+        task: "claim a row".to_owned(),
+        goal: "one claim".to_owned(),
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"unreadable"),
+        session: None,
+        effort: None,
+        model: None,
+    });
+
+    let err = outcome.expect_err("a plan nobody can read is not an empty plan");
+    assert!(
+        err.to_string().contains(city::ROADMAP_FILE),
+        "the refusal has to name the file a person must fix: {err}"
+    );
+}
+
+#[test]
+fn a_line_the_history_refused_is_a_change_the_city_never_made() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
+
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking a row",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            completion("took it", None),
+        ],
+    );
+
+    let mut worker = attach_provider(
+        worker_over_faults(dir.path(), Some("roadmap_claimed")),
+        &base_url,
+        "m-local",
+    )
+    .unwrap();
+
+    let outcome = worker.handle(wire::Command::Dispatch {
+        addr: Address::parse("lab/room1").unwrap(),
+        task: "take one row".to_owned(),
+        goal: "one claim".to_owned(),
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost"),
+        session: None,
+        effort: None,
+        model: None,
+    });
+    drop(provider);
+
+    let after = std::fs::read_to_string(&plan).unwrap();
+    assert_eq!(
+        after, PLAN_TWO_FREE_ROWS,
+        "the line never landed, so the plan on disk must stand exactly as it was"
+    );
+
+    assert!(outcome.is_ok(), "the run goes on past a refused claim");
+}
+
+#[test]
+fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
+    let take = serde_json::json!({ "action": "claim", "node": "1" });
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion("taking a row", "tu_1", "plan", take.clone()),
+            completion("took it", None),
+            tool_completion("taking the same row", "tu_2", "plan", take),
+            completion("took another", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
+        worker
+            .handle(wire::Command::Dispatch {
+                addr: Address::parse(room).unwrap(),
+                task: "take a row from the plan".to_owned(),
+                goal: "claim one row, then stop".to_owned(),
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
+                idem: kernel::IdemKey::derive(
+                    &RunId::CITY,
+                    kernel::Seq::new(u64::try_from(n).unwrap()),
+                    b"dispatch",
+                ),
+                session: None,
+                effort: None,
+                model: None,
+            })
+            .unwrap();
+    }
+    drop(provider);
+
+    let after = std::fs::read_to_string(&plan).unwrap();
+    assert!(
+        after.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
+        "the claim landed, and the run that ended holding it left it red: {after}"
+    );
+    assert!(
+        after.contains("| 2 | glaze tests | 1 |  | Not started |  |"),
+        "a refused claim rewrites nothing, not even the row it was offered: {after}"
+    );
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let history: String = verified
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect::<Vec<String>>()
+        .join("\n");
+    assert_eq!(
+        history.matches("roadmap_claimed").count(),
+        1,
+        "one row, one claim, however many runs asked for it"
+    );
+}
+
+#[test]
+fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
+    let take = serde_json::json!({ "action": "claim", "node": "1" });
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion("taking a row", "tu_1", "plan", take.clone()),
+            tool_completion(
+                "handing it back",
+                "tu_2",
+                "plan",
+                serde_json::json!({ "action": "release", "node": "1", "reason": "not mine" }),
+            ),
+            completion("handed back", None),
+            tool_completion("taking the freed row", "tu_3", "plan", take),
+            completion("took it", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
+        worker
+            .handle(wire::Command::Dispatch {
+                addr: Address::parse(room).unwrap(),
+                task: "take a row from the plan".to_owned(),
+                goal: "claim one row".to_owned(),
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
+                idem: kernel::IdemKey::derive(
+                    &RunId::CITY,
+                    kernel::Seq::new(u64::try_from(n).unwrap()),
+                    b"dispatch",
+                ),
+                session: None,
+                effort: None,
+                model: None,
+            })
+            .unwrap();
+    }
+    drop(provider);
+
+    let history: String = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect();
+    assert_eq!(
+        (
+            history.matches("roadmap_claimed").count(),
+            std::fs::read_to_string(&plan)
+                .unwrap()
+                .contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
+        ),
+        (2, true),
+        "the second run takes the node the first handed back, and freezing while holding it leaves it Blocked"
+    );
+}
+
+#[test]
+fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
+    let evidence = format!("cas:b3-{}", "ab".repeat(32));
+
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking it",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            tool_completion(
+                "closing it",
+                "tu_2",
+                "plan",
+                serde_json::json!({ "action": "finish", "node": "1", "evidence": evidence }),
+            ),
+            completion("closed", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "close the row".to_owned(),
+            goal: "finish row 1 with evidence".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let after = std::fs::read_to_string(&plan).unwrap();
+    let kernel::RoadmapShape::WellFormed { rows } = kernel::spine::check_roadmap_shape(&after)
+    else {
+        panic!("an edited plan still parses");
+    };
+    let tree = kernel::PlanTree::build(rows).expect("an edited plan is still a tree");
+    let kernel::Progress::Planned(planned) = tree.progress() else {
+        panic!("a plan's progress is planned")
+    };
+    assert_eq!(
+        (planned.done, planned.total),
+        (1, 1),
+        "an evidenced Done is what moves the figure the person reads"
+    );
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let history: String = verified
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect::<Vec<String>>()
+        .join("\n");
+    assert!(history.contains("roadmap_finished"));
+}
+
+#[test]
+fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking a row",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            completion("stopping without a word", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "take a row".to_owned(),
+            goal: "claim one row".to_owned(),
+            model: None,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"froze"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let after = std::fs::read_to_string(&plan).unwrap();
+    let kernel::RoadmapShape::WellFormed { rows } = kernel::spine::check_roadmap_shape(&after)
+    else {
+        panic!("an edited plan still parses");
+    };
+    let statuses: Vec<(String, kernel::RoadmapStatus)> = rows
+        .into_iter()
+        .map(|row| (row.id.to_string(), row.status))
+        .collect();
+    assert_eq!(
+        statuses,
+        vec![
+            ("1".to_owned(), kernel::RoadmapStatus::Blocked),
+            ("2".to_owned(), kernel::RoadmapStatus::NotStarted),
+        ],
+        "the held row is spent on its one exit when the run ends: {after}"
+    );
+}

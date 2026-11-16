@@ -1,0 +1,395 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::sync::{Arc, Mutex};
+
+use kernel::{Tool, ToolCall, ToolName};
+
+use super::tool::ACTIONS;
+use super::*;
+// The desk produces the effects; whether one still holds is
+// `claim_effect`'s question, asked here against a real desk run.
+use crate::claim_effect::still_true;
+use kernel::spine::{check_roadmap_shape, set_roadmap_status};
+use kernel::{EvidenceCell, Locator, RoadmapShape};
+
+/// The plan's evidence column for one node, read back the way a person
+/// reading the file would: the reader half of what `finish` writes.
+fn evidence_of(text: &str, id: &NodeId) -> Option<Locator> {
+    let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
+        return None;
+    };
+    rows.iter()
+        .find(|row| &row.id == id)
+        .and_then(|row| match &row.evidence {
+            EvidenceCell::Present(locator) => Some(locator.clone()),
+            EvidenceCell::Empty | EvidenceCell::Invalid { .. } => None,
+        })
+}
+
+pub(super) const PLAN: &str = "\
+# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | wire the kiln | 1 |  | Not started |  |
+| 2 | glaze tests | 1 |  | In progress |  |
+| 3 | fire the batch | 1 | 2 | Not started |  |
+";
+
+pub(super) fn desk() -> Arc<Mutex<ClaimDesk>> {
+    Arc::new(Mutex::new(ClaimDesk::new(
+        "potter@lab.1".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        PLAN.to_owned(),
+        Booking::new(|_| Ok(())),
+    )))
+}
+
+pub(super) fn call(args: Value) -> ToolCall {
+    ToolCall {
+        id: "tu_1".to_owned(),
+        name: ToolName::parse("plan").unwrap(),
+        args: Payload::new(args.as_object().unwrap().clone()).unwrap(),
+    }
+}
+
+fn locator() -> String {
+    format!("cas:b3-{}", "ab".repeat(32))
+}
+
+pub(super) fn node(raw: &str) -> NodeId {
+    NodeId::parse(raw).unwrap()
+}
+
+#[test]
+fn claiming_a_ready_node_marks_it_and_queues_one_effect() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    assert_eq!(
+        outcome.result.as_map().get("item").and_then(Value::as_str),
+        Some("wire the kiln")
+    );
+    let mut borrowed = shared.lock().unwrap();
+    let text = borrowed.roadmap().expect("the plan changed").to_owned();
+    assert!(text.contains("| 1 | wire the kiln | 1 |  | In progress |  |"));
+    let effects = borrowed.take_effects();
+    assert_eq!(effects.len(), 1);
+    assert_eq!(effects[0].id(), &node("1"));
+    assert_eq!(effects[0].kind(), Some(kernel::EventKind::RoadmapClaimed));
+    assert!(
+        borrowed.take_effects().is_empty(),
+        "an effect read twice would be a claim recorded twice"
+    );
+}
+
+#[test]
+fn a_node_somebody_else_is_working_on_is_refused_with_a_ready_one() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let refusal = tool
+        .invoke(&call(serde_json::json!({ "action": "claim", "node": "2" })))
+        .unwrap_err();
+    assert_eq!(refusal.code(), &AxCode::GoalConflict);
+    assert!(refusal.subject().contains("In progress"));
+    assert!(
+        refusal.recovery().contains("claim 1"),
+        "the third part names a node the caller may actually take: {}",
+        refusal.recovery()
+    );
+    assert!(
+        shared.lock().unwrap().roadmap().is_none(),
+        "a refusal writes nothing"
+    );
+}
+
+/// The ready set is what `list` offers: a node whose dependency is
+/// not done is not work anybody can take.
+#[test]
+fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({ "action": "list" })))
+        .unwrap();
+    let map = outcome.result.as_map();
+    let ready = map.get("ready").and_then(Value::as_array).unwrap();
+    assert_eq!(ready.len(), 1, "3 waits for 2");
+    assert_eq!(ready[0].get("node").and_then(Value::as_str), Some("1"));
+    assert_eq!(
+        map.get("in_progress")
+            .and_then(Value::as_array)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(map.get("nodes_total").and_then(Value::as_u64), Some(3));
+    assert!(
+        shared.lock().unwrap().roadmap().is_none(),
+        "reading the plan does not modify it"
+    );
+}
+
+#[test]
+fn a_run_holds_one_node_at_a_time() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let refusal = tool
+        .invoke(&call(serde_json::json!({ "action": "claim", "node": "3" })))
+        .unwrap_err();
+    assert!(refusal.subject().contains("holds 1"));
+    assert!(refusal.recovery().contains("one node"));
+}
+
+/// A path given as evidence is pinned through the tool's `Pinner`, and a
+/// string spelled as a Locator is judged as one even when a `Pinner`
+/// stands by (`Sprawling/collab/Spec.lean` D20).
+#[test]
+fn a_path_given_as_evidence_is_pinned_and_a_broken_locator_is_not() {
+    let shared = desk();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let heard = Arc::clone(&asked);
+    let tool = ClaimTool::new(Arc::clone(&shared))
+        .unwrap()
+        .pinning(Pinner::new(move |path| {
+            heard.lock().unwrap().push(path.to_owned());
+            Locator::parse(&locator())
+        }));
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let broken = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": "cas:b3-short"
+        })))
+        .map(|_| ())
+        .map_err(|err| *err.code());
+    let pinned = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": "report.md"
+        })))
+        .map(|_| ())
+        .map_err(|err| *err.code());
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert_eq!(
+        (
+            broken,
+            pinned,
+            asked.lock().unwrap().clone(),
+            evidence_of(&text, &node("1")).map(|l| l.to_string()),
+        ),
+        (
+            Err(AxCode::LocatorInvalid),
+            Ok(()),
+            vec!["report.md".to_owned()],
+            Some(locator()),
+        )
+    );
+}
+
+#[test]
+fn finishing_requires_evidence_that_parses() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let missing = tool
+        .invoke(&call(
+            serde_json::json!({ "action": "finish", "node": "1" }),
+        ))
+        .unwrap_err();
+    assert_eq!(missing.code(), &AxCode::EvidenceMissing);
+    let unparsable = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": "trust me"
+        })))
+        .unwrap_err();
+    assert_eq!(unparsable.code(), &AxCode::LocatorInvalid);
+    let done = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": locator()
+        })))
+        .unwrap();
+    assert!(done.result.as_map().contains_key("evidence"));
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert_eq!(
+        evidence_of(&text, &node("1")).map(|l| l.to_string()),
+        Some(locator()),
+        "what was written is what a reader retrieves"
+    );
+}
+
+/// The plan gate, from the tool's side: a run may only put down the
+/// node it took, and it may not close one it never claimed.
+#[test]
+fn a_run_can_only_put_down_what_it_took() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let never = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "2", "evidence": locator()
+        })))
+        .unwrap_err();
+    assert!(never.subject().contains("holds nothing"));
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let other = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "2", "evidence": locator()
+        })))
+        .unwrap_err();
+    assert!(other.subject().contains("holds 1, not 2"));
+}
+
+#[test]
+fn blocking_paints_the_node_red_and_says_why() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({
+            "action": "block", "node": "1", "reason": "the kiln has no power"
+        })))
+        .unwrap();
+    assert_eq!(
+        outcome.result.as_map().get("red").and_then(Value::as_bool),
+        Some(true)
+    );
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
+    let effects = shared.lock().unwrap().take_effects();
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapBlocked));
+    let payload = effects[1].line("potter@lab.1").unwrap().unwrap().1;
+    assert_eq!(
+        payload.as_map().get("verb").and_then(Value::as_str),
+        Some("blocked")
+    );
+    assert!(
+        payload
+            .as_map()
+            .get("line")
+            .and_then(Value::as_str)
+            .is_some_and(|line| line.contains("no power")),
+        "the reason travels with the record, not only with the row"
+    );
+}
+
+#[test]
+fn releasing_puts_the_node_back_where_another_run_can_take_it() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({
+            "action": "release", "node": "1", "reason": "not my trade"
+        })))
+        .unwrap();
+    assert_eq!(
+        outcome.result.as_map().get("red").and_then(Value::as_bool),
+        Some(false),
+        "handing back is not red"
+    );
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert!(text.contains("| 1 | wire the kiln | 1 |  | Not started |  |"));
+    let effects = shared.lock().unwrap().take_effects();
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapReleased));
+}
+
+#[test]
+fn putting_a_node_down_without_a_reason_is_refused() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let refusal = tool
+        .invoke(&call(serde_json::json!({ "action": "block", "node": "1" })))
+        .unwrap_err();
+    assert!(refusal.recovery().contains("one line"));
+}
+
+/// A run that ends holding a node leaves red behind, and the reason
+/// says what happened rather than inventing one.
+#[test]
+fn a_run_that_freezes_still_holding_a_node_leaves_it_red() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    shared.lock().unwrap().abandon().unwrap();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
+    let effects = shared.lock().unwrap().take_effects();
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapBlocked));
+    assert!(
+        shared.lock().unwrap().abandon().is_ok(),
+        "a run that put its node down properly abandons nothing"
+    );
+}
+
+#[test]
+fn an_effect_whose_node_moved_underneath_it_is_no_longer_true() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let effects = shared.lock().unwrap().take_effects();
+    assert!(
+        still_true(PLAN, &effects[0]),
+        "against the file it was decided on, the effect holds"
+    );
+    let moved = set_roadmap_status(PLAN, &node("1"), RoadmapStatus::InProgress, None).unwrap();
+    assert!(
+        !still_true(&moved, &effects[0]),
+        "somebody else took the node first; the claim does not take"
+    );
+}
+
+#[test]
+fn a_plan_that_does_not_parse_refuses_with_the_repair() {
+    let shared = Arc::new(Mutex::new(ClaimDesk::new(
+        "potter@lab.1".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        "no table here".to_owned(),
+        Booking::new(|_| Ok(())),
+    )));
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let refusal = tool
+        .invoke(&call(serde_json::json!({ "action": "list" })))
+        .unwrap_err();
+    assert!(refusal.recovery().contains("six-column"));
+}
+
+#[test]
+fn an_unknown_action_is_answered_with_the_six_that_exist() {
+    let tool = ClaimTool::new(desk()).unwrap();
+    let refusal = tool
+        .invoke(&call(serde_json::json!({ "action": "delete" })))
+        .unwrap_err();
+    assert_eq!(refusal.recovery(), ACTIONS);
+}
+
+#[test]
+fn the_tool_refuses_a_call_bearing_another_tools_name() {
+    let tool = ClaimTool::new(desk()).unwrap();
+    let refusal = tool
+        .invoke(&ToolCall {
+            id: "tu_x".to_owned(),
+            name: ToolName::parse("signal").unwrap(),
+            args: Payload::empty(),
+        })
+        .unwrap_err();
+    assert_eq!(refusal.code(), &AxCode::InvalidArgs);
+    assert_eq!(
+        tool.meta().name.as_str(),
+        "plan",
+        "a refusal must not poison the tool"
+    );
+}

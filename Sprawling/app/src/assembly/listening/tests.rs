@@ -1,0 +1,215 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+
+#[test]
+fn a_serve_refused_at_the_socket_writes_no_line() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    crate::assembly::init_city(city.path()).expect("a city forms");
+    let ledger = kernel::layout::CityLayout::new(city.path()).ledger();
+
+    let lines = || -> Vec<String> {
+        storage::read_raw_lines_at(&ledger)
+            .expect("the ledger reads")
+            .iter()
+            .map(|line| String::from_utf8_lossy(line).into_owned())
+            .collect()
+    };
+    let before = lines();
+    let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("a free port");
+    let addr = taken.local_addr().expect("the port it took");
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let refused = executor.block_on(super::listen(serving_at(city.path(), addr)));
+
+    assert!(refused.is_err(), "a busy port is a refusal");
+    assert_eq!(
+        lines(),
+        before,
+        "a serve refused at the socket wrote into the ledger"
+    );
+}
+
+#[test]
+fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    crate::assembly::init_city(city.path()).expect("a city forms");
+    let held = storage::JsonlLedger::open(
+        &kernel::layout::CityLayout::new(city.path()).ledger(),
+        kernel::TimeMs::new(0),
+    )
+    .expect("the first writer opens the city");
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port");
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let refused = executor
+        .block_on(super::listen(serving_at(city.path(), addr)))
+        .err()
+        .map(|refusal| refusal.code().as_str());
+
+    assert_eq!(
+        refused,
+        Some("E_LEDGER_HELD"),
+        "a serve opened a city another writer holds"
+    );
+    assert!(
+        std::net::TcpListener::bind(addr).is_ok(),
+        "a serve refused at the Ledger kept its port"
+    );
+    drop(held);
+}
+
+const OPENING_PHASES: [&str; 7] = [
+    "bind",
+    "open the ledger",
+    "lines from genesis",
+    "cut the standing snapshot",
+    "cut the views snapshot",
+    "copy the views",
+    "start the worker",
+];
+
+#[test]
+fn a_listening_city_says_what_opening_it_cost() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    let formed = crate::assembly::init_city(city.path()).expect("a city forms");
+    let held = runtime::replay::verify_ledger_dir(&formed.ledger_dir)
+        .expect("the formed ledger verifies")
+        .raw_lines()
+        .len();
+    let journal = crate::serving::Journal::new(std::sync::Arc::new(crate::assembly::SystemClock));
+    let mut heard = journal.lines().subscribe();
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port");
+    let serving = super::Serving {
+        log: runtime::diagnostics::Diagnostics::new(
+            runtime::diagnostics::Level::Effect,
+            journal.sink(),
+        ),
+        journal,
+        ..serving_at(city.path(), addr)
+    };
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let listening = executor
+        .block_on(super::listen(serving))
+        .expect("the city listens");
+
+    let mut opening = Vec::new();
+    while let Ok(line) = heard.try_recv() {
+        if line.level == wire::LogLevel::Effect && line.line.starts_with("opened the city in ") {
+            opening.push(line.line);
+        }
+    }
+
+    let named_in_order = |line: &str| -> Vec<&'static str> {
+        let mut found: Vec<(usize, &'static str)> = OPENING_PHASES
+            .iter()
+            .filter_map(|phase| line.find(phase).map(|at| (at, *phase)))
+            .collect();
+        found.sort_unstable();
+        found.into_iter().map(|(_, phase)| phase).collect()
+    };
+    assert_eq!(
+        (
+            opening.len(),
+            opening
+                .first()
+                .map(|line| named_in_order(line.as_str()))
+                .unwrap_or_default()
+        ),
+        (1, OPENING_PHASES.to_vec()),
+        "the opening lines heard: {opening:?}"
+    );
+    assert!(
+        opening
+            .iter()
+            .all(|line| line.contains(&format!("fold {held} lines from genesis"))),
+        "the opening lines heard: {opening:?}"
+    );
+    drop(listening);
+}
+
+#[test]
+fn every_line_written_while_opening_reaches_the_views() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    let formed = crate::assembly::init_city(city.path()).expect("a city forms");
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port");
+    let notice = kernel::Payload::of(&kernel::event::record::ProviderDegraded::VaultFellBack(
+        kernel::event::record::VaultFellBack {
+            component: "vault".to_owned(),
+            fallback: "session-memory".to_owned(),
+            persistence: "this-process".to_owned(),
+            reason: "a test asked for it".to_owned(),
+        },
+    ))
+    .expect("a notice");
+    let serving = super::Serving {
+        vault_notice: Some(notice),
+        ..serving_at(city.path(), addr)
+    };
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let listening = executor
+        .block_on(super::listen(serving))
+        .expect("the city listens");
+
+    let written = runtime::replay::verify_ledger_dir(&formed.ledger_dir)
+        .expect("the ledger verifies")
+        .raw_lines()
+        .len();
+
+    let mut folded = (listening.answering)(wire::Query::CityView).0;
+    for _ in 0..250 {
+        if folded.value() >= u64::try_from(written).expect("a count") {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        folded = (listening.answering)(wire::Query::CityView).0;
+    }
+    assert_eq!(
+        folded.value(),
+        u64::try_from(written).expect("a count"),
+        "the views stand before line {written} of the ledger"
+    );
+    drop(listening);
+}
+
+fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super::Serving {
+    super::Serving {
+        city_root: city_root.to_path_buf(),
+        addr,
+        token: "a-key-for-this-test-serve".to_owned(),
+        client: wire::ClientAssets::Disk(city_root.to_path_buf()),
+        vault: gateway::Custodian::in_memory(),
+        vault_notice: None,
+        log: runtime::diagnostics::Diagnostics::off(),
+        journal: crate::serving::Journal::new(std::sync::Arc::new(crate::assembly::SystemClock)),
+        core: accounting::person::CorePriority::Normal,
+    }
+}

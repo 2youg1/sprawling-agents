@@ -1,0 +1,183 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
+use crate::address::Address;
+use crate::error::{AxCode, AxError};
+use crate::event::identity::RunId;
+
+const CITY: &str = "city";
+
+const PERSON: &str = "person";
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Who {
+    City,
+
+    Person,
+
+    Resident(Address),
+}
+
+impl Who {
+    pub fn resident(addr: Address) -> Result<Who, AxError> {
+        if addr.as_str() == CITY || addr.as_str() == PERSON {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "attribute a ledger line",
+                addr.as_str(),
+            )
+            .with_recovery(
+                "give this resident an address other than `city` or `person`: both \
+                 words name another party the ledger attributes lines to",
+            ));
+        }
+        Ok(Who::Resident(addr))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Who::City => CITY,
+            Who::Person => PERSON,
+            Who::Resident(addr) => addr.as_str(),
+        }
+    }
+
+    #[must_use]
+    pub fn handed_down_by(&self, predecessor: Option<RunId>, parent: Option<RunId>) -> String {
+        match self {
+            Who::City => "the city".to_owned(),
+            Who::Person => "the User".to_owned(),
+            Who::Resident(addr) => match predecessor.or(parent) {
+                Some(run) => format!("@{addr}, run {run}", addr = addr.as_str()),
+                None => format!("@{addr}", addr = addr.as_str()),
+            },
+        }
+    }
+
+    pub fn parse(raw: &str) -> Result<Who, AxError> {
+        match raw {
+            CITY => Ok(Who::City),
+            PERSON => Ok(Who::Person),
+            other => Ok(Who::Resident(Address::parse(other)?)),
+        }
+    }
+}
+
+#[must_use]
+pub fn escape_markup(text: &str) -> String {
+    text.chars()
+        .fold(String::with_capacity(text.len()), |mut out, c| {
+            match c {
+                '<' => out.push_str("&lt;"),
+                '>' => out.push_str("&gt;"),
+                '&' => out.push_str("&amp;"),
+                other => out.push(other),
+            }
+            out
+        })
+}
+
+impl fmt::Display for Who {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for Who {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Who {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        Who::parse(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+
+        #[test]
+        fn escaped_text_holds_no_bracket_and_reads_back(text in "[a-z<>&; ]{0,24}") {
+            let escaped = escape_markup(&text);
+            prop_assert!(!escaped.contains(['<', '>']), "{}", escaped);
+            let read = escaped
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&");
+            prop_assert_eq!(read, text);
+        }
+    }
+
+    #[test]
+    fn the_three_parties_write_the_words_the_histories_already_hold() {
+        let resident = Who::resident(Address::parse("lobby/scribe.md").unwrap()).unwrap();
+        assert_eq!(Who::City.to_string(), "city");
+        assert_eq!(Who::Person.to_string(), "person");
+        assert_eq!(resident.to_string(), "lobby/scribe.md");
+        for party in [Who::City, Who::Person, resident] {
+            assert_eq!(Who::parse(party.as_str()).unwrap(), party);
+            assert_eq!(
+                serde_json::to_string(&party).unwrap(),
+                format!("\"{party}\"")
+            );
+        }
+    }
+
+    #[test]
+    fn work_handed_down_names_the_run_that_handed_it_down() {
+        let lead = Who::resident(Address::parse("lab/lead").unwrap()).unwrap();
+        let parent = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
+        let before = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000002").unwrap();
+        assert_eq!(
+            [
+                Who::Person.handed_down_by(None, None),
+                Who::City.handed_down_by(None, Some(parent)),
+                lead.handed_down_by(None, Some(parent)),
+                lead.handed_down_by(Some(before), Some(parent)),
+                lead.handed_down_by(None, None),
+            ],
+            [
+                "the User".to_owned(),
+                "the city".to_owned(),
+                format!("@lab/lead, run {parent}"),
+                format!("@lab/lead, run {before}"),
+                "@lab/lead".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_resident_may_not_answer_to_either_reserved_word() {
+        for reserved in ["city", "person"] {
+            let err = Who::resident(Address::parse(reserved).unwrap()).unwrap_err();
+            assert_eq!(err.code(), &AxCode::InvalidArgs);
+        }
+    }
+
+    #[test]
+    fn a_word_that_is_not_an_address_is_refused_rather_than_guessed() {
+        let err = Who::parse("../elsewhere").unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+    }
+}

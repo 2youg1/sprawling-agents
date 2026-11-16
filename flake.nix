@@ -1,5 +1,5 @@
 # The devshell and complete application share the repository toolchain.
-# Packaging contract: sprawling D50 in crates/sprawling/spec/Install.lean.
+# Packaging contract: sprawling D50 in Sprawling/app/spec/Install.lean.
 {
   description = "sprawling - a locally deployed agent-city harness";
 
@@ -44,7 +44,7 @@
         # not a second place the version is decided.
         declaredChannel = (builtins.fromTOML (builtins.readFile toolchainFile)).toolchain.channel;
 
-        # Zig's version lives in `crates/desktop/ffi/zig-version` and
+        # Zig's version lives in `Sprawling/desktop/ffi/zig-version` and
         # nowhere else, as Rust's lives in `rust-toolchain.toml`. nixpkgs
         # carries one attribute per Zig series (`zig_0_17` for 0.17.x), so
         # the attribute is derived from that file rather than named here.
@@ -52,11 +52,11 @@
         # `checks.devshell-covers-just-check` below runs that probe, so a
         # nixpkgs whose series has moved to another patch release turns the
         # check red rather than handing the shell a Zig the build refuses.
-        zigPin = pkgs.lib.strings.trim (builtins.readFile ./crates/desktop/ffi/zig-version);
+        zigPin = pkgs.lib.strings.trim (builtins.readFile ./Sprawling/desktop/ffi/zig-version);
         zigAttribute = "zig_" + builtins.replaceStrings [ "." ] [ "_" ] (pkgs.lib.versions.majorMinor zigPin);
         zig =
           pkgs.${zigAttribute}
-            or (throw "nixpkgs has no ${zigAttribute}, the series crates/desktop/ffi/zig-version pins (${zigPin})");
+            or (throw "nixpkgs has no ${zigAttribute}, the series Sprawling/desktop/ffi/zig-version pins (${zigPin})");
 
         # Bun's version lives in `client/package.json`, in the `packageManager`
         # field `oven-sh/setup-bun` reads on every workflow (AGENTS.md, the
@@ -167,14 +167,14 @@
         # packaging build cannot silently fall back to an obsolete path.
         bundleDir = builtins.elemAt
           (builtins.match ''.*const BUNDLE_DIR: &str = "([^"]+)";.*''
-            (builtins.readFile ./crates/sprawling/build.rs)) 0;
+            (builtins.readFile ./Sprawling/app/build.rs)) 0;
         skillSource = builtins.elemAt
           (builtins.match ''.*const SKILLS_DIR: &str = "([^"]+)";.*''
-            (builtins.readFile ./crates/xtask/src/package/contents.rs)) 0;
+            (builtins.readFile ./Tools/xtask/src/package/contents.rs)) 0;
         skillEntry = builtins.elemAt
           (builtins.match ''.*const SKILLS_ENTRY: &str = "([^"]+)";.*''
-            (builtins.readFile ./crates/xtask/src/package/contents.rs)) 0;
-        applicationManifest = builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml);
+            (builtins.readFile ./Tools/xtask/src/package/contents.rs)) 0;
+        applicationManifest = builtins.fromTOML (builtins.readFile ./Sprawling/app/Cargo.toml);
         workspacePackage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package;
         applicationName = applicationManifest.package.name;
         mainProgram = (builtins.head (applicationManifest.bin or [ { name = applicationName; } ])).name;
@@ -213,7 +213,7 @@
             cp -R ${bunDeps}/share/bun-cache "$BUN_INSTALL_CACHE_DIR"
             chmod -R u+w "$BUN_INSTALL_CACHE_DIR"
             just build-web
-            test -s crates/sprawling/${bundleDir}/index.html
+            test -s Sprawling/app/${bundleDir}/index.html
           '';
           postBuild = ''
             # Judge what build.rs embedded, not just what Vite left on disk.
@@ -235,7 +235,7 @@
           # `nix build` buys no new verdict and costs a cold compile.
           doCheck = false;
           meta = {
-            description = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.description;
+            description = (builtins.fromTOML (builtins.readFile ./Sprawling/app/Cargo.toml)).package.description;
             homepage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.homepage;
             license = pkgs.lib.meta.getLicenseFromSpdxIdOr workspacePackage.license
               (throw "Unsupported Cargo SPDX license: ${workspacePackage.license}");
@@ -311,7 +311,7 @@
             ''
               set -eu
               tab=$(printf '\t')
-              table=crates/sprawling/src/doctor/table
+              table=Sprawling/app/src/doctor/table
               mkdir -p tree/$table
               cp ${self}/justfile tree/justfile
               chmod u+w tree/justfile

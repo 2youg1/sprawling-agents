@@ -8,7 +8,7 @@
 
 规定 `client/src/views/building/catalog.ts` 的 `pressRow`、`pressGroup`、`effectiveOf` 与 `meterOf`，以及 `catalog.svelte` 保存与被拒时怎样对待草稿（`client/Spec.lean` 4-50 其十）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`catalog.test.ts` 逐条回放本文件末尾 `#eval` 打印的编辑序列。
 
-能力节一次编辑一级表：本楼那一级，或全城那一级（`crates/wire/Spec.lean` §8-99）。草稿就是那一级的整张 `[catalog]` 表；保存把整张表发给城。一行的档位按城的读法算（`kernel::config::CatalogExposure::stated`）：固定的那两件恒为常驻；更近一级说了的（编辑全城那一级时，本楼那一级的表）压过草稿；否则先看草稿的工具键、再看草稿的命名空间键，都不说时取这一行的「继承值」——编辑本楼时是城那一级与缺省给它的，编辑全城时是缺省。继承值与更近一级的值由页面从 `CatalogAnswer` 算好放进行里，本模型把它们当作行的已知字段。
+能力节一次编辑一级表：本楼那一级，或全城那一级（`Sprawling/wire/Spec.lean` §8-99）。草稿就是那一级的整张 `[catalog]` 表；保存把整张表发给城。一行的档位按城的读法算（`kernel::config::CatalogExposure::stated`）：固定的那两件恒为常驻；更近一级说了的（编辑全城那一级时，本楼那一级的表）压过草稿；否则先看草稿的工具键、再看草稿的命名空间键，都不说时取这一行的「继承值」——编辑本楼时是城那一级与缺省给它的，编辑全城时是缺省。继承值与更近一级的值由页面从 `CatalogAnswer` 算好放进行里，本模型把它们当作行的已知字段。
 
 模型里工具与命名空间都写成自然数。
 

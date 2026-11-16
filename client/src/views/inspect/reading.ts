@@ -3,30 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How the inspector reads one call (client/Spec.lean §4-45). The tool's own
-// registration is the authority on what a call is: `Call.render` says a
-// call is a terminal or a diff, `Call.effect` that it only read
-// (`kernel::ToolMeta`), and nothing here keeps a table of tool names. The
-// two readings `render` does not name are told apart by the shape of what
-// the call recorded, which is what each view goes on to read anyway: a
-// picture the content store keeps, or one file read from a line.
-
 import { Option, Schema } from "effect";
 
 import { Locator } from "../../wire";
 import type { Call, RoundsAnswer } from "../../wire";
 import type { RightItem } from "./open.svelte";
 
-// What the inspector draws for a call. `printed` is any other call: its
-// tool, what it was asked, and what it answered.
 export type Reading = "terminal" | "printed" | "diff" | "file" | "shot";
 
-// The two regions of the right side: the editor above, the terminal
-// below (docs/frontend-method.md §7F).
 export type Region = "editor" | "terminal";
 
-// One tab of the inspector's strip: the item, the name it is shown by,
-// and the region it opens in.
 export interface Tab {
   readonly item: RightItem;
   readonly label: string;
@@ -45,12 +31,6 @@ export function regionOf(reading: Reading): Region {
   }
 }
 
-// The arguments of a call that read one file from one line, and nothing
-// else: a search also reads under a path, but it asks for a pattern, and
-// an excess key refuses the decode. A ledger holds both spellings, because
-// recorded calls are never re-spelled (crates/runtime/spec/Tools.lean
-// D115): `file_path` with a line number counted from 1 (D119), and the
-// older `path` with a line counted from 0.
 const ReadOne = Schema.Union([
   Schema.Struct({
     file_path: Schema.String,
@@ -69,8 +49,6 @@ function readFromAsked(read: typeof ReadOne.Type): ReadFrom {
   return { path: read.path, line: (read.offset ?? 0) + 1 };
 }
 
-// A screenshot as the browser tool records it: the picture is in the
-// content store, and the record names it and its two sides.
 const Picture = Schema.Struct({
   image: Locator,
   width: Schema.Int,
@@ -81,7 +59,7 @@ export type Picture = typeof Picture.Type;
 
 export interface ReadFrom {
   readonly path: string;
-  // One-based, as an editor counts.
+
   readonly line: number;
 }
 
@@ -109,20 +87,13 @@ export function pictureOf(call: Call): Picture | null {
 export function readingOf(call: Call): Reading {
   const render = call.render ?? "generic";
   if (render === "terminal") return "terminal";
-  // A letter and a delegation have no file to open; what they asked for
-  // and answered is printed (kernel D37).
+
   if (render === "signal" || render === "delegate") return "printed";
   if (render !== "generic") return "diff";
   if (pictureOf(call) !== null) return "shot";
   return readFrom(call) === null ? "printed" : "file";
 }
 
-// What the right side follows while nobody has opened an item: the
-// newest call of this run in each region, so a person watching a run sees
-// the file it last touched above the command it last ran. A command still
-// running is followed for its live tail; any other call is followed once
-// it has answered something, and `printed` calls are not followed at all,
-// because a run that only planned and delegated has nothing to inspect.
 export function followingIn(rounds: RoundsAnswer): readonly RightItem[] {
   const calls = rounds.turns.flatMap((turn) => turn.calls).reverse();
   const editor = calls.find(

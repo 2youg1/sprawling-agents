@@ -54,7 +54,7 @@ env:
 
 jobs:
   # Same-commit validation, including the cache environment, belongs to CI.
-  # D27 in crates/xtask/Spec.lean preserves the existing release blocking scope.
+  # D27 in Tools/xtask/Spec.lean preserves the existing release blocking scope.
   #
   # `channel` exists only on the `workflow_call` interface, so it is absent
   # exactly when a push or a dispatch started this run: a caller has already
@@ -111,7 +111,7 @@ jobs:
   # code rather than here: the Linux build keeps a key in the kernel's
   # own keyring through `keyring`'s `linux-native` (keyutils) feature,
   # which is a syscall and needs no bus, and it reports that key as
-  # `Persistence::ThisBoot` because a reboot empties it (`crates/gateway/Spec.lean`
+  # `Persistence::ThisBoot` because a reboot empties it (`Sprawling/gateway/Spec.lean`
   # §8-4). `libdbus-sys` is out of the lockfile entirely.
   #
   # Archive runs beside validation and advisories; publish waits for all
@@ -138,7 +138,7 @@ jobs:
     # targets musl rather than the runner's glibc gcc. `musl-gcc` is what
     # `musl-tools` installs; `cargo zigbuild` was measured against it and
     # lost, because its link is not position-independent and so drops
-    # ASLR (`crates/sprawling/spec/Install.lean` D57). Declared for the
+    # ASLR (`Sprawling/app/spec/Install.lean` D57). Declared for the
     # whole job because only the row that builds this triple ever reads a `CC_<triple>` variable;
     # the two host rows never look at it.
     #
@@ -164,7 +164,7 @@ jobs:
       # as CI, so the cache key and small-file writes follow D27's measurements.
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with, on the Windows row; the
-      # action installs nothing on the other two (`crates/desktop/Spec.lean` 8-12).
+      # action installs nothing on the other two (`Sprawling/desktop/Spec.lean` 8-12).
       - uses: ./.github/actions/zig
       # The pinned toolchain installs the host target only, and adding
       # `targets` to `rust-toolchain.toml` would make every job on every
@@ -190,7 +190,7 @@ jobs:
       # `just package`. Both take the triple the matrix names, and only the
       # justfile turns it into the `--target` that `cargo xtask package`
       # reads to find `target/<triple>/release` and name the archive
-      # (crates/xtask/Spec.lean §8-11). An empty triple is the host build,
+      # (Tools/xtask/Spec.lean §8-11). An empty triple is the host build,
       # whose two archive names are what they always were.
       # Only main saves, and a tag push never runs on main, so the tag run
       # is warm when a prior main build wrote the three-platform `release`
@@ -451,7 +451,7 @@ jobs:
       # downloads, verifies and places the binary, and the placed file is
       # compared byte for byte with the archive's and asked its version.
       # Windows installs through install.ps1, which this step does not run
-      # (`crates/sprawling/Spec.lean` §8-94).
+      # (`Sprawling/app/Spec.lean` §8-94).
       - name: install the archive with install.sh from a loopback release
         if: runner.os != 'Windows'
         shell: bash
@@ -463,15 +463,15 @@ jobs:
           tag="$GITHUB_REF_NAME"
           if [ "$GITHUB_EVENT_NAME" != push ]; then
             version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "sprawling") | .version')
-            tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' crates/kernel/src/release.rs)-$(date -u +%y%m%d)"
+            tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' Sprawling/kernel/src/release.rs)-$(date -u +%y%m%d)"
           fi
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
       - name: validate native payloads without decoding binaries
         if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
-        run: python3 crates/xtask/src/channel/validate_test.py
+        run: python3 Tools/xtask/src/channel/validate_test.py
       - name: install the generated Arch package
         if: runner.os == 'Linux' && env.RELEASE_CHANNEL != 'nightly'
-        run: python3 crates/xtask/src/channel/validate.py target/channels target/package
+        run: python3 Tools/xtask/src/channel/validate.py target/channels target/package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: archive-${{ runner.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
@@ -750,7 +750,7 @@ jobs:
         run: echo "::notice::AUR publication skipped; create an AUR account and configure AUR_SSH_KEY."
 
   # The same source, reachable by `cargo install sprawling` and, through the
-  # binstall metadata in `crates/sprawling/Cargo.toml`, by `cargo binstall
+  # binstall metadata in `Sprawling/app/Cargo.toml`, by `cargo binstall
   # sprawling`, which fetches the archive this tag's release carries.
   #
   # **No token lives here either.** Each publishable package is registered
@@ -762,11 +762,11 @@ jobs:
   # workflow before the next tag: the exchange covers exactly the packages
   # whose registration matches this run, so one missing registration stops
   # the job at `publish` with a 403
-  # (`crates/sprawling/spec/Doctor.lean` §8-157).
+  # (`Sprawling/app/spec/Doctor.lean` §8-157).
   #
   # Last of all, after npm: a crates.io version can never be replaced, and
   # a tag can be re-cut, so nothing irreversible happens before every other
-  # channel has stood up (`crates/sprawling/Spec.lean` §8-157). Only a tag
+  # channel has stood up (`Sprawling/app/Spec.lean` §8-157). Only a tag
   # publishes, because the binstall address is built from the tag name and
   # a dispatch from a branch has none.
   crates:
@@ -806,14 +806,14 @@ jobs:
           echo "packages=${packages}" >>"${GITHUB_OUTPUT}"
       # binstall's templates cannot spell this project's tag, which carries
       # the maturity and a date, so the manifest says `v{ version }` and the
-      # tag this run was cut from replaces it here (`crates/sprawling/Spec.lean`
+      # tag this run was cut from replaces it here (`Sprawling/app/Spec.lean`
       # D32). Only `[package.metadata]` changes, which cargo does not build from.
       - name: point the binstall address at this tag
         if: steps.pending.outputs.packages != ''
         shell: bash
         run: |
           set -euo pipefail
-          manifest=crates/sprawling/Cargo.toml
+          manifest=Sprawling/app/Cargo.toml
           sed -i "s#/releases/download/v{ version }/#/releases/download/${GITHUB_REF_NAME}/#" "${manifest}"
           if grep -q '/releases/download/v{ version }/' "${manifest}" \
             || ! grep -q "/releases/download/${GITHUB_REF_NAME}/" "${manifest}"; then

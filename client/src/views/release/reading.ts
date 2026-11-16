@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the release group reads out of the city's answer
-// (`crates/wire/spec/Answer/Release.lean` D24): one line per registry the
-// city asked, and the command that updates this binary through the
-// channel that installed it.
-//
-// The city carries the exact comparison version beside its verdict.
-
 import type { Key } from "../../core/lang";
 import type { Reason } from "../setup/dependencies";
 import type { InstallChannel, Registry, RegistryNewest, ReleaseLine, UpdateHint } from "../../wire";
@@ -20,8 +13,6 @@ const REGISTRY: Readonly<Record<Registry, Key>> = {
   github: "release_registry_github",
 };
 
-// The newest release a registry read, or why it has none: exactly one
-// of the two is set.
 export type RegistryLine =
   | { readonly registry: Key; readonly newest: ReleaseLine; readonly reason: null }
   | { readonly registry: Key; readonly newest: null; readonly reason: Reason };
@@ -51,9 +42,6 @@ const CHANNEL: Readonly<Record<InstallChannel, Key>> = {
   source: "release_channel_source",
 };
 
-// How this binary was installed, and the command the city printed for
-// updating it; a binary built from source has no command, and the page
-// says to pull and rebuild instead.
 export interface Update {
   readonly channel: Key;
   readonly command: string | null;

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The device's half of the pairing handshake (`crates/remote_access/
+// The device's half of the pairing handshake (`Sprawling/remote_access/
 // Spec.lean` §8-6) against a city written here from the protocol's own
 // words, because the Rust city's pairing reply is drawn from randomness
 // no fixture can hold still. What the city opens is the claim the

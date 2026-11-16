@@ -3,28 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The three versions a dependency row shows - installed here, pinned by
-// this repository, newest upstream - and whether the first is behind the
-// last (`crates/sprawling/Spec.lean` §8-120).
-//
-// The city reads each version and this page compares them: a reading
-// the city could not take is its own answer, and a version with no
-// dotted number in it is never called behind, because a comparison
-// made up from half a number would tell a person to update something
-// that may be current.
-
 import type { Key } from "../../core/lang";
 import type { DoctorNewest, DoctorUnread } from "../../wire";
 
-// The dotted number as its parts, or null when the text has none.
 function parts(version: string): readonly number[] | null {
   const dotted = /\d+(?:\.\d+)+/u.exec(version)?.[0];
   return dotted === undefined ? null : dotted.split(".").map(Number);
 }
 
-// Whether `installed` is an older release than `newest`. Parts are
-// compared left to right and a missing part counts as zero, so 1.97
-// and 1.97.0 are the same release.
 export function behind(installed: string | null, newest: string | null): boolean {
   if (installed === null || newest === null) return false;
   const have = parts(installed);
@@ -47,9 +33,6 @@ const UNREAD: Record<DoctorUnread, Key> = {
   unknown_item: "machine_unread_unknown_item",
 };
 
-// What the newest column says: the version itself, a phrase for a
-// reading the city could not take, or that the question is still out -
-// not answered yet, or answered `asking` while the city reads it.
 export type Newest =
   { readonly version: string } | { readonly key: Key; readonly said: string | null };
 
@@ -61,8 +44,6 @@ export function newestOf(answer: DoctorNewest | undefined): Newest {
   return { key: "machine_upstream_refused", said: answer.refused.said };
 }
 
-// The items whose reading the city is still taking, which the page asks
-// about again after a pause.
 export function stillAsking(newest: Readonly<Record<string, DoctorNewest>>): readonly string[] {
   return Object.entries(newest)
     .filter(([, answer]) => answer === "asking")

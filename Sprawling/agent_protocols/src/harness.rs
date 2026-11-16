@@ -1,0 +1,25 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+mod catalog;
+mod detect;
+mod entry;
+mod environment;
+mod paste;
+mod process;
+mod roster;
+mod session;
+
+pub use catalog::{Catalog, registry_entry};
+pub use detect::{CLIENT_CONFIGS, configured, detected};
+pub use entry::{AgentEntry, AgentId, AgentSource, Consented, Launch, Pin};
+pub use environment::passed;
+pub use paste::pasted;
+pub use process::HarnessProcess;
+pub use roster::{OFFICIAL, Official, Roster, SetUpDir, Unseated};
+pub use session::{
+    AcpSession, Answer, AuthMethod, Introduced, Listener, LoginKind, PermissionAsk, Permit,
+    PermitKind, PermitOption, StopReason, Update,
+};

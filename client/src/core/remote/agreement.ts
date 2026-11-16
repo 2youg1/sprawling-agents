@@ -3,18 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The key exchange both handshakes share (`crates/remote_access/
-// Spec.lean` §8-4): an ephemeral X25519 key from WebCrypto and an
-// ephemeral ML-KEM-768 key from `@noble/post-quantum`, the transcript
-// both sides sign, and the two session keys HKDF expands from both
-// secrets under that transcript. A man in the middle needs both secrets
-// to reach either key.
-
 import { Result } from "effect";
 
 export interface Ephemeral {
   readonly x25519: CryptoKey;
-  // FIPS 203's 2400-byte decapsulation key.
+
   readonly mlKem: Uint8Array<ArrayBuffer>;
 }
 
@@ -27,9 +20,6 @@ const X25519_BITS = 256;
 
 const postQuantum = () => import("@noble/post-quantum/ml-kem.js");
 
-// A fresh ephemeral pair and its public half, X25519 then the ML-KEM
-// encapsulation key, as a hello carries them; null when this browser
-// has no X25519.
 export async function ephemeral(): Promise<{
   readonly ephemeral: Ephemeral;
   readonly public: Uint8Array<ArrayBuffer>;
@@ -47,9 +37,6 @@ export async function ephemeral(): Promise<{
   };
 }
 
-// The handshake's record: SHA-256 of the label, what the device opened
-// with, and the city's answer without its signature. SHA-256 rather than
-// the city's BLAKE3 because WebCrypto has the one and not the other.
 export async function record(
   label: Uint8Array<ArrayBuffer>,
   opening: Uint8Array<ArrayBuffer>,
@@ -63,8 +50,6 @@ export async function record(
   );
 }
 
-// What one side signs: the label, its role, the record. The role keeps
-// one side's signature from ever standing in for the other's.
 export function signed(
   label: Uint8Array<ArrayBuffer>,
   role: "city" | "device",
@@ -73,8 +58,6 @@ export function signed(
   return new Uint8Array([...label, ...new TextEncoder().encode(role), ...transcript]);
 }
 
-// The two session keys: HKDF-SHA256, the record as salt, the X25519
-// secret then the ML-KEM secret as input.
 export async function derive(
   transcript: Uint8Array<ArrayBuffer>,
   xSecret: Uint8Array<ArrayBuffer>,
@@ -101,8 +84,6 @@ export async function derive(
   };
 }
 
-// The session keys the device reaches from the city's answer; null when
-// the city's X25519 key or ML-KEM ciphertext is not one this side can use.
 export async function agreed(
   mine: Ephemeral,
   transcript: Uint8Array<ArrayBuffer>,

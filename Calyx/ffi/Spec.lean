@@ -5,7 +5,7 @@
 
 /-! # console_ffi 的规格
 
-`sprawling-console-ffi`（库名 `console_ffi`，目录 `Calyx/ffi`）是控制台的渲染器：一片 Zig 叶子（`Calyx/ffi/zig/leaf.zig`）把 Rust 写好的一份 scene 读成终端一帧的字节，Rust 一侧只借出 scene 与输出缓冲，读回帧长与光标所在的行。控制台本身（CLI 与安静宿主的生命周期、按键、会话、读记录）在 `crates/sprawling/spec/Console.lean` §8-11；那里决定屏上有什么，这里决定它长什么样。
+`sprawling-console-ffi`（库名 `console_ffi`，目录 `Calyx/ffi`）是控制台的渲染器：一片 Zig 叶子（`Calyx/ffi/zig/leaf.zig`）把 Rust 写好的一份 scene 读成终端一帧的字节，Rust 一侧只借出 scene 与输出缓冲，读回帧长与光标所在的行。控制台本身（CLI 与安静宿主的生命周期、按键、会话、读记录）在 `Sprawling/app/spec/Console.lean` §8-11；那里决定屏上有什么，这里决定它长什么样。
 
 渲染是一个纯函数——同一份 scene、同一个宽度得到同样的字节——叶子本身没有状态机；Rust 缓冲重试由下列状态机刻画。这里也证明它排版的一条性质：写进一行的字恒不越过这一行剩下的列（§2），终端的最后一列因此从不被写（D6）。其余由 `console_ffi::tests` 守住：每一帧写进一个终端模拟器（`vt100`），比对整屏文字、光标位置与下一帧擦除的行数；Zig 一侧的单测由 `zig test Calyx/ffi/zig/leaf.zig` 跑。
 -/
@@ -180,11 +180,11 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 /-! D1 渲染器是一片 Zig 叶子，在它自己的包里，`unsafe` 只在那一次调用
 
-决定：控制台的排版与转义序列由 Zig 写成，静态链接进二进制；叶子只读借来的 scene、只写借来的缓冲，不读时钟、不开文件、不留状态；包的 lint 表与工作区相同，只有 `unsafe_code` 是 `deny`，`console_ffi::leaf` 里那一次调用在最窄处以 `#[expect(unsafe_code, reason = …)]` 放开，旁边一行 `SAFETY:` 写使它成立、可能为假的前提。`build.rs` 用 `zig-version` 钉住的 Zig 按目标三元组 `zig build-lib`，非 Windows 目标加 `-fPIC`；仓库里构建时这份钉与 `crates/desktop/ffi/zig-version` 必须相同。`ReleaseSafe` 让叶子的每个越界与溢出检查留在发布的二进制里，失败即陷入；`panic = std.debug.no_panic`，叶子不带栈回溯机制，在每个目标上构建得一样。
+决定：控制台的排版与转义序列由 Zig 写成，静态链接进二进制；叶子只读借来的 scene、只写借来的缓冲，不读时钟、不开文件、不留状态；包的 lint 表与工作区相同，只有 `unsafe_code` 是 `deny`，`console_ffi::leaf` 里那一次调用在最窄处以 `#[expect(unsafe_code, reason = …)]` 放开，旁边一行 `SAFETY:` 写使它成立、可能为假的前提。`build.rs` 用 `zig-version` 钉住的 Zig 按目标三元组 `zig build-lib`，非 Windows 目标加 `-fPIC`；仓库里构建时这份钉与 `Sprawling/desktop/ffi/zig-version` 必须相同。`ReleaseSafe` 让叶子的每个越界与溢出检查留在发布的二进制里，失败即陷入；`panic = std.debug.no_panic`，叶子不带栈回溯机制，在每个目标上构建得一样。
 
 理由：控制台用 Zig 实现（人的定规）。叶子是纯函数，所以边界只有两段字节与一个结果结构，scene 由 Rust 的唯一写者产生，读不懂的 scene 是写者的缺陷而不是输入。
 
-被否：①把渲染放进 `crates/desktop/ffi`——那个包是桌面 server 的缝，只在 Windows 上构建，控制台在三个平台上都要。②全屏备用屏的 TUI 库——控制台的 CLI 在主屏上，回滚归终端（`crates/sprawling/spec/Console.lean` §8-11）。
+被否：①把渲染放进 `Sprawling/desktop/ffi`——那个包是桌面 server 的缝，只在 Windows 上构建，控制台在三个平台上都要。②全屏备用屏的 TUI 库——控制台的 CLI 在主屏上，回滚归终端（`Sprawling/app/spec/Console.lean` §8-11）。
 
 代价：Zig 0.17 成为在每个平台上构建工作区的前提，CI 的每个构建作业都装它（`.github/actions/zig`）。
 
@@ -211,7 +211,7 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 决定：活动区只在有事发生时重画——一条记录、一个键、一次缩放；正在工作的那一行写「since 时刻」，不跳秒、不转圈。
 
-理由：一个在输出时滚到底部的终端里，每秒一次的重画会让人读不了回滚；旧 conhost 在选中文字时会暂停输出。城在工作这件事另有 OSC 7501 告诉终端（`crates/sprawling/spec/Console/ProgramStatus.lean` D77）。
+理由：一个在输出时滚到底部的终端里，每秒一次的重画会让人读不了回滚；旧 conhost 在选中文字时会暂停输出。城在工作这件事另有 OSC 7501 告诉终端（`Sprawling/app/spec/Console/ProgramStatus.lean` D77）。
 -/
 
 /-! D5 记录里的控制字符到不了终端

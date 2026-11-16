@@ -22,7 +22,7 @@
   const VERSION = B3Hash.make("3c1f0a9e".repeat(8));
   const BASE = GitOid.make("7c41e09aa1b2c3d4e5f60718293a4b5c6d7e8f90");
   const HEAD = GitOid.make("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678");
-  const CHANGED = "crates/city/src/document.rs";
+  const CHANGED = "Sprawling/city/src/document.rs";
 
   const PLAN = "# Plan\n\nThe reader opens a version, edits it in the browser, and saves it.\n";
 

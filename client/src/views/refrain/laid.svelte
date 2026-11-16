@@ -8,7 +8,7 @@
 <script lang="ts">
   // The blocks the city read out of a stretch of Markdown, drawn as
   // elements and never through `innerHTML` (client/Spec.lean §4-26,
-  // `crates/documents/Spec.lean` D21). A formula is drawn by KaTeX
+  // `Sprawling/documents/Spec.lean` D21). A formula is drawn by KaTeX
   // (`formula.svelte`, §4-64a). What the city read and this page does not
   // draw - HTML, front matter, nesting too deep, and a formula KaTeX
   // refuses - is its own source in the mono face, so "something is here that this page does

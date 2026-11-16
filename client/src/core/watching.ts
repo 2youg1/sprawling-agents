@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Whether this page watches the city's performance monitor, and the
-// readings it has been sent (`crates/wire/Spec.lean` §8-47).
-//
-// **The city samples only while somebody watches**, so this page says
-// the most any of its watchers wants: `watch` while a monitor panel is
-// open, `watch_summary` while only the fact bar's summary is, which the
-// city answers by reading its own process alone, and `release` when
-// neither is. It says it again on a new connection: the city forgets a
-// session's watch when the socket closes.
-
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -20,22 +10,17 @@ import { encodeFrame } from "./frames";
 import { BeatMs } from "../wire";
 import type { Monitoring, Sample } from "../wire";
 
-// The readings kept: one a second for five minutes, the length of the
-// history `bin::monitor::CAPACITY` keeps on the city's side.
 const KEPT = 300;
 
 export interface Watching {
   readonly samples: Readable<readonly Sample[]>;
-  // Starts watching the whole monitor; the returned function stops
-  // this watcher.
+
   readonly watch: () => () => void;
-  // Starts watching the summary alone; the returned function stops
-  // this watcher.
+
   readonly watchSummary: () => () => void;
   readonly sampled: (sample: Sample) => void;
   readonly reconnected: () => void;
-  // Asks the city to sample at this beat, in milliseconds, from now on;
-  // the city keeps it, and each reading says the beat it was taken at.
+
   readonly setBeat: (ms: number) => void;
 }
 

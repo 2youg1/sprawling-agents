@@ -1,0 +1,377 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::consts_policy::IMAGE_QUALITY;
+use serde_json::{Value, json};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolName {
+    Windows,
+    Snapshot,
+    Act,
+    Screenshot,
+    Record,
+    Clipboard,
+}
+
+impl ToolName {
+    pub(crate) const ALL: [ToolName; 6] = [
+        ToolName::Windows,
+        ToolName::Snapshot,
+        ToolName::Act,
+        ToolName::Screenshot,
+        ToolName::Record,
+        ToolName::Clipboard,
+    ];
+
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            ToolName::Windows => "desktop.windows",
+            ToolName::Snapshot => "desktop.snapshot",
+            ToolName::Act => "desktop.act",
+            ToolName::Screenshot => "desktop.screenshot",
+            ToolName::Record => "desktop.record",
+            ToolName::Clipboard => "desktop.clipboard",
+        }
+    }
+
+    pub(crate) fn parse(name: &str) -> Option<ToolName> {
+        ToolName::ALL.into_iter().find(|tool| tool.as_str() == name)
+    }
+}
+
+pub(crate) struct ToolCard {
+    pub(crate) name: ToolName,
+    pub(crate) description: String,
+    pub(crate) schema: Value,
+}
+
+fn naming_a_window() -> Value {
+    json!({
+        "title": { "type": "string", "description": "the window's title, as `desktop.windows` reported it" },
+        "process": { "type": "string", "description": "the process that owns the window, for example `notepad.exe`" },
+    })
+}
+
+fn properties(own: Value) -> Value {
+    let mut merged = naming_a_window();
+    if let (Some(into), Some(from)) = (merged.as_object_mut(), own.as_object()) {
+        for (key, value) in from {
+            into.insert(key.clone(), value.clone());
+        }
+    }
+    merged
+}
+
+fn largest_quality() -> u32 {
+    let admits = |quality: u32| IMAGE_QUALITY.admit(quality).is_ok();
+    if admits(u32::MAX) {
+        return u32::MAX;
+    }
+    let (mut admitted, mut refused) = (0_u32, u32::MAX);
+    while let Some(gap @ 2..) = refused.checked_sub(admitted) {
+        let middle = admitted.saturating_add(gap / 2);
+        if admits(middle) {
+            admitted = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    admitted
+}
+
+pub(crate) fn table() -> Vec<ToolCard> {
+    vec![
+        ToolCard {
+            name: ToolName::Windows,
+            description: "List the top-level windows on this desktop: title, owning process, \
+                 bounds, and a ref the other tools take. Only windows this server's scope file \
+                 lists are reported. It does not focus, move, resize or close anything, and it \
+                 does not read what is inside a window."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": {
+                    "process": { "type": "string", "description": "report only windows owned by this process" },
+                },
+                "required": [],
+                "additionalProperties": false,
+            }),
+        },
+        ToolCard {
+            name: ToolName::Snapshot,
+            description: "Read one named window as an outline: one line per element, its ref, \
+                 role and name, indented by depth and in the order the window lists them, then \
+                 a line with the window's title, process and the generation number \
+                 `desktop.act` carries back, which stops being accepted once the window is \
+                 snapshotted again, moves or changes size. It does not return pixels or \
+                 positions, it does not expose native handles, and it does not read a window the \
+                 scope file leaves out."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": properties(json!({
+                    "depth": { "type": "integer", "minimum": 1, "description": "how many levels of the tree to return" },
+                })),
+                "required": [],
+                "additionalProperties": false,
+            }),
+        },
+        ToolCard {
+            name: ToolName::Act,
+            description: "Do one thing to one window: click, double, right, drag, scroll, type or \
+                 key, at a ref from a snapshot or at a point. `generation` is the snapshot the \
+                 action was decided against, and an action decided against an older view is \
+                 refused, and so is one decided before the window moved or changed size. The named window must hold the keyboard when the action is sent, and \
+                 must be the window under the point it lands on; otherwise nothing is sent. If \
+                 the desktop takes only part of the action, the answer says how much and \
+                 releases any key or button that part left held; it does not send the rest. It \
+                 does not retry, it does not chain several actions, and it does not fall back \
+                 to a nearby element when the ref no longer resolves."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": properties(json!({
+                    "action": {
+                        "type": "string",
+                        "enum": ["click", "double", "right", "drag", "scroll", "type", "key"],
+                    },
+                    "ref": { "type": "string", "description": "a ref minted by `desktop.snapshot`, such as `e12`" },
+                    "point": {
+                        "type": "object",
+                        "properties": {
+                            "x": { "type": "integer" },
+                            "y": { "type": "integer" },
+                        },
+                        "required": ["x", "y"],
+                        "description": "window-relative point, for what no ref names",
+                    },
+                    "to": {
+                        "type": "object",
+                        "properties": {
+                            "x": { "type": "integer" },
+                            "y": { "type": "integer" },
+                        },
+                        "required": ["x", "y"],
+                        "description": "where a drag ends, or how far a scroll goes",
+                    },
+                    "text": { "type": "string", "description": "what `type` types" },
+                    "key": { "type": "string", "description": "what `key` presses, such as `Enter` or `F2`" },
+                    "modifiers": {
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["ctrl", "alt", "shift", "win"] },
+                    },
+                    "generation": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "the generation of the snapshot this action was decided against",
+                    },
+                })),
+                "required": ["action"],
+
+                "dependentRequired": { "ref": ["generation"] },
+                "additionalProperties": false,
+            }),
+        },
+        ToolCard {
+            name: ToolName::Screenshot,
+            description: "Capture one named window, or a region of it, and return the image as \
+                 an image block, with its width and height in a text block beside it. `scale` \
+                 and `quality` are whole percentages, because every call is recorded and the record holds no fractions. \
+                 It does not write a file, it does not read text out of the image, and it does \
+                 not capture the whole screen."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": properties(json!({
+                    "region": {
+                        "type": "object",
+                        "properties": {
+                            "x": { "type": "integer" },
+                            "y": { "type": "integer" },
+                            "width": { "type": "integer", "minimum": 1 },
+                            "height": { "type": "integer", "minimum": 1 },
+                        },
+                        "required": ["x", "y", "width", "height"],
+                    },
+                    "format": { "type": "string", "enum": ["png", "jpeg", "webp"] },
+                    "quality": { "type": "integer", "minimum": 0, "maximum": largest_quality() },
+                    "scale": { "type": "integer", "minimum": 1, "maximum": 100, "description": "percent of the original size" },
+                })),
+                "required": [],
+                "additionalProperties": false,
+            }),
+        },
+        ToolCard {
+            name: ToolName::Record,
+            description: "Start or stop recording one named window: an mp4 when ffmpeg is on \
+                 this machine's PATH, otherwise a directory of PNG frames. `start` answers with \
+                 a `recording` id, and `stop` takes that id back, because a window's title can \
+                 change while it is being recorded; it also says how many frames were written, \
+                 and why, if the recording ended before it was stopped. The scope file has to \
+                 switch recording on. With `audio`, it also records the one sound device the \
+                 scope file names, and `stop` answers with that sound. A recording ends itself \
+                 after ten minutes. It does not edit, transcode or upload anything, and it does \
+                 not choose a sound device."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": properties(json!({
+                    "state": { "type": "string", "enum": ["start", "stop"] },
+                    "recording": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "which recording `stop` ends, as `start` reported it",
+                    },
+                    "audio": {
+                        "type": "boolean",
+                        "description": "whether `start` also records the sound device the scope file names",
+                    },
+                })),
+                "required": ["state"],
+                "additionalProperties": false,
+            }),
+        },
+        ToolCard {
+            name: ToolName::Clipboard,
+            description: "Read this machine's clipboard as text, or replace it with text. The \
+                 scope file has to switch the clipboard on. It does not touch images or file \
+                 lists, it does not keep a history, and it does not restore what it replaced."
+                .to_owned(),
+            schema: json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["get", "set"] },
+                    "text": { "type": "string", "description": "what `set` puts there" },
+                },
+                "required": ["operation"],
+                "additionalProperties": false,
+            }),
+        },
+    ]
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+
+    const EXPECTED: [&str; 6] = [
+        "desktop.windows",
+        "desktop.snapshot",
+        "desktop.act",
+        "desktop.screenshot",
+        "desktop.record",
+        "desktop.clipboard",
+    ];
+
+    fn card(name: ToolName) -> ToolCard {
+        table()
+            .into_iter()
+            .find(|card| card.name == name)
+            .expect("every name in the enum has a card")
+    }
+
+    #[test]
+    fn the_table_is_the_six_tools_this_server_promises() {
+        let names: Vec<&str> = table().iter().map(|card| card.name.as_str()).collect();
+        assert_eq!(names, EXPECTED.to_vec());
+        assert_eq!(ToolName::parse("desktop.act"), Some(ToolName::Act));
+        assert_eq!(ToolName::parse("desktop.reboot"), None);
+
+        let published: Vec<ToolName> = table().iter().map(|card| card.name).collect();
+        for name in ToolName::ALL {
+            assert!(published.contains(&name), "{} has no card", name.as_str());
+        }
+    }
+
+    #[test]
+    fn every_description_says_what_the_tool_does_not_do() {
+        for card in table() {
+            assert!(
+                card.description.contains("does not"),
+                "{} never says what it does not do: {}",
+                card.name.as_str(),
+                card.description
+            );
+        }
+    }
+
+    #[test]
+    fn every_schema_is_an_object_schema_with_named_properties() {
+        for card in table() {
+            assert_eq!(card.schema["type"], "object", "{}", card.name.as_str());
+            assert!(
+                card.schema["properties"].is_object(),
+                "{} has no properties",
+                card.name.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn acting_names_a_reference_and_the_generation_it_was_decided_against() {
+        let act = card(ToolName::Act);
+        let properties = &act.schema["properties"];
+        assert!(properties["ref"].is_object());
+        assert!(properties["generation"].is_object());
+
+        assert_eq!(act.schema["required"], json!(["action"]));
+        assert_eq!(
+            act.schema["dependentRequired"],
+            json!({ "ref": ["generation"] })
+        );
+        assert!(properties["action"]["enum"].is_array());
+        let actions: Vec<&str> = properties["action"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        for verb in ["click", "double", "right", "drag", "scroll", "type", "key"] {
+            assert!(actions.contains(&verb), "{verb} is not offered");
+        }
+    }
+
+    #[test]
+    fn a_screenshot_names_its_format_and_a_recording_names_its_two_states() {
+        let shot = card(ToolName::Screenshot);
+        let formats: Vec<&str> = shot.schema["properties"]["format"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(formats, vec!["png", "jpeg", "webp"]);
+        let record = card(ToolName::Record);
+        let states: Vec<&str> = record.schema["properties"]["state"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(states, vec!["start", "stop"]);
+
+        assert_eq!(record.schema["properties"]["recording"]["type"], "integer");
+        let clipboard = card(ToolName::Clipboard);
+        assert!(clipboard.schema["required"].is_array());
+    }
+
+    #[test]
+    fn the_screenshot_schema_states_the_largest_quality_the_city_admits() {
+        let stated = card(ToolName::Screenshot).schema["properties"]["quality"]["maximum"]
+            .as_u64()
+            .unwrap();
+        let most = u32::try_from(stated).unwrap();
+        assert!(IMAGE_QUALITY.admit(most).is_ok());
+        assert!(IMAGE_QUALITY.admit(most + 1).is_err());
+    }
+}

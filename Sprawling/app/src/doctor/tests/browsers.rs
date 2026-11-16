@@ -1,0 +1,138 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use std::collections::BTreeSet;
+
+use crate::doctor::family::{Confidence, Family, member_at};
+use crate::doctor::{Detection, Platform, REQUIREMENTS, Tier};
+
+#[test]
+fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
+    let detected: BTreeSet<&str> = REQUIREMENTS
+        .iter()
+        .filter(|item| item.tier == Tier::Use && matches!(item.detect, Detection::Family(_)))
+        .map(|item| item.name)
+        .collect();
+    assert_eq!(
+        detected,
+        ["gecko", "chromium", "webkit"].into_iter().collect(),
+        "the three engines a session can be held with are three rows"
+    );
+    for family in Family::ALL {
+        for member in family.members() {
+            let places: usize = Platform::ALL
+                .into_iter()
+                .map(|platform| member.places.at(platform).len())
+                .sum();
+            assert!(
+                places > 0,
+                "{} says nowhere it is installed, so only a search path finds it",
+                member.name
+            );
+            for platform in Platform::ALL {
+                for place in member.places.at(platform).iter() {
+                    assert!(
+                        place.starts_with('/') || place.contains(":\\"),
+                        "{} names {place}, which is not a place",
+                        member.name
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_found_browser_is_reported_by_the_brand_it_is() {
+    let developer = std::path::Path::new(r"C:\Program Files\Firefox Developer Edition\firefox.exe");
+    assert_eq!(
+        member_at(Family::Gecko, developer).map(|member| member.name),
+        Some("firefox-developer")
+    );
+    assert_eq!(
+        member_at(Family::Gecko, std::path::Path::new("/usr/bin/zen")).map(|member| member.name),
+        Some("zen")
+    );
+    assert_eq!(
+        member_at(
+            Family::Chromium,
+            std::path::Path::new("/usr/local/bin/vivaldi")
+        )
+        .map(|member| member.name),
+        Some("vivaldi"),
+        "a brand installed where this table does not look is still that brand"
+    );
+}
+
+#[test]
+fn no_browser_is_started_to_learn_its_version() {
+    let looking = include_str!("../family.rs");
+    for spelling in ["ask_version", "Command::new"] {
+        assert!(
+            !looking.contains(spelling),
+            "doctor::family names {spelling}, so looking for a browser can start one"
+        );
+    }
+}
+
+#[test]
+fn a_member_that_needs_confirming_is_never_the_first_answer() {
+    let gecko = Family::Gecko.members();
+    let tor = gecko
+        .iter()
+        .position(|member| member.name == "tor-browser")
+        .expect("the Gecko family carries Tor Browser");
+    assert_eq!(
+        tor,
+        gecko.len().saturating_sub(1),
+        "Tor Browser answers only when nothing else does"
+    );
+    assert_eq!(
+        gecko
+            .get(tor)
+            .map(|member| member.confidence.caveat())
+            .unwrap_or_default(),
+        ", confirm it by hand once"
+    );
+    assert!(
+        Family::WebKit
+            .members()
+            .iter()
+            .all(|member| member.confidence == Confidence::Experimental),
+        "Safari's BiDi support is partial, and the report says so"
+    );
+}
+
+#[test]
+fn the_chromium_file_is_the_family_rendered() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/doctor/family/chromium.tsv");
+    let rendered = Family::Chromium.members().iter().fold(
+        concat!(
+            "# generated from Sprawling/app/src/doctor/family/chromium.rs by the test ",
+            "`the_chromium_file_is_the_family_rendered`; edit the family, not this file\n",
+            "# brand<TAB>program<TAB>windows<TAB>macos<TAB>linux, places separated by |\n"
+        )
+        .to_owned(),
+        |mut file, member| {
+            let places = |platform| member.places.at(platform).join("|");
+            file.push_str(&format!(
+                "{}\t{}\t{}\t{}\t{}\n",
+                member.name,
+                member.program,
+                places(Platform::Windows),
+                places(Platform::MacOs),
+                places(Platform::Linux)
+            ));
+            file
+        },
+    );
+    let written = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(
+        written == rendered,
+        "{} is not what the family renders; write this into it:\n<<<\n{rendered}>>>",
+        path.display()
+    );
+}

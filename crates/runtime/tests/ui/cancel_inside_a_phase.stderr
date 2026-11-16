@@ -1,5 +1,0 @@
-error[E0599]: no method named `cancel` found for struct `Turn<'h, S>` in the current scope
-  --> tests/ui/cancel_inside_a_phase.rs:13:10
-   |
-13 |     turn.cancel();
-   |          ^^^^^^ method not found in `Turn<'_, Assembling>`

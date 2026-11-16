@@ -1,7 +1,7 @@
-# The Zig `crates/desktop/ffi/zig-version` pins, which builds the two Zig
+# The Zig `Sprawling/desktop/ffi/zig-version` pins, which builds the two Zig
 # leaves: the console's renderer, `Calyx/ffi`, on every target
 # (`Calyx/ffi/Spec.lean` D1), and the desktop server's leaf on
-# Windows targets (`crates/desktop/Spec.lean` section 8-12). Every job that
+# Windows targets (`Sprawling/desktop/Spec.lean` section 8-12). Every job that
 # builds the `sprawling` crate, on any runner, installs it.
 #
 # The version is read from the pin file at run time, so a new Zig is an
@@ -20,7 +20,7 @@
 # which the restore and the save of the entry cost as well.
 name: zig
 description: >-
-  Install the Zig crates/desktop/ffi/zig-version pins, and prove zig
+  Install the Zig Sprawling/desktop/ffi/zig-version pins, and prove zig
   answers with that version.
 inputs:
   cache:
@@ -34,7 +34,7 @@ runs:
     - name: the pinned version
       id: pin
       shell: bash
-      run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/crates/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/Sprawling/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
       with:
         version: ${{ steps.pin.outputs.version }}

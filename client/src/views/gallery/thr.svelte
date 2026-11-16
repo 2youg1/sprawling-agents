@@ -144,7 +144,7 @@
           [
             call(101, going + 2_000, 0, {
               tool: "read",
-              subject: "crates/city/city-SPEC.md",
+              subject: "Sprawling/city/city-SPEC.md",
               effect: "read",
               render: "generic",
               took_us: 300,
@@ -164,7 +164,7 @@
             }),
             call(104, going + 6_000, 87, {
               tool: "edit",
-              subject: "crates/city/src/document.rs",
+              subject: "Sprawling/city/src/document.rs",
               effect: { write: { domain: Address.make("lab") } },
               render: { diff: { locations: [] } },
             }),

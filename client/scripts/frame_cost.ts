@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The instrument behind the `client_frame_decode` row of crates/xtask/budgets.toml:
-// what the page pays to read one event frame off the socket, by the hot
-// decoder and by the Effect schema it stands in for, interleaved on the
-// same machine. It prints a reading and judges nothing, because a
-// wall-clock figure is the machine's and a loaded machine is not a defect.
-//
-//   cd client && bun scripts/frame_cost.ts
-
 import { Result, Schema } from "effect";
 
 import { decodeFrame } from "../src/core/frames";
@@ -30,8 +22,6 @@ const eventText = JSON.stringify({
 });
 const bySchema = Schema.decodeUnknownResult(Schema.fromJsonString(ServerFrame));
 
-// The fastest of several batches: the floor the decoder reaches, which a
-// busy neighbour on the machine can slow but not lower.
 function floorMicros(run: () => unknown): number {
   const batch = 2000;
   let best = Number.POSITIVE_INFINITY;

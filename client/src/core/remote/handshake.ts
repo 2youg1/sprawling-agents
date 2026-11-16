@@ -3,29 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The device's half of the remote door's two handshakes
-// (`crates/remote_access/Spec.lean` §8-4, §8-6), byte for byte the
-// layout `remote_access::handshake` reads.
-//
-// **Pairing**: the device's first visit, authenticated by the city
-// alone. The device checks the key the city presents against the
-// fingerprint the invitation pinned, then the city's signature, and only
-// then seals the claim - the code, its own public key and its proof - so
-// a route that tampered with the answer never sees the code.
-//
-// **Session**: every visit after that. The city signs the record with
-// the key the device pinned at pairing, the device answers with its own
-// signature, and both hold the same two session keys.
-
 import { agreed, ephemeral, record, signed, type Ephemeral, type SessionKeys } from "./agreement";
 import type { Invitation } from "./invitation";
 import { PUBLIC_BYTES, sign, verifies, type DeviceKey } from "./keys";
 import { opener, sealer, type Opener, type Sealer } from "./seal";
 
-// Why the device stopped: a message of the wrong length; a city whose
-// key is not the one the invitation names; a city signature that does
-// not hold; a key exchange that did not agree; this device's own key
-// refusing to sign or seal.
 export type Refused = "length" | "fingerprint" | "signature" | "agreement" | "key";
 
 export interface Session {
@@ -33,7 +15,6 @@ export interface Session {
   readonly opener: Opener;
 }
 
-// The hello a device sent, and the ephemeral keys only it holds.
 export interface DevicePairing {
   readonly hello: Uint8Array<ArrayBuffer>;
   readonly ephemeral: Ephemeral;
@@ -42,9 +23,8 @@ export interface DevicePairing {
 export type DeviceWaiting = DevicePairing;
 
 export interface Claimed {
-  // The claim, sealed under the session's first key.
   readonly sealed: Uint8Array<ArrayBuffer>;
-  // The city's whole public key, which the device pins from now on.
+
   readonly city: Uint8Array<ArrayBuffer>;
   readonly session: Session;
 }
@@ -72,7 +52,6 @@ function sessionOf(keys: SessionKeys): Session {
   };
 }
 
-// A fresh ephemeral pair behind `opening`; null when this browser lacks X25519.
 async function opened(
   opening: Uint8Array<ArrayBuffer>,
   nonce: Uint8Array<ArrayBuffer>,
@@ -97,7 +76,6 @@ export function sessionHello(
   return device.length === DEVICE_ID_BYTES ? opened(device, nonce) : Promise.resolve(null);
 }
 
-// Checks the city's answer to a pairing hello and seals the claim.
 export async function claim(
   pairing: DevicePairing,
   reply: Uint8Array<ArrayBuffer>,
@@ -125,7 +103,6 @@ export async function claim(
   return sealed === null ? "key" : { sealed, city: presented, session };
 }
 
-// Checks the city's answer to a session hello and signs the finish.
 export async function finish(
   waiting: DeviceWaiting,
   reply: Uint8Array<ArrayBuffer>,
@@ -140,8 +117,6 @@ export async function finish(
   return signature === null ? "key" : { finish: signature, session: sessionOf(agreement) };
 }
 
-// The part both answers share - X25519, ciphertext, nonce, signature -
-// checked against the city's key, then agreed.
 async function answered(
   mine: DevicePairing,
   label: Uint8Array<ArrayBuffer>,

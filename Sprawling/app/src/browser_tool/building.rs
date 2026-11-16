@@ -1,0 +1,66 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+use kernel::{AxCode, AxError};
+use storage::Cas;
+
+use super::BrowserTool;
+use super::Role;
+use super::person::for_user_browser;
+
+pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open a page, look at it, act on it, \
+     take a screenshot, measure boxes, fetch an address as text, read the console, resize, \
+     close. `fetch` runs in the open page, so it carries that page's cookies and keeps its \
+     same-origin rules; HTML comes back as readable text, and a redirect is reported rather \
+     than followed. The accessibility tree \
+     answers most questions; reach for a screenshot when the question is what someone looking at the page would \
+     see. A screenshot covers the whole page, a `ref` from the snapshot, or a `clip` rectangle \
+     in CSS pixels, and comes back at most 1920 pixels on its longest side; coordinates this \
+     tool acts on are always viewport CSS pixels, whatever a picture was scaled to. An element \
+     reference carries the snapshot's generation, and one from an older snapshot is refused and \
+     not misdirected.";
+
+pub(crate) fn for_building(
+    city_root: &std::path::Path,
+    origin: storage::BlockOrigin,
+) -> Result<BrowserTool, AxError> {
+    let profile = city_root.join(browser::Profile::of(&origin.building)?.path().as_str());
+    std::fs::create_dir_all(&profile).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "make a browser profile",
+            format!("{}: {err}", profile.display()),
+        )
+        .with_recovery("fix the directory's permissions")
+    })?;
+    let cas = open_cas(city_root)?;
+    let port = crate::browser_bidi::port_for(city_root);
+    BrowserTool::new(
+        Role::Building,
+        Box::new(crate::browser_bidi::LazyEngine::new(profile, false, port)),
+        cas,
+        origin,
+    )
+}
+
+pub(super) fn open_cas(city_root: &std::path::Path) -> Result<Cas, AxError> {
+    Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
+        .map_err(storage::StorageError::into_ax)
+}
+
+pub(crate) fn for_rules(
+    city_root: &std::path::Path,
+    origin: &storage::BlockOrigin,
+    rules: &city::BuildingRules,
+) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
+    let mut tools: Vec<Box<dyn kernel::Tool>> = Vec::new();
+    if rules.browser() {
+        tools.push(Box::new(for_building(city_root, origin.clone())?));
+    }
+    if let Some(user) = rules.usersbrowser() {
+        tools.push(Box::new(for_user_browser(city_root, user, origin.clone())?));
+    }
+    Ok(tools)
+}

@@ -138,7 +138,7 @@ release_index() {
 
 # The first tag in the channel its argument names, from a list ordered
 # newest publication first. A function rather than a `case` inside `$( )`:
-# `crates/sprawling/spec/Install.lean` section 8-118 records why that
+# `Sprawling/app/spec/Install.lean` section 8-118 records why that
 # clause has to sit at the top level.
 channel_head() {
     while IFS="$(printf '\t')" read -r published candidate; do
