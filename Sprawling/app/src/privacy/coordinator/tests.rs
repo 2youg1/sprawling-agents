@@ -5,7 +5,7 @@
 
 use std::rc::Rc;
 
-use kernel::{AxCode, AxError};
+use kernel::AxError;
 use proptest::prelude::*;
 
 use super::super::state::fixtures::{dword, owner};

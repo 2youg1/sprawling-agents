@@ -90,15 +90,15 @@ pub(super) enum Seen {
 /// The host's true values, the history's lines, the faults the next
 /// calls meet, and the log of everything seen.
 pub(super) struct World {
-    now: u64,
-    foreign: bool,
-    values: BTreeMap<PrivacyControl, Snapshot>,
-    lines: Vec<Line>,
-    reads: VecDeque<ReadEffect>,
-    writes: VecDeque<WriteEffect>,
-    appends: VecDeque<AppendEffect>,
-    lapse_on_prepared: bool,
-    log: Vec<Seen>,
+    pub(super) now: u64,
+    pub(super) foreign: bool,
+    pub(super) values: BTreeMap<PrivacyControl, Snapshot>,
+    pub(super) lines: Vec<Line>,
+    pub(super) reads: VecDeque<ReadEffect>,
+    pub(super) writes: VecDeque<WriteEffect>,
+    pub(super) appends: VecDeque<AppendEffect>,
+    pub(super) lapse_on_prepared: bool,
+    pub(super) log: Vec<Seen>,
 }
 
 pub(super) type Shared = Rc<RefCell<World>>;
@@ -122,7 +122,7 @@ pub(super) fn world() -> Shared {
     }))
 }
 
-pub(super) struct FaultHost(Shared);
+pub(super) struct FaultHost(pub(super) Shared);
 
 impl accounting::Clock for FaultHost {
     fn now(&self) -> Result<TimeMs, AxError> {
@@ -193,7 +193,7 @@ pub(super) struct MemoryJournal {
 }
 
 impl MemoryJournal {
-    fn open(world: &Shared) -> Result<Self, HistoryFault> {
+    pub(super) fn open(world: &Shared) -> Result<Self, HistoryFault> {
         let history = History::fold(world.borrow().lines.clone())?;
         Ok(Self {
             world: Rc::clone(world),

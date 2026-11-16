@@ -14,18 +14,11 @@
 mod harness;
 use harness::*;
 
-use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt};
-use kernel::{Address, AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
-use remote_access::door::DeviceId;
-use remote_access::handshake::{self, CityFingerprint, Invitation, PairReply, Reply, Session};
-use remote_access::keys::{SigningKey, VerifyingKey};
+use kernel::{AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
+use remote_access::handshake::{CityFingerprint, Invitation};
 use remote_access::route::command::LOCAL_ENV;
-use remote_access::seal::Payload;
-// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`Sprawling/app/Spec.lean` §8-151)
-use tokio_tungstenite::tungstenite::Message;
 
 #[test]
 #[ignore = "the route command the end-to-end test starts; it does nothing on its own"]
