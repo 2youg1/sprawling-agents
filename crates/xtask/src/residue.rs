@@ -1,0 +1,348 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! Gate: retired legacy paths leave no residue in active configuration
+//! (xtask D45). Historical CHANGELOG text is outside the scan;
+//! `residue-ok:` covers its line and the following. A legacy path whose
+//! status is still `live` does not fail the present layout.
+
+use std::path::Path;
+
+use crate::modmap;
+use crate::product_roots::{self, Layout, LegacyPath, Table};
+use crate::release;
+use crate::report::{Violation, XtaskError};
+use crate::walk;
+
+const GATE: &str = "residue";
+const RULE: &str = "a retired legacy path must not remain in the tree or in active configuration (xtask D45)";
+const MARK: &str = "residue-ok:";
+
+/// Filename stems treated as historical record, never as active config.
+const HISTORY_FILES: [&str; 1] = ["CHANGELOG.md"];
+
+/// Extensions of active configuration the residue scan reads.
+const ACTIVE_EXT: [&str; 8] = ["toml", "yml", "yaml", "nix", "json", "sh", "ps1", "just"];
+
+/// Gate entry: validate the product-root table, refuse a wrong-case
+/// sibling of a current root, and refuse retired legacy residue.
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let table = product_roots::load(root)?;
+    let mut violations = Vec::new();
+    violations.extend(missing_current(root, &table));
+    violations.extend(wrong_case(root, &table)?);
+    for legacy in table.retired() {
+        violations.extend(retired_residue(root, legacy, &table)?);
+    }
+    Ok(violations)
+}
+
+fn missing_current(root: &Path, table: &Table) -> Vec<Violation> {
+    let mut violations = Vec::new();
+    for product in table.roots.iter().filter(|product| product.layout == Layout::Current) {
+        let Some(path) = table.path_of(&product.name) else {
+            continue;
+        };
+        if root.join(path).is_dir() {
+            continue;
+        }
+        violations.push(Violation {
+            gate: GATE,
+            location: format!("{path}/"),
+            rule: RULE.to_owned(),
+            violation: format!(
+                "product root `{name}` declares path `{path}` with layout `current`, and that directory is not there",
+                name = product.name
+            ),
+            alternative: format!(
+                "create `{path}/`, or set `layout = \"planned\"` in `{map}` until the move lands",
+                map = modmap::MAP
+            ),
+        });
+    }
+    violations
+}
+
+fn wrong_case(root: &Path, table: &Table) -> Result<Vec<Violation>, XtaskError> {
+    let mut violations = Vec::new();
+    for product in table.roots.iter().filter(|root| root.layout == Layout::Current) {
+        if let Some(found) = sibling_wrong_case(root, &product.path)? {
+            violations.push(Violation {
+                gate: GATE,
+                location: found.clone(),
+                rule: RULE.to_owned(),
+                violation: format!(
+                    "directory `{found}` is a wrong-case sibling of product root `{}`",
+                    product.path
+                ),
+                alternative: format!(
+                    "remove `{found}`, or rename it to the exact case `{}` from `{map}`",
+                    product.path,
+                    map = modmap::MAP
+                ),
+            });
+        }
+    }
+    Ok(violations)
+}
+
+fn sibling_wrong_case(root: &Path, exact: &str) -> Result<Option<String>, XtaskError> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Ok(None);
+    };
+    let want = exact.to_ascii_lowercase();
+    for entry in entries {
+        let entry = entry.map_err(|source| XtaskError::Io {
+            path: root.display().to_string(),
+            source,
+        })?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if !entry.path().is_dir() {
+            continue;
+        }
+        if name != exact && name.to_ascii_lowercase() == want {
+            return Ok(Some(name.to_owned()));
+        }
+    }
+    Ok(None)
+}
+
+fn retired_residue(
+    root: &Path,
+    legacy: &LegacyPath,
+    table: &Table,
+) -> Result<Vec<Violation>, XtaskError> {
+    let mut violations = Vec::new();
+    let dir = root.join(&legacy.path);
+    if dir.is_dir() {
+        violations.push(Violation {
+            gate: GATE,
+            location: format!("{}/", legacy.path),
+            rule: RULE.to_owned(),
+            violation: format!(
+                "retired legacy path `{}` still exists as a directory",
+                legacy.path
+            ),
+            alternative: format!(
+                "finish the move that retired `{}`, or set its status back to `live` in `{map}` while the tree still holds it",
+                legacy.path,
+                map = modmap::MAP
+            ),
+        });
+    }
+    for file in walk::files(root)? {
+        let rel = walk::rel(root, &file);
+        if !is_active_config(&rel) {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let lines: Vec<&str> = text.lines().collect();
+        for (number, line) in lines.iter().enumerate() {
+            let marked = line.contains(MARK)
+                || number
+                    .checked_sub(1)
+                    .and_then(|prev| lines.get(prev))
+                    .is_some_and(|prev| prev.contains(MARK));
+            if marked {
+                continue;
+            }
+            if defines_legacy_row(&rel, line, legacy) {
+                continue;
+            }
+            if transition_row(&rel, line, table, legacy) {
+                continue;
+            }
+            if !line_names_legacy(line, &legacy.path) {
+                continue;
+            }
+            violations.push(Violation {
+                gate: GATE,
+                location: format!("{rel}:{}", number.saturating_add(1)),
+                rule: RULE.to_owned(),
+                violation: format!(
+                    "active configuration still names retired path `{}`",
+                    legacy.path
+                ),
+                alternative: format!(
+                    "rewrite the path from `{map}`, or mark a historical line with `{MARK}`",
+                    map = modmap::MAP
+                ),
+            });
+        }
+    }
+    Ok(violations)
+}
+
+fn is_active_config(rel: &str) -> bool {
+    let name = rel.rsplit('/').next().unwrap_or(rel);
+    if HISTORY_FILES.iter().any(|history| name.eq_ignore_ascii_case(history)) {
+        return false;
+    }
+    if name.eq_ignore_ascii_case("justfile") || name.eq_ignore_ascii_case("lakefile.toml") {
+        return true;
+    }
+    if rel.starts_with(".github/") {
+        return true;
+    }
+    Path::new(name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ACTIVE_EXT.iter().any(|keep| keep.eq_ignore_ascii_case(ext)))
+}
+
+fn defines_legacy_row(rel: &str, line: &str, legacy: &LegacyPath) -> bool {
+    rel == modmap::MAP && line.contains(&format!("path = \"{}\"", legacy.path))
+}
+
+fn transition_row(rel: &str, line: &str, table: &Table, legacy: &LegacyPath) -> bool {
+    if rel != modmap::MAP {
+        return false;
+    }
+    table.roots.iter().any(|root| {
+        root.transition.as_deref() == Some(legacy.path.as_str())
+            && line.contains(&format!("transition = \"{}\"", legacy.path))
+    })
+}
+
+fn line_names_legacy(line: &str, legacy: &str) -> bool {
+    let needle = format!("{legacy}/");
+    let needle_win = format!("{legacy}\\");
+    let path_hit = release::path_tokens(line).into_iter().any(|token| {
+        let trimmed = token.trim_end_matches(['.', '-']);
+        let rest = trimmed.strip_prefix("./").unwrap_or(trimmed);
+        rest.starts_with(&needle) || rest.starts_with(&needle_win)
+    });
+    if path_hit {
+        return true;
+    }
+    let double = format!("\"{legacy}\"");
+    let single = format!("'{legacy}'");
+    line.contains(&double) || line.contains(&single)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod tests {
+    use super::*;
+    use crate::root::fixture;
+    use crate::root::this_checkout;
+
+    fn minimal_table(retired_crates: bool) -> String {
+        let status = if retired_crates { "retired" } else { "live" };
+        format!(
+            r#"
+module = []
+[[product_root]]
+name = "Sprawling"
+path = "Sprawling"
+layout = "planned"
+[[product_root]]
+name = "Tools"
+path = "Tools"
+layout = "planned"
+[[product_root]]
+name = "Calyx"
+path = "Calyx"
+layout = "current"
+[[product_root]]
+name = "RefRain"
+path = "RefRain"
+layout = "planned"
+transition = "client"
+[[product_root]]
+name = "Mei"
+path = "Mei"
+layout = "current"
+[[legacy_path]]
+path = "crates"
+status = "{status}"
+[[legacy_path]]
+path = "client"
+status = "live"
+"#
+        )
+    }
+
+    fn scratch(label: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "xtask-residue-{label}-{}",
+            std::process::id()
+        ));
+        if root.exists() {
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+        fixture::write(&root, "Cargo.lock", "");
+        std::fs::create_dir_all(root.join("Calyx")).unwrap();
+        std::fs::create_dir_all(root.join("Mei")).unwrap();
+        root
+    }
+
+    #[test]
+    fn the_current_layout_is_green_while_legacy_paths_stay_live() {
+        let violations = check(this_checkout()).unwrap();
+        assert!(
+            violations.is_empty(),
+            "residue must stay green on the unmoved tree: {violations:?}"
+        );
+    }
+
+    #[test]
+    fn a_retired_path_in_active_config_is_refused() {
+        let root = scratch("retired-ref");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(&root, "Cargo.toml", "members = [\"crates/kernel\"]\n");
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations.iter().any(|v| v.violation.contains("crates")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn changelog_and_residue_ok_lines_are_outside_the_scan() {
+        let root = scratch("history");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(
+            &root,
+            "docs/CHANGELOG.md",
+            "- moved out of `crates/kernel`\n",
+        );
+        fixture::write(
+            &root,
+            "notes.toml",
+            "# residue-ok: historical map\nold = \"crates/kernel\"\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn a_wrong_case_sibling_of_a_current_root_is_refused() {
+        let root = scratch("case");
+        fixture::write(&root, modmap::MAP, &minimal_table(false));
+        std::fs::create_dir_all(root.join("calyx")).unwrap();
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations.iter().any(|v| v.violation.contains("calyx")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn line_names_legacy_matches_path_tokens_only() {
+        assert!(line_names_legacy("members = [\"crates/kernel\"]", "crates"));
+        assert!(!line_names_legacy("the crates themselves", "crates"));
+        assert!(line_names_legacy("path = \"./crates/xtask\"", "crates"));
+        assert!(line_names_legacy("members = [\"crates\"]", "crates"));
+    }
+}

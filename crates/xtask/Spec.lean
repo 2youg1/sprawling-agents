@@ -33,6 +33,7 @@ Markdown 时的标签 `8-n`，别处引作 `crates/xtask/Spec.lean §8-n`。
 | modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应，测试模块无条目也可（D40）；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
+| residue | 产品根只从 `architecture.toml` 的 `[[product_root]]` 读；`[[legacy_path]]` 在 `status = "retired"` 后不得以根目录或活动配置（toml／yaml／nix／json／sh／ps1／just／justfile／`.github/`）残留；历史 `CHANGELOG.md` 不扫，`residue-ok:` 覆盖本行与下一行；`layout = "current"` 的根须在盘且拒绝错误大小写的同级目录（D45） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；`wording-ok:` 豁免它所在的块里的专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17、§8-38 与 §8-51 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
@@ -127,7 +128,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。本文只说每道门判什么，不抄一份名册，也不手写门数，因为手写的名册与数组相隔一次代码改动而不是一个 token：要知道跑哪几道，读那张数组或跑 `cargo xtask gates --list`；门数只写在 D2 的受管标记里。
 
-三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。`source` 也不自成一门：它是 `length` 与 `comments` 共用的 Rust／TypeScript／Svelte 文件选择器与 `--files` 作用域，保证两道文件级门不各走一套扫描面。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（一个 crate 的 Lean 规格：命令新建骨架，同名的门判树，§8-41、§8-42）｜`lean`（把一份 `.lean` 当文本读出门要的几种受限形状，被 `spec`、`specalign`、`wiring` 调用，§8-43）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`acp_catalog`（`cargo xtask acp-catalog`：从 ACP registry 的 CDN 读一次索引，只留城读的字段，连同 `Date` 与 `ETag` 写成 `crates/agent_protocols/catalog/registry.json`；人在发版刷新目录时跑它，恒不入 `gates`，因为碰网络的门会因 CDN 的缘故变红，`crates/agent_protocols/Spec.lean` D13）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
+三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。`source` 也不自成一门：它是 `length` 与 `comments` 共用的 Rust／TypeScript／Svelte 文件选择器与 `--files` 作用域，保证两道文件级门不各走一套扫描面。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`product_roots`（`architecture.toml` 的 `[[product_root]]`／`[[legacy_path]]` 的唯一读者，被 `residue` 调用，并为后续搬迁提供 `path_of`，D45）｜`spec`（一个 crate 的 Lean 规格：命令新建骨架，同名的门判树，§8-41、§8-42）｜`lean`（把一份 `.lean` 当文本读出门要的几种受限形状，被 `spec`、`specalign`、`wiring` 调用，§8-43）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`acp_catalog`（`cargo xtask acp-catalog`：从 ACP registry 的 CDN 读一次索引，只留城读的字段，连同 `Date` 与 `ETag` 写成 `crates/agent_protocols/catalog/registry.json`；人在发版刷新目录时跑它，恒不入 `gates`，因为碰网络的门会因 CDN 的缘故变红，`crates/agent_protocols/Spec.lean` D13）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
 
 `secret::nix`（`src/secret/nix.rs`，形状 value）拥有 `NarHashes::classify(rel, bytes) -> NarHashes` 与 `NarHashes::admits(&SecretSpan) -> bool`；私有 span 集只经 canonical JSON 属性分类构造，provider 与整段匹配规则也由它决定，`secret::check` 只询问分类结果（§8-9）。关联缺陷回归在 `src/secret/nix_tests.rs`，经真实 `secret::check` 验证。
 
@@ -421,11 +422,11 @@ D37 **替换测试换的是解析后的路径，产物不落在二进制嵌入�
 
 /-! ### 8-15 release：链接的拼法与树上的名字逐字节相等
 
-**一条在大小写不敏感的文件系统上永远为绿的坏链接。** 八份文档链向 `docs/glossary.md`，盘上的文件叫 `docs/GLOSSARY.md`——Windows 与 macOS 的默认文件系统两种拼法都开得出，Linux 与托管站点只开得出一种，于是每一位从网页上点它的读者拿到 404，而在 Windows 与 macOS 上五条断言全绿。**门不能用 `open` 判这件事**：判据必须是树自己写下的名字，而不是当下这套文件系统愿不愿意开。
+**一条在大小写不敏感的文件系统上永远为绿的坏链接。** 八份文档链向 `docs/glossary.md`，盘上的文件曾用错误大小写的文件名（仅大小写不同）——Windows 与 macOS 的默认文件系统两种拼法都开得出，Linux 与托管站点只开得出一种，于是每一位从网页上点它的读者拿到 404，而在 Windows 与 macOS 上五条断言全绿。**门不能用 `open` 判这件事**：判据必须是树自己写下的名字，而不是当下这套文件系统愿不愿意开。
 
 **第六条断言**：一条落在树内的相对链接，其拼法必须与已发布路径逐字节相等；只在大小写上不同即红，拒词点名盘上的那个名字。判据住 `crates/xtask/src/release/link.rs` 的 `Spellings`（已发布集合加一张小写索引），`release.rs` 仍是唯一的 `Violation` 产地。**`None` 覆盖两种情形且是故意的**：链接是对的，或者它指的根本不是一份已发布文件（目录、或已由脚手架断言报过的路径）——本条只答大小写这一个问题，抢答别的会把更弱的句子排在读者前面。
 
-**这一次的迁移方向是改盘上的名字，不是改链接。** 全仓 30 余处提及一律写 `docs/glossary.md`，其中 `crates/xtask/src/vocabulary.rs:76` 是运行时真的去打开它的那一处；唯一写大写的是文件名自己。故 `docs/GLOSSARY.md` 改名为 `docs/glossary.md`，一处改动，零个读者需要跟着动。
+**这一次的迁移方向是改盘上的名字，不是改链接。** 全仓 30 余处提及一律写 `docs/glossary.md`，其中 `crates/xtask/src/vocabulary.rs:76` 是运行时真的去打开它的那一处；唯一写大写的是文件名自己。故把那份错误大小写的文件改名为 `docs/glossary.md`，一处改动，零个读者需要跟着动。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/
@@ -437,7 +438,7 @@ D37 **替换测试换的是解析后的路径，产物不落在二进制嵌入�
 **机制＝受管区段。** 文档用一对 HTML 注释圈住一段文字，开标记里写它由哪个事实生成：
 
 <!-- xtask:begin gate_count -->
-25
+26
 <!-- xtask:end -->
 
 上面这一段本身就是一个受管区段，圈的是 `gate_count`：它由 `cargo xtask docnum --write` 写出，读者据此知道这道门长什么样，而它同时受这道门看守，故这份 SPEC 里的示例不可能与机制分叉。
@@ -1406,6 +1407,8 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
    D43 **注释上限是拒止线，不是写作目标（人的定规）。** 默认不写注释，只有代码、类型、测试或 SPEC 不能替代的必要契约才保留；MPL 头已不进扫描之后，10% 只阻止注释继续膨胀，作者不得向这个比例填充。15% 在 200 行正文上比 10% 多放行约 10 行注释，松到会留下叙述空间，故不取。拒词要求从零注释重新思考什么必须存在，而不是把现有注释压缩到额度内。被否：①全仓禁止注释——外部平台约束、SAFETY 前提和非显而易见的接口契约仍需要就近记录；②给 rustdoc、TSDoc 或普通注释分别设比例——多个额度鼓励把一种注释改写成另一种，失去总量约束；③MPL 剔除后仍用 15%——额度只量作者注释时，15% 过宽。重开参数：出现一类必要契约无法在这一个总量预算内表达，且移入类型或 SPEC 会削弱可验证性。
 
    D44 **文件门支持显式的变更文件作用域（人的定规）。** `length comments --files <path>...` 只判这些仓库相对路径；空清单判空，绝不回退全树，绝对路径、盘符与 `..` 以 `invalid-file-scope` 拒绝。只有这两道文件级门接受该参数，其他门入选时以 `unsupported-file-scope` 拒绝，因为局部读取不能冒充它们的整树结论。全量运行保留为迁移盘点；日常与 `check-branch`／CI 判变更文件，触及旧违规就必须清完。被否：①记录旧文件豁免表——第二份债务名册会漂移，而路径范围来自本次变更本身；②无路径时自动全扫——一次没有源码变更的提交会重新背上全部旧债。重开参数：其他门形成同等的局部判定契约，逐门增加，不共用一个假称全树的参数。
+
+D45 **产品根路径表是搬迁与残留门的唯一权威；旧路径在标记 retired 之前不判红。** `architecture.toml` 的 `[[product_root]]` 列出 `Sprawling`／`Tools`／`Calyx`／`RefRain`／`Mei` 五个根（路径大小写锁定），`layout` 区分今日已有与计划根，`transition` 记录改名前仍持有的目录（今日 `RefRain`←`client`）；`[[legacy_path]]` 记录 `crates`／`client`，`status = "live"` 时本门只校验表形与当前根的错误大小写同级目录，不因未搬迁布局变红；`status = "retired"` 后拒绝根目录残留与活动配置中的路径记号，历史 `CHANGELOG.md` 与 `residue-ok:` 行除外，表内定义该路径的行除外。`product_roots::path_of` 供后续搬迁与包叶名拼接成目录，禁止第二张路径对照表。被否：①在 CI／Nix／Lean 各自硬编码根——加产品要改多处；②迁完才加残留门——迁后无法证明「零残留」曾被机器拒绝过。重开参数：第二个过渡别名，或活动配置的文件类需要扩大。
 8. **报告**：三段式渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
 
 ### 两个设计

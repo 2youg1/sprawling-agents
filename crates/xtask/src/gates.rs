@@ -13,12 +13,12 @@ use std::thread;
 use crate::report::{self, Violation, XtaskError};
 use crate::{
     artifact, boundary, budget, color, comments, depmap, docnum, guard, header, length, lexicon,
-    modmap, motion, npm, packaged, proof, release, render, secret, spec, specalign, unused,
-    wire_ts, wiring, wording,
+    modmap, motion, npm, packaged, proof, release, render, residue, secret, spec, specalign,
+    unused, wire_ts, wiring, wording,
 };
 
 /// Roster length; types `GATES` so the count and the list cannot disagree.
-pub(crate) const COUNT: usize = 25;
+pub(crate) const COUNT: usize = 26;
 
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
@@ -127,6 +127,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "guard",
         check: guard::check,
+    },
+    Gate {
+        name: "residue",
+        check: residue::check,
     },
 ];
 

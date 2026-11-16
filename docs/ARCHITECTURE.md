@@ -1271,6 +1271,13 @@ yet.
   module may have one and needs none), read only by
   `cargo xtask modmap`, and asked for one module at a time rather than read
   through, so no entry has a position a person maintains.
+- **The product-root path table is also `architecture.toml`**, as
+  `[[product_root]]` and `[[legacy_path]]`. It is the one authority for
+  top-level product directories (`Sprawling/`, `Tools/`, `Calyx/`,
+  `RefRain/`, `Mei/`); later moves derive paths from it, and
+  `cargo xtask residue` refuses a legacy path once marked `retired`.
+  During transition the table may list planned roots beside the paths
+  the tree still holds (`crates/`, `client/`).
 - **Adding an entry is the registration step**: it lands in the same change
   as the file, before the file is written.
 - **Removing an entry requires a ruling**, recorded as a `Verdict:` trailer

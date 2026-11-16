@@ -1583,3 +1583,49 @@ duty = "out of product: scripted scenarios on a counted clock, and the benches t
 
 [family.benchstat]
 duty = "out of product: deterministic validation, statistics and reports for a benchmark round"
+
+# Product roots: the one authority for top-level product directories.
+# Later moves, Lean, CI, Nix and packaging derive paths from this table;
+# adding a product is a row here. `path` is the directory with exact case.
+# `layout` is `current` when the checkout holds that directory today, or
+# `planned` when a later move will create it. `transition` names the
+# directory the tree still holds during a rename (RefRain ← client).
+
+[[product_root]]
+name = "Sprawling"
+path = "Sprawling"
+layout = "planned"
+
+[[product_root]]
+name = "Tools"
+path = "Tools"
+layout = "planned"
+
+[[product_root]]
+name = "Calyx"
+path = "Calyx"
+layout = "current"
+
+[[product_root]]
+name = "RefRain"
+path = "RefRain"
+layout = "planned"
+transition = "client"
+
+[[product_root]]
+name = "Mei"
+path = "Mei"
+layout = "current"
+
+# Paths that once held product or tool code. The residue gate refuses
+# references in active configuration, and a directory at the repository
+# root, once `status = "retired"`. `live` keeps the present layout green
+# until the migration marks them retired.
+
+[[legacy_path]]
+path = "crates"
+status = "live"
+
+[[legacy_path]]
+path = "client"
+status = "live"
