@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which facts a document may quote, and the code each one is recounted
-//! from.
-//!
-//! [`FACTS`] is the whole authority. A row names the key a marker writes,
-//! the home a refusal sends the reader to, and the function that recounts
-//! it; adding a row is what lets a document quote one more number, and
-//! there is no second list anywhere.
-//!
-//! A key may carry one argument after a colon — `dep_version:toml` names
-//! the crate, `budget_reading:frontend_artifact` names the register row —
-//! so one generator serves a family of facts instead of one row per
-//! member. The argument is part of what the document writes, which is why
-//! a wrong argument is refused by name rather than silently skipped.
-
 use std::path::Path;
 
 use crate::budget::REGISTER;
@@ -26,20 +12,13 @@ use crate::{architecture, budget, depmap, gates, proof, walk};
 mod crate_table;
 mod recount;
 
-/// One fact a document may quote, and how to recount it.
 pub(super) struct Fact {
-    /// The key a marker names it by, before any colon.
     pub(super) key: &'static str,
-    /// Where the fact lives, for a refusal a reader can act on.
     pub(super) home: &'static str,
-    /// What the argument after the colon names, when the fact takes one.
     pub(super) takes: Option<&'static str>,
-    /// Today's value, rendered the way a document writes it. The second
-    /// parameter is the argument, empty for a fact that takes none.
     recount: fn(&Path, &str) -> Result<String, XtaskError>,
 }
 
-/// Every fact a managed span may name.
 const FACTS: [Fact; 21] = [
     Fact {
         key: "wire_v",
@@ -99,9 +78,7 @@ const FACTS: [Fact; 21] = [
         key: "fuzz_targets",
         home: "Tools/fuzz/fuzz_targets",
         takes: None,
-        recount: |root, _arg| {
-            recount::in_directory(root, "Tools/fuzz/fuzz_targets", "fuzz target")
-        },
+        recount: |root, _arg| recount::in_directory(root, "Tools/fuzz/fuzz_targets", "fuzz target"),
     },
     Fact {
         key: "citysim_scenarios",
@@ -172,11 +149,6 @@ const FACTS: [Fact; 21] = [
     },
 ];
 
-/// Today's reading for one key, or `None` when no fact owns it.
-///
-/// A key that names a fact but carries the wrong shape of argument is
-/// unknown rather than wrong: `budget_reading` without a row recounts
-/// nothing, and the refusal that follows lists what a marker may say.
 pub(super) fn value(root: &Path, key: &str) -> Result<Option<String>, XtaskError> {
     let (name, argument) = split(key);
     let Some(fact) = FACTS.iter().find(|fact| fact.key == name) else {
@@ -191,7 +163,6 @@ pub(super) fn value(root: &Path, key: &str) -> Result<Option<String>, XtaskError
     }
 }
 
-/// Where the fact behind a key lives, for a refusal a reader can act on.
 pub(super) fn home(key: &str) -> &'static str {
     let (name, _) = split(key);
     FACTS
@@ -200,7 +171,6 @@ pub(super) fn home(key: &str) -> &'static str {
         .map_or("its code", |fact| fact.home)
 }
 
-/// Every key a marker may name, in the shape it is written.
 pub(super) fn keys() -> String {
     FACTS
         .iter()
@@ -212,7 +182,6 @@ pub(super) fn keys() -> String {
         .join(", ")
 }
 
-/// A key split into the fact it names and the argument it carries.
 fn split(key: &str) -> (&str, Option<&str>) {
     match key.split_once(':') {
         Some((name, argument)) => (name.trim(), Some(argument.trim())),
@@ -220,8 +189,6 @@ fn split(key: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// The root manifest, which states the workspace's package roster and
-/// the versions every member inherits.
 pub(crate) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
     let text = walk::read_text(&root.join("Cargo.toml"))?;
     toml::from_str(&text).map_err(|err| XtaskError::Doc {
@@ -230,8 +197,6 @@ pub(crate) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
     })
 }
 
-/// The version every member inherits, which the newest `CHANGELOG.md`
-/// section names in its heading.
 fn workspace_version(root: &Path) -> Result<String, XtaskError> {
     root_manifest(root)?
         .get("workspace")
@@ -247,9 +212,6 @@ fn workspace_version(root: &Path) -> Result<String, XtaskError> {
         })
 }
 
-/// The maturity in the spelling a span names: `word` as a sentence writes
-/// it, `titled` as a tag and a heading do (Tools/xtask/Spec.lean D17).
-/// Both come from `kernel::Maturity`, so this only carries the string.
 fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskError> {
     match spelling {
         "word" => Ok(maturity.word().to_owned()),
@@ -264,7 +226,6 @@ fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskE
     }
 }
 
-/// The register row a fact names, parsed from `Tools/xtask/budgets.toml`.
 fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
     budget::register(root)?
         .get(row)
@@ -275,19 +236,6 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
         })
 }
 
-/// The seed the adversary draws every property from, read out of the Lean
-/// definition that holds it.
-///
-/// The figure's home is `Tools/adversary/`, because that is the program that
-/// draws from it, and its specification `Tools/adversary/Spec.lean` quotes it. Reading it here makes
-/// the quotation a managed span: nothing else joins a Lean definition to a
-/// number written in prose, so the two could disagree with every gate
-/// green.
-///
-/// A source that no longer states the seed in the one shape this reader
-/// knows is a failure rather than an empty reading. Reporting nothing
-/// would leave the quoted figure as the only copy, which is the shape of
-/// defect the managed span exists to close.
 fn adversary_seed(root: &Path) -> Result<String, XtaskError> {
     const SOURCE: &str = "Tools/adversary/test/Main.lean";
     let text = walk::read_text(&root.join(SOURCE))?;
@@ -381,9 +329,6 @@ best_p50_us = 2759
         assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());
     }
 
-    /// The relocated checkout's module map, with the two families its
-    /// packages carry: `sprawling-j`'s modules are named `bin::`, as the
-    /// assembly root's are, so it reads `[family.bin]` and not `[family.j]`.
     const FAMILIES: &str = r#"module = [
   { name = "k::a", file = "tools/k/src/a.rs", owns = "a module under tools/", shape = "value", since = "T", status = "built", spec = "k-SPEC.md#8-9" },
   { name = "bin::b", file = "crates/j/src/b.rs", owns = "a module named for its family", shape = "value", since = "T", status = "built", spec = "j-SPEC.md#8-1" },
@@ -396,8 +341,6 @@ duty = "what k owns | and a bar"
 duty = "the assembly root"
 "#;
 
-    /// A relocated checkout with a SPEC beside each package and `map` as
-    /// its module map.
     fn tabled(label: &str, map: &str) -> std::path::PathBuf {
         let root = crate::root::fixture::relocated(label);
         crate::root::fixture::write(&root, "architecture.toml", map);
@@ -418,8 +361,6 @@ duty = "the assembly root"
         assert_eq!(drawn.unwrap(), Some(expected.to_owned()));
     }
 
-    /// A package that migrated points at its `Spec.lean`, and one that has
-    /// not at its Markdown SPEC.
     #[test]
     fn a_migrated_package_quotes_its_lean_specification() {
         let root = crate::root::fixture::relocated("crate-table-lean");
@@ -458,9 +399,6 @@ duty = "the assembly root"
         );
     }
 
-    /// Entering alpha moves `kernel::release::MATURITY`, and every span
-    /// that quotes it follows in the spelling the span names; a spelling
-    /// kernel does not give is refused rather than guessed at.
     #[test]
     fn the_maturity_is_quoted_in_the_spelling_the_span_names() {
         let quoted =

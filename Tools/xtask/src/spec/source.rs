@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The last three assertions of the `spec` gate (Tools/xtask/Spec.lean
-//! §8-42), read off every `.lean` in the tree as text: the imports each
-//! side may make, no proof obligation left undischarged, and every
-//! repository path a specification cites on disk.
-//!
-//! **The checker and the specifications do not import each other**
-//! (ARCHITECTURE.md section 11): the checker judges the binary from
-//! outside, and a checker that imported a restatement of a rule would
-//! hold a second authority for it. A specification follows the crate
-//! graph, so a part cannot lean on a crate its own crate may not use.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -25,15 +14,10 @@ use crate::release;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The library the checker is, and the one it may import besides the
-/// toolchain's.
 const CHECKER_LIBRARY: &str = "Sprawling";
 
-/// The libraries the Lean toolchain ships, which anything may import.
 const TOOLCHAIN: [&str; 3] = ["Init", "Std", "Lean"];
 
-/// What a file answers to: the checker's rules, its specification's, or
-/// those of the package whose directory holds it.
 #[derive(Clone, Copy)]
 enum Owner<'a> {
     Checker,
@@ -41,14 +25,8 @@ enum Owner<'a> {
     Package(&'a Member),
 }
 
-/// Who answers for the file at `rel`. Under the checker's directory, its
-/// entry and the parts beside it are its specification and everything else
-/// is the checker (Tools/xtask/Spec.lean §8-47).
 fn owner_of<'a>(found: &'a [Member], rel: &str) -> Option<Owner<'a>> {
-    let Some(inside) = rel
-        .strip_prefix(super::CHECKER)
-        .and_then(|rest| rest.strip_prefix('/'))
-    else {
+    let Some(inside) = super::under_checker(rel) else {
         return members::owner(found, rel).map(Owner::Package);
     };
     let specified = inside == lean::ENTRY
@@ -67,10 +45,11 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
     let allowed = depmap::parse_block(&walk::read_text(&root.join(architecture::PATH))?)?;
     let top = top_directories(root)?;
     for file in walk::files_with_ext(root, &["lean"])? {
-        let rel = walk::rel(root, &file);
-        if walk::in_isolation_zone(&rel) {
+        let walked = walk::rel(root, &file);
+        if walk::in_isolation_zone(&walked) {
             continue;
         }
+        let rel = super::checker_rel(&walked);
         let text = walk::read_text(&file)?;
         let code = lean::code(&text);
         undischarged(&rel, &code, out);
@@ -103,13 +82,6 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
     Ok(())
 }
 
-/// A `sorry` or an `admit` left in the code, or an `axiom` declared.
-///
-/// A word keeps its dots, so `Door.admit` and `d.admit` are names rather
-/// than the tactic; `admit` is the tactic only where nothing but the end
-/// of the line, a `;` or a `)` follows it, since a binder or a field may
-/// be called `admit` too. `sorry` is a term Lean reserves, so any
-/// occurrence is one.
 fn undischarged(rel: &str, code: &str, out: &mut Vec<Violation>) {
     for (index, line) in code.lines().enumerate() {
         let words: Vec<&str> = line
@@ -134,12 +106,10 @@ fn undischarged(rel: &str, code: &str, out: &mut Vec<Violation>) {
     }
 }
 
-/// A character of a Lean name, dots included.
 fn word(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '\'' | '.')
 }
 
-/// Whether `line` uses the `admit` tactic.
 fn tactic_admit(line: &str) -> bool {
     const ADMIT: &str = "admit";
     line.match_indices(ADMIT).any(|(at, _)| {
@@ -152,15 +122,12 @@ fn tactic_admit(line: &str) -> bool {
     })
 }
 
-/// The depmap block and the packages it names, which together say what
-/// a file may import.
 struct Reach<'a> {
     found: &'a [Member],
     allowed: &'a BTreeMap<String, BTreeSet<String>>,
 }
 
 impl Reach<'_> {
-    /// Why `owner` may not import `module`, or `None` when it may.
     fn refusal(&self, owner: Owner<'_>, module: &str) -> Option<String> {
         if TOOLCHAIN.iter().any(|library| within(module, library)) {
             return None;
@@ -212,14 +179,12 @@ impl Reach<'_> {
     }
 }
 
-/// Whether `module` is `prefix` or a module below it.
 fn within(module: &str, prefix: &str) -> bool {
     module
         .strip_prefix(prefix)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
 }
 
-/// A repository path the specification cites whose file is not there.
 fn cited_paths(root: &Path, rel: &str, text: &str, top: &BTreeSet<String>) -> Vec<Violation> {
     let mut out = Vec::new();
     for (index, line) in text.lines().enumerate() {
@@ -245,8 +210,6 @@ fn cited_paths(root: &Path, rel: &str, text: &str, top: &BTreeSet<String>) -> Ve
     out
 }
 
-/// The directories at the repository root: a cited path that starts at
-/// one of them is a path into this tree.
 fn top_directories(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     let io = |source| XtaskError::Io {
         path: ".".to_owned(),

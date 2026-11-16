@@ -3,49 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What rides in a release archive, and where each part is read from.
-//!
-//! **The list is closed, and every part of it is required.** A part that
-//! cannot be found is a refusal naming the recipe that produces it,
-//! because an archive that quietly left out, say, the bill of materials
-//! whenever `target/` held none would let two people packaging one tag
-//! ship archives that disagree about what is inside them.
-
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 use crate::sbom;
 use crate::walk;
 
-/// One part of a release archive.
-///
-/// Exhaustive on purpose: the two questions the packager asks of each
-/// part — what a person finds after unpacking, and what has to exist for
-/// it to be there — have one answer each per variant.
 pub(super) enum Packaged {
-    /// The executable, under the name its target gives it.
     Binary,
-    /// A document a person reads beside the binary, and where the tree
-    /// keeps it. This path is the document's only reader on the release
-    /// path, so moving the document means changing this row in the same
-    /// change; otherwise the archive fails to assemble on a release
-    /// runner, the one place nobody watches until a tag is already cut.
     Document {
         name: &'static str,
         source: &'static str,
     },
-    /// The CycloneDX bill of materials, so a person who wants to know
-    /// what is inside the binary does not have to build it.
     Sbom,
-    /// The skills a release ships: `Sprawling/city/skills/`, walked as it
-    /// stands and carried as `skills/`. One
-    /// part rather than one row per skill, because the list of skills is
-    /// the directory's business and a closed per-file list here would be
-    /// a second home for it.
     Skills,
 }
 
-/// Everything a release archive carries, in the order it is written.
 pub(super) const ARCHIVE: [Packaged; 5] = [
     Packaged::Binary,
     Packaged::Document {
@@ -60,31 +33,19 @@ pub(super) const ARCHIVE: [Packaged; 5] = [
     Packaged::Sbom,
 ];
 
-/// Executable bits. The archive is the only thing that carries them to a
-/// machine that has never seen this file, and a binary that arrives
-/// without them is a binary nobody can run.
 const EXECUTABLE_MODE: u32 = 0o755;
 
-/// Everything else is read, not run.
 const READABLE_MODE: u32 = 0o644;
 
-/// Where the tree of skills lives in the repository: the city crate
-/// owns it, because its build script embeds the same files a new city
-/// shelves.
 const SKILLS_DIR: &str = "Sprawling/city/skills";
 
-/// The name the archive carries the tree of skills under, so the person
-/// who unpacks a release finds `skills/` beside the binary.
 const SKILLS_ENTRY: &str = "skills";
 
-/// The release build this archive is assembled around: where it landed,
-/// and what the target it was built for calls it.
 pub(super) struct Executable<'b> {
     pub(super) name: &'static str,
     pub(super) path: &'b Path,
 }
 
-/// One entry of the archive, resolved to bytes on disk.
 #[derive(Debug)]
 pub(super) struct Entry {
     pub(super) name: String,
@@ -92,11 +53,6 @@ pub(super) struct Entry {
     pub(super) mode: u32,
 }
 
-/// Every entry of the archive, or the refusal that names the missing one.
-///
-/// # Errors
-/// When a part of the archive is not on disk, with the recipe that
-/// writes it.
 pub(super) fn entries(root: &Path, binary: &Executable) -> Result<Vec<Entry>, XtaskError> {
     let mut out = Vec::new();
     for part in &ARCHIVE {
@@ -141,7 +97,6 @@ impl Packaged {
         Ok(entries)
     }
 
-    /// What a person does about this part being absent.
     fn recovery(&self) -> &'static str {
         match *self {
             Self::Binary => "run `just dist` first",
@@ -158,19 +113,6 @@ impl Packaged {
     }
 }
 
-/// Every file under `Sprawling/city/skills/`, one entry each, named
-/// `skills/<path>`.
-///
-/// Walked rather than listed: which skills a release carries is the
-/// directory's business, and `walk::files` already returns them sorted
-/// by relative path, so two packagings of one tree produce one archive.
-/// `skills/LICENSES.md` rides the same walk, which is how the licence
-/// text travels with the files it covers.
-///
-/// # Errors
-/// Refuses a tree with no `Sprawling/city/skills/` directory - the part is required
-/// like every other, and an archive that silently ships without the
-/// skills is the defect this table exists to prevent.
 fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
     let dir = root.join(SKILLS_DIR);
     if !dir.is_dir() {
@@ -194,8 +136,6 @@ fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
     Ok(out)
 }
 
-/// The name the archive carries the bill of materials under: the last
-/// segment of the one path that says where it is written.
 fn sbom_name() -> Result<String, XtaskError> {
     Path::new(sbom::SBOM)
         .file_name()
@@ -222,9 +162,6 @@ mod tests {
         crate::root::this_checkout()
     }
 
-    /// The skills ride in the archive exactly as they stand on disk: the
-    /// list of skills is the directory's business, and a person who
-    /// unpacks a release finds them where the harnesses look.
     #[test]
     fn the_skills_ride_in_the_archive_under_their_own_paths() {
         let dir = std::env::temp_dir().join(format!("sprawling-skills-{}", std::process::id()));
@@ -241,8 +178,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// A part of the closed list that is not on disk refuses the archive
-    /// and names the way out - the same contract every other part has.
     #[test]
     fn a_missing_skills_directory_refuses_the_archive() {
         let dir = std::env::temp_dir().join(format!("sprawling-noskills-{}", std::process::id()));
@@ -255,9 +190,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// A document the archive is assembled from has to be in the tree the
-    /// archive is assembled out of. This fails at `cargo nextest`, on
-    /// every push, rather than on a release runner after a tag is cut.
     #[test]
     fn every_packaged_document_is_in_the_tree() {
         for part in &ARCHIVE {
@@ -271,8 +203,6 @@ mod tests {
         }
     }
 
-    /// A tree holding every part of the archive, and the binary to
-    /// assemble it around.
     fn assembled(name: &str) -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!("sprawling-{name}-{}", std::process::id()));
         std::fs::remove_dir_all(&root).ok();
@@ -288,17 +218,17 @@ mod tests {
         let skill = root.join(SKILLS_DIR).join("example");
         std::fs::create_dir_all(&skill).unwrap();
         std::fs::write(skill.join("SKILL.md"), b"skill").unwrap();
-        std::fs::write(root.join("sprawling"), b"binary").unwrap();
+        let binary = root.join("target").join("release").join("sprawling");
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(&binary, b"binary").unwrap();
         root
     }
 
-    /// The defect this table exists for: an absent bill of materials used
-    /// to leave the archive one entry short and silent about it.
     #[test]
     fn an_absent_bill_of_materials_refuses_the_archive() {
         let root = assembled("sbom");
         std::fs::remove_file(root.join(SBOM)).unwrap();
-        let binary = root.join("sprawling");
+        let binary = root.join("target").join("release").join("sprawling");
 
         let refusal = entries(
             &root,
@@ -314,12 +244,10 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
-    /// The executable is the one entry that arrives runnable, and the
-    /// archive carries every part of the table.
     #[test]
     fn every_part_is_packed_and_only_the_binary_is_runnable() {
         let root = assembled("archive");
-        let binary = root.join("sprawling");
+        let binary = root.join("target").join("release").join("sprawling");
         let found = entries(
             &root,
             &Executable {
